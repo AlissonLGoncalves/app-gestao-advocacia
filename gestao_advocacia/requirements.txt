@@ -1,0 +1,8 @@
+# requirements.txt
+Flask
+psycopg2-binary
+python-dotenv
+Flask-SQLAlchemy # Para facilitar a interação com o BD
+Flask-Migrate # Para gerir alterações no esquema do BD
+pytest
+requests

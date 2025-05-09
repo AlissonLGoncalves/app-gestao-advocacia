@@ -1,0 +1,28 @@
+# Ambiente Virtual Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Arquivos de configuração local (se houver algum além do .env)
+instance/ 
+*.sqlite3 # Se usou o fallback do SQLite em algum momento
+*.db
+
+# Arquivo de variáveis de ambiente (NUNCA envie para o GitHub)
+.env 
+
+# Arquivos de IDE/Editor
+.vscode/
+.idea/
+*.swp
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Pasta de uploads (se for local)
+uploads/ 
+
+# Logs
+*.log
