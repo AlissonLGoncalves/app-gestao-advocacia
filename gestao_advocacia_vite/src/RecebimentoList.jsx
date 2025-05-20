@@ -1,9 +1,10 @@
 // Arquivo: src/RecebimentoList.jsx
-// Responsável por listar os recebimentos com filtros e ordenação.
+// v2: Estilização refinada, filtros completos e ordenação.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
 import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { toast } from 'react-toastify';
 
 function RecebimentoList({ onEditRecebimento, refreshKey }) {
     const [recebimentos, setRecebimentos] = useState([]);
@@ -35,7 +36,7 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
             setClientes(clientesData.clientes || []);
 
             let casosUrl = `${API_URL}/casos?sort_by=titulo&order=asc`;
-            if (clienteFilter) { // Se um cliente está selecionado, filtra os casos por esse cliente
+            if (clienteFilter) {
                 casosUrl += `&cliente_id=${clienteFilter}`;
             }
             const casosRes = await fetch(casosUrl);
@@ -45,9 +46,9 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
 
         } catch (err) {
             console.error("Erro ao buscar clientes/casos para filtro:", err);
-            // Não define erro principal da lista, apenas loga
+            toast.error(`Erro ao carregar dados para filtros: ${err.message}`);
         }
-    }, [clienteFilter]); // Depende do clienteFilter para recarregar casos
+    }, [clienteFilter]);
 
     const fetchRecebimentos = useCallback(async () => {
         setLoading(true);
@@ -73,6 +74,7 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
         } catch (err) {
             console.error("Erro ao buscar recebimentos:", err);
             setError(`Erro ao carregar recebimentos: ${err.message}`);
+            toast.error(`Erro ao carregar recebimentos: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -96,10 +98,12 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                     const resData = await response.json().catch(() => ({}));
                     throw new Error(resData.erro || `Erro HTTP: ${response.status}`);
                 }
+                toast.success(`Recebimento ID ${id} excluído com sucesso!`);
                 fetchRecebimentos(); 
             } catch (err) {
                 console.error(`Erro ao deletar recebimento ${id}:`, err);
                 setError(`Erro ao deletar recebimento: ${err.message}`);
+                toast.error(`Erro ao deletar recebimento: ${err.message}`);
             } finally {
                 setDeletingId(null);
             }
@@ -115,10 +119,10 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
     };
 
     const getSortIcon = (key) => {
-        const iconStyle = { width: '14px', height: '14px', display: 'inline', verticalAlign: 'middle' };
-        if (sortConfig.key !== key) return <ArrowsUpDownIcon className="ms-1 text-muted" style={iconStyle} />;
-        if (sortConfig.direction === 'asc') return <ArrowUpIcon className="ms-1 text-primary" style={iconStyle} />;
-        return <ArrowDownIcon className="ms-1 text-primary" style={iconStyle} />;
+        const iconStyle = { width: '14px', height: '14px', display: 'inline', verticalAlign: 'text-bottom', marginLeft: '4px' };
+        if (sortConfig.key !== key) return <ArrowsUpDownIcon className="text-muted" style={iconStyle} />;
+        if (sortConfig.direction === 'asc') return <ArrowUpIcon className="text-primary" style={iconStyle} />;
+        return <ArrowDownIcon className="text-primary" style={iconStyle} />;
     };
 
     const getStatusBadge = (status) => {
@@ -140,15 +144,16 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
         setDataVencimentoFim('');
         setDataRecebimentoInicio('');
         setDataRecebimentoFim('');
+        setShowFilters(false);
     };
 
     if (loading && recebimentos.length === 0) {
         return (
-            <div className="d-flex justify-content-center align-items-center p-4" style={{minHeight: '200px'}}>
+            <div className="d-flex justify-content-center align-items-center p-5">
                 <div className="spinner-border text-primary" role="status">
                     <span className="visually-hidden">Carregando recebimentos...</span>
                 </div>
-                <span className="ms-2 text-muted">Carregando recebimentos...</span>
+                <span className="ms-3 text-muted">Carregando recebimentos...</span>
             </div>
         );
     }
@@ -156,71 +161,76 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
     return (
         <div className="card shadow-sm">
             <div className="card-header bg-light p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h6 className="mb-0 text-secondary">Filtros e Busca de Recebimentos</h6>
+                <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
+                    <h6 className="mb-0 text-secondary me-3">Filtros e Busca de Recebimentos</h6>
                     <button 
                         className="btn btn-sm btn-outline-secondary py-1 px-2 d-flex align-items-center"
                         onClick={() => setShowFilters(!showFilters)}
+                        aria-expanded={showFilters}
+                        aria-controls="filtrosAvancadosRecebimentos"
                     >
                         <FunnelIcon style={{width: '16px', height: '16px'}} className="me-1" />
-                        {showFilters ? ' Ocultar Filtros Avançados' : ' Mostrar Filtros Avançados'}
+                        {showFilters ? 'Ocultar Avançados' : 'Mostrar Avançados'}
                     </button>
                 </div>
-                <div className="row g-2 align-items-center">
+                <div className="row g-2 align-items-end">
                     <div className="col-lg-3 col-md-6">
+                        <label htmlFor="searchTermRec" className="form-label form-label-sm visually-hidden">Buscar</label>
                         <input
                             type="text"
+                            id="searchTermRec"
                             className="form-control form-control-sm"
                             placeholder="Buscar por Descrição/Categoria..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="col-lg-3 col-md-6">
-                        <select className="form-select form-select-sm" value={clienteFilter} onChange={(e) => {setClienteFilter(e.target.value); setCasoFilter('');}}>
-                            <option value="">Todos os Clientes</option>
+                    <div className="col-lg-2 col-md-6">
+                        <label htmlFor="clienteFilterRec" className="form-label form-label-sm visually-hidden">Cliente</label>
+                        <select id="clienteFilterRec" className="form-select form-select-sm" value={clienteFilter} onChange={(e) => {setClienteFilter(e.target.value); setCasoFilter('');}}>
+                            <option value="">Todos Clientes</option>
                             {clientes.map(c => <option key={c.id} value={c.id}>{c.nome_razao_social}</option>)}
                         </select>
                     </div>
                     <div className="col-lg-3 col-md-6">
-                        <select className="form-select form-select-sm" value={casoFilter} onChange={(e) => setCasoFilter(e.target.value)} disabled={!clienteFilter && casos.length === 0 && !clientes.find(c => c.id === parseInt(clienteFilter))}>
+                        <label htmlFor="casoFilterRec" className="form-label form-label-sm visually-hidden">Caso</label>
+                        <select id="casoFilterRec" className="form-select form-select-sm" value={casoFilter} onChange={(e) => setCasoFilter(e.target.value)} disabled={!clienteFilter && casos.length === 0 && !clientes.find(c => c.id === parseInt(clienteFilter))}>
                             <option value="">Todos os Casos</option>
                             {casos.filter(c => !clienteFilter || c.cliente_id === parseInt(clienteFilter)).map(cs => (<option key={cs.id} value={cs.id}>{cs.titulo}</option>))}
                         </select>
                     </div>
-                    <div className="col-lg-3 col-md-6">
-                        <select className="form-select form-select-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                            <option value="">Todos os Status</option>
+                    <div className="col-lg-2 col-md-6">
+                        <label htmlFor="statusFilterRec" className="form-label form-label-sm visually-hidden">Status</label>
+                        <select id="statusFilterRec" className="form-select form-select-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                            <option value="">Todos Status</option>
                             <option value="Pendente">Pendente</option>
                             <option value="Pago">Pago</option>
                             <option value="Vencido">Vencido</option>
                             <option value="Cancelado">Cancelado</option>
                         </select>
                     </div>
+                    <div className="col-lg-2 col-md-12 text-lg-end">
+                        <button onClick={resetFilters} className="btn btn-sm btn-outline-secondary py-1 px-2 w-100">Limpar Filtros</button>
+                    </div>
                 </div>
                 {showFilters && (
-                     <div className="mt-3 pt-3 border-top">
-                        <div className="row g-2 align-items-center">
+                     <div className="mt-3 pt-3 border-top" id="filtrosAvancadosRecebimentos">
+                        <div className="row g-2 align-items-center mb-2">
                             <div className="col-md-3 col-sm-6">
-                                <label htmlFor="dataVencimentoInicio" className="form-label form-label-sm mb-1">Vencimento De:</label>
-                                <input type="date" id="dataVencimentoInicio" className="form-control form-control-sm" value={dataVencimentoInicio} onChange={e => setDataVencimentoInicio(e.target.value)} />
+                                <label htmlFor="dataVencimentoInicioRec" className="form-label form-label-sm mb-1">Vencimento De:</label>
+                                <input type="date" id="dataVencimentoInicioRec" className="form-control form-control-sm" value={dataVencimentoInicio} onChange={e => setDataVencimentoInicio(e.target.value)} />
                             </div>
                             <div className="col-md-3 col-sm-6">
-                                <label htmlFor="dataVencimentoFim" className="form-label form-label-sm mb-1">Vencimento Até:</label>
-                                <input type="date" id="dataVencimentoFim" className="form-control form-control-sm" value={dataVencimentoFim} onChange={e => setDataVencimentoFim(e.target.value)} />
+                                <label htmlFor="dataVencimentoFimRec" className="form-label form-label-sm mb-1">Vencimento Até:</label>
+                                <input type="date" id="dataVencimentoFimRec" className="form-control form-control-sm" value={dataVencimentoFim} onChange={e => setDataVencimentoFim(e.target.value)} />
                             </div>
                             <div className="col-md-3 col-sm-6">
-                                <label htmlFor="dataRecebimentoInicio" className="form-label form-label-sm mb-1">Recebimento De:</label>
-                                <input type="date" id="dataRecebimentoInicio" className="form-control form-control-sm" value={dataRecebimentoInicio} onChange={e => setDataRecebimentoInicio(e.target.value)} />
+                                <label htmlFor="dataRecebimentoInicioRec" className="form-label form-label-sm mb-1">Recebimento De:</label>
+                                <input type="date" id="dataRecebimentoInicioRec" className="form-control form-control-sm" value={dataRecebimentoInicio} onChange={e => setDataRecebimentoInicio(e.target.value)} />
                             </div>
                             <div className="col-md-3 col-sm-6">
-                                <label htmlFor="dataRecebimentoFim" className="form-label form-label-sm mb-1">Recebimento Até:</label>
-                                <input type="date" id="dataRecebimentoFim" className="form-control form-control-sm" value={dataRecebimentoFim} onChange={e => setDataRecebimentoFim(e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="row mt-2">
-                            <div className="col-12 text-end">
-                                <button onClick={resetFilters} className="btn btn-sm btn-outline-secondary py-1 px-2">Limpar Filtros</button>
+                                <label htmlFor="dataRecebimentoFimRec" className="form-label form-label-sm mb-1">Recebimento Até:</label>
+                                <input type="date" id="dataRecebimentoFimRec" className="form-control form-control-sm" value={dataRecebimentoFim} onChange={e => setDataRecebimentoFim(e.target.value)} />
                             </div>
                         </div>
                     </div>
@@ -230,7 +240,7 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
             {error && <div className="alert alert-danger m-3 small" role="alert">{error}</div>}
 
             <div className="table-responsive">
-                <table className="table table-hover table-striped table-sm mb-0">
+                <table className="table table-hover table-striped table-sm mb-0 align-middle">
                     <thead className="table-light">
                         <tr>
                             <th onClick={() => requestSort('descricao')} style={{ cursor: 'pointer' }}>Descrição {getSortIcon('descricao')}</th>
@@ -238,23 +248,25 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                             <th onClick={() => requestSort('caso_titulo')} style={{ cursor: 'pointer' }}>Caso {getSortIcon('caso_titulo')}</th>
                             <th className="text-end" onClick={() => requestSort('valor')} style={{ cursor: 'pointer' }}>Valor {getSortIcon('valor')}</th>
                             <th onClick={() => requestSort('data_vencimento')} style={{ cursor: 'pointer' }}>Vencimento {getSortIcon('data_vencimento')}</th>
+                            <th onClick={() => requestSort('data_recebimento')} style={{ cursor: 'pointer' }}>Recebimento {getSortIcon('data_recebimento')}</th>
                             <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>Status {getSortIcon('status')}</th>
-                            <th className="text-center">Ações</th>
+                            <th className="text-center" style={{width: '100px'}}>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         {recebimentos.length === 0 && !loading ? (
-                            <tr><td colSpan="7" className="text-center text-muted p-4">Nenhum recebimento encontrado.</td></tr>
+                            <tr><td colSpan="8" className="text-center text-muted p-4">Nenhum recebimento encontrado.</td></tr>
                         ) : (
                             recebimentos.map((r) => (
                                 <tr key={r.id}>
-                                    <td className="align-middle">{r.descricao}</td>
-                                    <td className="align-middle">{r.cliente_nome || '-'}</td>
-                                    <td className="align-middle">{r.caso_titulo || '-'}</td>
-                                    <td className="align-middle text-end">{parseFloat(r.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                    <td className="align-middle">{new Date(r.data_vencimento).toLocaleDateString()}</td>
-                                    <td className="align-middle"><span className={`badge ${getStatusBadge(r.status)}`}>{r.status}</span></td>
-                                    <td className="text-center align-middle">
+                                    <td className="px-3 py-2">{r.descricao}</td>
+                                    <td className="px-3 py-2">{r.cliente_nome || '-'}</td>
+                                    <td className="px-3 py-2">{r.caso_titulo || '-'}</td>
+                                    <td className="px-3 py-2 text-end">{parseFloat(r.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                    <td className="px-3 py-2">{new Date(r.data_vencimento).toLocaleDateString()}</td>
+                                    <td className="px-3 py-2">{r.data_recebimento ? new Date(r.data_recebimento).toLocaleDateString() : '-'}</td>
+                                    <td className="px-3 py-2"><span className={`badge fs-xs ${getStatusBadge(r.status)}`}>{r.status}</span></td>
+                                    <td className="px-3 py-2 text-center">
                                         <button onClick={() => onEditRecebimento(r)} className="btn btn-sm btn-outline-primary me-1 p-1 lh-1" title="Editar" style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}} disabled={deletingId === r.id}><PencilSquareIcon style={{ width: '16px', height: '16px' }} /></button>
                                         <button onClick={() => handleDeleteClick(r.id)} className="btn btn-sm btn-outline-danger p-1 lh-1" title="Deletar" style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}} disabled={deletingId === r.id}>
                                             {deletingId === r.id ? <div className="spinner-border spinner-border-sm" role="status" style={{width: '1rem', height: '1rem'}}></div> : <TrashIcon style={{ width: '16px', height: '16px' }} />}
@@ -267,8 +279,8 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                 </table>
             </div>
             {recebimentos.length > 0 && (
-                <div className="card-footer bg-light text-muted p-2 text-end">
-                    <small>{recebimentos.length} recebimento(s) encontrado(s)</small>
+                <div className="card-footer bg-light text-muted p-2 text-end small">
+                    {recebimentos.length} recebimento(s) encontrado(s)
                 </div>
             )}
         </div>

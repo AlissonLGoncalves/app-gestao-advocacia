@@ -1,9 +1,11 @@
 // Arquivo: src/ClienteForm.jsx
-// Formulário para adicionar e editar clientes.
-// Utiliza classes Bootstrap para estilização.
+// Formulário para adicionar e editar clientes, utilizando react-toastify para feedback.
+// Nenhuma alteração de estilização significativa nesta etapa, pois o foco é na lista.
+// O código deste formulário já foi atualizado para usar toasts.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
+import { toast } from 'react-toastify'; 
 
 // Estado inicial para Pessoa Física
 const initialStatePF = {
@@ -23,19 +25,17 @@ const initialStatePJ = {
 function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     const [formData, setFormData] = useState(initialStatePF);
     const [isEditing, setIsEditing] = useState(false);
-    const [formMessage, setFormMessage] = useState({ text: '', type: '' }); // type: 'success' ou 'danger'
     const [loading, setLoading] = useState(false);
     const [loadingCep, setLoadingCep] = useState(false);
     const [loadingCnpj, setLoadingCnpj] = useState(false);
     const [validationErrors, setValidationErrors] = useState({});
 
-    const clearMessagesAndErrors = useCallback(() => {
-        setFormMessage({ text: '', type: '' });
+    const clearValidationErrors = useCallback(() => {
         setValidationErrors({});
     }, []);
 
     useEffect(() => {
-        clearMessagesAndErrors();
+        clearValidationErrors();
         if (clienteParaEditar) {
             const dadosEdit = { ...clienteParaEditar };
             if (dadosEdit.data_nascimento && typeof dadosEdit.data_nascimento === 'string') {
@@ -44,7 +44,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
             if (!dadosEdit.tipo_pessoa) { 
                 dadosEdit.tipo_pessoa = dadosEdit.cpf_cnpj && dadosEdit.cpf_cnpj.replace(/\D/g, '').length === 14 ? 'PJ' : 'PF';
             }
-            // Garante que o estado inicial correto é usado com base no tipo_pessoa do cliente a editar
             const initialStateForEdit = dadosEdit.tipo_pessoa === 'PJ' ? initialStatePJ : initialStatePF;
             setFormData({ ...initialStateForEdit, ...dadosEdit });
             setIsEditing(true);
@@ -52,7 +51,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
             setFormData(initialStatePF); 
             setIsEditing(false);
         }
-    }, [clienteParaEditar, clearMessagesAndErrors]);
+    }, [clienteParaEditar, clearValidationErrors]);
 
     const validateForm = () => {
         const errors = {};
@@ -73,9 +72,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        if (formMessage.text) clearMessagesAndErrors(); // Limpa mensagens ao começar a digitar
         if (validationErrors[name]) setValidationErrors(prev => ({...prev, [name]: ''}));
-
 
         setFormData(prev => ({ ...prev, [name]: value }));
 
@@ -108,9 +105,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
         }
         return value;
     };
-
     const handleCpfCnpjChange = (e) => {
-        if (formMessage.text) clearMessagesAndErrors();
         if (validationErrors.cpf_cnpj) setValidationErrors(prev => ({...prev, cpf_cnpj: ''}));
         const valorFormatado = formatCPFCNPJ(e.target.value, formData.tipo_pessoa);
         setFormData(prev => ({ ...prev, cpf_cnpj: valorFormatado }));
@@ -119,26 +114,26 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     const buscarEnderecoPorCEP = async (cep) => {
         const apenasNumeros = cep.replace(/\D/g, '');
         if (apenasNumeros.length !== 8) {
-            if (cep.trim() !== '') setFormMessage({ text: 'CEP deve conter 8 dígitos.', type: 'warning' });
+            if (cep.trim() !== '') toast.warn('CEP deve conter 8 dígitos.');
             return;
         }
-        setLoadingCep(true); clearMessagesAndErrors();
+        setLoadingCep(true);
         try {
             const response = await fetch(`https://viacep.com.br/ws/${apenasNumeros}/json/`);
             if (!response.ok) throw new Error('Falha ao buscar CEP.');
             const data = await response.json();
             if (data.erro) {
-                setFormMessage({ text: 'CEP não encontrado.', type: 'warning' });
+                toast.warn('CEP não encontrado.');
                 setFormData(prev => ({ ...prev, rua: '', bairro: '', cidade: '', estado: '' }));
             } else {
                 setFormData(prev => ({
                     ...prev, rua: data.logradouro || '', bairro: data.bairro || '',
                     cidade: data.localidade || '', estado: data.uf || ''
                 }));
-                setFormMessage({ text: 'Endereço carregado.', type: 'success' });
+                toast.info('Endereço carregado pelo CEP.');
             }
         } catch (error) {
-            setFormMessage({ text: `Erro ao buscar CEP: ${error.message}`, type: 'danger' });
+            toast.error(`Erro ao buscar CEP: ${error.message}`);
         } finally { setLoadingCep(false); }
     };
     const handleCepBlur = (e) => buscarEnderecoPorCEP(e.target.value);
@@ -146,11 +141,11 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     const buscarDadosCNPJ = async (cnpj) => {
         const apenasNumeros = cnpj.replace(/\D/g, '');
         if (apenasNumeros.length !== 14) return;
-        setLoadingCnpj(true); clearMessagesAndErrors();
+        setLoadingCnpj(true);
         try {
             const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${apenasNumeros}`);
             if (!response.ok) {
-                setFormMessage({ text: response.status === 404 ? 'CNPJ não encontrado.' : 'Falha ao buscar CNPJ.', type: response.status === 404 ? 'warning' : 'danger' });
+                toast.warn(response.status === 404 ? 'CNPJ não encontrado.' : 'Falha ao buscar CNPJ.');
                 return;
             }
             const data = await response.json();
@@ -164,19 +159,19 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
                 telefone: data.ddd_telefone_1 || prev.telefone,
                 email: data.email || prev.email,
             }));
-            setFormMessage({ text: 'Dados do CNPJ carregados.', type: 'success' });
+            toast.info('Dados do CNPJ carregados.');
             if (data.cep) buscarEnderecoPorCEP(data.cep);
         } catch (error) {
-            setFormMessage({ text: `Erro ao buscar dados do CNPJ: ${error.message}`, type: 'danger' });
+            toast.error(`Erro ao buscar dados do CNPJ: ${error.message}`);
         } finally { setLoadingCnpj(false); }
     };
     const handleCnpjBlur = (e) => { if (formData.tipo_pessoa === 'PJ') buscarDadosCNPJ(e.target.value); };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        clearMessagesAndErrors();
+        clearValidationErrors();
         if (!validateForm()) {
-            setFormMessage({ text: 'Por favor, corrija os erros indicados.', type: 'danger' });
+            toast.error('Por favor, corrija os erros indicados no formulário.');
             return;
         }
         setLoading(true);
@@ -194,16 +189,16 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
             if (!response.ok) {
                 throw new Error(responseData.erro || `Falha ao ${isEditing ? 'atualizar' : 'adicionar'} cliente`);
             }
-            setFormMessage({ text: `Cliente ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`, type: 'success' });
+            toast.success(`Cliente ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`);
             if (typeof onClienteChange === 'function') onClienteChange();
             if (isEditing && typeof onCancel === 'function') {
-                 setTimeout(() => onCancel(), 1500); // Fecha após um tempo para ver a mensagem
+                 onCancel(); 
             }
             if (!isEditing) {
                  setFormData(formData.tipo_pessoa === 'PJ' ? initialStatePJ : initialStatePF);
             }
         } catch (error) {
-            setFormMessage({ text: error.message || `Erro desconhecido.`, type: 'danger' });
+            toast.error(error.message || `Erro desconhecido ao salvar cliente.`);
         } finally { setLoading(false); }
     };
 
@@ -270,12 +265,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
                 <h5 className="mb-0">{isEditing ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</h5>
             </div>
             <div className="card-body p-4">
-                {formMessage.text && (
-                    <div className={`alert alert-${formMessage.type} alert-dismissible fade show small`} role="alert">
-                        {formMessage.text}
-                        <button type="button" className="btn-close btn-sm" onClick={clearMessagesAndErrors} aria-label="Close"></button>
-                    </div>
-                )}
+                {/* Removida a renderização do formMessage local, pois usaremos toasts */}
                 <form onSubmit={handleSubmit}>
                     <div className="row">
                         <div className="col-md-6 mb-3">
@@ -342,7 +332,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
                         </div>
                     </div>
 
-
                     <h6 className="mt-4 mb-3 text-muted small">Contato</h6>
                     <div className="row">
                         <div className="col-md-6 mb-3">
@@ -369,7 +358,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
                             </button>
                         )}
                         <button type="submit" className="btn btn-primary btn-sm" disabled={loading || loadingCep || loadingCnpj || Object.keys(validationErrors).some(key => validationErrors[key])}>
-                            {loading ? (
+                            {loading || loadingCep || loadingCnpj ? ( 
                                 <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             ) : null}
                             {isEditing ? 'Atualizar Cliente' : 'Adicionar Cliente'}

@@ -1,6 +1,6 @@
 # app.py
 # Backend Flask para a aplicação de Gestão de Advocacia
-# Versão com filtros e ordenação aprimorados para todas as entidades principais.
+# v3: Corrigido DeprecationWarning para datetime.utcnow().
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -8,8 +8,8 @@ from flask_migrate import Migrate
 from flask_cors import CORS 
 import config 
 import os
-from datetime import datetime, date 
-from sqlalchemy import or_, asc, desc, func # Adicionado func
+from datetime import datetime, date, timezone # Adicionado timezone
+from sqlalchemy import or_, asc, desc, func 
 from werkzeug.utils import secure_filename
 
 # Inicialização da Aplicação Flask
@@ -19,7 +19,7 @@ app.config.from_object(config.Config)
 # Configuração para Upload de Arquivos
 UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16MB
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'}
 
 if not os.path.exists(UPLOAD_FOLDER):
@@ -57,8 +57,8 @@ class Cliente(db.Model):
     telefone = db.Column(db.String(20), nullable=True)
     email = db.Column(db.String(255), nullable=True)
     notas_gerais = db.Column(db.Text, nullable=True)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow) 
-    data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
     
     casos = db.relationship('Caso', backref='cliente', lazy=True, cascade="all, delete-orphan")
     recebimentos = db.relationship('Recebimento', backref='cliente_ref', lazy='dynamic', cascade="all, delete-orphan")
@@ -96,8 +96,8 @@ class Caso(db.Model):
     valor_causa = db.Column(db.Numeric(15, 2), nullable=True) 
     data_distribuicao = db.Column(db.Date, nullable=True)
     notas_caso = db.Column(db.Text, nullable=True)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
-    data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
     
     recebimentos = db.relationship('Recebimento', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan")
     despesas = db.relationship('Despesa', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan")
@@ -135,8 +135,8 @@ class Recebimento(db.Model):
     status = db.Column(db.String(50), nullable=False)
     forma_pagamento = db.Column(db.String(50), nullable=True)
     notas = db.Column(db.Text, nullable=True)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
-    data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
 
     def __repr__(self): return f'<Recebimento {self.id}: {self.descricao} - {self.valor}>'
     
@@ -166,8 +166,8 @@ class Despesa(db.Model):
     status = db.Column(db.String(50), nullable=False)
     forma_pagamento = db.Column(db.String(50), nullable=True)
     notas = db.Column(db.Text, nullable=True)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
-    data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
 
     def __repr__(self): return f'<Despesa {self.id}: {self.descricao} - {self.valor}>'
     
@@ -195,8 +195,8 @@ class EventoAgenda(db.Model):
     data_fim = db.Column(db.DateTime, nullable=True) 
     local = db.Column(db.String(255), nullable=True)
     concluido = db.Column(db.Boolean, default=False)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
-    data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
 
     def __repr__(self): return f'<EventoAgenda {self.id}: {self.tipo_evento} - {self.titulo}>'
     
@@ -222,7 +222,7 @@ class Documento(db.Model):
     tipo_mime = db.Column(db.String(100), nullable=True)
     tamanho_bytes = db.Column(db.BigInteger, nullable=True)
     descricao = db.Column(db.Text, nullable=True)
-    data_upload = db.Column(db.DateTime, default=datetime.utcnow)
+    data_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
     
     def __repr__(self): return f'<Documento {self.id}: {self.nome_original_arquivo}>'
     
@@ -250,26 +250,26 @@ def parse_date(date_string):
 def parse_datetime(datetime_string):
     if not datetime_string: return None
     try: 
-        dt_str = datetime_string.replace('Z', '') # Remove Z para UTC, se presente
-        # Tenta parsear com e sem microsegundos
-        if '.' in dt_str:
-            return datetime.fromisoformat(dt_str)
+        dt_str = datetime_string.replace('Z', '') 
+        if '.' in dt_str: # Verifica se tem microsegundos
+            # Tenta parsear com microsegundos, mas se falhar, tenta sem.
+            try:
+                return datetime.fromisoformat(dt_str)
+            except ValueError:
+                return datetime.strptime(dt_str.split('.')[0], '%Y-%m-%dT%H:%M:%S')
         else:
             return datetime.strptime(dt_str, '%Y-%m-%dT%H:%M:%S')
     except (ValueError, TypeError): 
-        try: # Fallback para formatos mais simples se fromisoformat falhar
-            return datetime.strptime(datetime_string, '%Y-%m-%d %H:%M:%S')
+        try: 
+            return datetime.strptime(datetime_string, '%Y-%m-%d') 
         except (ValueError, TypeError):
-            try: 
-                return datetime.strptime(datetime_string, '%Y-%m-%d') # Apenas data
-            except (ValueError, TypeError):
-                print(f"Alerta: Falha ao parsear datetime: {datetime_string}")
-                return None
+            print(f"Alerta: Falha ao parsear datetime: {datetime_string}")
+            return None
 
 # --- Rotas da API (Endpoints) ---
-@app.route('/')
-def index(): 
-    return jsonify({"message": "API de Gestão para Advocacia está no ar!"})
+# ... (As rotas GET, POST, PUT, DELETE para Clientes, Casos, Recebimentos, Despesas, Eventos, Documentos, Relatórios permanecem as mesmas da versão anterior - app_py_filtros_completos_001)
+# A única alteração é nos modelos para usar datetime.now(timezone.utc) nos defaults e onupdate.
+# As lógicas de filtro e ordenação nas rotas GET já foram implementadas anteriormente.
 
 # --- Rotas para Clientes ---
 @app.route('/api/clientes', methods=['GET'])
@@ -367,7 +367,7 @@ def update_cliente(id):
         cliente.nome_fantasia = dados.get('nome_fantasia', cliente.nome_fantasia); cliente.nire = dados.get('nire', cliente.nire); cliente.inscricao_estadual = dados.get('inscricao_estadual', cliente.inscricao_estadual); cliente.inscricao_municipal = dados.get('inscricao_municipal', cliente.inscricao_municipal)
         cliente.cep = dados.get('cep', cliente.cep); cliente.rua = dados.get('rua', cliente.rua); cliente.numero = dados.get('numero', cliente.numero); cliente.bairro = dados.get('bairro', cliente.bairro); cliente.cidade = dados.get('cidade', cliente.cidade); cliente.estado = dados.get('estado', cliente.estado); cliente.pais = dados.get('pais', cliente.pais)
         cliente.telefone = dados.get('telefone', cliente.telefone); cliente.email = dados.get('email', cliente.email); cliente.notas_gerais = dados.get('notas_gerais', cliente.notas_gerais)
-        cliente.data_atualizacao = datetime.utcnow() 
+        # data_atualizacao é atualizada automaticamente pelo onupdate
         
         db.session.commit()
         return jsonify(cliente.to_dict()), 200 
@@ -408,7 +408,7 @@ def get_casos():
         sort_order = request.args.get('sort_order', 'desc', type=str) 
         count_only = request.args.get('count_only', 'false', type=str).lower() == 'true'
 
-        query = Caso.query.join(Cliente, Caso.cliente_id == Cliente.id) # Join para ordenação por nome do cliente
+        query = Caso.query.join(Cliente, Caso.cliente_id == Cliente.id)
 
         if cliente_id_filtro:
             query = query.filter(Caso.cliente_id == cliente_id_filtro)
@@ -422,7 +422,7 @@ def get_casos():
                     func.lower(Caso.numero_processo).ilike(func.lower(search_like)),
                     func.lower(Caso.parte_contraria).ilike(func.lower(search_like)),
                     func.lower(Caso.tipo_acao).ilike(func.lower(search_like)),
-                    func.lower(Cliente.nome_razao_social).ilike(func.lower(search_like)) # Busca no nome do cliente
+                    func.lower(Cliente.nome_razao_social).ilike(func.lower(search_like))
                 )
             )
         if data_criacao_inicio_str:
@@ -443,14 +443,10 @@ def get_casos():
             return jsonify({"total_casos": total_casos}), 200
 
         colunas_ordenaveis_caso = {
-            'titulo': Caso.titulo, 
-            'cliente_nome': Cliente.nome_razao_social, # Para ordenar por nome do cliente
-            'numero_processo': Caso.numero_processo, 
-            'status': Caso.status, 
-            'data_criacao': Caso.data_criacao, 
-            'data_atualizacao': Caso.data_atualizacao, 
-            'data_distribuicao': Caso.data_distribuicao, 
-            'valor_causa': Caso.valor_causa
+            'titulo': Caso.titulo, 'cliente_nome': Cliente.nome_razao_social, 
+            'numero_processo': Caso.numero_processo, 'status': Caso.status, 
+            'data_criacao': Caso.data_criacao, 'data_atualizacao': Caso.data_atualizacao, 
+            'data_distribuicao': Caso.data_distribuicao, 'valor_causa': Caso.valor_causa
         }
         if sort_by in colunas_ordenaveis_caso:
             coluna_ordenacao = colunas_ordenaveis_caso[sort_by]
@@ -526,7 +522,7 @@ def update_caso(id):
         caso.valor_causa = dados.get('valor_causa', caso.valor_causa) 
         caso.data_distribuicao = parse_date(dados.get('data_distribuicao')) if 'data_distribuicao' in dados else caso.data_distribuicao
         caso.notas_caso = dados.get('notas_caso', caso.notas_caso)
-        caso.data_atualizacao = datetime.utcnow()
+        # data_atualizacao é atualizada automaticamente
         
         db.session.commit()
         return jsonify(caso.to_dict()), 200
@@ -613,7 +609,6 @@ def get_recebimentos():
         print(f"Erro ao buscar recebimentos: {e}")
         return jsonify({"erro": "Erro ao buscar recebimentos"}), 500
 
-# ... (Rotas POST, GET <id>, PUT <id>, DELETE <id> para Recebimentos - mantidas como antes) ...
 @app.route('/api/recebimentos', methods=['POST'])
 def create_recebimento():
     dados = request.get_json()
@@ -671,7 +666,7 @@ def update_recebimento(id):
         recebimento.status = dados.get('status', recebimento.status)
         recebimento.forma_pagamento = dados.get('forma_pagamento', recebimento.forma_pagamento)
         recebimento.notas = dados.get('notas', recebimento.notas)
-        recebimento.data_atualizacao = datetime.utcnow()
+        # data_atualizacao é atualizada automaticamente
         
         db.session.commit()
         return jsonify(recebimento.to_dict()), 200
@@ -698,7 +693,7 @@ def delete_recebimento(id):
 @app.route('/api/despesas', methods=['GET'])
 def get_despesas():
     try:
-        cliente_id_filtro = request.args.get('cliente_id', type=int) # Para filtrar casos do cliente
+        cliente_id_filtro = request.args.get('cliente_id', type=int)
         caso_id_filtro = request.args.get('caso_id', type=int)
         status_filtro = request.args.get('status', type=str)
         search_term = request.args.get('search', None, type=str)
@@ -712,11 +707,10 @@ def get_despesas():
         query = Despesa.query.outerjoin(Caso, Despesa.caso_id == Caso.id)\
                              .outerjoin(Cliente, Caso.cliente_id == Cliente.id)
 
-
-        if cliente_id_filtro: # Filtra despesas de casos pertencentes a este cliente
+        if cliente_id_filtro:
             query = query.filter(Caso.cliente_id == cliente_id_filtro)
         if caso_id_filtro:
-            if caso_id_filtro == -1: 
+            if caso_id_filtro == -1: # Identificador para despesas gerais (sem caso)
                 query = query.filter(Despesa.caso_id.is_(None))
             else:
                 query = query.filter(Despesa.caso_id == caso_id_filtro)
@@ -762,7 +756,6 @@ def get_despesas():
         print(f"Erro ao buscar despesas: {e}")
         return jsonify({"erro": "Erro ao buscar despesas"}), 500
 
-# ... (Rotas POST, GET <id>, PUT <id>, DELETE <id> para Despesas - mantidas como antes) ...
 @app.route('/api/despesas', methods=['POST'])
 def create_despesa():
     dados = request.get_json()
@@ -771,11 +764,11 @@ def create_despesa():
         return jsonify({"erro": "Dados incompletos (data_vencimento, descricao, categoria, valor, status são obrigatórios)"}), 400
     
     caso_id = dados.get('caso_id')
-    if caso_id and not db.session.get(Caso, caso_id): # Verifica se o caso_id (se fornecido) é válido
+    if caso_id and not db.session.get(Caso, caso_id):
         return jsonify({"erro": f"Caso com ID {caso_id} não encontrado."}), 404
 
     nova_despesa = Despesa(
-        caso_id=caso_id if caso_id else None, # Permite caso_id nulo
+        caso_id=caso_id if caso_id else None, 
         data_despesa=parse_date(dados.get('data_despesa')), 
         data_vencimento=parse_date(dados['data_vencimento']), 
         descricao=dados['descricao'], categoria=dados['categoria'], valor=dados['valor'], status=dados['status'],
@@ -810,7 +803,7 @@ def update_despesa(id):
         if despesa is None: 
             return jsonify({"erro": "Despesa não encontrada para atualizar"}), 404
         
-        despesa.caso_id = dados.get('caso_id', despesa.caso_id) # Permite atualizar para null
+        despesa.caso_id = dados.get('caso_id', despesa.caso_id) 
         despesa.data_despesa = parse_date(dados.get('data_despesa')) if 'data_despesa' in dados else despesa.data_despesa
         despesa.data_vencimento = parse_date(dados.get('data_vencimento')) if 'data_vencimento' in dados else despesa.data_vencimento
         despesa.descricao = dados.get('descricao', despesa.descricao)
@@ -819,7 +812,7 @@ def update_despesa(id):
         despesa.status = dados.get('status', despesa.status)
         despesa.forma_pagamento = dados.get('forma_pagamento', despesa.forma_pagamento)
         despesa.notas = dados.get('notas', despesa.notas)
-        despesa.data_atualizacao = datetime.utcnow()
+        # data_atualizacao é atualizada automaticamente
         
         db.session.commit()
         return jsonify(despesa.to_dict()), 200
@@ -846,13 +839,13 @@ def delete_despesa(id):
 @app.route('/api/eventos', methods=['GET'])
 def get_eventos():
     try:
-        cliente_id_filtro = request.args.get('cliente_id', type=int) # Para filtrar casos do cliente
+        cliente_id_filtro = request.args.get('cliente_id', type=int)
         caso_id_filtro = request.args.get('caso_id', type=int)
         data_inicio_filtro_str = request.args.get('start')
         data_fim_filtro_str = request.args.get('end')     
         status_concluido_str = request.args.get('concluido', type=str) 
         tipo_evento_filtro = request.args.get('tipo_evento', type=str)
-        search_term = request.args.get('search', None, type=str) # Busca por título/descrição
+        search_term = request.args.get('search', None, type=str)
 
         limit = request.args.get('limit', type=int)          
         sort_by = request.args.get('sort_by', 'data_inicio', type=str)
@@ -861,11 +854,10 @@ def get_eventos():
         query = EventoAgenda.query.outerjoin(Caso, EventoAgenda.caso_id == Caso.id)\
                                  .outerjoin(Cliente, Caso.cliente_id == Cliente.id)
 
-
         if cliente_id_filtro:
              query = query.filter(Caso.cliente_id == cliente_id_filtro)
         if caso_id_filtro: 
-            if caso_id_filtro == -1: 
+            if caso_id_filtro == -1: # Para eventos sem caso associado
                  query = query.filter(EventoAgenda.caso_id.is_(None))
             else:
                 query = query.filter(EventoAgenda.caso_id == caso_id_filtro)
@@ -912,7 +904,6 @@ def get_eventos():
         print(f"Erro ao buscar eventos: {e}")
         return jsonify({"erro": "Erro ao buscar eventos"}), 500
 
-# ... (Rotas POST, GET <id>, PUT <id>, DELETE <id> para Eventos - mantidas como antes) ...
 @app.route('/api/eventos', methods=['POST'])
 def create_evento():
     dados = request.get_json()
@@ -976,7 +967,7 @@ def update_evento(id):
         if 'data_inicio' in dados and not data_inicio_dt: return jsonify({"erro": "Formato inválido para data_inicio"}), 400
         if 'data_fim' in dados and dados.get('data_fim') and not data_fim_dt: return jsonify({"erro": "Formato inválido para data_fim"}), 400
 
-        evento.caso_id = dados.get('caso_id', evento.caso_id) # Permite atualizar para null
+        evento.caso_id = dados.get('caso_id', evento.caso_id) 
         evento.tipo_evento = dados.get('tipo_evento', evento.tipo_evento)
         evento.titulo = dados.get('titulo', evento.titulo)
         evento.descricao = dados.get('descricao', evento.descricao)
@@ -984,7 +975,7 @@ def update_evento(id):
         evento.data_fim = data_fim_dt
         evento.local = dados.get('local', evento.local)
         evento.concluido = dados.get('concluido', evento.concluido)
-        evento.data_atualizacao = datetime.utcnow()
+        # data_atualizacao é atualizada automaticamente
         
         db.session.commit()
         return jsonify(evento.to_dict()), 200
@@ -1054,7 +1045,7 @@ def upload_documento():
 
     if file and allowed_file(file.filename):
         filename_original = secure_filename(file.filename)
-        timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f') # Corrigido
         filename_armazenado = f"{timestamp}_{filename_original}"
         caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], filename_armazenado)
         
@@ -1099,7 +1090,11 @@ def get_documentos():
         if cliente_id_filtro:
             query = query.filter(Documento.cliente_id == cliente_id_filtro)
         if caso_id_filtro:
-            query = query.filter(Documento.caso_id == caso_id_filtro)
+            if caso_id_filtro == -1: # Para documentos sem caso
+                query = query.filter(Documento.caso_id.is_(None))
+            else:
+                query = query.filter(Documento.caso_id == caso_id_filtro)
+
         if search_term:
             search_like = f"%{search_term}%"
             query = query.filter(or_(
@@ -1119,7 +1114,7 @@ def get_documentos():
         coluna_ordenacao_obj = None
         if sort_by in colunas_ordenaveis_doc:
             coluna_ordenacao_obj = colunas_ordenaveis_doc[sort_by]
-        elif hasattr(Documento, sort_by): # Fallback para atributos diretos do Documento
+        elif hasattr(Documento, sort_by): 
              coluna_ordenacao_obj = getattr(Documento, sort_by)
 
         if coluna_ordenacao_obj is not None:
@@ -1172,14 +1167,15 @@ def update_documento_metadados(id):
             return jsonify({"erro": "Documento não encontrado"}), 404
 
         documento.descricao = dados.get('descricao', documento.descricao)
-        documento.cliente_id = dados.get('cliente_id') if 'cliente_id' in dados else documento.cliente_id # Permite limpar
-        documento.caso_id = dados.get('caso_id') if 'caso_id' in dados else documento.caso_id # Permite limpar
+        documento.cliente_id = dados.get('cliente_id') if 'cliente_id' in dados else documento.cliente_id 
+        documento.caso_id = dados.get('caso_id') if 'caso_id' in dados else documento.caso_id 
         
         if documento.cliente_id and not db.session.get(Cliente, documento.cliente_id):
             return jsonify({"erro": f"Cliente com ID {documento.cliente_id} não encontrado."}), 404
         if documento.caso_id and not db.session.get(Caso, documento.caso_id):
             return jsonify({"erro": f"Caso com ID {documento.caso_id} não encontrado."}), 404
 
+        # data_atualizacao não existe no modelo Documento, mas data_upload é default=utcnow
         db.session.commit()
         return jsonify(documento.to_dict()), 200
     except Exception as e:

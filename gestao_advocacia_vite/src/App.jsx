@@ -1,9 +1,13 @@
 // src/App.jsx
 // Componente principal da aplicação React.
 // Gere a navegação e renderiza o conteúdo da seção ativa.
-// v2: Passa a função mudarSecao para o Dashboard e usa Heroicons.
+// Garante que o formulário correto é renderizado para cada seção.
 
 import React, { useState, useCallback } from 'react';
+
+// Importação do Toastify
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css'; // CSS do Toastify
 
 // Importação dos componentes de cada seção
 import ClienteList from './ClienteList.jsx';
@@ -16,7 +20,7 @@ import DespesaList from './DespesaList.jsx';
 import DespesaForm from './DespesaForm.jsx';
 import EventoAgendaList from './EventoAgendaList.jsx';
 import EventoAgendaForm from './EventoAgendaForm.jsx';
-import Dashboard from './Dashboard.jsx'; // Importa o Dashboard
+import Dashboard from './Dashboard.jsx';
 import RelatoriosPage from './RelatoriosPage.jsx';
 import DocumentoList from './DocumentoList.jsx';
 import DocumentoForm from './DocumentoForm.jsx';
@@ -34,7 +38,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 // Constantes para identificar as seções da aplicação
-export const SECOES = { // Exportando para que Dashboard possa usar
+export const SECOES = { 
   DASHBOARD: 'DASHBOARD',
   CLIENTES: 'CLIENTES',
   CASOS: 'CASOS',
@@ -51,11 +55,11 @@ function App() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const mudarSecao = useCallback((secao) => { // useCallback para otimização
+  const mudarSecao = useCallback((secao) => { 
     setSecaoAtiva(secao);
     setItemParaEditar(null);
     setMostrarFormulario(false);
-  }, []); // Sem dependências, pois setSecaoAtiva, etc., são estáveis
+  }, []); 
 
   const handleEditarClick = (item, secaoEspecifica = null) => {
     const secaoAlvo = secaoEspecifica || secaoAtiva;
@@ -84,7 +88,7 @@ function App() {
     };
 
     if (mostrarFormulario) {
-      switch (secaoAtiva) {
+      switch (secaoAtiva) { // ESTE SWITCH É CRUCIAL
         case SECOES.CLIENTES:
           return <ClienteForm clienteParaEditar={itemParaEditar} onClienteChange={handleFormularioFechado} {...propsComunsForm} />;
         case SECOES.CASOS:
@@ -95,7 +99,7 @@ function App() {
           return <DespesaForm despesaParaEditar={itemParaEditar} onDespesaChange={handleFormularioFechado} {...propsComunsForm} />;
         case SECOES.AGENDA:
           return <EventoAgendaForm eventoParaEditar={itemParaEditar} onEventoChange={handleFormularioFechado} {...propsComunsForm} />;
-        case SECOES.DOCUMENTOS:
+        case SECOES.DOCUMENTOS: // Garante que DocumentoForm é chamado para a seção DOCUMENTOS
           return <DocumentoForm documentoParaEditar={itemParaEditar} onDocumentoChange={handleFormularioFechado} {...propsComunsForm} />;
         default:
           return null;
@@ -107,7 +111,6 @@ function App() {
         onClick={handleAdicionarClick} 
         className="btn btn-primary mb-3 d-flex align-items-center"
       >
-        {/* Ícone de Adicionar (Heroicon) */}
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="me-2" width="18" height="18">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
@@ -117,7 +120,6 @@ function App() {
 
     switch (secaoAtiva) {
       case SECOES.DASHBOARD:
-        // Passando mudarSecao para o Dashboard
         return <Dashboard mudarSecao={mudarSecao} />; 
       case SECOES.CLIENTES:
         return (
@@ -174,49 +176,60 @@ function App() {
       className={`btn w-100 d-flex align-items-center text-start mb-1 ${secaoAtiva === secao ? 'btn-primary active' : 'btn-light'}`}
       title={children}
     >
-      {/* Renderiza o componente de ícone passado como prop */}
       <IconComponent className="me-2" style={{ width: '18px', height: '18px' }} />
       <span className="ms-1">{children}</span>
     </button>
   );
 
   return (
-    <div className="d-flex vh-100">
-      <aside className="bg-light border-end p-3 d-flex flex-column" style={{ width: '250px', flexShrink: 0 }}>
-        <div className="h3 text-primary mb-4 text-center pt-2">
-          Gestão ADV
-        </div>
-        {/* Usando os componentes Heroicon importados */}
-        <NavButton secao={SECOES.DASHBOARD} icon={HomeIcon}>Dashboard</NavButton>
-        <NavButton secao={SECOES.CLIENTES} icon={UsersIcon}>Clientes</NavButton>
-        <NavButton secao={SECOES.CASOS} icon={BriefcaseIcon}>Casos</NavButton>
-        <NavButton secao={SECOES.RECEBIMENTOS} icon={CurrencyDollarIcon}>Recebimentos</NavButton>
-        <NavButton secao={SECOES.DESPESAS} icon={CreditCardIcon}>Despesas</NavButton>
-        <NavButton secao={SECOES.AGENDA} icon={CalendarDaysIcon}>Agenda</NavButton>
-        <NavButton secao={SECOES.DOCUMENTOS} icon={DocumentTextIcon}>Documentos</NavButton>
-        <NavButton secao={SECOES.RELATORIOS} icon={ChartBarIcon}>Relatórios</NavButton>
-        
-        <div className="mt-auto pt-3 border-top">
-            <p className="text-muted small text-center">
-                App Gestão ADV <br/>
-                &copy; {new Date().getFullYear()}
-            </p>
-        </div>
-      </aside>
+    <> 
+      <ToastContainer
+        position="top-right"
+        autoClose={5000} 
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored" 
+      />
+      <div className="d-flex vh-100">
+        <aside className="bg-light border-end p-3 d-flex flex-column" style={{ width: '250px', flexShrink: 0 }}>
+          <div className="h3 text-primary mb-4 text-center pt-2">
+            Gestão ADV
+          </div>
+          <NavButton secao={SECOES.DASHBOARD} icon={HomeIcon}>Dashboard</NavButton>
+          <NavButton secao={SECOES.CLIENTES} icon={UsersIcon}>Clientes</NavButton>
+          <NavButton secao={SECOES.CASOS} icon={BriefcaseIcon}>Casos</NavButton>
+          <NavButton secao={SECOES.RECEBIMENTOS} icon={CurrencyDollarIcon}>Recebimentos</NavButton>
+          <NavButton secao={SECOES.DESPESAS} icon={CreditCardIcon}>Despesas</NavButton>
+          <NavButton secao={SECOES.AGENDA} icon={CalendarDaysIcon}>Agenda</NavButton>
+          <NavButton secao={SECOES.DOCUMENTOS} icon={DocumentTextIcon}>Documentos</NavButton>
+          <NavButton secao={SECOES.RELATORIOS} icon={ChartBarIcon}>Relatórios</NavButton>
+          
+          <div className="mt-auto pt-3 border-top">
+              <p className="text-muted small text-center">
+                  App Gestão ADV <br/>
+                  &copy; {new Date().getFullYear()}
+              </p>
+          </div>
+        </aside>
 
-      <div className="flex-grow-1 d-flex flex-column overflow-hidden">
-        <header className="bg-white shadow-sm border-bottom p-3">
-            <h1 className="h5 mb-0 text-capitalize">
-              {/* Converte a chave da seção para um título mais legível */}
-              {secaoAtiva.toLowerCase().replace('_', ' ')} 
-            </h1>
-        </header>
-        
-        <main className="flex-grow-1 overflow-auto p-4" style={{backgroundColor: '#f8f9fa'}}>
-           {renderizarConteudoPrincipal()}
-        </main>
+        <div className="flex-grow-1 d-flex flex-column overflow-hidden">
+          <header className="bg-white shadow-sm border-bottom p-3">
+              <h1 className="h5 mb-0 text-capitalize">
+                {secaoAtiva.toLowerCase().replace('_', ' ')} 
+              </h1>
+          </header>
+          
+          <main className="flex-grow-1 overflow-auto p-4" style={{backgroundColor: '#f8f9fa'}}>
+            {renderizarConteudoPrincipal()}
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

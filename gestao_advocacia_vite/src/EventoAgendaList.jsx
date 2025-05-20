@@ -1,9 +1,10 @@
 // Arquivo: src/EventoAgendaList.jsx
-// Responsável por listar os eventos da agenda com filtros e ordenação.
+// v2: Estilização refinada, filtros completos e ordenação.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
 import { PencilSquareIcon, TrashIcon, CheckCircleIcon, XCircleIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon, CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { toast } from 'react-toastify';
 
 function EventoAgendaList({ onEditEvento, refreshKey }) {
     const [eventos, setEventos] = useState([]);
@@ -15,13 +16,13 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     const [togglingId, setTogglingId] = useState(null);
 
     // Estados para filtros
-    const [searchTerm, setSearchTerm] = useState(''); // Para buscar por título ou descrição
+    const [searchTerm, setSearchTerm] = useState('');
     const [clienteFilter, setClienteFilter] = useState('');
-    const [casoFilter, setCasoFilter] = useState(''); // Pode ser ID do caso ou "EVENTO_GERAL"
+    const [casoFilter, setCasoFilter] = useState('');
     const [tipoEventoFilter, setTipoEventoFilter] = useState('');
-    const [statusConclusaoFilter, setStatusConclusaoFilter] = useState(''); // '', 'concluido', 'pendente'
-    const [dataInicioFilter, setDataInicioFilter] = useState(''); // Data de início do período
-    const [dataFimFilter, setDataFimFilter] = useState(''); // Data de fim do período
+    const [statusConclusaoFilter, setStatusConclusaoFilter] = useState(''); 
+    const [dataInicioFilter, setDataInicioFilter] = useState('');
+    const [dataFimFilter, setDataFimFilter] = useState('');
     const [showFilters, setShowFilters] = useState(false);
 
     // Estado para ordenação
@@ -47,6 +48,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
 
         } catch (err) {
             console.error("Erro ao buscar clientes/casos para filtro de agenda:", err);
+            toast.error(`Erro ao carregar dados para filtros: ${err.message}`);
         }
     }, [clienteFilter]);
 
@@ -55,12 +57,12 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
         setError('');
         let url = `${API_URL}/eventos?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
         if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
-        if (clienteFilter && !casoFilter) { // Se cliente selecionado, mas nenhum caso específico
-             url += `&cliente_id=${clienteFilter}`; // API precisa suportar filtro de eventos por cliente_id (via casos)
+        if (clienteFilter && !casoFilter) {
+             url += `&cliente_id=${clienteFilter}`;
         }
         if (casoFilter) {
             if (casoFilter === "EVENTO_GERAL") {
-                url += `&caso_id=-1`; // Sinaliza para buscar eventos sem caso_id
+                url += `&caso_id=-1`; 
             } else {
                 url += `&caso_id=${casoFilter}`;
             }
@@ -82,6 +84,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
         } catch (err) {
             console.error("Erro ao buscar eventos:", err);
             setError(`Erro ao carregar eventos: ${err.message}`);
+            toast.error(`Erro ao carregar eventos: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -105,10 +108,12 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
                     const resData = await response.json().catch(() => ({}));
                     throw new Error(resData.erro || `Erro HTTP: ${response.status}`);
                 }
+                toast.success(`Evento ID ${id} excluído com sucesso!`);
                 fetchEventos(); 
             } catch (err) {
                 console.error(`Erro ao deletar evento ${id}:`, err);
                 setError(`Erro ao deletar evento: ${err.message}`);
+                toast.error(`Erro ao deletar evento: ${err.message}`);
             } finally {
                 setDeletingId(null);
             }
@@ -118,20 +123,15 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     const handleToggleConcluido = async (evento) => {
         setTogglingId(evento.id);
         setError(null);
-        // Prepara os dados para enviar, garantindo que as datas estejam no formato correto se forem enviadas
-        // A API de update de evento espera um corpo JSON completo.
         const dadosAtualizados = { 
             ...evento, 
-            // Converte data_inicio e data_fim para string ISO se existirem, removendo milissegundos e 'Z'
-            // A API deve ser capaz de parsear isso.
             data_inicio: evento.data_inicio ? new Date(evento.data_inicio).toISOString().split('.')[0] : null,
             data_fim: evento.data_fim ? new Date(evento.data_fim).toISOString().split('.')[0] : null,
             concluido: !evento.concluido 
         };
-         // Remove o campo 'cliente' e 'caso_titulo' que são apenas para exibição e não do modelo EventoAgenda
         delete dadosAtualizados.cliente; 
         delete dadosAtualizados.caso_titulo; 
-        delete dadosAtualizados.cliente_nome; // Se existir
+        delete dadosAtualizados.cliente_nome;
 
         try {
             const response = await fetch(`${API_URL}/eventos/${evento.id}`, {
@@ -143,10 +143,12 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
                 const resData = await response.json().catch(() => ({}));
                 throw new Error(resData.erro || `Erro HTTP: ${response.status}`);
             }
+            toast.success(`Status do evento ID ${evento.id} atualizado!`);
             fetchEventos();
         } catch (err) {
             console.error(`Erro ao atualizar status do evento ${evento.id}:`, err);
             setError(`Erro ao atualizar status: ${err.message}`);
+            toast.error(`Erro ao atualizar status: ${err.message}`);
         } finally {
             setTogglingId(null);
         }
@@ -161,10 +163,10 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     };
 
     const getSortIcon = (key) => {
-        const iconStyle = { width: '14px', height: '14px', display: 'inline', verticalAlign: 'middle' };
-        if (sortConfig.key !== key) return <ArrowsUpDownIcon className="ms-1 text-muted" style={iconStyle} />;
-        if (sortConfig.direction === 'asc') return <ArrowUpIcon className="ms-1 text-primary" style={iconStyle} />;
-        return <ArrowDownIcon className="ms-1 text-primary" style={iconStyle} />;
+        const iconStyle = { width: '14px', height: '14px', display: 'inline', verticalAlign: 'text-bottom', marginLeft: '4px' };
+        if (sortConfig.key !== key) return <ArrowsUpDownIcon className="text-muted" style={iconStyle} />;
+        if (sortConfig.direction === 'asc') return <ArrowUpIcon className="text-primary" style={iconStyle} />;
+        return <ArrowDownIcon className="text-primary" style={iconStyle} />;
     };
     
     const resetFilters = () => {
@@ -175,15 +177,16 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
         setStatusConclusaoFilter('');
         setDataInicioFilter('');
         setDataFimFilter('');
+        setShowFilters(false);
     };
 
     if (loading && eventos.length === 0) {
         return (
-            <div className="d-flex justify-content-center align-items-center p-4" style={{minHeight: '200px'}}>
+            <div className="d-flex justify-content-center align-items-center p-5">
                 <div className="spinner-border text-primary" role="status">
                     <span className="visually-hidden">Carregando agenda...</span>
                 </div>
-                <span className="ms-2 text-muted">Carregando agenda...</span>
+                <span className="ms-3 text-muted">Carregando agenda...</span>
             </div>
         );
     }
@@ -191,68 +194,79 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     return (
         <div className="card shadow-sm">
             <div className="card-header bg-light p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h6 className="mb-0 text-secondary">Filtros e Busca na Agenda</h6>
+                <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
+                    <h6 className="mb-0 text-secondary me-3">Filtros e Busca na Agenda</h6>
                     <button 
                         className="btn btn-sm btn-outline-secondary py-1 px-2 d-flex align-items-center"
                         onClick={() => setShowFilters(!showFilters)}
+                        aria-expanded={showFilters}
+                        aria-controls="filtrosAvancadosAgenda"
                     >
                         <FunnelIcon style={{width: '16px', height: '16px'}} className="me-1" />
-                        {showFilters ? ' Ocultar Filtros Avançados' : ' Mostrar Filtros Avançados'}
+                        {showFilters ? 'Ocultar Avançados' : 'Mostrar Avançados'}
                     </button>
                 </div>
-                <div className="row g-2 align-items-center">
-                    <div className="col-lg-4 col-md-6">
+                <div className="row g-2 align-items-end">
+                    <div className="col-lg-3 col-md-6">
+                        <label htmlFor="searchTermAgenda" className="form-label form-label-sm visually-hidden">Buscar</label>
                         <input
                             type="text"
+                            id="searchTermAgenda"
                             className="form-control form-control-sm"
                             placeholder="Buscar por Título/Descrição..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="col-lg-4 col-md-6">
-                        <select className="form-select form-select-sm" value={clienteFilter} onChange={(e) => {setClienteFilter(e.target.value); setCasoFilter('');}}>
+                    <div className="col-lg-3 col-md-6">
+                        <label htmlFor="clienteFilterAgenda" className="form-label form-label-sm visually-hidden">Cliente</label>
+                        <select id="clienteFilterAgenda" className="form-select form-select-sm" value={clienteFilter} onChange={(e) => {setClienteFilter(e.target.value); setCasoFilter('');}}>
                             <option value="">Todos Clientes (para Casos)</option>
                             {clientes.map(c => <option key={c.id} value={c.id}>{c.nome_razao_social}</option>)}
                         </select>
                     </div>
-                    <div className="col-lg-4 col-md-12">
-                        <select className="form-select form-select-sm" value={casoFilter} onChange={(e) => setCasoFilter(e.target.value)}>
+                    <div className="col-lg-3 col-md-6">
+                        <label htmlFor="casoFilterAgenda" className="form-label form-label-sm visually-hidden">Caso</label>
+                        <select id="casoFilterAgenda" className="form-select form-select-sm" value={casoFilter} onChange={(e) => setCasoFilter(e.target.value)}>
                             <option value="">Todos os Casos/Eventos Gerais</option>
                             <option value="EVENTO_GERAL">Apenas Eventos Gerais (Sem Caso)</option>
                             {casos.filter(c => !clienteFilter || c.cliente_id === parseInt(clienteFilter)).map(cs => (<option key={cs.id} value={cs.id}>{cs.titulo}</option>))}
                         </select>
                     </div>
+                     <div className="col-lg-3 col-md-6 text-lg-end">
+                        <button onClick={resetFilters} className="btn btn-sm btn-outline-secondary py-1 px-2 w-100">Limpar Filtros Básicos</button>
+                    </div>
                 </div>
                 {showFilters && (
-                     <div className="mt-3 pt-3 border-top">
-                        <div className="row g-2 align-items-center">
+                     <div className="mt-3 pt-3 border-top" id="filtrosAvancadosAgenda">
+                        <div className="row g-2 align-items-center mb-2">
                             <div className="col-md-3 col-sm-6">
-                                <select className="form-select form-select-sm" value={tipoEventoFilter} onChange={(e) => setTipoEventoFilter(e.target.value)}>
+                                <label htmlFor="tipoEventoFilterAgenda" className="form-label form-label-sm mb-1">Tipo de Evento:</label>
+                                <select id="tipoEventoFilterAgenda" className="form-select form-select-sm" value={tipoEventoFilter} onChange={(e) => setTipoEventoFilter(e.target.value)}>
                                     <option value="">Todos os Tipos</option>
                                     {tipoEventoOptions.map(tipo => (<option key={tipo} value={tipo}>{tipo}</option>))}
                                 </select>
                             </div>
                             <div className="col-md-3 col-sm-6">
-                                <select className="form-select form-select-sm" value={statusConclusaoFilter} onChange={(e) => setStatusConclusaoFilter(e.target.value)}>
-                                    <option value="">Todos (Conclusão)</option>
+                                <label htmlFor="statusConclusaoFilterAgenda" className="form-label form-label-sm mb-1">Status Conclusão:</label>
+                                <select id="statusConclusaoFilterAgenda" className="form-select form-select-sm" value={statusConclusaoFilter} onChange={(e) => setStatusConclusaoFilter(e.target.value)}>
+                                    <option value="">Todos</option>
                                     <option value="pendente">Pendentes</option>
                                     <option value="concluido">Concluídos</option>
                                 </select>
                             </div>
                             <div className="col-md-3 col-sm-6">
-                                <label htmlFor="dataInicioEvt" className="form-label form-label-sm mb-1 visually-hidden">De:</label>
-                                <input type="date" id="dataInicioEvt" className="form-control form-control-sm" value={dataInicioFilter} onChange={e => setDataInicioFilter(e.target.value)} title="Filtrar por data de início a partir de"/>
+                                <label htmlFor="dataInicioEvt" className="form-label form-label-sm mb-1">Período Início De:</label>
+                                <input type="date" id="dataInicioEvt" className="form-control form-control-sm" value={dataInicioFilter} onChange={e => setDataInicioFilter(e.target.value)} />
                             </div>
                             <div className="col-md-3 col-sm-6">
-                                 <label htmlFor="dataFimEvt" className="form-label form-label-sm mb-1 visually-hidden">Até:</label>
-                                <input type="date" id="dataFimEvt" className="form-control form-control-sm" value={dataFimFilter} onChange={e => setDataFimFilter(e.target.value)} title="Filtrar por data de início até"/>
+                                 <label htmlFor="dataFimEvt" className="form-label form-label-sm mb-1">Período Início Até:</label>
+                                <input type="date" id="dataFimEvt" className="form-control form-control-sm" value={dataFimFilter} onChange={e => setDataFimFilter(e.target.value)} />
                             </div>
                         </div>
-                        <div className="row mt-2">
+                         <div className="row mt-2">
                             <div className="col-12 text-end">
-                                <button onClick={resetFilters} className="btn btn-sm btn-outline-secondary py-1 px-2">Limpar Filtros</button>
+                                <button onClick={resetFilters} className="btn btn-sm btn-outline-danger py-1 px-2">Limpar Todos os Filtros</button>
                             </div>
                         </div>
                     </div>
@@ -262,7 +276,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
             {error && <div className="alert alert-danger m-3 small" role="alert">{error}</div>}
 
             <div className="table-responsive">
-                <table className="table table-hover table-striped table-sm mb-0">
+                <table className="table table-hover table-striped table-sm mb-0 align-middle">
                     <thead className="table-light">
                         <tr>
                             <th onClick={() => requestSort('data_inicio')} style={{ cursor: 'pointer' }}>Data/Hora Início {getSortIcon('data_inicio')}</th>
@@ -270,7 +284,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
                             <th onClick={() => requestSort('tipo_evento')} style={{ cursor: 'pointer' }}>Tipo {getSortIcon('tipo_evento')}</th>
                             <th onClick={() => requestSort('caso_titulo')} style={{ cursor: 'pointer' }}>Caso {getSortIcon('caso_titulo')}</th>
                             <th className="text-center" onClick={() => requestSort('concluido')} style={{ cursor: 'pointer' }}>Concluído {getSortIcon('concluido')}</th>
-                            <th className="text-center">Ações</th>
+                            <th className="text-center" style={{width: '100px'}}>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -278,18 +292,18 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
                             <tr><td colSpan="6" className="text-center text-muted p-4">Nenhum evento/prazo encontrado.</td></tr>
                         ) : (
                             eventos.map((evento) => (
-                                <tr key={evento.id} className={evento.concluido ? 'opacity-50' : ''}>
-                                    <td className="align-middle">
+                                <tr key={evento.id} className={evento.concluido ? 'table-light text-muted' : ''} style={evento.concluido ? {textDecoration: 'line-through'} : {}}>
+                                    <td className="px-3 py-2">
                                         {new Date(evento.data_inicio).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                     </td>
-                                    <td className="align-middle">{evento.titulo}</td>
-                                    <td className="align-middle">
+                                    <td className="px-3 py-2">{evento.titulo}</td>
+                                    <td className="px-3 py-2">
                                         {evento.tipo_evento === 'Prazo' && <ClockIcon className="me-1 text-danger d-inline" style={{width: '16px', height: '16px'}}/>}
                                         {evento.tipo_evento !== 'Prazo' && <CalendarDaysIcon className="me-1 text-primary d-inline" style={{width: '16px', height: '16px'}}/>}
                                         {evento.tipo_evento}
                                     </td>
-                                    <td className="align-middle">{evento.caso_titulo || '-'}</td>
-                                    <td className="text-center align-middle">
+                                    <td className="px-3 py-2">{evento.caso_titulo || '-'}</td>
+                                    <td className="text-center px-3 py-2">
                                         <button
                                             onClick={() => handleToggleConcluido(evento)}
                                             className={`btn btn-sm p-1 lh-1 ${evento.concluido ? 'btn-outline-secondary' : 'btn-outline-success'}`}
@@ -300,7 +314,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
                                             {togglingId === evento.id ? <div className="spinner-border spinner-border-sm" role="status"></div> : (evento.concluido ? <XCircleIcon style={{ width: '18px', height: '18px' }}/> : <CheckCircleIcon style={{ width: '18px', height: '18px' }} />)}
                                         </button>
                                     </td>
-                                    <td className="text-center align-middle">
+                                    <td className="text-center px-3 py-2">
                                         <button onClick={() => onEditEvento(evento)} className="btn btn-sm btn-outline-primary me-1 p-1 lh-1" title="Editar" style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}} disabled={deletingId === evento.id || togglingId === evento.id}><PencilSquareIcon style={{ width: '16px', height: '16px' }} /></button>
                                         <button onClick={() => handleDeleteClick(evento.id)} className="btn btn-sm btn-outline-danger p-1 lh-1" title="Deletar" style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}} disabled={deletingId === evento.id || togglingId === evento.id}>
                                             {deletingId === evento.id ? <div className="spinner-border spinner-border-sm" role="status" style={{width: '1rem', height: '1rem'}}></div> : <TrashIcon style={{ width: '16px', height: '16px' }} />}
@@ -313,8 +327,8 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
                 </table>
             </div>
             {eventos.length > 0 && (
-                <div className="card-footer bg-light text-muted p-2 text-end">
-                    <small>{eventos.length} evento(s) encontrado(s)</small>
+                <div className="card-footer bg-light text-muted p-2 text-end small">
+                    {eventos.length} evento(s) encontrado(s)
                 </div>
             )}
         </div>
