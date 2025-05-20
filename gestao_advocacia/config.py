@@ -12,5 +12,5 @@ class Config:  # Sem espaços antes de 'class'
 
     # Configuração do Banco de Dados usando SQLAlchemy # Linha indentada
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(basedir, 'app.db') # Continuação indentada
+        'postgresql://postgres:Alisson075*@localhost:5432/advocacia_db' + os.path.join(basedir, 'app.db') # Continuação indentada
     SQLALCHEMY_TRACK_MODIFICATIONS = False # Linha indentada

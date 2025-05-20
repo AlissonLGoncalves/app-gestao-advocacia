@@ -1,6 +1,6 @@
 # app.py
 # Backend Flask para a aplicação de Gestão de Advocacia
-# v3: Corrigido DeprecationWarning para datetime.utcnow().
+# v4: Corrigida ordem de validação em create_recebimento.
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -57,11 +57,11 @@ class Cliente(db.Model):
     telefone = db.Column(db.String(20), nullable=True)
     email = db.Column(db.String(255), nullable=True)
     notas_gerais = db.Column(db.Text, nullable=True)
-    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
-    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) 
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) 
     
     casos = db.relationship('Caso', backref='cliente', lazy=True, cascade="all, delete-orphan")
-    recebimentos = db.relationship('Recebimento', backref='cliente_ref', lazy='dynamic', cascade="all, delete-orphan")
+    recebimentos = db.relationship('Recebimento', backref='cliente_ref', lazy='dynamic', cascade="all, delete-orphan") 
     documentos = db.relationship('Documento', backref='cliente_ref_doc', lazy='dynamic', cascade="all, delete-orphan")
 
     def __repr__(self): return f'<Cliente {self.id}: {self.nome_razao_social}>'
@@ -96,12 +96,12 @@ class Caso(db.Model):
     valor_causa = db.Column(db.Numeric(15, 2), nullable=True) 
     data_distribuicao = db.Column(db.Date, nullable=True)
     notas_caso = db.Column(db.Text, nullable=True)
-    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
-    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
-    recebimentos = db.relationship('Recebimento', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan")
-    despesas = db.relationship('Despesa', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan")
-    eventos = db.relationship('EventoAgenda', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan")
+    recebimentos = db.relationship('Recebimento', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan") 
+    despesas = db.relationship('Despesa', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan") 
+    eventos = db.relationship('EventoAgenda', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan") 
     documentos = db.relationship('Documento', backref='caso_ref_doc', lazy='dynamic', cascade="all, delete-orphan")
     
     def __repr__(self): return f'<Caso {self.id}: {self.titulo}>'
@@ -135,8 +135,8 @@ class Recebimento(db.Model):
     status = db.Column(db.String(50), nullable=False)
     forma_pagamento = db.Column(db.String(50), nullable=True)
     notas = db.Column(db.Text, nullable=True)
-    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
-    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self): return f'<Recebimento {self.id}: {self.descricao} - {self.valor}>'
     
@@ -166,8 +166,8 @@ class Despesa(db.Model):
     status = db.Column(db.String(50), nullable=False)
     forma_pagamento = db.Column(db.String(50), nullable=True)
     notas = db.Column(db.Text, nullable=True)
-    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
-    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self): return f'<Despesa {self.id}: {self.descricao} - {self.valor}>'
     
@@ -195,8 +195,8 @@ class EventoAgenda(db.Model):
     data_fim = db.Column(db.DateTime, nullable=True) 
     local = db.Column(db.String(255), nullable=True)
     concluido = db.Column(db.Boolean, default=False)
-    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
-    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self): return f'<EventoAgenda {self.id}: {self.tipo_evento} - {self.titulo}>'
     
@@ -222,7 +222,7 @@ class Documento(db.Model):
     tipo_mime = db.Column(db.String(100), nullable=True)
     tamanho_bytes = db.Column(db.BigInteger, nullable=True)
     descricao = db.Column(db.Text, nullable=True)
-    data_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc)) # Corrigido
+    data_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     def __repr__(self): return f'<Documento {self.id}: {self.nome_original_arquivo}>'
     
@@ -251,8 +251,7 @@ def parse_datetime(datetime_string):
     if not datetime_string: return None
     try: 
         dt_str = datetime_string.replace('Z', '') 
-        if '.' in dt_str: # Verifica se tem microsegundos
-            # Tenta parsear com microsegundos, mas se falhar, tenta sem.
+        if '.' in dt_str:
             try:
                 return datetime.fromisoformat(dt_str)
             except ValueError:
@@ -267,11 +266,12 @@ def parse_datetime(datetime_string):
             return None
 
 # --- Rotas da API (Endpoints) ---
-# ... (As rotas GET, POST, PUT, DELETE para Clientes, Casos, Recebimentos, Despesas, Eventos, Documentos, Relatórios permanecem as mesmas da versão anterior - app_py_filtros_completos_001)
-# A única alteração é nos modelos para usar datetime.now(timezone.utc) nos defaults e onupdate.
-# As lógicas de filtro e ordenação nas rotas GET já foram implementadas anteriormente.
+@app.route('/')
+def index(): 
+    return jsonify({"message": "API de Gestão para Advocacia está no ar!"})
 
 # --- Rotas para Clientes ---
+# ... (Mantidas como na versão anterior - app_py_filtros_completos_001) ...
 @app.route('/api/clientes', methods=['GET'])
 def get_clientes():
     try: 
@@ -393,6 +393,7 @@ def delete_cliente(id):
         return jsonify({"erro": "Erro ao deletar cliente."}), 500
 
 # --- Rotas para Casos ---
+# ... (Mantidas como na versão anterior - app_py_filtros_completos_001) ...
 @app.route('/api/casos', methods=['GET'])
 def get_casos():
     try:
@@ -616,10 +617,11 @@ def create_recebimento():
        or not dados.get('descricao') or not dados.get('categoria') or dados.get('valor') is None or not dados.get('status'):
         return jsonify({"erro": "Dados incompletos (caso_id, cliente_id, data_vencimento, descricao, categoria, valor, status são obrigatórios)"}), 400
 
-    if not db.session.get(Caso, dados['caso_id']): 
-        return jsonify({"erro": f"Caso com ID {dados['caso_id']} não encontrado."}), 404
+    # CORREÇÃO: Validar cliente_id ANTES de caso_id
     if not db.session.get(Cliente, dados['cliente_id']): 
         return jsonify({"erro": f"Cliente com ID {dados['cliente_id']} não encontrado."}), 404
+    if not db.session.get(Caso, dados['caso_id']): 
+        return jsonify({"erro": f"Caso com ID {dados['caso_id']} não encontrado."}), 404
         
     novo_recebimento = Recebimento(
         caso_id=dados['caso_id'], cliente_id=dados['cliente_id'], 
@@ -658,6 +660,17 @@ def update_recebimento(id):
         if recebimento is None: 
             return jsonify({"erro": "Recebimento não encontrado para atualizar"}), 404
         
+        # Validar cliente_id e caso_id se forem alterados (geralmente não se altera FKs assim, mas se precisar)
+        if 'cliente_id' in dados and dados['cliente_id'] != recebimento.cliente_id:
+            if not db.session.get(Cliente, dados['cliente_id']):
+                return jsonify({"erro": f"Novo Cliente com ID {dados['cliente_id']} não encontrado."}), 404
+            recebimento.cliente_id = dados['cliente_id']
+        
+        if 'caso_id' in dados and dados['caso_id'] != recebimento.caso_id:
+            if not db.session.get(Caso, dados['caso_id']):
+                return jsonify({"erro": f"Novo Caso com ID {dados['caso_id']} não encontrado."}), 404
+            recebimento.caso_id = dados['caso_id']
+
         recebimento.data_recebimento = parse_date(dados.get('data_recebimento')) if 'data_recebimento' in dados else recebimento.data_recebimento
         recebimento.data_vencimento = parse_date(dados.get('data_vencimento')) if 'data_vencimento' in dados else recebimento.data_vencimento
         recebimento.descricao = dados.get('descricao', recebimento.descricao)
@@ -710,7 +723,7 @@ def get_despesas():
         if cliente_id_filtro:
             query = query.filter(Caso.cliente_id == cliente_id_filtro)
         if caso_id_filtro:
-            if caso_id_filtro == -1: # Identificador para despesas gerais (sem caso)
+            if caso_id_filtro == -1: 
                 query = query.filter(Despesa.caso_id.is_(None))
             else:
                 query = query.filter(Despesa.caso_id == caso_id_filtro)
@@ -857,7 +870,7 @@ def get_eventos():
         if cliente_id_filtro:
              query = query.filter(Caso.cliente_id == cliente_id_filtro)
         if caso_id_filtro: 
-            if caso_id_filtro == -1: # Para eventos sem caso associado
+            if caso_id_filtro == -1: 
                  query = query.filter(EventoAgenda.caso_id.is_(None))
             else:
                 query = query.filter(EventoAgenda.caso_id == caso_id_filtro)
@@ -1045,7 +1058,7 @@ def upload_documento():
 
     if file and allowed_file(file.filename):
         filename_original = secure_filename(file.filename)
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f') # Corrigido
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
         filename_armazenado = f"{timestamp}_{filename_original}"
         caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], filename_armazenado)
         
@@ -1090,7 +1103,7 @@ def get_documentos():
         if cliente_id_filtro:
             query = query.filter(Documento.cliente_id == cliente_id_filtro)
         if caso_id_filtro:
-            if caso_id_filtro == -1: # Para documentos sem caso
+            if caso_id_filtro == -1: 
                 query = query.filter(Documento.caso_id.is_(None))
             else:
                 query = query.filter(Documento.caso_id == caso_id_filtro)
@@ -1175,7 +1188,7 @@ def update_documento_metadados(id):
         if documento.caso_id and not db.session.get(Caso, documento.caso_id):
             return jsonify({"erro": f"Caso com ID {documento.caso_id} não encontrado."}), 404
 
-        # data_atualizacao não existe no modelo Documento, mas data_upload é default=utcnow
+        # data_atualizacao não existe no modelo Documento, mas data_upload é default
         db.session.commit()
         return jsonify(documento.to_dict()), 200
     except Exception as e:
