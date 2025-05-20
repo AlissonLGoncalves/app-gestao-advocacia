@@ -1,116 +1,122 @@
-// ==================================================
-// Conteúdo do arquivo: src/Dashboard.js
-// (Atualizado com melhorias de UX/UI)
-// ==================================================
+// src/Dashboard.js
+// Este componente exibe o painel principal da aplicação com estatísticas e informações relevantes.
+// Versão 4: Correção de erro de sintaxe e remoção de comentário problemático.
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config'; 
+import { API_URL } from './config'; // Certifique-se que config.js existe e exporta API_URL
 
-// Componente para um Card de Estatística Individual
-function StatCard({ title, value, icon, bgColor, textColor, iconColor, loading, unit = '' }) {
-    if (loading) {
-        return (
-            <div className={`p-6 rounded-lg shadow border animate-pulse ${bgColor || 'bg-gray-100'} ${textColor || 'text-gray-800'}`}>
-                <div className="h-6 bg-gray-300 rounded w-3/4 mb-2"></div>
-                <div className="h-8 bg-gray-400 rounded w-1/2"></div>
-            </div>
-        );
-    }
-    return (
-        <div className={`${bgColor || 'bg-gray-100'} border ${borderColorForBg(bgColor) || 'border-gray-200'} p-6 rounded-lg shadow hover:shadow-xl transition-shadow duration-300 ease-in-out`}>
-            <div className="flex items-center justify-between mb-2">
-                <h3 className={`text-lg font-semibold ${textColor || 'text-gray-800'}`}>{title}</h3>
-                {icon && <i className={`${icon} ${iconColor || 'text-gray-500'} text-3xl`}></i>}
-            </div>
-            <p className={`text-4xl font-bold ${textColor || 'text-gray-700'} mt-1`}>
-                {value} <span className="text-lg font-normal">{unit}</span>
-            </p>
+// Ícones SVG para os cards (Exemplos)
+const UsersIconSolid = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6.07 11c.046.327.07.66.07 1a6.97 6.97 0 00-1.5 4.33A5 5 0 011 16v1h6.07z" /></svg>;
+const BriefcaseIconSolid = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v1H2.5A1.5 1.5 0 001 6.5V16a2 2 0 002 2h14a2 2 0 002-2V6.5A1.5 1.5 0 0017.5 5H16V4a2 2 0 00-2-2H6zm4 10.5a.5.5 0 000-1H7.5a.5.5 0 000 1H10zm0-2a.5.5 0 000-1H7.5a.5.5 0 000 1H10zM7 6.5a.5.5 0 01.5-.5h5a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-5a.5.5 0 01-.5-.5v-1z" clipRule="evenodd" /></svg>;
+const CreditCardIconSolid = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zm-7 4a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1z" clipRule="evenodd" /></svg>;
+const TrendingDownIconSolid = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12 13a1 1 0 100 2h5a1 1 0 001-1V9a1 1 0 10-2 0v2.586l-4.293-4.293a1 1 0 00-1.414 0L8 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0L12 13zm-9-4a1 1 0 011-1h5a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>;
+
+
+// Componente reutilizável para os cards de estatísticas
+const StatCard = ({ title, value, icon, colorClass = "text-blue-600", bgColorClass = "bg-blue-100" }) => (
+  <div className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow duration-200 ease-in-out flex items-center space-x-3">
+    <div className={`p-2.5 rounded-full ${bgColorClass} ${colorClass}`}>
+      {icon}
+    </div>
+    <div className="flex-1">
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-normal">{title}</p>
+      <p className="text-xl font-semibold text-gray-800">{value}</p>
+    </div>
+  </div>
+);
+
+// Componente para item da lista de eventos
+const EventListItem = ({ evento }) => {
+  const dataFormatada = new Date(evento.data_inicio).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+  });
+  const horaFormatada = evento.data_inicio ? new Date(evento.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+
+  return (
+    <li className="py-3 px-1.5 hover:bg-gray-50 rounded-md transition-colors duration-150 cursor-pointer group">
+      <div className="flex items-center space-x-2.5">
+        <div className="flex-shrink-0">
+          {evento.tipo_evento === 'Prazo' ? (
+            <svg className="h-5 w-5 text-red-500 group-hover:text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          ) : (
+            <svg className="h-5 w-5 text-blue-500 group-hover:text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          )}
         </div>
-    );
-}
-
-// Função auxiliar para determinar a cor da borda com base na cor de fundo
-function borderColorForBg(bgColor) {
-    if (bgColor?.includes('blue')) return 'border-blue-300';
-    if (bgColor?.includes('green')) return 'border-green-300';
-    if (bgColor?.includes('yellow')) return 'border-yellow-300';
-    if (bgColor?.includes('purple')) return 'border-purple-300';
-    if (bgColor?.includes('red')) return 'border-red-300';
-    return 'border-gray-200';
-}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900 truncate">{evento.titulo}</p>
+          <p className="text-xs text-gray-500 group-hover:text-gray-600 truncate">
+            {dataFormatada} {horaFormatada && `às ${horaFormatada}`}
+            {evento.caso_titulo && <span className="ml-1.5 text-gray-400 group-hover:text-gray-500">| {evento.caso_titulo}</span>}
+          </p>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 group-hover:text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+        </svg>
+      </div>
+    </li>
+  );
+};
 
 
 function Dashboard() {
   const [stats, setStats] = useState({
     totalClientes: 0,
-    totalCasosAtivos: 0,
-    proximosEventos: [],
+    casosAtivos: 0,
     recebimentosPendentesValor: 0,
     recebimentosPendentesQtd: 0,
     despesasAPagarValor: 0,
     despesasAPagarQtd: 0,
   });
+  const [proximosEventos, setProximosEventos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const formatarMoeda = (valor) => {
-    if (valor === null || valor === undefined || isNaN(Number(valor))) return 'R$ 0,00';
-    return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
-
-  const formatarDataHora = (dataIso) => {
-    if (!dataIso) return '-';
-    try {
-      return new Date(dataIso).toLocaleString('pt-BR', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-      });
-    } catch { return dataIso; }
-  };
+  const [erro, setErro] = useState('');
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setErro('');
     try {
       const [clientesRes, casosRes, eventosRes, recebimentosRes, despesasRes] = await Promise.all([
-        fetch(`${API_URL}/clientes`).catch(e => ({ ok: false, statusText: e.message, json: () => Promise.resolve({erro: e.message}) })),
-        fetch(`${API_URL}/casos?status=Ativo`).catch(e => ({ ok: false, statusText: e.message, json: () => Promise.resolve({erro: e.message}) })), 
-        fetch(`${API_URL}/eventos?_sort=data_inicio&_order=asc&_limit=5&concluido=false`).catch(e => ({ ok: false, statusText: e.message, json: () => Promise.resolve({erro: e.message}) })),
-        fetch(`${API_URL}/recebimentos`).catch(e => ({ ok: false, statusText: e.message, json: () => Promise.resolve({erro: e.message}) })),
-        fetch(`${API_URL}/despesas`).catch(e => ({ ok: false, statusText: e.message, json: () => Promise.resolve({erro: e.message}) }))
+        fetch(`${API_URL}/clientes?count_only=true`),
+        fetch(`${API_URL}/casos?status=Ativo&count_only=true`),
+        fetch(`${API_URL}/eventos?sort_by=data_inicio&order=asc&limit=5&status=Pendente`),
+        fetch(`${API_URL}/recebimentos?status=Pendente`),
+        fetch(`${API_URL}/despesas?status=A Pagar`),
       ]);
 
-      const processResponse = async (res, name) => {
-          if (!res.ok) {
-              const errorBody = await res.json().catch(() => ({erro: `Erro na rede ao buscar ${name}`}));
-              throw new Error(`Erro ${name}: ${errorBody.erro || res.statusText}`);
-          }
-          return res.json();
-      };
-      
-      const clientesData = await processResponse(clientesRes, 'clientes');
-      const casosData = await processResponse(casosRes, 'casos');
-      const eventosData = await processResponse(eventosRes, 'eventos');
-      const recebimentosData = await processResponse(recebimentosRes, 'recebimentos');
-      const despesasData = await processResponse(despesasRes, 'despesas');
+      if (!clientesRes.ok) throw new Error('Falha ao carregar dados de clientes.');
+      if (!casosRes.ok) throw new Error('Falha ao carregar dados de casos.');
+      if (!eventosRes.ok) throw new Error('Falha ao carregar próximos eventos.');
+      if (!recebimentosRes.ok) throw new Error('Falha ao carregar recebimentos pendentes.');
+      if (!despesasRes.ok) throw new Error('Falha ao carregar despesas a pagar.');
 
-      const recebimentosPendentes = recebimentosData.filter(r => r.status === 'Pendente');
-      const totalPendente = recebimentosPendentes.reduce((acc, r) => acc + parseFloat(r.valor || 0), 0);
-      const despesasAPagar = despesasData.filter(d => d.status === 'A Pagar');
-      const totalAPagar = despesasAPagar.reduce((acc, d) => acc + parseFloat(d.valor || 0), 0);
+      const clientesData = await clientesRes.json();
+      const casosData = await casosRes.json();
+      const eventosData = await eventosRes.json();
+      const recebimentosData = await recebimentosRes.json();
+      const despesasData = await despesasRes.json();
+      
+      const recebimentosPendentes = (recebimentosData.recebimentos || []).filter(r => r.status === 'Pendente');
+      const totalPendenteValor = recebimentosPendentes.reduce((acc, curr) => acc + parseFloat(curr.valor || 0), 0);
+      const totalPendenteQtd = recebimentosPendentes.length;
+
+      const despesasAPagar = (despesasData.despesas || []).filter(d => d.status === 'A Pagar');
+      const totalAPagarValor = despesasAPagar.reduce((acc, curr) => acc + parseFloat(curr.valor || 0), 0);
+      const totalAPagarQtd = despesasAPagar.length;
 
       setStats({
-        totalClientes: clientesData.length,
-        totalCasosAtivos: casosData.length,
-        proximosEventos: eventosData, 
-        recebimentosPendentesValor: totalPendente,
-        recebimentosPendentesQtd: recebimentosPendentes.length,
-        despesasAPagarValor: totalAPagar,
-        despesasAPagarQtd: despesasAPagar.length,
+        totalClientes: clientesData.total_clientes || 0,
+        casosAtivos: casosData.total_casos || 0,
+        recebimentosPendentesValor: totalPendenteValor,
+        recebimentosPendentesQtd: totalPendenteQtd,
+        despesasAPagarValor: totalAPagarValor,
+        despesasAPagarQtd: totalAPagarQtd,
       });
+      setProximosEventos(eventosData.eventos || []);
 
-    } catch (err) {
-      console.error("Falha ao buscar dados do dashboard:", err);
-      setError(`Falha ao carregar dados do dashboard: ${err.message}`);
+    } catch (error) {
+      console.error("Erro ao carregar dados do dashboard:", error);
+      setErro(`Erro ao carregar Dashboard! ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -120,64 +126,66 @@ function Dashboard() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  if (loading) return (
-    <div className="p-4">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-6">Dashboard</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-            {[1,2,3,4,5].map(i => <StatCard key={i} title="" value="" loading={true} />)}
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200 animate-pulse">
-            <div className="h-6 bg-gray-300 rounded w-1/2 mb-4"></div>
-            <div className="space-y-3">
-                {[1,2,3].map(i => <div key={i} className="h-4 bg-gray-300 rounded w-full"></div>)}
-            </div>
-        </div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+        <p className="ml-3 text-gray-600 text-sm">Carregando...</p>
+      </div>
+    );
+  }
 
-  if (error) return (
-    <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
-        <span className="font-medium">Erro ao carregar Dashboard!</span> {error}
-    </div>
-  );
+  if (erro) {
+    return <div className="bg-red-50 border border-red-300 text-red-600 px-4 py-3 rounded-lg shadow-sm relative" role="alert">
+        <strong className="font-semibold">Ocorreu um erro!</strong>
+        <span className="block sm:inline ml-2 text-sm">{erro}</span>
+    </div>;
+  }
 
   return (
-    <div className="p-4">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-6">Visão Geral</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8"> {/* Ajustado para 5 colunas se possível */}
-        <StatCard title="Total de Clientes" value={stats.totalClientes} icon="fas fa-users" bgColor="bg-blue-50" textColor="text-blue-700" iconColor="text-blue-500" />
-        <StatCard title="Casos Ativos" value={stats.totalCasosAtivos} icon="fas fa-briefcase" bgColor="bg-green-50" textColor="text-green-700" iconColor="text-green-500" />
-        <StatCard title="Próximos Eventos" value={stats.proximosEventos.length} icon="fas fa-calendar-alt" bgColor="bg-yellow-50" textColor="text-yellow-700" iconColor="text-yellow-500" />
-        <StatCard title="A Receber" value={formatarMoeda(stats.recebimentosPendentesValor)} unit={`(${stats.recebimentosPendentesQtd})`} icon="fas fa-hand-holding-usd" bgColor="bg-purple-50" textColor="text-purple-700" iconColor="text-purple-500" />
-        <StatCard title="A Pagar" value={formatarMoeda(stats.despesasAPagarValor)} unit={`(${stats.despesasAPagarQtd})`} icon="fas fa-file-invoice-dollar" bgColor="bg-red-50" textColor="text-red-700" iconColor="text-red-500" />
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard 
+          title="Total de Clientes" 
+          value={stats.totalClientes} 
+          icon={<UsersIconSolid />} 
+          colorClass="text-indigo-500"
+          bgColorClass="bg-indigo-50"
+        />
+        <StatCard 
+          title="Casos Ativos" 
+          value={stats.casosAtivos} 
+          icon={<BriefcaseIconSolid />} 
+          colorClass="text-green-500"
+          bgColorClass="bg-green-50"
+        />
+         <StatCard 
+          title="Recebimentos Pendentes" 
+          value={`${stats.recebimentosPendentesQtd} (R$ ${stats.recebimentosPendentesValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+          icon={<CreditCardIconSolid />}
+          colorClass="text-amber-500" 
+          bgColorClass="bg-amber-50"
+        />
+        <StatCard 
+          title="Despesas a Pagar" 
+          value={`${stats.despesasAPagarQtd} (R$ ${stats.despesasAPagarValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+          icon={<TrendingDownIconSolid />}
+          colorClass="text-red-500"
+          bgColorClass="bg-red-50"
+        />
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-        <h3 className="text-xl font-semibold text-gray-700 mb-4">Próximos 5 Prazos/Eventos (Não Concluídos)</h3>
-        {stats.proximosEventos.length === 0 ? (
-          <p className="text-gray-500 italic">Nenhum prazo ou evento próximo para exibir.</p>
-        ) : (
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h2 className="text-base font-semibold text-gray-700 mb-2.5">Próximos Prazos e Eventos</h2>
+        {proximosEventos.length > 0 ? (
           <ul className="divide-y divide-gray-200">
-            {stats.proximosEventos.map(evento => (
-              <li key={evento.id} className="py-4 px-2 hover:bg-gray-50 rounded transition-colors duration-150">
-                <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-full ${evento.tipo_evento === 'Prazo' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                        <i className={`fas ${evento.tipo_evento === 'Prazo' ? 'fa-flag' : 'fa-calendar-check'} fa-fw`}></i>
-                    </div>
-                    <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-800">{evento.titulo}</p>
-                        <p className="text-xs text-gray-500">
-                            {evento.tipo_evento} - <span className="font-medium">{formatarDataHora(evento.data_inicio)}</span>
-                            {evento.caso_id && <span className="ml-2 text-gray-400">(Caso ID: {evento.caso_id})</span>}
-                        </p>
-                    </div>
-                    {/* TODO: Adicionar link ou ação para ver o evento/caso */}
-                    {/* <button className="text-xs text-indigo-500 hover:underline">Detalhes</button> */}
-                </div>
-              </li>
+            {proximosEventos.map(evento => (
+              <EventListItem key={evento.id} evento={evento} />
             ))}
           </ul>
+        ) : (
+          // Removido o comentário problemático da linha abaixo
+          <p className="text-gray-500 text-center py-5 text-xs">Nenhum prazo ou evento pendente nos próximos dias.</p>
         )}
       </div>
     </div>

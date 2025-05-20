@@ -1,0 +1,29 @@
+/* Arquivo: src/index.css */
+/* Este arquivo é para seus estilos globais personalizados ou para sobrescrever estilos do Bootstrap. */
+/* NÃO inclua diretivas do Tailwind CSS como @tailwind base; aqui. */
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* O Bootstrap já define um fundo para o body.
+     Se quiser sobrescrever para um fundo cinza claro específico, como tínhamos antes,
+     você pode descomentar e ajustar a linha abaixo: */
+  /* background-color: #f8f9fa; */ /* Exemplo: Bootstrap light gray */
+  /* color: #212529; */ /* Exemplo: Bootstrap default text color */
+  margin: 0; /* Garante que não há margens padrão no body */
+}
+
+/* Seus outros estilos globais personalizados podem vir aqui.
+   Por exemplo, se você tinha estilos importantes no seu App.css antigo (que não eram do Tailwind)
+   e decidiu não manter o App.css, você pode movê-los para cá.
+
+   Lembre-se que as classes do Tailwind (como p-4, text-blue-500, rounded-lg, etc.)
+   NÃO funcionarão mais. Você precisará usar classes do Bootstrap ou criar suas próprias classes CSS.
+*/
+
+/* Exemplo de estilo global (apenas para ilustração):
+   h1, h2, h3 {
+     color: #333;
+   }
+*/

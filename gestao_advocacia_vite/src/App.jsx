@@ -1,42 +1,40 @@
-// src/App.js
-// Este é o componente principal da aplicação React.
-// Ele gere a navegação entre as diferentes seções (Dashboard, Clientes, Casos, etc.)
-// e renderiza o conteúdo apropriado com base na seção ativa.
-// Versão com Heroicons para uma solução de ícones mais robusta.
+// src/App.jsx
+// Componente principal da aplicação React.
+// Gere a navegação e renderiza o conteúdo da seção ativa.
+// v2: Passa a função mudarSecao para o Dashboard e usa Heroicons.
 
 import React, { useState, useCallback } from 'react';
 
 // Importação dos componentes de cada seção
-import ClienteList from './ClienteList.js';
-import ClienteForm from './ClienteForm.js';
-import CasoList from './CasoList.js';
-import CasoForm from './CasoForm.js';
-import RecebimentoList from './RecebimentoList.js';
-import RecebimentoForm from './RecebimentoForm.js';
-import DespesaList from './DespesaList.js';
-import DespesaForm from './DespesaForm.js';
-import EventoAgendaList from './EventoAgendaList.js';
-import EventoAgendaForm from './EventoAgendaForm.js';
-import Dashboard from './Dashboard.js';
-import RelatoriosPage from './RelatoriosPage.js';
-import DocumentoList from './DocumentoList.js';
-import DocumentoForm from './DocumentoForm.js';
+import ClienteList from './ClienteList.jsx';
+import ClienteForm from './ClienteForm.jsx';
+import CasoList from './CasoList.jsx';
+import CasoForm from './CasoForm.jsx';
+import RecebimentoList from './RecebimentoList.jsx';
+import RecebimentoForm from './RecebimentoForm.jsx';
+import DespesaList from './DespesaList.jsx';
+import DespesaForm from './DespesaForm.jsx';
+import EventoAgendaList from './EventoAgendaList.jsx';
+import EventoAgendaForm from './EventoAgendaForm.jsx';
+import Dashboard from './Dashboard.jsx'; // Importa o Dashboard
+import RelatoriosPage from './RelatoriosPage.jsx';
+import DocumentoList from './DocumentoList.jsx';
+import DocumentoForm from './DocumentoForm.jsx';
 
-// Importação dos ícones da biblioteca Heroicons (outline para um visual mais leve)
+// Importação dos ícones da biblioteca Heroicons
 import {
   HomeIcon,
   UsersIcon,
   BriefcaseIcon,
   DocumentTextIcon,
   CurrencyDollarIcon,
-  CalendarDaysIcon, // Ícone mais apropriado para agenda
+  CalendarDaysIcon,
   ChartBarIcon,
-  CreditCardIcon // Ícone para Despesas
+  CreditCardIcon
 } from '@heroicons/react/24/outline';
 
-
 // Constantes para identificar as seções da aplicação
-const SECOES = {
+export const SECOES = { // Exportando para que Dashboard possa usar
   DASHBOARD: 'DASHBOARD',
   CLIENTES: 'CLIENTES',
   CASOS: 'CASOS',
@@ -48,59 +46,43 @@ const SECOES = {
 };
 
 function App() {
-  // Estado para controlar a seção atualmente ativa
   const [secaoAtiva, setSecaoAtiva] = useState(SECOES.DASHBOARD);
-  // Estado para guardar o item que está a ser editado (cliente, caso, etc.)
   const [itemParaEditar, setItemParaEditar] = useState(null);
-  // Estado para controlar a visibilidade do formulário de adição/edição
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  // Estado para forçar a atualização de listas após uma ação (adição, edição, deleção)
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Função para mudar a seção ativa e resetar estados de edição/formulário
-  const mudarSecao = (secao) => {
+  const mudarSecao = useCallback((secao) => { // useCallback para otimização
     setSecaoAtiva(secao);
-    setItemParaEditar(null); // Limpa item em edição ao mudar de seção
-    setMostrarFormulario(false); // Esconde formulário ao mudar de seção
-  };
+    setItemParaEditar(null);
+    setMostrarFormulario(false);
+  }, []); // Sem dependências, pois setSecaoAtiva, etc., são estáveis
 
-  // Função chamada quando o botão "Editar" de um item da lista é clicado
   const handleEditarClick = (item, secaoEspecifica = null) => {
-    const secaoAlvo = secaoEspecifica || secaoAtiva; // Usa seção específica se fornecida, senão a ativa
-    // Verifica se a seção alvo suporta edição através do formulário principal
+    const secaoAlvo = secaoEspecifica || secaoAtiva;
     if (Object.values(SECOES).includes(secaoAlvo) && secaoAlvo !== SECOES.DASHBOARD && secaoAlvo !== SECOES.RELATORIOS) {
-      setItemParaEditar(item); // Define o item para edição
-      setMostrarFormulario(true); // Mostra o formulário
-    } else {
-      console.warn(`Tentativa de edição em seção não suportada diretamente pelo formulário principal: ${secaoAlvo}`);
+      setItemParaEditar(item);
+      setMostrarFormulario(true);
     }
   };
 
-  // Função chamada quando o botão "Adicionar Novo..." é clicado
   const handleAdicionarClick = () => {
-    // Verifica se a seção ativa suporta adição através do formulário principal
     if (Object.values(SECOES).includes(secaoAtiva) && secaoAtiva !== SECOES.DASHBOARD && secaoAtiva !== SECOES.RELATORIOS) {
-      setItemParaEditar(null); // Garante que não há item em edição (modo de adição)
-      setMostrarFormulario(true); // Mostra o formulário
+      setItemParaEditar(null);
+      setMostrarFormulario(true);
     }
   };
   
-  // Callback chamado quando um formulário é fechado (após salvar ou cancelar)
-  // Usamos useCallback para memorizar a função e evitar recriações desnecessárias.
   const handleFormularioFechado = useCallback(() => {
-    setMostrarFormulario(false); // Esconde o formulário
-    setItemParaEditar(null); // Limpa o item em edição
-    setRefreshKey(prevKey => prevKey + 1); // Incrementa a chave para forçar a atualização da lista correspondente
+    setMostrarFormulario(false);
+    setItemParaEditar(null);
+    setRefreshKey(prevKey => prevKey + 1); 
   }, []);
 
-  // Função para renderizar o conteúdo principal (lista ou formulário) da seção ativa
   const renderizarConteudoPrincipal = () => {
-    // Props comuns passadas para todos os formulários
     const propsComunsForm = {
-        onCancel: () => { setMostrarFormulario(false); setItemParaEditar(null); } // Função para o botão "Cancelar"
+        onCancel: () => { setMostrarFormulario(false); setItemParaEditar(null); }
     };
 
-    // Se mostrarFormulario for true, renderiza o formulário correspondente à seção ativa
     if (mostrarFormulario) {
       switch (secaoAtiva) {
         case SECOES.CLIENTES:
@@ -116,16 +98,14 @@ function App() {
         case SECOES.DOCUMENTOS:
           return <DocumentoForm documentoParaEditar={itemParaEditar} onDocumentoChange={handleFormularioFechado} {...propsComunsForm} />;
         default:
-          return null; // Nenhuma seção de formulário correspondente
+          return null;
       }
     }
 
-    // Componente reutilizável para o botão "Adicionar Novo..."
-    // Usando classes Bootstrap para estilização
     const BotaoAdicionar = ({ texto }) => (
       <button 
         onClick={handleAdicionarClick} 
-        className="btn btn-primary mb-3 d-flex align-items-center" // Classes Bootstrap
+        className="btn btn-primary mb-3 d-flex align-items-center"
       >
         {/* Ícone de Adicionar (Heroicon) */}
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="me-2" width="18" height="18">
@@ -135,10 +115,10 @@ function App() {
       </button>
     );
 
-    // Se o formulário não estiver visível, renderiza a lista ou página correspondente à seção ativa
     switch (secaoAtiva) {
       case SECOES.DASHBOARD:
-        return <Dashboard />; // Componente do Dashboard
+        // Passando mudarSecao para o Dashboard
+        return <Dashboard mudarSecao={mudarSecao} />; 
       case SECOES.CLIENTES:
         return (
           <>
@@ -182,37 +162,31 @@ function App() {
           </>
         );
       case SECOES.RELATORIOS:
-        return <RelatoriosPage />; // Componente da página de relatórios
+        return <RelatoriosPage />;
       default:
-        // Mensagem padrão se nenhuma seção corresponder (não deve acontecer com a lógica atual)
-        return <div className="text-center text-muted mt-5">Selecione uma seção no menu.</div>; // Classe Bootstrap
+        return <div className="text-center text-muted mt-5">Selecione uma seção no menu.</div>;
     }
   };
 
-  // Componente reutilizável para os botões da barra de navegação lateral
-  // Usando classes Bootstrap para estilização e Heroicons
   const NavButton = ({ secao, icon: IconComponent, children }) => (
     <button
-      onClick={() => mudarSecao(secao)} // Chama mudarSecao ao clicar
-      className={`btn w-100 d-flex align-items-center text-start mb-1 ${secaoAtiva === secao ? 'btn-primary active' : 'btn-light'}`} // Classes Bootstrap
-      title={children} // Tooltip com o nome da seção
+      onClick={() => mudarSecao(secao)}
+      className={`btn w-100 d-flex align-items-center text-start mb-1 ${secaoAtiva === secao ? 'btn-primary active' : 'btn-light'}`}
+      title={children}
     >
-      <IconComponent className="me-2" style={{ width: '18px', height: '18px' }} /> {/* Componente Heroicon */}
-      <span className="ms-1">{children}</span> {/* Texto da seção */}
+      {/* Renderiza o componente de ícone passado como prop */}
+      <IconComponent className="me-2" style={{ width: '18px', height: '18px' }} />
+      <span className="ms-1">{children}</span>
     </button>
   );
 
-  // Estrutura principal da aplicação com classes Bootstrap
   return (
-    <div className="d-flex vh-100"> {/* Layout flexível que ocupa toda a altura da tela */}
-      
-      {/* Barra Lateral de Navegação Fixa */}
-      <aside className="bg-light border-end p-3 d-flex flex-column" style={{ width: '250px', flexShrink: 0 }}> {/* Estilo Bootstrap */}
-        {/* Título/Logo da Aplicação */}
+    <div className="d-flex vh-100">
+      <aside className="bg-light border-end p-3 d-flex flex-column" style={{ width: '250px', flexShrink: 0 }}>
         <div className="h3 text-primary mb-4 text-center pt-2">
           Gestão ADV
         </div>
-        {/* Botões de Navegação com Heroicons */}
+        {/* Usando os componentes Heroicon importados */}
         <NavButton secao={SECOES.DASHBOARD} icon={HomeIcon}>Dashboard</NavButton>
         <NavButton secao={SECOES.CLIENTES} icon={UsersIcon}>Clientes</NavButton>
         <NavButton secao={SECOES.CASOS} icon={BriefcaseIcon}>Casos</NavButton>
@@ -222,7 +196,6 @@ function App() {
         <NavButton secao={SECOES.DOCUMENTOS} icon={DocumentTextIcon}>Documentos</NavButton>
         <NavButton secao={SECOES.RELATORIOS} icon={ChartBarIcon}>Relatórios</NavButton>
         
-        {/* Rodapé da Barra Lateral */}
         <div className="mt-auto pt-3 border-top">
             <p className="text-muted small text-center">
                 App Gestão ADV <br/>
@@ -231,18 +204,16 @@ function App() {
         </div>
       </aside>
 
-      {/* Área de Conteúdo Principal */}
       <div className="flex-grow-1 d-flex flex-column overflow-hidden">
-        {/* Cabeçalho da Área de Conteúdo (mostra o nome da seção ativa) */}
-        <header className="bg-white shadow-sm border-bottom p-3"> {/* Estilo Bootstrap */}
-            <h1 className="h5 mb-0 text-capitalize"> {/* Estilo Bootstrap */}
+        <header className="bg-white shadow-sm border-bottom p-3">
+            <h1 className="h5 mb-0 text-capitalize">
+              {/* Converte a chave da seção para um título mais legível */}
               {secaoAtiva.toLowerCase().replace('_', ' ')} 
             </h1>
         </header>
         
-        {/* Área de Renderização do Conteúdo da Seção (com scroll) */}
-        <main className="flex-grow-1 overflow-auto p-4" style={{backgroundColor: '#f8f9fa'}}> {/* Estilo Bootstrap */}
-           {renderizarConteudoPrincipal()} {/* Renderiza a lista ou formulário da seção ativa */}
+        <main className="flex-grow-1 overflow-auto p-4" style={{backgroundColor: '#f8f9fa'}}>
+           {renderizarConteudoPrincipal()}
         </main>
       </div>
     </div>

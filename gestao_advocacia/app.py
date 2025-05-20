@@ -1,4 +1,7 @@
 # app.py
+# Backend Flask para a aplicação de Gestão de Advocacia
+# Versão com filtros e ordenação aprimorados para todas as entidades principais.
+
 from flask import Flask, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -6,21 +9,21 @@ from flask_cors import CORS
 import config 
 import os
 from datetime import datetime, date 
-from sqlalchemy import or_, asc, desc 
-from werkzeug.utils import secure_filename # Para uploads seguros
+from sqlalchemy import or_, asc, desc, func # Adicionado func
+from werkzeug.utils import secure_filename
 
 # Inicialização da Aplicação Flask
 app = Flask(__name__)
 app.config.from_object(config.Config) 
 
 # Configuração para Upload de Arquivos
-UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads') # Cria caminho para pasta 'uploads' na raiz do app
+UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limite de 16MB para uploads (opcional)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16MB
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'}
 
 if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER) # Cria a pasta de uploads se não existir
+    os.makedirs(UPLOAD_FOLDER)
 
 CORS(app) 
 
@@ -29,7 +32,7 @@ migrate = Migrate(app, db)
 
 # --- Modelos do Banco de Dados (SQLAlchemy Models) ---
 class Cliente(db.Model):
-    __tablename__ = 'clientes' 
+    __tablename__ = 'clientes'
     id = db.Column(db.Integer, primary_key=True)
     nome_razao_social = db.Column(db.String(255), nullable=False)
     cpf_cnpj = db.Column(db.String(18), nullable=False, unique=True)
@@ -56,11 +59,13 @@ class Cliente(db.Model):
     notas_gerais = db.Column(db.Text, nullable=True)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow) 
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 
+    
     casos = db.relationship('Caso', backref='cliente', lazy=True, cascade="all, delete-orphan")
-    recebimentos = db.relationship('Recebimento', backref='cliente_ref', lazy=True, cascade="all, delete-orphan") 
+    recebimentos = db.relationship('Recebimento', backref='cliente_ref', lazy='dynamic', cascade="all, delete-orphan")
     documentos = db.relationship('Documento', backref='cliente_ref_doc', lazy='dynamic', cascade="all, delete-orphan")
 
     def __repr__(self): return f'<Cliente {self.id}: {self.nome_razao_social}>'
+    
     def to_dict(self):
         return {
             'id': self.id, 'nome_razao_social': self.nome_razao_social, 'cpf_cnpj': self.cpf_cnpj,
@@ -93,19 +98,27 @@ class Caso(db.Model):
     notas_caso = db.Column(db.Text, nullable=True)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    recebimentos = db.relationship('Recebimento', backref='caso_ref', lazy=True, cascade="all, delete-orphan") 
-    despesas = db.relationship('Despesa', backref='caso_ref', lazy=True, cascade="all, delete-orphan") 
-    eventos = db.relationship('EventoAgenda', backref='caso_ref', lazy=True, cascade="all, delete-orphan") 
+    
+    recebimentos = db.relationship('Recebimento', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan")
+    despesas = db.relationship('Despesa', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan")
+    eventos = db.relationship('EventoAgenda', backref='caso_ref', lazy='dynamic', cascade="all, delete-orphan")
     documentos = db.relationship('Documento', backref='caso_ref_doc', lazy='dynamic', cascade="all, delete-orphan")
     
     def __repr__(self): return f'<Caso {self.id}: {self.titulo}>'
+    
     def to_dict(self):
         cliente_info = self.cliente.to_dict() if self.cliente else None 
         return {
-            'id': self.id, 'cliente_id': self.cliente_id, 'titulo': self.titulo, 'numero_processo': self.numero_processo, 'status': self.status, 
-            'parte_contraria': self.parte_contraria, 'adv_parte_contraria': self.adv_parte_contraria, 'tipo_acao': self.tipo_acao, 'vara_juizo': self.vara_juizo, 'comarca': self.comarca, 'instancia': self.instancia, 
-            'valor_causa': str(self.valor_causa) if self.valor_causa is not None else None, 'data_distribuicao': self.data_distribuicao.isoformat() if self.data_distribuicao else None,
-            'notas_caso': self.notas_caso, 'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None, 'data_atualizacao': self.data_atualizacao.isoformat() if self.data_atualizacao else None,
+            'id': self.id, 'cliente_id': self.cliente_id, 'titulo': self.titulo, 
+            'numero_processo': self.numero_processo, 'status': self.status, 
+            'parte_contraria': self.parte_contraria, 'adv_parte_contraria': self.adv_parte_contraria, 
+            'tipo_acao': self.tipo_acao, 'vara_juizo': self.vara_juizo, 'comarca': self.comarca, 
+            'instancia': self.instancia, 
+            'valor_causa': str(self.valor_causa) if self.valor_causa is not None else None, 
+            'data_distribuicao': self.data_distribuicao.isoformat() if self.data_distribuicao else None,
+            'notas_caso': self.notas_caso, 
+            'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None, 
+            'data_atualizacao': self.data_atualizacao.isoformat() if self.data_atualizacao else None,
             'cliente': cliente_info 
         }
 
@@ -126,6 +139,7 @@ class Recebimento(db.Model):
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self): return f'<Recebimento {self.id}: {self.descricao} - {self.valor}>'
+    
     def to_dict(self):
         return {
             'id': self.id, 'caso_id': self.caso_id, 'cliente_id': self.cliente_id, 
@@ -156,8 +170,9 @@ class Despesa(db.Model):
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self): return f'<Despesa {self.id}: {self.descricao} - {self.valor}>'
+    
     def to_dict(self):
-         return {
+        return {
             'id': self.id, 'caso_id': self.caso_id, 
             'data_despesa': self.data_despesa.isoformat() if self.data_despesa else None,
             'data_vencimento': self.data_vencimento.isoformat() if self.data_vencimento else None, 
@@ -182,7 +197,9 @@ class EventoAgenda(db.Model):
     concluido = db.Column(db.Boolean, default=False)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     def __repr__(self): return f'<EventoAgenda {self.id}: {self.tipo_evento} - {self.titulo}>'
+    
     def to_dict(self):
         return {
             'id': self.id, 'caso_id': self.caso_id, 'tipo_evento': self.tipo_evento, 
@@ -208,6 +225,7 @@ class Documento(db.Model):
     data_upload = db.Column(db.DateTime, default=datetime.utcnow)
     
     def __repr__(self): return f'<Documento {self.id}: {self.nome_original_arquivo}>'
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -223,7 +241,6 @@ class Documento(db.Model):
             'caso_titulo': self.caso_ref_doc.titulo if self.caso_ref_doc else None
         }
 
-
 # --- Funções Auxiliares ---
 def parse_date(date_string):
     if not date_string: return None
@@ -232,42 +249,64 @@ def parse_date(date_string):
 
 def parse_datetime(datetime_string):
     if not datetime_string: return None
-    try: return datetime.fromisoformat(datetime_string.replace('Z', '+00:00'))
-    except (ValueError, TypeError): return None
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    try: 
+        dt_str = datetime_string.replace('Z', '') # Remove Z para UTC, se presente
+        # Tenta parsear com e sem microsegundos
+        if '.' in dt_str:
+            return datetime.fromisoformat(dt_str)
+        else:
+            return datetime.strptime(dt_str, '%Y-%m-%dT%H:%M:%S')
+    except (ValueError, TypeError): 
+        try: # Fallback para formatos mais simples se fromisoformat falhar
+            return datetime.strptime(datetime_string, '%Y-%m-%d %H:%M:%S')
+        except (ValueError, TypeError):
+            try: 
+                return datetime.strptime(datetime_string, '%Y-%m-%d') # Apenas data
+            except (ValueError, TypeError):
+                print(f"Alerta: Falha ao parsear datetime: {datetime_string}")
+                return None
 
 # --- Rotas da API (Endpoints) ---
 @app.route('/')
 def index(): 
     return jsonify({"message": "API de Gestão para Advocacia está no ar!"})
 
-# --- Rotas para Clientes (CRUD) ---
+# --- Rotas para Clientes ---
 @app.route('/api/clientes', methods=['GET'])
 def get_clientes():
     try: 
         search_term = request.args.get('search', None, type=str)
         tipo_pessoa_filter = request.args.get('tipo_pessoa', None, type=str)
         sort_by = request.args.get('sort_by', 'nome_razao_social', type=str) 
-        sort_order = request.args.get('sort_order', 'asc', type=str) 
+        sort_order = request.args.get('sort_order', 'asc', type=str)
+        count_only = request.args.get('count_only', 'false', type=str).lower() == 'true'
+
         query = Cliente.query
+
         if tipo_pessoa_filter and tipo_pessoa_filter in ['PF', 'PJ']:
             query = query.filter(Cliente.tipo_pessoa == tipo_pessoa_filter)
+        
         if search_term:
             search_like = f"%{search_term}%"
-            query = query.filter(or_(Cliente.nome_razao_social.ilike(search_like), Cliente.cpf_cnpj.ilike(search_like)))
-        if hasattr(Cliente, sort_by): 
+            query = query.filter(or_(func.lower(Cliente.nome_razao_social).ilike(func.lower(search_like)), 
+                                     func.lower(Cliente.cpf_cnpj).ilike(func.lower(search_like))))
+        
+        if count_only:
+            total_clientes = query.count()
+            return jsonify({"total_clientes": total_clientes}), 200
+
+        colunas_ordenaveis_cliente = ['nome_razao_social', 'cpf_cnpj', 'tipo_pessoa', 'cidade', 'data_criacao', 'data_atualizacao']
+        if sort_by in colunas_ordenaveis_cliente and hasattr(Cliente, sort_by): 
             coluna_ordenacao = getattr(Cliente, sort_by)
             if sort_order.lower() == 'desc':
                 query = query.order_by(desc(coluna_ordenacao))
             else:
                 query = query.order_by(asc(coluna_ordenacao))
-        else:
+        else: 
             query = query.order_by(Cliente.nome_razao_social.asc())
+        
         todos_clientes = query.all()
-        return jsonify([c.to_dict() for c in todos_clientes]), 200
+        return jsonify({"clientes": [c.to_dict() for c in todos_clientes]}), 200
     except Exception as e: 
         print(f"Erro ao buscar clientes: {e}")
         return jsonify({"erro": "Erro ao buscar clientes"}), 500
@@ -277,10 +316,12 @@ def create_cliente():
     dados = request.get_json()
     if not dados or not dados.get('nome_razao_social') or not dados.get('cpf_cnpj') or not dados.get('tipo_pessoa'):
         return jsonify({"erro": "Dados incompletos (nome, cpf/cnpj, tipo são obrigatórios)"}), 400
+    
     cpf_cnpj_formatado = dados['cpf_cnpj'] 
     cliente_existente = Cliente.query.filter_by(cpf_cnpj=cpf_cnpj_formatado).first() 
     if cliente_existente:
-         return jsonify({"erro": f"Cliente com CPF/CNPJ {cpf_cnpj_formatado} já existe."}), 409
+        return jsonify({"erro": f"Cliente com CPF/CNPJ {cpf_cnpj_formatado} já existe."}), 409
+    
     novo_cliente = Cliente(
         nome_razao_social=dados['nome_razao_social'], cpf_cnpj=cpf_cnpj_formatado, tipo_pessoa=dados['tipo_pessoa'],
         rg=dados.get('rg'), orgao_emissor=dados.get('orgao_emissor'), data_nascimento=parse_date(dados.get('data_nascimento')),
@@ -317,7 +358,7 @@ def update_cliente(id):
     try:
         cliente = db.session.get(Cliente, id)
         if cliente is None:
-             return jsonify({"erro": "Cliente não encontrado para atualizar"}), 404
+            return jsonify({"erro": "Cliente não encontrado para atualizar"}), 404
         
         cliente.nome_razao_social = dados.get('nome_razao_social', cliente.nome_razao_social)
         cliente.rg = dados.get('rg', cliente.rg); cliente.orgao_emissor = dados.get('orgao_emissor', cliente.orgao_emissor)
@@ -340,44 +381,79 @@ def delete_cliente(id):
     try: 
         cliente = db.session.get(Cliente, id)
         if cliente is None: 
-             return jsonify({"erro": "Cliente não encontrado para deletar"}), 404
+            return jsonify({"erro": "Cliente não encontrado para deletar"}), 404
         db.session.delete(cliente)
         db.session.commit()
         return jsonify({"mensagem": f"Cliente {id} deletado com sucesso"}), 200 
     except Exception as e: 
         db.session.rollback()
         print(f"Erro ao deletar cliente {id}: {e}")
+        if "violates foreign key constraint" in str(e).lower():
+             return jsonify({"erro": "Não é possível deletar o cliente pois existem registros (casos, recebimentos, etc.) associados a ele."}), 409
         return jsonify({"erro": "Erro ao deletar cliente."}), 500
 
-# --- Rotas para Casos (CRUD) ---
+# --- Rotas para Casos ---
 @app.route('/api/casos', methods=['GET'])
 def get_casos():
     try:
         cliente_id_filtro = request.args.get('cliente_id', None, type=int)
         status_filtro = request.args.get('status', None, type=str)
         search_term = request.args.get('search', None, type=str)
+        data_criacao_inicio_str = request.args.get('data_criacao_inicio', None, type=str)
+        data_criacao_fim_str = request.args.get('data_criacao_fim', None, type=str)
+        data_atualizacao_inicio_str = request.args.get('data_atualizacao_inicio', None, type=str)
+        data_atualizacao_fim_str = request.args.get('data_atualizacao_fim', None, type=str)
+        
         sort_by = request.args.get('sort_by', 'data_atualizacao', type=str) 
         sort_order = request.args.get('sort_order', 'desc', type=str) 
+        count_only = request.args.get('count_only', 'false', type=str).lower() == 'true'
 
-        query = Caso.query
+        query = Caso.query.join(Cliente, Caso.cliente_id == Cliente.id) # Join para ordenação por nome do cliente
 
         if cliente_id_filtro:
             query = query.filter(Caso.cliente_id == cliente_id_filtro)
-        
         if status_filtro:
             query = query.filter(Caso.status == status_filtro)
-
         if search_term:
             search_like = f"%{search_term}%"
             query = query.filter(
                 or_(
-                    Caso.titulo.ilike(search_like),
-                    Caso.numero_processo.ilike(search_like)
+                    func.lower(Caso.titulo).ilike(func.lower(search_like)),
+                    func.lower(Caso.numero_processo).ilike(func.lower(search_like)),
+                    func.lower(Caso.parte_contraria).ilike(func.lower(search_like)),
+                    func.lower(Caso.tipo_acao).ilike(func.lower(search_like)),
+                    func.lower(Cliente.nome_razao_social).ilike(func.lower(search_like)) # Busca no nome do cliente
                 )
             )
-        
-        if hasattr(Caso, sort_by):
-            coluna_ordenacao = getattr(Caso, sort_by)
+        if data_criacao_inicio_str:
+            dt_inicio = parse_date(data_criacao_inicio_str)
+            if dt_inicio: query = query.filter(Caso.data_criacao >= datetime.combine(dt_inicio, datetime.min.time()))
+        if data_criacao_fim_str:
+            dt_fim = parse_date(data_criacao_fim_str)
+            if dt_fim: query = query.filter(Caso.data_criacao <= datetime.combine(dt_fim, datetime.max.time()))
+        if data_atualizacao_inicio_str:
+            dt_inicio = parse_date(data_atualizacao_inicio_str)
+            if dt_inicio: query = query.filter(Caso.data_atualizacao >= datetime.combine(dt_inicio, datetime.min.time()))
+        if data_atualizacao_fim_str:
+            dt_fim = parse_date(data_atualizacao_fim_str)
+            if dt_fim: query = query.filter(Caso.data_atualizacao <= datetime.combine(dt_fim, datetime.max.time()))
+
+        if count_only:
+            total_casos = query.count()
+            return jsonify({"total_casos": total_casos}), 200
+
+        colunas_ordenaveis_caso = {
+            'titulo': Caso.titulo, 
+            'cliente_nome': Cliente.nome_razao_social, # Para ordenar por nome do cliente
+            'numero_processo': Caso.numero_processo, 
+            'status': Caso.status, 
+            'data_criacao': Caso.data_criacao, 
+            'data_atualizacao': Caso.data_atualizacao, 
+            'data_distribuicao': Caso.data_distribuicao, 
+            'valor_causa': Caso.valor_causa
+        }
+        if sort_by in colunas_ordenaveis_caso:
+            coluna_ordenacao = colunas_ordenaveis_caso[sort_by]
             if sort_order.lower() == 'desc':
                 query = query.order_by(desc(coluna_ordenacao))
             else:
@@ -386,7 +462,7 @@ def get_casos():
             query = query.order_by(Caso.data_atualizacao.desc()) 
 
         todos_casos = query.all()
-        return jsonify([c.to_dict() for c in todos_casos]), 200
+        return jsonify({"casos": [c.to_dict() for c in todos_casos]}), 200
     except Exception as e: 
         print(f"Erro ao buscar casos: {e}")
         return jsonify({"erro": "Erro ao buscar casos"}), 500
@@ -399,7 +475,7 @@ def create_caso():
     
     cliente = db.session.get(Cliente, dados['cliente_id'])
     if not cliente:
-         return jsonify({"erro": f"Cliente com ID {dados['cliente_id']} não encontrado."}), 404
+        return jsonify({"erro": f"Cliente com ID {dados['cliente_id']} não encontrado."}), 404
 
     novo_caso = Caso(
         cliente_id=dados['cliente_id'], titulo=dados['titulo'], status=dados['status'], 
@@ -447,7 +523,7 @@ def update_caso(id):
         caso.vara_juizo = dados.get('vara_juizo', caso.vara_juizo)
         caso.comarca = dados.get('comarca', caso.comarca)
         caso.instancia = dados.get('instancia', caso.instancia)
-        caso.valor_causa = dados.get('valor_causa', caso.valor_causa)
+        caso.valor_causa = dados.get('valor_causa', caso.valor_causa) 
         caso.data_distribuicao = parse_date(dados.get('data_distribuicao')) if 'data_distribuicao' in dados else caso.data_distribuicao
         caso.notas_caso = dados.get('notas_caso', caso.notas_caso)
         caso.data_atualizacao = datetime.utcnow()
@@ -473,23 +549,71 @@ def delete_caso(id):
         print(f"Erro ao deletar caso {id}: {e}")
         return jsonify({"erro": "Erro ao deletar caso."}), 500
 
-# --- Rotas para Recebimentos (CRUD) ---
+# --- Rotas para Recebimentos ---
 @app.route('/api/recebimentos', methods=['GET'])
 def get_recebimentos():
-    caso_id_filtro = request.args.get('caso_id', type=int)
-    cliente_id_filtro = request.args.get('cliente_id', type=int)
-    try: 
-        query = Recebimento.query
-        if caso_id_filtro: 
-            query = query.filter_by(caso_id=caso_id_filtro)
-        if cliente_id_filtro: 
-            query = query.filter_by(cliente_id=cliente_id_filtro)
-        todos_recebimentos = query.order_by(Recebimento.data_vencimento.desc()).all()
-        return jsonify([r.to_dict() for r in todos_recebimentos]), 200
+    try:
+        cliente_id_filtro = request.args.get('cliente_id', type=int)
+        caso_id_filtro = request.args.get('caso_id', type=int)
+        status_filtro = request.args.get('status', type=str)
+        search_term = request.args.get('search', None, type=str)
+        data_vencimento_inicio_str = request.args.get('data_vencimento_inicio', None, type=str)
+        data_vencimento_fim_str = request.args.get('data_vencimento_fim', None, type=str)
+        data_recebimento_inicio_str = request.args.get('data_recebimento_inicio', None, type=str)
+        data_recebimento_fim_str = request.args.get('data_recebimento_fim', None, type=str)
+        sort_by = request.args.get('sort_by', 'data_vencimento', type=str)
+        sort_order = request.args.get('sort_order', 'desc', type=str)
+
+        query = Recebimento.query.join(Cliente, Recebimento.cliente_id == Cliente.id)\
+                                 .join(Caso, Recebimento.caso_id == Caso.id)
+
+        if cliente_id_filtro:
+            query = query.filter(Recebimento.cliente_id == cliente_id_filtro)
+        if caso_id_filtro:
+            query = query.filter(Recebimento.caso_id == caso_id_filtro)
+        if status_filtro:
+            query = query.filter(Recebimento.status == status_filtro)
+        if search_term:
+            search_like = f"%{search_term}%"
+            query = query.filter(or_(
+                func.lower(Recebimento.descricao).ilike(func.lower(search_like)),
+                func.lower(Recebimento.categoria).ilike(func.lower(search_like))
+            ))
+        if data_vencimento_inicio_str:
+            dt_inicio = parse_date(data_vencimento_inicio_str)
+            if dt_inicio: query = query.filter(Recebimento.data_vencimento >= dt_inicio)
+        if data_vencimento_fim_str:
+            dt_fim = parse_date(data_vencimento_fim_str)
+            if dt_fim: query = query.filter(Recebimento.data_vencimento <= dt_fim)
+        if data_recebimento_inicio_str:
+            dt_inicio = parse_date(data_recebimento_inicio_str)
+            if dt_inicio: query = query.filter(Recebimento.data_recebimento >= dt_inicio)
+        if data_recebimento_fim_str:
+            dt_fim = parse_date(data_recebimento_fim_str)
+            if dt_fim: query = query.filter(Recebimento.data_recebimento <= dt_fim)
+
+        colunas_ordenaveis_recebimento = {
+            'descricao': Recebimento.descricao, 'cliente_nome': Cliente.nome_razao_social, 
+            'caso_titulo': Caso.titulo, 'valor': Recebimento.valor, 
+            'data_vencimento': Recebimento.data_vencimento, 'data_recebimento': Recebimento.data_recebimento,
+            'status': Recebimento.status, 'categoria': Recebimento.categoria
+        }
+        if sort_by in colunas_ordenaveis_recebimento:
+            coluna_ordenacao = colunas_ordenaveis_recebimento[sort_by]
+            if sort_order.lower() == 'desc':
+                query = query.order_by(desc(coluna_ordenacao))
+            else:
+                query = query.order_by(asc(coluna_ordenacao))
+        else:
+            query = query.order_by(Recebimento.data_vencimento.desc())
+
+        todos_recebimentos = query.all()
+        return jsonify({"recebimentos": [r.to_dict() for r in todos_recebimentos]}), 200
     except Exception as e: 
         print(f"Erro ao buscar recebimentos: {e}")
         return jsonify({"erro": "Erro ao buscar recebimentos"}), 500
 
+# ... (Rotas POST, GET <id>, PUT <id>, DELETE <id> para Recebimentos - mantidas como antes) ...
 @app.route('/api/recebimentos', methods=['POST'])
 def create_recebimento():
     dados = request.get_json()
@@ -570,20 +694,75 @@ def delete_recebimento(id):
         print(f"Erro ao deletar recebimento {id}: {e}")
         return jsonify({"erro": "Erro ao deletar recebimento."}), 500
 
-# --- Rotas para Despesas (CRUD) ---
+# --- Rotas para Despesas ---
 @app.route('/api/despesas', methods=['GET'])
 def get_despesas():
-    caso_id_filtro = request.args.get('caso_id', type=int)
-    try: 
-        query = Despesa.query
-        if caso_id_filtro: 
-            query = query.filter_by(caso_id=caso_id_filtro)
-        todas_despesas = query.order_by(Despesa.data_vencimento.desc()).all()
-        return jsonify([d.to_dict() for d in todas_despesas]), 200
+    try:
+        cliente_id_filtro = request.args.get('cliente_id', type=int) # Para filtrar casos do cliente
+        caso_id_filtro = request.args.get('caso_id', type=int)
+        status_filtro = request.args.get('status', type=str)
+        search_term = request.args.get('search', None, type=str)
+        data_vencimento_inicio_str = request.args.get('data_vencimento_inicio', None, type=str)
+        data_vencimento_fim_str = request.args.get('data_vencimento_fim', None, type=str)
+        data_despesa_inicio_str = request.args.get('data_despesa_inicio', None, type=str)
+        data_despesa_fim_str = request.args.get('data_despesa_fim', None, type=str)
+        sort_by = request.args.get('sort_by', 'data_vencimento', type=str)
+        sort_order = request.args.get('sort_order', 'desc', type=str)
+
+        query = Despesa.query.outerjoin(Caso, Despesa.caso_id == Caso.id)\
+                             .outerjoin(Cliente, Caso.cliente_id == Cliente.id)
+
+
+        if cliente_id_filtro: # Filtra despesas de casos pertencentes a este cliente
+            query = query.filter(Caso.cliente_id == cliente_id_filtro)
+        if caso_id_filtro:
+            if caso_id_filtro == -1: 
+                query = query.filter(Despesa.caso_id.is_(None))
+            else:
+                query = query.filter(Despesa.caso_id == caso_id_filtro)
+        if status_filtro:
+            query = query.filter(Despesa.status == status_filtro)
+        if search_term:
+            search_like = f"%{search_term}%"
+            query = query.filter(or_(
+                func.lower(Despesa.descricao).ilike(func.lower(search_like)),
+                func.lower(Despesa.categoria).ilike(func.lower(search_like))
+            ))
+        if data_vencimento_inicio_str:
+            dt_inicio = parse_date(data_vencimento_inicio_str)
+            if dt_inicio: query = query.filter(Despesa.data_vencimento >= dt_inicio)
+        if data_vencimento_fim_str:
+            dt_fim = parse_date(data_vencimento_fim_str)
+            if dt_fim: query = query.filter(Despesa.data_vencimento <= dt_fim)
+        if data_despesa_inicio_str:
+            dt_inicio = parse_date(data_despesa_inicio_str)
+            if dt_inicio: query = query.filter(Despesa.data_despesa >= dt_inicio)
+        if data_despesa_fim_str:
+            dt_fim = parse_date(data_despesa_fim_str)
+            if dt_fim: query = query.filter(Despesa.data_despesa <= dt_fim)
+        
+        colunas_ordenaveis_despesa = {
+            'descricao': Despesa.descricao, 'caso_titulo': Caso.titulo, 
+            'valor': Despesa.valor, 'data_vencimento': Despesa.data_vencimento, 
+            'data_despesa': Despesa.data_despesa, 'status': Despesa.status, 
+            'categoria': Despesa.categoria
+        }
+        if sort_by in colunas_ordenaveis_despesa:
+            coluna_ordenacao = colunas_ordenaveis_despesa[sort_by]
+            if sort_order.lower() == 'desc':
+                query = query.order_by(desc(coluna_ordenacao))
+            else:
+                query = query.order_by(asc(coluna_ordenacao))
+        else:
+            query = query.order_by(Despesa.data_vencimento.desc())
+
+        todas_despesas = query.all()
+        return jsonify({"despesas": [d.to_dict() for d in todas_despesas]}), 200
     except Exception as e: 
         print(f"Erro ao buscar despesas: {e}")
         return jsonify({"erro": "Erro ao buscar despesas"}), 500
 
+# ... (Rotas POST, GET <id>, PUT <id>, DELETE <id> para Despesas - mantidas como antes) ...
 @app.route('/api/despesas', methods=['POST'])
 def create_despesa():
     dados = request.get_json()
@@ -592,11 +771,11 @@ def create_despesa():
         return jsonify({"erro": "Dados incompletos (data_vencimento, descricao, categoria, valor, status são obrigatórios)"}), 400
     
     caso_id = dados.get('caso_id')
-    if caso_id and not db.session.get(Caso, caso_id):
+    if caso_id and not db.session.get(Caso, caso_id): # Verifica se o caso_id (se fornecido) é válido
         return jsonify({"erro": f"Caso com ID {caso_id} não encontrado."}), 404
 
     nova_despesa = Despesa(
-        caso_id=caso_id, 
+        caso_id=caso_id if caso_id else None, # Permite caso_id nulo
         data_despesa=parse_date(dados.get('data_despesa')), 
         data_vencimento=parse_date(dados['data_vencimento']), 
         descricao=dados['descricao'], categoria=dados['categoria'], valor=dados['valor'], status=dados['status'],
@@ -631,7 +810,7 @@ def update_despesa(id):
         if despesa is None: 
             return jsonify({"erro": "Despesa não encontrada para atualizar"}), 404
         
-        despesa.caso_id = dados.get('caso_id', despesa.caso_id) 
+        despesa.caso_id = dados.get('caso_id', despesa.caso_id) # Permite atualizar para null
         despesa.data_despesa = parse_date(dados.get('data_despesa')) if 'data_despesa' in dados else despesa.data_despesa
         despesa.data_vencimento = parse_date(dados.get('data_vencimento')) if 'data_vencimento' in dados else despesa.data_vencimento
         despesa.descricao = dados.get('descricao', despesa.descricao)
@@ -663,30 +842,77 @@ def delete_despesa(id):
         print(f"Erro ao deletar despesa {id}: {e}")
         return jsonify({"erro": "Erro ao deletar despesa."}), 500
 
-
-# --- Rotas para Eventos da Agenda (CRUD) ---
+# --- Rotas para Eventos da Agenda ---
 @app.route('/api/eventos', methods=['GET'])
 def get_eventos():
-    caso_id_filtro = request.args.get('caso_id', type=int)
-    data_inicio_filtro = request.args.get('start')
-    data_fim_filtro = request.args.get('end')     
-    try: 
-        query = EventoAgenda.query
+    try:
+        cliente_id_filtro = request.args.get('cliente_id', type=int) # Para filtrar casos do cliente
+        caso_id_filtro = request.args.get('caso_id', type=int)
+        data_inicio_filtro_str = request.args.get('start')
+        data_fim_filtro_str = request.args.get('end')     
+        status_concluido_str = request.args.get('concluido', type=str) 
+        tipo_evento_filtro = request.args.get('tipo_evento', type=str)
+        search_term = request.args.get('search', None, type=str) # Busca por título/descrição
+
+        limit = request.args.get('limit', type=int)          
+        sort_by = request.args.get('sort_by', 'data_inicio', type=str)
+        sort_order = request.args.get('sort_order', 'asc', type=str)
+
+        query = EventoAgenda.query.outerjoin(Caso, EventoAgenda.caso_id == Caso.id)\
+                                 .outerjoin(Cliente, Caso.cliente_id == Cliente.id)
+
+
+        if cliente_id_filtro:
+             query = query.filter(Caso.cliente_id == cliente_id_filtro)
         if caso_id_filtro: 
-            query = query.filter_by(caso_id=caso_id_filtro)
-        if data_inicio_filtro: 
-            dt_inicio = parse_datetime(data_inicio_filtro)
+            if caso_id_filtro == -1: 
+                 query = query.filter(EventoAgenda.caso_id.is_(None))
+            else:
+                query = query.filter(EventoAgenda.caso_id == caso_id_filtro)
+        if tipo_evento_filtro:
+            query = query.filter(EventoAgenda.tipo_evento == tipo_evento_filtro)
+        if status_concluido_str is not None:
+            if status_concluido_str.lower() == 'true':
+                query = query.filter(EventoAgenda.concluido == True)
+            elif status_concluido_str.lower() == 'false':
+                 query = query.filter(EventoAgenda.concluido == False)
+        if search_term:
+            search_like = f"%{search_term}%"
+            query = query.filter(or_(
+                func.lower(EventoAgenda.titulo).ilike(func.lower(search_like)),
+                func.lower(EventoAgenda.descricao).ilike(func.lower(search_like))
+            ))
+        if data_inicio_filtro_str: 
+            dt_inicio = parse_datetime(data_inicio_filtro_str)
             if dt_inicio: query = query.filter(EventoAgenda.data_inicio >= dt_inicio)
-        if data_fim_filtro: 
-            dt_fim = parse_datetime(data_fim_filtro)
+        if data_fim_filtro_str: 
+            dt_fim = parse_datetime(data_fim_filtro_str)
             if dt_fim: query = query.filter(EventoAgenda.data_inicio <= dt_fim) 
         
-        todos_eventos = query.order_by(EventoAgenda.data_inicio.asc()).all()
-        return jsonify([e.to_dict() for e in todos_eventos]), 200
+        colunas_ordenaveis_evento = {
+            'data_inicio': EventoAgenda.data_inicio, 'titulo': EventoAgenda.titulo,
+            'tipo_evento': EventoAgenda.tipo_evento, 'concluido': EventoAgenda.concluido,
+            'caso_titulo': Caso.titulo, 'cliente_nome': Cliente.nome_razao_social
+        }
+        if sort_by in colunas_ordenaveis_evento:
+            coluna_ordenacao = colunas_ordenaveis_evento[sort_by]
+            if sort_order.lower() == 'desc':
+                query = query.order_by(desc(coluna_ordenacao))
+            else:
+                query = query.order_by(asc(coluna_ordenacao))
+        else:
+            query = query.order_by(EventoAgenda.data_inicio.asc())
+        
+        if limit: 
+            query = query.limit(limit)
+            
+        todos_eventos = query.all()
+        return jsonify({"eventos": [e.to_dict() for e in todos_eventos]}), 200
     except Exception as e: 
         print(f"Erro ao buscar eventos: {e}")
         return jsonify({"erro": "Erro ao buscar eventos"}), 500
 
+# ... (Rotas POST, GET <id>, PUT <id>, DELETE <id> para Eventos - mantidas como antes) ...
 @app.route('/api/eventos', methods=['POST'])
 def create_evento():
     dados = request.get_json()
@@ -702,13 +928,18 @@ def create_evento():
 
     if not data_inicio_dt:
         return jsonify({"erro": "Formato inválido para data_inicio (use ISO 8601)"}), 400
-    if dados.get('data_fim') and not data_fim_dt:
-         return jsonify({"erro": "Formato inválido para data_fim (use ISO 8601)"}), 400
+    if dados.get('data_fim') and not data_fim_dt: 
+        return jsonify({"erro": "Formato inválido para data_fim (use ISO 8601)"}), 400
 
     novo_evento = EventoAgenda(
-        caso_id=caso_id, tipo_evento=dados['tipo_evento'], titulo=dados['titulo'],
-        descricao=dados.get('descricao'), data_inicio=data_inicio_dt, data_fim=data_fim_dt,
-        local=dados.get('local'), concluido=dados.get('concluido', False)
+        caso_id=caso_id if caso_id else None, 
+        tipo_evento=dados['tipo_evento'], 
+        titulo=dados['titulo'],
+        descricao=dados.get('descricao'), 
+        data_inicio=data_inicio_dt, 
+        data_fim=data_fim_dt,
+        local=dados.get('local'), 
+        concluido=dados.get('concluido', False)
     )
     try: 
         db.session.add(novo_evento)
@@ -741,10 +972,11 @@ def update_evento(id):
         
         data_inicio_dt = parse_datetime(dados.get('data_inicio')) if 'data_inicio' in dados else evento.data_inicio
         data_fim_dt = parse_datetime(dados.get('data_fim')) if 'data_fim' in dados else evento.data_fim
-        if not data_inicio_dt: return jsonify({"erro": "Formato inválido para data_inicio"}), 400
-        if dados.get('data_fim') and not data_fim_dt: return jsonify({"erro": "Formato inválido para data_fim"}), 400
+        
+        if 'data_inicio' in dados and not data_inicio_dt: return jsonify({"erro": "Formato inválido para data_inicio"}), 400
+        if 'data_fim' in dados and dados.get('data_fim') and not data_fim_dt: return jsonify({"erro": "Formato inválido para data_fim"}), 400
 
-        evento.caso_id = dados.get('caso_id', evento.caso_id)
+        evento.caso_id = dados.get('caso_id', evento.caso_id) # Permite atualizar para null
         evento.tipo_evento = dados.get('tipo_evento', evento.tipo_evento)
         evento.titulo = dados.get('titulo', evento.titulo)
         evento.descricao = dados.get('descricao', evento.descricao)
@@ -775,7 +1007,7 @@ def delete_evento(id):
         print(f"Erro ao deletar evento {id}: {e}")
         return jsonify({"erro": "Erro ao deletar evento."}), 500
 
-# --- NOVAS ROTAS DE RELATÓRIOS ---
+# --- ROTAS DE RELATÓRIOS ---
 @app.route('/api/relatorios/contas-a-receber', methods=['GET'])
 def get_contas_a_receber():
     try:
@@ -855,17 +1087,51 @@ def upload_documento():
 
 @app.route('/api/documentos', methods=['GET'])
 def get_documentos():
-    cliente_id_filtro = request.args.get('cliente_id', type=int)
-    caso_id_filtro = request.args.get('caso_id', type=int)
     try:
-        query = Documento.query
-        if cliente_id_filtro:
-            query = query.filter_by(cliente_id=cliente_id_filtro)
-        if caso_id_filtro:
-            query = query.filter_by(caso_id=caso_id_filtro)
+        cliente_id_filtro = request.args.get('cliente_id', type=int)
+        caso_id_filtro = request.args.get('caso_id', type=int)
+        search_term = request.args.get('search', None, type=str)
+        sort_by = request.args.get('sort_by', 'data_upload', type=str)
+        sort_order = request.args.get('sort_order', 'desc', type=str)
         
-        todos_documentos = query.order_by(Documento.data_upload.desc()).all()
-        return jsonify([d.to_dict() for d in todos_documentos]), 200
+        query = Documento.query.outerjoin(Cliente, Documento.cliente_id == Cliente.id)\
+                               .outerjoin(Caso, Documento.caso_id == Caso.id)
+        if cliente_id_filtro:
+            query = query.filter(Documento.cliente_id == cliente_id_filtro)
+        if caso_id_filtro:
+            query = query.filter(Documento.caso_id == caso_id_filtro)
+        if search_term:
+            search_like = f"%{search_term}%"
+            query = query.filter(or_(
+                func.lower(Documento.nome_original_arquivo).ilike(func.lower(search_like)),
+                func.lower(Documento.descricao).ilike(func.lower(search_like))
+            ))
+        
+        colunas_ordenaveis_doc = {
+            'nome_original_arquivo': Documento.nome_original_arquivo,
+            'descricao': Documento.descricao,
+            'data_upload': Documento.data_upload,
+            'tamanho_bytes': Documento.tamanho_bytes,
+            'cliente_nome': Cliente.nome_razao_social, 
+            'caso_titulo': Caso.titulo 
+        }
+
+        coluna_ordenacao_obj = None
+        if sort_by in colunas_ordenaveis_doc:
+            coluna_ordenacao_obj = colunas_ordenaveis_doc[sort_by]
+        elif hasattr(Documento, sort_by): # Fallback para atributos diretos do Documento
+             coluna_ordenacao_obj = getattr(Documento, sort_by)
+
+        if coluna_ordenacao_obj is not None:
+            if sort_order.lower() == 'desc':
+                query = query.order_by(desc(coluna_ordenacao_obj))
+            else:
+                query = query.order_by(asc(coluna_ordenacao_obj))
+        else:
+             query = query.order_by(Documento.data_upload.desc())
+        
+        todos_documentos = query.all()
+        return jsonify({"documentos": [d.to_dict() for d in todos_documentos]}), 200
     except Exception as e:
         print(f"Erro ao buscar documentos: {e}")
         return jsonify({"erro": "Erro ao buscar documentos"}), 500
@@ -873,21 +1139,54 @@ def get_documentos():
 @app.route('/api/documentos/download/<path:nome_armazenado>', methods=['GET'])
 def download_documento(nome_armazenado):
     try:
-        doc_metadata = Documento.query.filter_by(nome_armazenado=nome_armazenado).first()
+        safe_nome_armazenado = secure_filename(nome_armazenado)
+        if safe_nome_armazenado != nome_armazenado:
+             return jsonify({"erro": "Nome de arquivo inválido"}), 400
+
+        doc_metadata = Documento.query.filter_by(nome_armazenado=safe_nome_armazenado).first()
         if not doc_metadata:
             return jsonify({"erro": "Metadados do documento não encontrados"}), 404
-        caminho_completo = os.path.join(app.config['UPLOAD_FOLDER'], nome_armazenado)
+        
+        caminho_completo = os.path.join(app.config['UPLOAD_FOLDER'], safe_nome_armazenado)
         if not os.path.exists(caminho_completo):
-             return jsonify({"erro": "Arquivo físico não encontrado no servidor"}), 404
+            return jsonify({"erro": "Arquivo físico não encontrado no servidor"}), 404
+            
         return send_from_directory(
-            app.config['UPLOAD_FOLDER'], 
-            nome_armazenado, 
+            directory=app.config['UPLOAD_FOLDER'], 
+            path=safe_nome_armazenado, 
             as_attachment=True, 
-            download_name=doc_metadata.nome_original_arquivo 
+            download_name=doc_metadata.nome_original_arquivo
         )
     except Exception as e:
         print(f"Erro ao baixar documento {nome_armazenado}: {e}")
         return jsonify({"erro": "Erro ao baixar documento"}), 500
+
+@app.route('/api/documentos/<int:id>', methods=['PUT']) 
+def update_documento_metadados(id):
+    dados = request.get_json()
+    if not dados:
+        return jsonify({"erro": "Nenhum dado fornecido para atualização"}), 400
+    try:
+        documento = db.session.get(Documento, id)
+        if not documento:
+            return jsonify({"erro": "Documento não encontrado"}), 404
+
+        documento.descricao = dados.get('descricao', documento.descricao)
+        documento.cliente_id = dados.get('cliente_id') if 'cliente_id' in dados else documento.cliente_id # Permite limpar
+        documento.caso_id = dados.get('caso_id') if 'caso_id' in dados else documento.caso_id # Permite limpar
+        
+        if documento.cliente_id and not db.session.get(Cliente, documento.cliente_id):
+            return jsonify({"erro": f"Cliente com ID {documento.cliente_id} não encontrado."}), 404
+        if documento.caso_id and not db.session.get(Caso, documento.caso_id):
+            return jsonify({"erro": f"Caso com ID {documento.caso_id} não encontrado."}), 404
+
+        db.session.commit()
+        return jsonify(documento.to_dict()), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao atualizar metadados do documento {id}: {e}")
+        return jsonify({"erro": "Erro ao atualizar metadados do documento"}), 500
+
 
 @app.route('/api/documentos/<int:id>', methods=['DELETE'])
 def delete_documento(id):
@@ -895,13 +1194,17 @@ def delete_documento(id):
         documento = db.session.get(Documento, id)
         if not documento:
             return jsonify({"erro": "Documento não encontrado"}), 404
+        
         caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], documento.nome_armazenado)
+        
         db.session.delete(documento) 
+        
         if os.path.exists(caminho_arquivo):
             try:
                 os.remove(caminho_arquivo)
             except Exception as e_file:
                 print(f"Erro ao deletar arquivo físico {documento.nome_armazenado}: {e_file}")
+        
         db.session.commit()
         return jsonify({"mensagem": f"Documento ID {id} e arquivo associado deletados com sucesso"}), 200
     except Exception as e:
