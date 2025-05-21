@@ -1,29 +1,24 @@
 // src/App.jsx
-// Componente principal da aplicação React.
-// Gere a navegação e renderiza o conteúdo da seção ativa.
-// Garante que o formulário correto é renderizado para cada seção.
+// Componente principal da aplicação React com React Router.
 
-import React, { useState, useCallback } from 'react';
+import React from 'react';
+import { Routes, Route, NavLink, Outlet } from 'react-router-dom'; // Removido useNavigate, useParams não usados diretamente aqui
 
 // Importação do Toastify
 import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css'; // CSS do Toastify
+import 'react-toastify/dist/ReactToastify.css';
+import "bootstrap-icons/font/bootstrap-icons.css";
 
-// Importação dos componentes de cada seção
-import ClienteList from './ClienteList.jsx';
-import ClienteForm from './ClienteForm.jsx';
-import CasoList from './CasoList.jsx';
-import CasoForm from './CasoForm.jsx';
-import RecebimentoList from './RecebimentoList.jsx';
-import RecebimentoForm from './RecebimentoForm.jsx';
-import DespesaList from './DespesaList.jsx';
-import DespesaForm from './DespesaForm.jsx';
-import EventoAgendaList from './EventoAgendaList.jsx';
-import EventoAgendaForm from './EventoAgendaForm.jsx';
-import Dashboard from './Dashboard.jsx';
-import RelatoriosPage from './RelatoriosPage.jsx';
-import DocumentoList from './DocumentoList.jsx';
-import DocumentoForm from './DocumentoForm.jsx';
+// Importação dos componentes de página
+import DashboardPage from './pages/DashboardPage.jsx';
+import ClientesPage from './pages/ClientesPage.jsx';
+import CasosPage from './pages/CasosPage.jsx';
+import RecebimentosPage from './pages/RecebimentosPage.jsx';
+import DespesasPage from './pages/DespesasPage.jsx'; // Corrigido o nome do arquivo se você chamou de "DepesasPage"
+import AgendaPage from './pages/AgendaPage.jsx';
+import DocumentosPage from './pages/DocumentosPage.jsx';
+import RelatoriosPage from './pages/RelatoriosPage.jsx';
+import NotFoundPage from './pages/NotFoundPage.jsx'; // Esta é a importação problemática
 
 // Importação dos ícones da biblioteca Heroicons
 import {
@@ -37,154 +32,89 @@ import {
   CreditCardIcon
 } from '@heroicons/react/24/outline';
 
-// Importação do CSS do Bootstrap Icons
-// Esta linha depende da instalação correta do pacote 'bootstrap-icons'
-import "bootstrap-icons/font/bootstrap-icons.css";
-
-// Constantes para identificar as seções da aplicação
-export const SECOES = {
-  DASHBOARD: 'DASHBOARD',
-  CLIENTES: 'CLIENTES',
-  CASOS: 'CASOS',
-  RECEBIMENTOS: 'RECEBIMENTOS',
-  DESPESAS: 'DESPESAS',
-  AGENDA: 'AGENDA',
-  DOCUMENTOS: 'DOCUMENTOS',
-  RELATORIOS: 'RELATORIOS',
-};
-
-function App() {
-  const [secaoAtiva, setSecaoAtiva] = useState(SECOES.DASHBOARD);
-  const [itemParaEditar, setItemParaEditar] = useState(null);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  const mudarSecao = useCallback((secao) => {
-    setSecaoAtiva(secao);
-    setItemParaEditar(null);
-    setMostrarFormulario(false);
-  }, []);
-
-  const handleEditarClick = (item, secaoEspecifica = null) => {
-    const secaoAlvo = secaoEspecifica || secaoAtiva;
-    if (Object.values(SECOES).includes(secaoAlvo) && secaoAlvo !== SECOES.DASHBOARD && secaoAlvo !== SECOES.RELATORIOS) {
-      setItemParaEditar(item);
-      setMostrarFormulario(true);
-    }
+// Layout principal que inclui a sidebar e o header
+const MainLayout = () => {
+  // Para obter o título da página de forma reativa, use useLocation
+  // import { useLocation } from 'react-router-dom';
+  // const location = useLocation();
+  // const getPageTitle = () => { ... lógica baseada em location.pathname ... }
+  // Por simplicidade, mantendo a versão anterior por enquanto:
+  const { pathname } = window.location;
+  const getPageTitle = () => {
+    const pathParts = pathname.split('/').filter(Boolean);
+    if (pathParts.length === 0 || pathParts[0] === 'dashboard' || pathParts[0] === '') return 'Dashboard';
+    if (pathParts[0] === 'clientes' && pathParts[1] === 'novo') return 'Novo Cliente';
+    if (pathParts[0] === 'clientes' && pathParts[1] === 'editar') return 'Editar Cliente';
+    if (pathParts[0] === 'casos' && pathParts[1] === 'novo') return 'Novo Caso';
+    if (pathParts[0] === 'casos' && pathParts[1] === 'editar') return 'Editar Caso';
+    if (pathParts[0] === 'recebimentos' && pathParts[1] === 'novo') return 'Novo Recebimento';
+    if (pathParts[0] === 'recebimentos' && pathParts[1] === 'editar') return 'Editar Recebimento';
+    if (pathParts[0] === 'despesas' && pathParts[1] === 'novo') return 'Nova Despesa';
+    if (pathParts[0] === 'despesas' && pathParts[1] === 'editar') return 'Editar Despesa';
+    if (pathParts[0] === 'agenda' && pathParts[1] === 'novo') return 'Novo Evento';
+    if (pathParts[0] === 'agenda' && pathParts[1] === 'editar') return 'Editar Evento';
+    if (pathParts[0] === 'documentos' && pathParts[1] === 'novo') return 'Novo Documento';
+    if (pathParts[0] === 'documentos' && pathParts[1] === 'editar') return 'Editar Documento';
+    
+    // Garante que o título seja capitalizado corretamente
+    const title = pathParts[0] ? pathParts[0].replace('-', ' ') : 'Página';
+    return title.charAt(0).toUpperCase() + title.slice(1);
   };
 
-  const handleAdicionarClick = () => {
-    if (Object.values(SECOES).includes(secaoAtiva) && secaoAtiva !== SECOES.DASHBOARD && secaoAtiva !== SECOES.RELATORIOS) {
-      setItemParaEditar(null);
-      setMostrarFormulario(true);
-    }
-  };
 
-  const handleFormularioFechado = useCallback(() => {
-    setMostrarFormulario(false);
-    setItemParaEditar(null);
-    setRefreshKey(prevKey => prevKey + 1);
-  }, []);
-
-  const renderizarConteudoPrincipal = () => {
-    const propsComunsForm = {
-        onCancel: () => { setMostrarFormulario(false); setItemParaEditar(null); }
-    };
-
-    if (mostrarFormulario) {
-      switch (secaoAtiva) {
-        case SECOES.CLIENTES:
-          return <ClienteForm clienteParaEditar={itemParaEditar} onClienteChange={handleFormularioFechado} {...propsComunsForm} />;
-        case SECOES.CASOS:
-          return <CasoForm casoParaEditar={itemParaEditar} onCasoChange={handleFormularioFechado} {...propsComunsForm} />;
-        case SECOES.RECEBIMENTOS:
-          return <RecebimentoForm recebimentoParaEditar={itemParaEditar} onRecebimentoChange={handleFormularioFechado} {...propsComunsForm} />;
-        case SECOES.DESPESAS:
-          return <DespesaForm despesaParaEditar={itemParaEditar} onDespesaChange={handleFormularioFechado} {...propsComunsForm} />;
-        case SECOES.AGENDA:
-          return <EventoAgendaForm eventoParaEditar={itemParaEditar} onEventoChange={handleFormularioFechado} {...propsComunsForm} />;
-        case SECOES.DOCUMENTOS:
-          return <DocumentoForm documentoParaEditar={itemParaEditar} onDocumentoChange={handleFormularioFechado} {...propsComunsForm} />;
-        default:
-          return null;
+  const NavButton = ({ to, icon: IconComponent, children }) => (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `btn w-100 d-flex align-items-center text-start mb-1 ${isActive ? 'btn-primary active' : 'btn-light'}`
       }
-    }
-
-    const BotaoAdicionar = ({ texto }) => (
-      <button
-        onClick={handleAdicionarClick}
-        className="btn btn-primary mb-3 d-flex align-items-center"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="me-2" width="18" height="18">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-        </svg>
-        {texto}
-      </button>
-    );
-
-    switch (secaoAtiva) {
-      case SECOES.DASHBOARD:
-        return <Dashboard mudarSecao={mudarSecao} />;
-      case SECOES.CLIENTES:
-        return (
-          <>
-            {!mostrarFormulario && <BotaoAdicionar texto="Adicionar Novo Cliente" />}
-            <ClienteList key={refreshKey} onEditCliente={(cliente) => handleEditarClick(cliente, SECOES.CLIENTES)} />
-          </>
-        );
-      case SECOES.CASOS:
-        return (
-          <>
-            {!mostrarFormulario && <BotaoAdicionar texto="Adicionar Novo Caso" />}
-            <CasoList key={refreshKey} onEditCaso={(caso) => handleEditarClick(caso, SECOES.CASOS)} />
-          </>
-        );
-      case SECOES.RECEBIMENTOS:
-        return (
-          <>
-            {!mostrarFormulario && <BotaoAdicionar texto="Adicionar Novo Recebimento" />}
-            <RecebimentoList key={refreshKey} onEditRecebimento={(item) => handleEditarClick(item, SECOES.RECEBIMENTOS)} />
-          </>
-        );
-      case SECOES.DESPESAS:
-         return (
-          <>
-            {!mostrarFormulario && <BotaoAdicionar texto="Adicionar Nova Despesa" />}
-            <DespesaList key={refreshKey} onEditDespesa={(item) => handleEditarClick(item, SECOES.DESPESAS)} />
-          </>
-        );
-      case SECOES.AGENDA:
-        return (
-          <>
-            {!mostrarFormulario && <BotaoAdicionar texto="Adicionar Novo Evento" />}
-            <EventoAgendaList key={refreshKey} onEditEvento={(item) => handleEditarClick(item, SECOES.AGENDA)} />
-          </>
-        );
-      case SECOES.DOCUMENTOS:
-        return (
-          <>
-            {!mostrarFormulario && <BotaoAdicionar texto="Adicionar Novo Documento" />}
-            <DocumentoList key={refreshKey} onEditDocumento={(doc) => handleEditarClick(doc, SECOES.DOCUMENTOS)} />
-          </>
-        );
-      case SECOES.RELATORIOS:
-        return <RelatoriosPage />;
-      default:
-        return <div className="text-center text-muted mt-5">Selecione uma seção no menu.</div>;
-    }
-  };
-
-  const NavButton = ({ secao, icon: IconComponent, children }) => (
-    <button
-      onClick={() => mudarSecao(secao)}
-      className={`btn w-100 d-flex align-items-center text-start mb-1 ${secaoAtiva === secao ? 'btn-primary active' : 'btn-light'}`}
       title={children}
     >
       <IconComponent className="me-2" style={{ width: '18px', height: '18px' }} />
       <span className="ms-1">{children}</span>
-    </button>
+    </NavLink>
   );
 
+  return (
+    <div className="d-flex vh-100">
+      <aside className="bg-light border-end p-3 d-flex flex-column" style={{ width: '250px', flexShrink: 0 }}>
+        <div className="h3 text-primary mb-4 text-center pt-2">
+          Gestão ADV
+        </div>
+        <NavButton to="/dashboard" icon={HomeIcon}>Dashboard</NavButton>
+        <NavButton to="/clientes" icon={UsersIcon}>Clientes</NavButton>
+        <NavButton to="/casos" icon={BriefcaseIcon}>Casos</NavButton>
+        <NavButton to="/recebimentos" icon={CurrencyDollarIcon}>Recebimentos</NavButton>
+        <NavButton to="/despesas" icon={CreditCardIcon}>Despesas</NavButton>
+        <NavButton to="/agenda" icon={CalendarDaysIcon}>Agenda</NavButton>
+        <NavButton to="/documentos" icon={DocumentTextIcon}>Documentos</NavButton>
+        <NavButton to="/relatorios" icon={ChartBarIcon}>Relatórios</NavButton>
+
+        <div className="mt-auto pt-3 border-top">
+          <p className="text-muted small text-center">
+            App Gestão ADV <br />
+            &copy; {new Date().getFullYear()}
+          </p>
+        </div>
+      </aside>
+
+      <div className="flex-grow-1 d-flex flex-column overflow-hidden">
+        <header className="bg-white shadow-sm border-bottom p-3">
+          <h1 className="h5 mb-0 text-capitalize">
+             {getPageTitle()}
+          </h1>
+        </header>
+
+        <main className="flex-grow-1 overflow-auto p-4" style={{ backgroundColor: '#f8f9fa' }}>
+          <Outlet /> {/* Componentes da rota aninhada serão renderizados aqui */}
+        </main>
+      </div>
+    </div>
+  );
+};
+
+
+function App() {
   return (
     <>
       <ToastContainer
@@ -199,40 +129,40 @@ function App() {
         pauseOnHover
         theme="colored"
       />
-      <div className="d-flex vh-100">
-        <aside className="bg-light border-end p-3 d-flex flex-column" style={{ width: '250px', flexShrink: 0 }}>
-          <div className="h3 text-primary mb-4 text-center pt-2">
-            Gestão ADV
-          </div>
-          <NavButton secao={SECOES.DASHBOARD} icon={HomeIcon}>Dashboard</NavButton>
-          <NavButton secao={SECOES.CLIENTES} icon={UsersIcon}>Clientes</NavButton>
-          <NavButton secao={SECOES.CASOS} icon={BriefcaseIcon}>Casos</NavButton>
-          <NavButton secao={SECOES.RECEBIMENTOS} icon={CurrencyDollarIcon}>Recebimentos</NavButton>
-          <NavButton secao={SECOES.DESPESAS} icon={CreditCardIcon}>Despesas</NavButton>
-          <NavButton secao={SECOES.AGENDA} icon={CalendarDaysIcon}>Agenda</NavButton>
-          <NavButton secao={SECOES.DOCUMENTOS} icon={DocumentTextIcon}>Documentos</NavButton>
-          <NavButton secao={SECOES.RELATORIOS} icon={ChartBarIcon}>Relatórios</NavButton>
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
 
-          <div className="mt-auto pt-3 border-top">
-              <p className="text-muted small text-center">
-                  App Gestão ADV <br/>
-                  &copy; {new Date().getFullYear()}
-              </p>
-          </div>
-        </aside>
+          <Route path="clientes" element={<ClientesPage />} />
+          <Route path="clientes/novo" element={<ClientesPage />} /> 
+          <Route path="clientes/editar/:clienteId" element={<ClientesPage />} />
+          
+          <Route path="casos" element={<CasosPage />} />
+          <Route path="casos/novo" element={<CasosPage />} />
+          <Route path="casos/editar/:casoId" element={<CasosPage />} />
 
-        <div className="flex-grow-1 d-flex flex-column overflow-hidden">
-          <header className="bg-white shadow-sm border-bottom p-3">
-              <h1 className="h5 mb-0 text-capitalize">
-                {secaoAtiva.toLowerCase().replace('_', ' ')}
-              </h1>
-          </header>
+          <Route path="recebimentos" element={<RecebimentosPage />} />
+          <Route path="recebimentos/novo" element={<RecebimentosPage />} />
+          <Route path="recebimentos/editar/:recebimentoId" element={<RecebimentosPage />} />
 
-          <main className="flex-grow-1 overflow-auto p-4" style={{backgroundColor: '#f8f9fa'}}>
-            {renderizarConteudoPrincipal()}
-          </main>
-        </div>
-      </div>
+          <Route path="despesas" element={<DespesasPage />} />
+          <Route path="despesas/novo" element={<DespesasPage />} />
+          <Route path="despesas/editar/:despesaId" element={<DespesasPage />} />
+
+          <Route path="agenda" element={<AgendaPage />} />
+          <Route path="agenda/novo" element={<AgendaPage />} />
+          <Route path="agenda/editar/:eventoId" element={<AgendaPage />} />
+          
+          <Route path="documentos" element={<DocumentosPage />} />
+          <Route path="documentos/novo" element={<DocumentosPage />} />
+          <Route path="documentos/editar/:documentoId" element={<DocumentosPage />} />
+
+          <Route path="relatorios" element={<RelatoriosPage />} />
+          
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
     </>
   );
 }
