@@ -1,127 +1,58 @@
-# Arquivo: config/settings.py
-# Configurações completas para o projeto Django, incluindo preparação para Heroku.
-# Comentários em Português (Pt-BR).
-
-from pathlib import Path
+# CAMINHO: gestao_advocacia/config.py
 import os
-import dj_database_url # Para configurar o banco de dados a partir de uma URL (útil para Heroku)
+from dotenv import load_dotenv
 
-# Constrói caminhos dentro do projeto como: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+# Define o diretório base do projeto (onde este arquivo config.py está)
+basedir = os.path.abspath(os.path.dirname(__file__))
 
-
-# Configurações de desenvolvimento de início rápido - inadequadas para produção
-# Veja https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
-
-# AVISO DE SEGURANÇA: mantenha a chave secreta usada em produção em segredo!
-# Para desenvolvimento, pode ser uma chave simples. Para produção, use uma variável de ambiente.
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-sua-chave-secreta-padrao-para-desenvolvimento')
-
-# AVISO DE SEGURANÇA: não execute com debug ativado em produção!
-# Em produção, defina a variável de ambiente DJANGO_DEBUG como 'False'
-# O padrão é 'True' para desenvolvimento se a variável não estiver definida.
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
-
-
-# Hosts/domínios permitidos para esta instalação do Django.
-ALLOWED_HOSTS = []
-if not DEBUG:
-    HEROKU_APP_NAME = os.environ.get('HEROKU_APP_NAME') 
-    if HEROKU_APP_NAME:
-        ALLOWED_HOSTS.append(f"{HEROKU_APP_NAME}.herokuapp.com")
-    # Adicione seu domínio personalizado se tiver um, ex: 'www.seuapp.com.br'
-    # ALLOWED_HOSTS.append('www.seuadvocaciaapp.com.br') 
+# Carrega variáveis de ambiente do arquivo .env que deve estar na MESMA PASTA que config.py
+# Crie um arquivo .env na pasta 'gestao_advocacia' se ainda não tiver, 
+# para FLASK_SECRET_KEY e DATABASE_URL (se não for usar a string direta abaixo)
+dotenv_path = os.path.join(basedir, '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+    print(f"Arquivo .env carregado de: {dotenv_path}")
 else:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    print(f"Aviso: Arquivo .env não encontrado em {dotenv_path}. Usando valores padrão ou variáveis de ambiente globais.")
 
+class Config:
+    """Configurações base da aplicação Flask."""
+    
+    # CHAVE SECRETA: Mude para algo único e seguro em produção!
+    # Pode ser definida pela variável de ambiente FLASK_SECRET_KEY
+    SECRET_KEY = os.environ.get('FLASK_SECRET_KEY') or 'minha-chave-secreta-flask-super-segura-12345'
+    
+    # Configuração do Banco de Dados:
+    # Prioriza DATABASE_URL do ambiente (útil para Heroku/produção ou se definida no .env)
+    # Se não encontrar, usa a string para PostgreSQL local.
+    # Certifique-se de que seu servidor PostgreSQL está rodando e acessível com estas credenciais.
+    # E que a base de dados 'advocacia_db' existe.
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'postgresql://postgres:Alisson075*@localhost:5432/advocacia_db'
+        # Exemplo alternativo para SQLite (mais simples para desenvolvimento inicial se não quiser usar PostgreSQL):
+        # 'sqlite:///' + os.path.join(basedir, 'app_flask.db') 
+    
+    SQLALCHEMY_TRACK_MODIFICATIONS = False # Desabilita o tracking de modificações do SQLAlchemy (melhora performance)
 
-# Definição das Aplicações Instaladas
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'gestao', # Sua app principal
-    # 'whitenoise.runserver_nostatic', # Descomente se quiser usar WhiteNoise com o runserver local
-]
+    # Configurações para Upload de Arquivos
+    UPLOAD_FOLDER = os.path.join(basedir, 'uploads') # Pasta para armazenar uploads
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # Limite de 16MB para uploads
+    ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'}
 
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', 
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-]
+    # A criação da pasta UPLOAD_FOLDER é melhor feita no app.py para garantir o contexto correto da aplicação.
+    # No entanto, se quiser garantir aqui, pode descomentar e ajustar:
+    # if not os.path.exists(UPLOAD_FOLDER):
+    #     try:
+    #         os.makedirs(UPLOAD_FOLDER)
+    #         print(f"Pasta de uploads criada em: {UPLOAD_FOLDER}")
+    #     except Exception as e:
+    #         print(f"Erro ao criar pasta de uploads {UPLOAD_FOLDER}: {e}")
 
-ROOT_URLCONF = 'config.urls'
-
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'], 
-        'APP_DIRS': True, 
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-                'django.template.context_processors.media',
-            ],
-        },
-    },
-]
-
-WSGI_APPLICATION = 'config.wsgi.application'
-
-
-# Banco de Dados
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.config(
-        conn_max_age=600,
-        ssl_require=True if os.environ.get('DJANGO_ENV') == 'production' else False 
-    )
-
-# Validação de Senhas
-AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
-]
-
-# Internacionalização e Localização
-LANGUAGE_CODE = 'pt-br'
-TIME_ZONE = 'America/Sao_Paulo'
-USE_I18N = True
-USE_TZ = True
-
-# Arquivos Estáticos (CSS, JavaScript, Imagens da aplicação)
-STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-# STATICFILES_DIRS = [ BASE_DIR / "static_global", ] # Se tiver uma pasta static global
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-# Arquivos de Media (Arquivos enviados pelos utilizadores)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'mediafiles' # Crie esta pasta na raiz do seu projeto
-
-# Tipo de campo de chave primária padrão
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# LOGIN_REDIRECT_URL = '/' 
-# LOGOUT_REDIRECT_URL = '/' 
-# LOGIN_URL = 'login' 
+# Você pode adicionar outras classes de configuração se precisar (ex: DevelopmentConfig, TestingConfig)
+# class DevelopmentConfig(Config):
+#     DEBUG = True
+#
+# class TestingConfig(Config):
+#     TESTING = True
+#     SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL') or \
+#         'sqlite:///' + os.path.join(basedir, 'test_flask.db') # Banco de dados de teste separado
