@@ -1,0 +1,130 @@
+{% extends "gestao/base.html" %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina|default:"Formulário de Caso" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_pagina }}</h1>
+</div>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endif %}
+
+            <fieldset class="mb-4">
+                <legend class="h5 mb-3 border-bottom pb-2">Informações Principais do Caso</legend>
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label for="{{ form.titulo.id_for_label }}" class="form-label form-label-sm">{{ form.titulo.label }}{% if form.titulo.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                        {{ form.titulo }}
+                        {% if form.titulo.errors %}<div class="invalid-feedback d-block">{{ form.titulo.errors|join:", " }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.cliente.id_for_label }}" class="form-label form-label-sm">{{ form.cliente.label }}{% if form.cliente.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                        {% if cliente_associado %}
+                            <input type="hidden" name="{{ form.cliente.name }}" value="{{ cliente_associado.pk }}">
+                            <input type="text" class="form-control form-control-sm" value="{{ cliente_associado.nome_razao_social }}" readonly>
+                            <small class="form-text text-muted">Associado ao cliente: {{ cliente_associado.nome_razao_social }}</small>
+                        {% else %}
+                            {{ form.cliente }}
+                        {% endif %}
+                        {% if form.cliente.errors %}<div class="invalid-feedback d-block">{{ form.cliente.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.status.id_for_label }}" class="form-label form-label-sm">{{ form.status.label }}{% if form.status.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                        {{ form.status }}
+                        {% if form.status.errors %}<div class="invalid-feedback d-block">{{ form.status.errors|join:", " }}</div>{% endif %}
+                    </div>
+                </div>
+                 <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.numero_processo.id_for_label }}" class="form-label form-label-sm">{{ form.numero_processo.label }}</label>
+                        {{ form.numero_processo }}
+                        {% if form.numero_processo.errors %}<div class="invalid-feedback d-block">{{ form.numero_processo.errors|join:", " }}</div>{% endif %}
+                    </div>
+                     <div class="col-md-6 mb-3">
+                        <label for="{{ form.tipo_acao.id_for_label }}" class="form-label form-label-sm">{{ form.tipo_acao.label }}</label>
+                        {{ form.tipo_acao }}
+                        {% if form.tipo_acao.errors %}<div class="invalid-feedback d-block">{{ form.tipo_acao.errors|join:", " }}</div>{% endif %}
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="mb-4">
+                <legend class="h6 mb-3 border-bottom pb-1">Partes e Detalhes Processuais</legend>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.parte_contraria.id_for_label }}" class="form-label form-label-sm">{{ form.parte_contraria.label }}</label>
+                        {{ form.parte_contraria }}
+                        {% if form.parte_contraria.errors %}<div class="invalid-feedback d-block">{{ form.parte_contraria.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.adv_parte_contraria.id_for_label }}" class="form-label form-label-sm">{{ form.adv_parte_contraria.label }}</label>
+                        {{ form.adv_parte_contraria }}
+                        {% if form.adv_parte_contraria.errors %}<div class="invalid-feedback d-block">{{ form.adv_parte_contraria.errors|join:", " }}</div>{% endif %}
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="{{ form.vara_juizo.id_for_label }}" class="form-label form-label-sm">{{ form.vara_juizo.label }}</label>
+                        {{ form.vara_juizo }}
+                        {% if form.vara_juizo.errors %}<div class="invalid-feedback d-block">{{ form.vara_juizo.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="{{ form.comarca.id_for_label }}" class="form-label form-label-sm">{{ form.comarca.label }}</label>
+                        {{ form.comarca }}
+                        {% if form.comarca.errors %}<div class="invalid-feedback d-block">{{ form.comarca.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="{{ form.instancia.id_for_label }}" class="form-label form-label-sm">{{ form.instancia.label }}</label>
+                        {{ form.instancia }}
+                        {% if form.instancia.errors %}<div class="invalid-feedback d-block">{{ form.instancia.errors|join:", " }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.valor_causa.id_for_label }}" class="form-label form-label-sm">{{ form.valor_causa.label }}</label>
+                        {{ form.valor_causa }}
+                        {% if form.valor_causa.errors %}<div class="invalid-feedback d-block">{{ form.valor_causa.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.data_distribuicao.id_for_label }}" class="form-label form-label-sm">{{ form.data_distribuicao.label }}</label>
+                        {{ form.data_distribuicao }}
+                        {% if form.data_distribuicao.errors %}<div class="invalid-feedback d-block">{{ form.data_distribuicao.errors|join:", " }}</div>{% endif %}
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="mb-3">
+                <label for="{{ form.notas_caso.id_for_label }}" class="form-label form-label-sm">{{ form.notas_caso.label }}</label>
+                {{ form.notas_caso }}
+                {% if form.notas_caso.errors %}<div class="invalid-feedback d-block">{{ form.notas_caso.errors|join:", " }}</div>{% endif %}
+            </div>
+
+            <div class="mt-4 pt-3 border-top">
+                <button type="submit" class="btn btn-primary btn-sm px-4">Salvar Caso</button>
+                {% if form.instance.pk %}
+                    <a href="{% url 'gestao:caso_detail' form.instance.pk %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% elif form.instance.cliente %}
+                     <a href="{% url 'gestao:cliente_detail' form.instance.cliente.pk %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% else %}
+                     <a href="{% url 'gestao:caso_list' %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

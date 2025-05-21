@@ -1,0 +1,95 @@
+{% extends "gestao/base.html" %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina|default:"Formulário de Evento/Prazo" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_pagina }}</h1>
+</div>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endif %}
+
+            <fieldset class="mb-4">
+                <legend class="h5 mb-3 border-bottom pb-2">Detalhes do Evento/Prazo</legend>
+                <div class="mb-3">
+                    <label for="{{ form.titulo.id_for_label }}" class="form-label form-label-sm">{{ form.titulo.label }}{% if form.titulo.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                    {{ form.titulo }}
+                    {% if form.titulo.errors %}<div class="invalid-feedback d-block">{{ form.titulo.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.tipo_evento.id_for_label }}" class="form-label form-label-sm">{{ form.tipo_evento.label }}{% if form.tipo_evento.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                        {{ form.tipo_evento }}
+                        {% if form.tipo_evento.errors %}<div class="invalid-feedback d-block">{{ form.tipo_evento.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.caso.id_for_label }}" class="form-label form-label-sm">{{ form.caso.label }}</label>
+                        {% if caso_associado %}
+                             <input type="hidden" name="{{ form.caso.name }}" value="{{ caso_associado.pk }}">
+                             <input type="text" class="form-control form-control-sm" value="{{ caso_associado.titulo }}" readonly>
+                             <small class="form-text text-muted">Associado ao caso: {{ caso_associado.titulo }}</small>
+                        {% else %}
+                            {{ form.caso }}
+                        {% endif %}
+                        {% if form.caso.errors %}<div class="invalid-feedback d-block">{{ form.caso.errors|join:", " }}</div>{% endif %}
+                        <small class="form-text text-muted">Opcional.</small>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.data_inicio.id_for_label }}" class="form-label form-label-sm">{{ form.data_inicio.label }}{% if form.data_inicio.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                        {{ form.data_inicio }}
+                        {% if form.data_inicio.errors %}<div class="invalid-feedback d-block">{{ form.data_inicio.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.data_fim.id_for_label }}" class="form-label form-label-sm">{{ form.data_fim.label }}</label>
+                        {{ form.data_fim }}
+                        {% if form.data_fim.errors %}<div class="invalid-feedback d-block">{{ form.data_fim.errors|join:", " }}</div>{% endif %}
+                         <small class="form-text text-muted">Opcional. Deixe em branco se for um evento de dia inteiro ou sem data final definida.</small>
+                    </div>
+                </div>
+                 <div class="mb-3">
+                    <label for="{{ form.local.id_for_label }}" class="form-label form-label-sm">{{ form.local.label }}</label>
+                    {{ form.local }}
+                    {% if form.local.errors %}<div class="invalid-feedback d-block">{{ form.local.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="{{ form.descricao.id_for_label }}" class="form-label form-label-sm">{{ form.descricao.label }}</label>
+                    {{ form.descricao }}
+                    {% if form.descricao.errors %}<div class="invalid-feedback d-block">{{ form.descricao.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="form-check mb-3">
+                    {{ form.concluido }}
+                    <label class="form-check-label form-label-sm" for="{{ form.concluido.id_for_label }}">
+                        {{ form.concluido.label }}
+                    </label>
+                    {% if form.concluido.errors %}<div class="invalid-feedback d-block">{{ form.concluido.errors|join:", " }}</div>{% endif %}
+                </div>
+            </fieldset>
+
+            <div class="mt-4 pt-3 border-top">
+                <button type="submit" class="btn btn-primary btn-sm px-4">Salvar Evento/Prazo</button>
+                {% if form.instance.pk and form.instance.caso %}
+                    <a href="{% url 'gestao:caso_detail' form.instance.caso.pk %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% elif form.instance.pk %}
+                     <a href="{% url 'gestao:evento_list' %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% elif caso_associado %}
+                     <a href="{% url 'gestao:caso_detail' caso_associado.pk %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% else %}
+                     <a href="{% url 'gestao:evento_list' %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

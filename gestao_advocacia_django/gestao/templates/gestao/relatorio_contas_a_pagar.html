@@ -1,0 +1,61 @@
+{% extends "gestao/base.html" %}
+
+{% block title %}{{ titulo_pagina|default:"Relatório: Contas a Pagar" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_pagina }}</h1>
+    <a href="{% url 'gestao:relatorio_list' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left-circle me-1"></i> Voltar para Relatórios
+    </a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Despesas a Pagar e Vencidas</h5>
+    </div>
+    <div class="card-body">
+        {% if despesas %}
+            <div class="table-responsive">
+                <table class="table table-striped table-sm align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Caso Associado</th>
+                            <th class="text-end">Valor (R$)</th>
+                            <th>Vencimento</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for despesa in despesas %}
+                        <tr>
+                            <td>{{ despesa.descricao }}</td>
+                            <td>{{ despesa.caso.titulo|default:"Despesa Geral" }}</td>
+                            <td class="text-end">{{ despesa.valor|floatformat:2 }}</td>
+                            <td>{{ despesa.data_vencimento|date:"d/m/Y" }}</td>
+                            <td>
+                                <span class="badge {% if despesa.status == 'Vencida' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                    {{ despesa.get_status_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-group-divider">
+                            <th colspan="2" class="text-end">Total Geral:</th>
+                            <th class="text-end fw-bold">R$ {{ total_geral|floatformat:2 }}</th>
+                            <th colspan="2"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% else %}
+             <div class="alert alert-info" role="alert">
+                Nenhuma conta a pagar ou vencida no momento.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

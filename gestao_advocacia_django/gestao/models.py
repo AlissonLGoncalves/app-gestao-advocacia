@@ -1,172 +1,248 @@
-# Arquivo: gestao/models.py
+# CAMINHO: gestao/models.py
 from django.db import models
-from django.utils import timezone
-import os # Necessário para a função get_upload_path
+from django.urls import reverse
+from django.utils import timezone # Para default=timezone.now
+import os
+import uuid
+from django.conf import settings
+
+# Choices para campos
+ESTADO_CIVIL_CHOICES = [
+    ('', '---------'),
+    ('Solteiro(a)', 'Solteiro(a)'),
+    ('Casado(a)', 'Casado(a)'),
+    ('Divorciado(a)', 'Divorciado(a)'),
+    ('Viúvo(a)', 'Viúvo(a)'),
+    ('União Estável', 'União Estável'),
+]
+
+UF_CHOICES = [
+    ('', '---------'),
+    ('AC', 'Acre'), ('AL', 'Alagoas'), ('AP', 'Amapá'), ('AM', 'Amazonas'),
+    ('BA', 'Bahia'), ('CE', 'Ceará'), ('DF', 'Distrito Federal'), ('ES', 'Espírito Santo'),
+    ('GO', 'Goiás'), ('MA', 'Maranhão'), ('MT', 'Mato Grosso'), ('MS', 'Mato Grosso do Sul'),
+    ('MG', 'Minas Gerais'), ('PA', 'Pará'), ('PB', 'Paraíba'), ('PR', 'Paraná'),
+    ('PE', 'Pernambuco'), ('PI', 'Piauí'), ('RJ', 'Rio de Janeiro'),
+    ('RN', 'Rio Grande do Norte'), ('RS', 'Rio Grande do Sul'), ('RO', 'Rondônia'),
+    ('RR', 'Roraima'), ('SC', 'Santa Catarina'), ('SP', 'São Paulo'),
+    ('SE', 'Sergipe'), ('TO', 'Tocantins')
+]
 
 class Cliente(models.Model):
     TIPO_PESSOA_CHOICES = [('PF', 'Pessoa Física'), ('PJ', 'Pessoa Jurídica')]
     
-    nome_razao_social = models.CharField(max_length=255)
-    cpf_cnpj = models.CharField(max_length=18, unique=True) # Aumentado para acomodar formatação
-    tipo_pessoa = models.CharField(max_length=2, choices=TIPO_PESSOA_CHOICES)
-    rg = models.CharField(max_length=20, blank=True, null=True)
-    orgao_emissor = models.CharField(max_length=50, blank=True, null=True)
-    data_nascimento = models.DateField(blank=True, null=True)
-    estado_civil = models.CharField(max_length=50, blank=True, null=True)
-    profissao = models.CharField(max_length=100, blank=True, null=True)
-    nacionalidade = models.CharField(max_length=100, blank=True, null=True, default='Brasileiro(a)')
-    nome_fantasia = models.CharField(max_length=255, blank=True, null=True)
-    nire = models.CharField(max_length=50, blank=True, null=True)
-    inscricao_estadual = models.CharField(max_length=50, blank=True, null=True)
-    inscricao_municipal = models.CharField(max_length=50, blank=True, null=True)
-    cep = models.CharField(max_length=9, blank=True, null=True)
-    rua = models.CharField(max_length=255, blank=True, null=True)
-    numero = models.CharField(max_length=20, blank=True, null=True)
-    bairro = models.CharField(max_length=100, blank=True, null=True)
-    cidade = models.CharField(max_length=100, blank=True, null=True)
-    estado = models.CharField(max_length=2, blank=True, null=True)
-    pais = models.CharField(max_length=50, default='Brasil', blank=True, null=True)
-    telefone = models.CharField(max_length=20, blank=True, null=True)
-    email = models.EmailField(max_length=255, blank=True, null=True)
-    notas_gerais = models.TextField(blank=True, null=True)
-    data_criacao = models.DateTimeField(default=timezone.now)
-    data_atualizacao = models.DateTimeField(auto_now=True)
+    nome_razao_social = models.CharField("Nome / Razão Social", max_length=255)
+    cpf_cnpj = models.CharField("CPF/CNPJ", max_length=18, unique=True)
+    tipo_pessoa = models.CharField("Tipo de Pessoa", max_length=2, choices=TIPO_PESSOA_CHOICES)
+    
+    # Campos PF
+    rg = models.CharField("RG", max_length=20, blank=True, null=True)
+    orgao_emissor = models.CharField("Órgão Emissor", max_length=50, blank=True, null=True)
+    data_nascimento = models.DateField("Data de Nascimento", blank=True, null=True)
+    estado_civil = models.CharField("Estado Civil", max_length=50, choices=ESTADO_CIVIL_CHOICES, blank=True, null=True)
+    profissao = models.CharField("Profissão", max_length=100, blank=True, null=True)
+    nacionalidade = models.CharField("Nacionalidade", max_length=100, blank=True, null=True, default='Brasileiro(a)')
+
+    # Campos PJ
+    nome_fantasia = models.CharField("Nome Fantasia", max_length=255, blank=True, null=True)
+    nire = models.CharField("NIRE", max_length=50, blank=True, null=True) # Número de Identificação do Registro de Empresas
+    inscricao_estadual = models.CharField("Inscrição Estadual", max_length=50, blank=True, null=True)
+    inscricao_municipal = models.CharField("Inscrição Municipal", max_length=50, blank=True, null=True)
+
+    # Endereço
+    cep = models.CharField("CEP", max_length=9, blank=True, null=True)
+    rua = models.CharField("Rua/Logradouro", max_length=255, blank=True, null=True)
+    numero = models.CharField("Número", max_length=20, blank=True, null=True)
+    bairro = models.CharField("Bairro", max_length=100, blank=True, null=True)
+    cidade = models.CharField("Cidade", max_length=100, blank=True, null=True)
+    estado = models.CharField("UF", max_length=2, choices=UF_CHOICES, blank=True, null=True)
+    pais = models.CharField("País", max_length=50, default='Brasil', blank=True, null=True)
+
+    # Contato e Outros
+    telefone = models.CharField("Telefone", max_length=20, blank=True, null=True)
+    email = models.EmailField("Email", max_length=255, blank=True, null=True)
+    notas_gerais = models.TextField("Notas Gerais", blank=True, null=True)
+    
+    data_criacao = models.DateTimeField("Data de Criação", default=timezone.now)
+    data_atualizacao = models.DateTimeField("Data de Atualização", auto_now=True)
+
+    # Relacionamentos
+    # casos (definido em Caso)
+    # recebimentos (definido em Recebimento)
+    # documentos (definido em Documento)
 
     def __str__(self):
         return self.nome_razao_social
 
+    def get_absolute_url(self):
+        return reverse('gestao:cliente_detail', kwargs={'pk': self.pk})
+
 class Caso(models.Model):
     STATUS_CASO_CHOICES = [
-        ('Ativo', 'Ativo'), ('Suspenso', 'Suspenso'),
-        ('Encerrado', 'Encerrado'), ('Arquivado', 'Arquivado')
+        ('Ativo', 'Ativo'),
+        ('Pendente', 'Pendente'),
+        ('Suspenso', 'Suspenso'),
+        ('Encerrado', 'Encerrado'),
+        ('Arquivado', 'Arquivado'),
     ]
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='casos')
-    titulo = models.CharField(max_length=255)
-    numero_processo = models.CharField(max_length=30, unique=True, blank=True, null=True)
-    status = models.CharField(max_length=50, choices=STATUS_CASO_CHOICES, default='Ativo')
-    parte_contraria = models.CharField(max_length=255, blank=True, null=True)
-    adv_parte_contraria = models.CharField(max_length=255, blank=True, null=True)
-    tipo_acao = models.CharField(max_length=100, blank=True, null=True)
-    vara_juizo = models.CharField(max_length=100, blank=True, null=True)
-    comarca = models.CharField(max_length=100, blank=True, null=True)
-    instancia = models.CharField(max_length=50, blank=True, null=True)
-    valor_causa = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
-    data_distribuicao = models.DateField(blank=True, null=True)
-    notas_caso = models.TextField(blank=True, null=True)
-    data_criacao = models.DateTimeField(default=timezone.now)
-    data_atualizacao = models.DateTimeField(auto_now=True)
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='casos', verbose_name="Cliente")
+    titulo = models.CharField("Título do Caso", max_length=255)
+    numero_processo = models.CharField("Número do Processo", max_length=30, blank=True, null=True, unique=True)
+    status = models.CharField("Status", max_length=50, choices=STATUS_CASO_CHOICES, default='Ativo')
+    
+    parte_contraria = models.CharField("Parte Contrária", max_length=255, blank=True, null=True)
+    adv_parte_contraria = models.CharField("Advogado da Parte Contrária", max_length=255, blank=True, null=True)
+    tipo_acao = models.CharField("Tipo de Ação/Natureza", max_length=100, blank=True, null=True)
+    vara_juizo = models.CharField("Vara/Juízo", max_length=100, blank=True, null=True)
+    comarca = models.CharField("Comarca", max_length=100, blank=True, null=True)
+    instancia = models.CharField("Instância", max_length=50, blank=True, null=True)
+    valor_causa = models.DecimalField("Valor da Causa", max_digits=15, decimal_places=2, blank=True, null=True)
+    data_distribuicao = models.DateField("Data de Distribuição/Início", blank=True, null=True)
+    
+    notas_caso = models.TextField("Notas sobre o Caso", blank=True, null=True)
+    data_criacao = models.DateTimeField("Data de Criação", default=timezone.now)
+    data_atualizacao = models.DateTimeField("Data de Atualização", auto_now=True)
 
     def __str__(self):
-        return self.titulo
+        return f"{self.titulo} (Cliente: {self.cliente.nome_razao_social})"
+
+    def get_absolute_url(self):
+        return reverse('gestao:caso_detail', kwargs={'pk': self.pk})
 
 class Recebimento(models.Model):
     STATUS_RECEBIMENTO_CHOICES = [
-        ('Pendente', 'Pendente'), ('Pago', 'Pago'),
-        ('Vencido', 'Vencido'), ('Cancelado', 'Cancelado')
+        ('Pendente', 'Pendente'),
+        ('Pago', 'Pago'),
+        ('Vencido', 'Vencido'),
+        ('Cancelado', 'Cancelado'),
     ]
     CATEGORIA_RECEBIMENTO_CHOICES = [
-        ('Honorários Advocatícios', 'Honorários Advocatícios'), ('Honorários de Êxito', 'Honorários de Êxito'),
-        ('Consultoria', 'Consultoria'), ('Custas Processuais (Reembolso)', 'Custas Processuais (Reembolso)'),
-        ('Despesas (Reembolso)', 'Despesas (Reembolso)'), ('Acordo Judicial', 'Acordo Judicial'),
-        ('Outros Recebimentos', 'Outros Recebimentos')
+        ('Honorários Iniciais', 'Honorários Iniciais'),
+        ('Honorários Mensais', 'Honorários Mensais'),
+        ('Honorários de Êxito', 'Honorários de Êxito'),
+        ('Custas Processuais', 'Custas Processuais (Reembolso)'),
+        ('Acordo', 'Acordo'),
+        ('Outros', 'Outros'),
     ]
-    caso = models.ForeignKey(Caso, on_delete=models.CASCADE, related_name='recebimentos')
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='recebimentos_cliente')
-    data_recebimento = models.DateField(blank=True, null=True)
-    data_vencimento = models.DateField()
-    descricao = models.CharField(max_length=255)
-    categoria = models.CharField(max_length=100, choices=CATEGORIA_RECEBIMENTO_CHOICES, default='Honorários Advocatícios')
-    valor = models.DecimalField(max_digits=15, decimal_places=2)
-    status = models.CharField(max_length=50, choices=STATUS_RECEBIMENTO_CHOICES, default='Pendente')
-    forma_pagamento = models.CharField(max_length=50, blank=True, null=True)
-    notas = models.TextField(blank=True, null=True)
-    data_criacao = models.DateTimeField(default=timezone.now)
-    data_atualizacao = models.DateTimeField(auto_now=True)
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='recebimentos_cliente', verbose_name="Cliente")
+    caso = models.ForeignKey(Caso, on_delete=models.CASCADE, related_name='recebimentos_caso', verbose_name="Caso Associado")
+    descricao = models.CharField("Descrição", max_length=255)
+    categoria = models.CharField("Categoria", max_length=100, choices=CATEGORIA_RECEBIMENTO_CHOICES)
+    valor = models.DecimalField("Valor (R$)", max_digits=15, decimal_places=2)
+    data_vencimento = models.DateField("Data de Vencimento")
+    data_recebimento = models.DateField("Data de Recebimento", blank=True, null=True)
+    status = models.CharField("Status", max_length=50, choices=STATUS_RECEBIMENTO_CHOICES, default='Pendente')
+    forma_pagamento = models.CharField("Forma de Pagamento", max_length=50, blank=True, null=True)
+    notas = models.TextField("Notas", blank=True, null=True)
+    data_criacao = models.DateTimeField("Data de Criação", default=timezone.now)
+    data_atualizacao = models.DateTimeField("Data de Atualização", auto_now=True)
 
     def __str__(self):
-        return f"{self.descricao} - R$ {self.valor}"
+        return f"{self.descricao} - R$ {self.valor} (Venc: {self.data_vencimento})"
 
 class Despesa(models.Model):
     STATUS_DESPESA_CHOICES = [
-        ('A Pagar', 'A Pagar'), ('Paga', 'Paga'),
-        ('Vencida', 'Vencida'), ('Cancelada', 'Cancelada')
+        ('A Pagar', 'A Pagar'),
+        ('Paga', 'Paga'),
+        ('Vencida', 'Vencida'),
+        ('Cancelada', 'Cancelada'),
     ]
     CATEGORIA_DESPESA_CHOICES = [
-        ('Custas Processuais', 'Custas Processuais'), ('Honorários Periciais', 'Honorários Periciais'),
-        ('Cópias e Impressões', 'Cópias e Impressões'), ('Deslocamento/Viagem', 'Deslocamento/Viagem'),
-        ('Aluguel Escritório', 'Aluguel Escritório'), ('Contas (Água, Luz, Internet, Telefone)', 'Contas (Água, Luz, Internet, Telefone)'),
-        ('Software e Assinaturas', 'Software e Assinaturas'), ('Material de Escritório', 'Material de Escritório'),
-        ('Marketing e Publicidade', 'Marketing e Publicidade'), ('Impostos e Taxas Escritório', 'Impostos e Taxas Escritório'),
-        ('Outras Despesas', 'Outras Despesas')
+        ('Custas Judiciais', 'Custas Judiciais'),
+        ('Cópias e Impressões', 'Cópias e Impressões'),
+        ('Deslocamento', 'Deslocamento'),
+        ('Serviços de Terceiros', 'Serviços de Terceiros (Peritos, etc.)'),
+        ('Correspondente Jurídico', 'Correspondente Jurídico'),
+        ('Despesas Administrativas', 'Despesas Administrativas (Escritório)'),
+        ('Outras', 'Outras'),
     ]
-    caso = models.ForeignKey(Caso, on_delete=models.SET_NULL, blank=True, null=True, related_name='despesas')
-    data_despesa = models.DateField(blank=True, null=True)
-    data_vencimento = models.DateField()
-    descricao = models.CharField(max_length=255)
-    categoria = models.CharField(max_length=100, choices=CATEGORIA_DESPESA_CHOICES, default='Custas Processuais')
-    valor = models.DecimalField(max_digits=15, decimal_places=2)
-    status = models.CharField(max_length=50, choices=STATUS_DESPESA_CHOICES, default='A Pagar')
-    forma_pagamento = models.CharField(max_length=50, blank=True, null=True)
-    notas = models.TextField(blank=True, null=True)
-    data_criacao = models.DateTimeField(default=timezone.now)
-    data_atualizacao = models.DateTimeField(auto_now=True)
+    caso = models.ForeignKey(Caso, on_delete=models.SET_NULL, blank=True, null=True, related_name='despesas_caso', verbose_name="Caso Associado (Opcional)")
+    descricao = models.CharField("Descrição", max_length=255)
+    categoria = models.CharField("Categoria", max_length=100, choices=CATEGORIA_DESPESA_CHOICES)
+    valor = models.DecimalField("Valor (R$)", max_digits=15, decimal_places=2)
+    data_vencimento = models.DateField("Data de Vencimento")
+    data_despesa = models.DateField("Data da Despesa/Pagamento", blank=True, null=True) # Pode ser a data do pagamento
+    status = models.CharField("Status", max_length=50, choices=STATUS_DESPESA_CHOICES, default='A Pagar')
+    forma_pagamento = models.CharField("Forma de Pagamento", max_length=50, blank=True, null=True)
+    notas = models.TextField("Notas", blank=True, null=True)
+    data_criacao = models.DateTimeField("Data de Criação", default=timezone.now)
+    data_atualizacao = models.DateTimeField("Data de Atualização", auto_now=True)
 
     def __str__(self):
-        return f"{self.descricao} - R$ {self.valor}"
+        return f"{self.descricao} - R$ {self.valor} (Venc: {self.data_vencimento})"
 
 class EventoAgenda(models.Model):
     TIPO_EVENTO_CHOICES = [
-        ('Prazo', 'Prazo'), ('Audiência', 'Audiência'),
-        ('Reunião', 'Reunião'), ('Lembrete', 'Lembrete'), ('Outro', 'Outro')
+        ('Prazo', 'Prazo Processual'),
+        ('Audiência', 'Audiência'),
+        ('Reunião', 'Reunião'),
+        ('Lembrete', 'Lembrete'),
+        ('Outro', 'Outro Compromisso'),
     ]
-    caso = models.ForeignKey(Caso, on_delete=models.SET_NULL, blank=True, null=True, related_name='eventos')
-    tipo_evento = models.CharField(max_length=50, choices=TIPO_EVENTO_CHOICES, default='Lembrete')
-    titulo = models.CharField(max_length=255)
-    descricao = models.TextField(blank=True, null=True)
-    data_inicio = models.DateTimeField()
-    data_fim = models.DateTimeField(blank=True, null=True)
-    local = models.CharField(max_length=255, blank=True, null=True)
-    concluido = models.BooleanField(default=False)
-    data_criacao = models.DateTimeField(default=timezone.now)
-    data_atualizacao = models.DateTimeField(auto_now=True)
+    caso = models.ForeignKey(Caso, on_delete=models.SET_NULL, blank=True, null=True, related_name='eventos_caso', verbose_name="Caso Associado (Opcional)")
+    tipo_evento = models.CharField("Tipo de Evento", max_length=50, choices=TIPO_EVENTO_CHOICES)
+    titulo = models.CharField("Título do Evento/Prazo", max_length=255)
+    descricao = models.TextField("Descrição Detalhada", blank=True, null=True)
+    data_inicio = models.DateTimeField("Data e Hora de Início")
+    data_fim = models.DateTimeField("Data e Hora de Fim", blank=True, null=True)
+    local = models.CharField("Local (se aplicável)", max_length=255, blank=True, null=True)
+    concluido = models.BooleanField("Concluído?", default=False)
+    data_criacao = models.DateTimeField("Data de Criação", default=timezone.now)
+    data_atualizacao = models.DateTimeField("Data de Atualização", auto_now=True)
 
     def __str__(self):
-        return f"{self.tipo_evento}: {self.titulo} em {self.data_inicio.strftime('%d/%m/%Y %H:%M')}"
+        return f"{self.get_tipo_evento_display()}: {self.titulo} ({self.data_inicio.strftime('%d/%m/%Y %H:%M')})"
 
 def get_upload_path(instance, filename):
+    # Gera um nome de arquivo único para evitar colisões e organiza por data/cliente/caso
     ext = filename.split('.')[-1]
-    timestamp = timezone.now().strftime('%Y%m%d%H%M%S%f')
-    # Tenta usar o ID da instância se já existir (ao editar), senão 'novo'
-    instance_id_part = instance.pk if instance.pk else 'novo'
-    unique_filename = f"{timestamp}_{instance_id_part}.{ext}"
+    unique_id = uuid.uuid4().hex
+    timestamp_path = timezone.now().strftime('%Y/%m/%d')
     
-    entity_path = "geral"
-    if instance.cliente:
-        entity_path = f"cliente_{instance.cliente.id}"
-    if instance.caso: # Se tiver caso, ele sobrepõe o cliente para organização
-        entity_path = os.path.join(f"cliente_{instance.caso.cliente.id}" if instance.caso.cliente else "sem_cliente", f"caso_{instance.caso.id}")
-
-    return os.path.join('documentos', entity_path, unique_filename)
+    subfolder = "geral"
+    if instance.caso:
+        subfolder = f"cliente_{instance.caso.cliente.id}/caso_{instance.caso.id}"
+    elif instance.cliente:
+        subfolder = f"cliente_{instance.cliente.id}/geral"
+        
+    return os.path.join('documentos', timestamp_path, subfolder, f"{unique_id}.{ext}")
 
 class Documento(models.Model):
-    cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, blank=True, null=True, related_name='documentos_cliente')
-    caso = models.ForeignKey(Caso, on_delete=models.SET_NULL, blank=True, null=True, related_name='documentos_caso')
-    arquivo = models.FileField(upload_to=get_upload_path) 
-    nome_original_arquivo = models.CharField(max_length=255, blank=True) # Pode ser preenchido no save
-    descricao = models.TextField(blank=True, null=True)
-    data_upload = models.DateTimeField(default=timezone.now)
-
-    def __str__(self):
-        return self.nome_original_arquivo or f"Documento ID {self.id}"
+    cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, blank=True, null=True, related_name='documentos_cliente', verbose_name="Cliente Associado (Opcional)")
+    caso = models.ForeignKey(Caso, on_delete=models.SET_NULL, blank=True, null=True, related_name='documentos_caso', verbose_name="Caso Associado (Opcional)")
+    
+    nome_original_arquivo = models.CharField("Nome Original do Arquivo", max_length=255)
+    arquivo = models.FileField("Arquivo", upload_to=get_upload_path) # O caminho será dinâmico
+    descricao = models.TextField("Descrição do Documento", blank=True, null=True)
+    
+    # Metadados preenchidos automaticamente
+    nome_armazenado = models.CharField("Nome Armazenado no Servidor", max_length=255, blank=True, editable=False) # Preenchido no save
+    tipo_mime = models.CharField("Tipo MIME", max_length=100, blank=True, editable=False)
+    tamanho_bytes = models.BigIntegerField("Tamanho (bytes)", blank=True, null=True, editable=False)
+    
+    data_upload = models.DateTimeField("Data do Upload", default=timezone.now)
 
     def save(self, *args, **kwargs):
-        if self.arquivo and not self.nome_original_arquivo:
-            self.nome_original_arquivo = os.path.basename(self.arquivo.name)
+        if self.arquivo and not self.nome_armazenado: # Apenas na criação ou se o arquivo for alterado
+            self.nome_armazenado = self.arquivo.name # O 'name' já inclui o caminho gerado por upload_to
+            self.tipo_mime = self.arquivo.file.content_type
+            self.tamanho_bytes = self.arquivo.size
         super().save(*args, **kwargs)
 
+    def __str__(self):
+        return self.nome_original_arquivo
+
     def delete(self, *args, **kwargs):
+        # Deletar o arquivo físico do sistema de arquivos antes de deletar o registro
         if self.arquivo:
-            # Verifica se o arquivo existe antes de tentar deletar
-            if hasattr(self.arquivo, 'path') and self.arquivo.path and os.path.isfile(self.arquivo.path):
-                os.remove(self.arquivo.path)
+            caminho_arquivo = os.path.join(settings.MEDIA_ROOT, str(self.arquivo.name))
+            if os.path.exists(caminho_arquivo):
+                try:
+                    os.remove(caminho_arquivo)
+                except Exception as e:
+                    # Logar o erro, mas não impedir a deleção do registro do BD
+                    print(f"Erro ao deletar arquivo físico {caminho_arquivo}: {e}")
         super().delete(*args, **kwargs)
+
+    def get_absolute_url(self): # Para o botão "Download" ou "Ver"
+        return reverse('gestao:documento_download', kwargs={'pk': self.pk})

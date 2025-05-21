@@ -1,0 +1,40 @@
+{% extends "gestao/base.html" %}
+
+{% block title %}{{ titulo_pagina|default:"Central de Relatórios" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_pagina|default:"Central de Relatórios" }}</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0">Financeiro</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                <a href="{% url 'gestao:relatorio_contas_a_receber' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    Contas a Receber
+                    <i class="bi bi-arrow-right-circle"></i>
+                </a>
+                <a href="{% url 'gestao:relatorio_contas_a_pagar' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    Contas a Pagar
+                    <i class="bi bi-arrow-right-circle"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0">Operacional (Em Breve)</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                <a href="#" class="list-group-item list-group-item-action disabled">Casos por Status</a>
+                <a href="#" class="list-group-item list-group-item-action disabled">Prazos da Semana</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends "gestao/base.html" %}
+
+{% block title %}{{ titulo_pagina|default:"Dashboard" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_pagina|default:"Dashboard" }}</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-4 col-lg-3 mb-3">
+        <div class="card text-center h-100 shadow-sm">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="card-title"><i class="bi bi-people-fill me-2"></i>Clientes</h5>
+                    <p class="card-text display-4">{{ num_clientes }}</p>
+                </div>
+                <a href="{% url 'gestao:cliente_list' %}" class="btn btn-primary btn-sm mt-2">Ver Clientes</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-3 mb-3">
+        <div class="card text-center h-100 shadow-sm">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="card-title"><i class="bi bi-briefcase-fill me-2"></i>Casos Ativos</h5>
+                    <p class="card-text display-4">{{ num_casos_ativos }}</p>
+                </div>
+                <a href="{% url 'gestao:caso_list' %}" class="btn btn-primary btn-sm mt-2">Ver Casos</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-3 mb-3">
+        <div class="card text-center h-100 shadow-sm">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="card-title"><i class="bi bi-cash-stack me-2"></i>A Receber</h5>
+                    <p class="card-text fs-5">R$ {{ total_a_receber|floatformat:2 }}</p>
+                </div>
+                <a href="{% url 'gestao:recebimento_list' %}" class="btn btn-success btn-sm mt-2">Ver Recebimentos</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-3 mb-3">
+        <div class="card text-center h-100 shadow-sm">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="card-title"><i class="bi bi-credit-card-2-front-fill me-2"></i>A Pagar</h5>
+                    <p class="card-text fs-5">R$ {{ total_a_pagar|floatformat:2 }}</p>
+                </div>
+                <a href="{% url 'gestao:despesa_list' %}" class="btn btn-danger btn-sm mt-2">Ver Despesas</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-6 mb-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-calendar-event me-2"></i>Próximos Prazos/Eventos</h5>
+            </div>
+            <div class="card-body">
+                {% if proximos_eventos %}
+                    <ul class="list-group list-group-flush">
+                    {% for evento in proximos_eventos %}
+                        <li class="list-group-item">
+                            <a href="{% if evento.caso %}{% url 'gestao:caso_detail' evento.caso.pk %}{% else %}{% url 'gestao:evento_list' %}{% endif %}">
+                                {{ evento.titulo }}
+                            </a> - {{ evento.data_inicio|date:"d/m/Y H:i" }}
+                            {% if evento.caso %}<small class="text-muted"> (Caso: {{ evento.caso.titulo }})</small>{% endif %}
+                        </li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">Nenhum evento próximo.</p>
+                {% endif %}
+            </div>
+             <div class="card-footer text-center">
+                <a href="{% url 'gestao:evento_list' %}" class="btn btn-outline-primary btn-sm">Ver Agenda Completa</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-2"></i>Ações Rápidas</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                <a href="{% url 'gestao:cliente_create' %}" class="list-group-item list-group-item-action">Adicionar Novo Cliente</a>
+                <a href="{% url 'gestao:caso_create' %}" class="list-group-item list-group-item-action">Adicionar Novo Caso</a>
+                <a href="{% url 'gestao:evento_create' %}" class="list-group-item list-group-item-action">Novo Evento/Prazo na Agenda</a>
+                <a href="{% url 'gestao:documento_create' %}" class="list-group-item list-group-item-action">Adicionar Documento</a>
+                <a href="{% url 'gestao:recebimento_create' %}" class="list-group-item list-group-item-action">Novo Recebimento</a>
+                <a href="{% url 'gestao:despesa_create' %}" class="list-group-item list-group-item-action">Nova Despesa</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

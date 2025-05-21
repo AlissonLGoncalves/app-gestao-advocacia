@@ -1,0 +1,113 @@
+{% extends "gestao/base.html" %}
+
+{% block title %}Agenda de Eventos e Prazos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Agenda - Eventos e Prazos</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'gestao:evento_create' %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-circle me-1"></i> Adicionar Novo Evento/Prazo
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header card-header-filters">
+        <h6 class="mb-0">Filtros</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="q_evento" class="form-label form-label-sm">Buscar por Título:</label>
+                <input type="text" name="q" id="q_evento" class="form-control form-control-sm" value="{{ q|default:'' }}">
+            </div>
+            <div class="col-md-3">
+                <label for="caso_filter_evento" class="form-label form-label-sm">Caso:</label>
+                <select name="caso" id="caso_filter_evento" class="form-select form-select-sm">
+                    <option value="">Todos/Eventos Gerais</option>
+                    {% for caso_obj in casos %}
+                        <option value="{{ caso_obj.pk }}" {% if caso_filter == caso_obj.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ caso_obj.titulo }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="tipo_evento_filter" class="form-label form-label-sm">Tipo:</label>
+                <select name="tipo_evento" id="tipo_evento_filter" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    {% for val, disp in tipo_evento_choices %}
+                        <option value="{{ val }}" {% if tipo_evento_filter == val %}selected{% endif %}>{{ disp }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="concluido_filter_evento" class="form-label form-label-sm">Status:</label>
+                <select name="concluido" id="concluido_filter_evento" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    <option value="false" {% if concluido_filter == 'false' %}selected{% endif %}>Pendente</option>
+                    <option value="true" {% if concluido_filter == 'true' %}selected{% endif %}>Concluído</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex">
+                <button class="btn btn-sm btn-outline-primary w-100 me-2" type="submit"><i class="bi bi-funnel me-1"></i>Filtrar</button>
+                <a href="{% url 'gestao:evento_list' %}" class="btn btn-sm btn-outline-secondary w-100"><i class="bi bi-eraser me-1"></i>Limpar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if eventos %}
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Título <a href="?order_by=titulo&direction={% if order_by == 'titulo' and direction == 'asc' %}desc{% else %}asc{% endif %}&{{ base_querystring }}"><i class="bi bi-arrow-down-up sort-icon {% if order_by == 'titulo' %}active{% endif %}"></i></a></th>
+                    <th>Tipo <a href="?order_by=tipo_evento&direction={% if order_by == 'tipo_evento' and direction == 'asc' %}desc{% else %}asc{% endif %}&{{ base_querystring }}"><i class="bi bi-arrow-down-up sort-icon {% if order_by == 'tipo_evento' %}active{% endif %}"></i></a></th>
+                    <th>Caso <a href="?order_by=caso&direction={% if order_by == 'caso' and direction == 'asc' %}desc{% else %}asc{% endif %}&{{ base_querystring }}"><i class="bi bi-arrow-down-up sort-icon {% if order_by == 'caso' %}active{% endif %}"></i></a></th>
+                    <th>Início <a href="?order_by=data_inicio&direction={% if order_by == 'data_inicio' and direction == 'asc' %}desc{% else %}asc{% endif %}&{{ base_querystring }}"><i class="bi bi-arrow-down-up sort-icon {% if order_by == 'data_inicio' %}active{% endif %}"></i></a></th>
+                    <th>Fim</th>
+                    <th>Concluído <a href="?order_by=concluido&direction={% if order_by == 'concluido' and direction == 'asc' %}desc{% else %}asc{% endif %}&{{ base_querystring }}"><i class="bi bi-arrow-down-up sort-icon {% if order_by == 'concluido' %}active{% endif %}"></i></a></th>
+                    <th class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for evento_obj in eventos %}
+                <tr class="{% if evento_obj.concluido %}table-light text-muted{% endif %}" style="{% if evento_obj.concluido %}text-decoration: line-through;{% endif %}">
+                    <td>{{ evento_obj.titulo }}</td>
+                    <td>{{ evento_obj.get_tipo_evento_display }}</td>
+                    <td>
+                        {% if evento_obj.caso %}
+                        <a href="{% url 'gestao:caso_detail' evento_obj.caso.pk %}">{{ evento_obj.caso.titulo }}</a>
+                        {% else %}Evento Geral{% endif %}
+                    </td>
+                    <td>{{ evento_obj.data_inicio|date:"d/m/Y H:i" }}</td>
+                    <td>{{ evento_obj.data_fim|date:"d/m/Y H:i"|default:"-" }}</td>
+                    <td>
+                        {% if evento_obj.concluido %}
+                            <i class="bi bi-check-circle-fill text-success"></i> Sim
+                        {% else %}
+                            <i class="bi bi-hourglass-split text-warning"></i> Pendente
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <a href="{% url 'gestao:evento_update' evento_obj.pk %}" class="btn btn-outline-primary btn-sm btn-action-icon me-1" title="Editar">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                        <a href="{% url 'gestao:evento_delete' evento_obj.pk %}" class="btn btn-outline-danger btn-sm btn-action-icon" title="Deletar">
+                            <i class="bi bi-trash3"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "gestao/includes/pagination.html" %}
+{% else %}
+     <div class="alert alert-secondary mt-3" role="alert">
+        Nenhum evento/prazo cadastrado {% if q or caso_filter or tipo_evento_filter or concluido_filter %}com os filtros aplicados{% endif %}.
+    </div>
+{% endif %}
+{% endblock %}

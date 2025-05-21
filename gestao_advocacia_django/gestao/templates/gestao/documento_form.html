@@ -1,0 +1,103 @@
+{% extends "gestao/base.html" %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina|default:"Formulário de Documento" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_pagina }}</h1>
+</div>
+
+<form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endif %}
+
+            <fieldset class="mb-4">
+                <legend class="h5 mb-3 border-bottom pb-2">Detalhes do Documento</legend>
+                {% if not edit_mode or not form.instance.pk %}
+                <div class="mb-3">
+                    <label for="{{ form.arquivo.id_for_label }}" class="form-label form-label-sm">{{ form.arquivo.label }}{% if form.arquivo.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                    {{ form.arquivo }}
+                    {% if form.arquivo.errors %}<div class="invalid-feedback d-block">{{ form.arquivo.errors|join:", " }}</div>{% endif %}
+                </div>
+                {% else %}
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm">Arquivo Atual:</label>
+                        <p>
+                            {% if form.instance.arquivo %}
+                                <a href="{{ form.instance.arquivo.url }}" target="_blank">{{ form.instance.nome_original_arquivo }}</a>
+                            {% else %}
+                                Nenhum arquivo associado.
+                            {% endif %}
+                        </p>
+                        <small class="form-text text-muted">A alteração do arquivo não é permitida na edição de metadados. Para alterar o arquivo, delete este registro e adicione um novo.</small>
+                    </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label for="{{ form.descricao.id_for_label }}" class="form-label form-label-sm">{{ form.descricao.label }}</label>
+                    {{ form.descricao }}
+                    {% if form.descricao.errors %}<div class="invalid-feedback d-block">{{ form.descricao.errors|join:", " }}</div>{% endif %}
+                </div>
+            </fieldset>
+            
+            <fieldset class="mb-4">
+                <legend class="h6 mb-3 border-bottom pb-1">Associações (Opcional)</legend>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.cliente.id_for_label }}" class="form-label form-label-sm">{{ form.cliente.label }}</label>
+                        {% if cliente_associado %}
+                            <input type="hidden" name="{{ form.cliente.name }}" value="{{ cliente_associado.pk }}">
+                            <input type="text" class="form-control form-control-sm" value="{{ cliente_associado.nome_razao_social }}" readonly>
+                        {% elif caso_associado and caso_associado.cliente %}
+                             <input type="hidden" name="{{ form.cliente.name }}" value="{{ caso_associado.cliente.pk }}">
+                             <input type="text" class="form-control form-control-sm" value="{{ caso_associado.cliente.nome_razao_social }}" readonly>
+                        {% else %}
+                            {{ form.cliente }}
+                        {% endif %}
+                        {% if form.cliente.errors %}<div class="invalid-feedback d-block">{{ form.cliente.errors|join:", " }}</div>{% endif %}
+                         <small class="form-text text-muted">Será preenchido se um caso for selecionado.</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.caso.id_for_label }}" class="form-label form-label-sm">{{ form.caso.label }}</label>
+                         {% if caso_associado %}
+                             <input type="hidden" name="{{ form.caso.name }}" value="{{ caso_associado.pk }}">
+                             <input type="text" class="form-control form-control-sm" value="{{ caso_associado.titulo }}" readonly>
+                             <small class="form-text text-muted">Associado ao caso: {{ caso_associado.titulo }}</small>
+                        {% else %}
+                            {{ form.caso }}
+                        {% endif %}
+                        {% if form.caso.errors %}<div class="invalid-feedback d-block">{{ form.caso.errors|join:", " }}</div>{% endif %}
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="mt-4 pt-3 border-top">
+                <button type="submit" class="btn btn-primary btn-sm px-4">Salvar Documento</button>
+                {% if form.instance.pk %}
+                    {% if form.instance.caso %}
+                         <a href="{% url 'gestao:caso_detail' form.instance.caso.pk %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                    {% elif form.instance.cliente %}
+                         <a href="{% url 'gestao:cliente_detail' form.instance.cliente.pk %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                    {% else %}
+                        <a href="{% url 'gestao:documento_list' %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                    {% endif %}
+                {% elif caso_associado %}
+                    <a href="{% url 'gestao:caso_detail' caso_associado.pk %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% elif cliente_associado %}
+                     <a href="{% url 'gestao:cliente_detail' cliente_associado.pk %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% else %}
+                     <a href="{% url 'gestao:documento_list' %}" class="btn btn-outline-secondary btn-sm ms-2 px-3">Cancelar</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
