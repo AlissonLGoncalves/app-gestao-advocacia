@@ -1,0 +1,351 @@
+{% extends "gestao/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_pagina|default:"Dashboard" }}</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="card-title">Clientes Cadastrados</h5>
+                    <p class="card-text display-4">{{ num_clientes }}</p>
+                </div>
+                <a href="{% url 'gestao:cliente_list' %}" class="btn btn-primary btn-sm mt-2">Ver Clientes</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="card-title">Casos Ativos</h5>
+                    <p class="card-text display-4">{{ num_casos_ativos }}</p>
+                </div>
+                <a href="{% url 'gestao:caso_list' %}" class="btn btn-primary btn-sm mt-2">Ver Casos</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="card-title">Próximos Prazos/Eventos</h5>
+                    {% if proximos_eventos %}
+                        <ul class="list-unstyled mt-2">
+                        {% for evento in proximos_eventos %}
+                            <li class="small">{{ evento.titulo }} - {{ evento.data_inicio|date:"d/m/Y H:i" }}</li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="card-text text-muted small">Nenhum evento próximo.</p>
+                    {% endif %}
+                </div>
+                <a href="{% url 'gestao:evento_list' %}" class="btn btn-primary btn-sm mt-2">Ver Agenda Completa</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Financeiro Rápido</h5>
+                <p class="card-text">Total a Receber (Pendente/Vencido): <strong class="text-success">R$ {{ total_a_receber|floatformat:2 }}</strong></p>
+                <p class="card-text">Total a Pagar (A Pagar/Vencida): <strong class="text-danger">R$ {{ total_a_pagar|floatformat:2 }}</strong></p>
+                <div class="d-flex justify-content-start mt-3">
+                    <a href="{% url 'gestao:recebimento_list' %}" class="btn btn-outline-success btn-sm me-2">Ver Recebimentos</a>
+                    <a href="{% url 'gestao:despesa_list' %}" class="btn btn-outline-danger btn-sm">Ver Despesas</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Ações Rápidas</h5>
+                <div class="list-group list-group-flush">
+                    <a href="{% url 'gestao:cliente_create' %}" class="list-group-item list-group-item-action">Adicionar Novo Cliente</a>
+                    <a href="{% url 'gestao:caso_create' %}" class="list-group-item list-group-item-action">Adicionar Novo Caso</a>
+                    <a href="{% url 'gestao:evento_create' %}" class="list-group-item list-group-item-action">Novo Evento/Prazo na Agenda</a>
+                    <a href="{% url 'gestao:documento_create' %}" class="list-group-item list-group-item-action">Adicionar Documento</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+```
+```html
+{% extends "gestao/base.html" %}
+
+{% block title %}{{ titulo_pagina|default:"Lista de Clientes" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_pagina|default:"Clientes" }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'gestao:cliente_create' %}" class="btn btn-sm btn-primary">
+            Adicionar Novo Cliente
+        </a>
+    </div>
+</div>
+
+<form method="get" class="mb-3 p-3 border rounded bg-light">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-5">
+            <label for="q_cliente" class="form-label form-label-sm">Buscar por Nome/CPF/CNPJ/Email:</label>
+            <input type="text" name="q" id="q_cliente" class="form-control form-control-sm" value="{{ request.GET.q|default:'' }}">
+        </div>
+        <div class="col-md-4">
+            <label for="tipo_pessoa_cliente" class="form-label form-label-sm">Tipo de Pessoa:</label>
+            <select name="tipo_pessoa" id="tipo_pessoa_cliente" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                <option value="PF" {% if request.GET.tipo_pessoa == 'PF' %}selected{% endif %}>Pessoa Física</option>
+                <option value="PJ" {% if request.GET.tipo_pessoa == 'PJ' %}selected{% endif %}>Pessoa Jurídica</option>
+            </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-sm btn-outline-secondary w-100 me-1" type="submit">Filtrar</button>
+            <a href="{% url 'gestao:cliente_list' %}" class="btn btn-sm btn-outline-danger w-100">Limpar</a>
+        </div>
+    </div>
+</form>
+
+{% if clientes %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-sm">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome/Razão Social</th>
+                    <th>CPF/CNPJ</th>
+                    <th>Tipo</th>
+                    <th>Email</th>
+                    <th>Telefone</th>
+                    <th class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                <tr>
+                    <td><a href="{% url 'gestao:cliente_detail' cliente.pk %}">{{ cliente.nome_razao_social }}</a></td>
+                    <td>{{ cliente.cpf_cnpj }}</td>
+                    <td>{{ cliente.get_tipo_pessoa_display }}</td>
+                    <td>{{ cliente.email|default:"-" }}</td>
+                    <td>{{ cliente.telefone|default:"-" }}</td>
+                    <td class="text-center">
+                        <a href="{% url 'gestao:cliente_update' cliente.pk %}" class="btn btn-outline-primary btn-sm py-0 px-1 me-1" title="Editar">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg>
+                        </a>
+                        <a href="{% url 'gestao:cliente_delete' cliente.pk %}" class="btn btn-outline-danger btn-sm py-0 px-1" title="Deletar">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-trash3" viewBox="0 0 16 16"><path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5ZM11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H2.506a.58.58 0 0 0-.01 0H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1h-.995a.59.59 0 0 0-.01 0H11Zm1.958 1-.846 10.58a.5.5 0 0 1-.998.06L10 3.5h2.958Z"/></svg>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+        <nav aria-label="Paginação de clientes" class="mt-3">
+            <ul class="pagination pagination-sm justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_pessoa %}&tipo_pessoa={{ request.GET.tipo_pessoa }}{% endif %}">Anterior</a></li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active" aria-current="page"><span class="page-link">{{ num }}</span></li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_pessoa %}&tipo_pessoa={{ request.GET.tipo_pessoa }}{% endif %}">{{ num }}</a></li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_pessoa %}&tipo_pessoa={{ request.GET.tipo_pessoa }}{% endif %}">Próxima</a></li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">Próxima</span></li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+
+{% else %}
+    <p class="text-muted">Nenhum cliente cadastrado ainda.</p>
+{% endif %}
+{% endblock %}
+```
+```html
+{% extends "gestao/base.html" %}
+{% comment %} {% load crispy_forms_tags %} Descomente se for usar crispy-forms {% endcomment %}
+
+{% block title %}{{ titulo_pagina|default:"Formulário de Cliente" }}{% endblock %}
+
+{% block content %}
+<div class="pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_pagina|default:"Formulário de Cliente" }}</h1>
+</div>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    
+    {# Renderiza o formulário usando Bootstrap grid e classes de formulário #}
+    {# Para validação de erros, o Django adiciona a classe 'is-invalid' automaticamente se o widget for configurado corretamente #}
+    {# ou você pode adicionar manualmente no template com base em form.field.errors #}
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label for="{{ form.tipo_pessoa.id_for_label }}" class="form-label form-label-sm">{{ form.tipo_pessoa.label }}{% if form.tipo_pessoa.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+            {{ form.tipo_pessoa }}
+            {% if form.tipo_pessoa.errors %}<div class="invalid-feedback d-block">{{ form.tipo_pessoa.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="col-md-6 mb-3">
+            <label for="{{ form.cpf_cnpj.id_for_label }}" class="form-label form-label-sm">{{ form.cpf_cnpj.label }}{% if form.cpf_cnpj.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+            {{ form.cpf_cnpj }}
+            {% if form.cpf_cnpj.errors %}<div class="invalid-feedback d-block">{{ form.cpf_cnpj.errors|join:", " }}</div>{% endif %}
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="{{ form.nome_razao_social.id_for_label }}" class="form-label form-label-sm">{{ form.nome_razao_social.label }}{% if form.nome_razao_social.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+        {{ form.nome_razao_social }}
+        {% if form.nome_razao_social.errors %}<div class="invalid-feedback d-block">{{ form.nome_razao_social.errors|join:", " }}</div>{% endif %}
+    </div>
+    
+    <div id="campos-pf" style="display: {% if form.instance.tipo_pessoa == 'PF' or not form.instance.pk and form.initial.tipo_pessoa|default:'PF' == 'PF' %}block{% else %}none{% endif %};">
+        <h6 class="mt-4 mb-3 text-muted small">Dados Pessoa Física</h6>
+        <div class="row">
+            <div class="col-md-6 mb-3"><label for="{{ form.rg.id_for_label }}" class="form-label form-label-sm">{{ form.rg.label }}</label>{{ form.rg }} {% if form.rg.errors %}<div class="invalid-feedback d-block">{{ form.rg.errors|join:", " }}</div>{% endif %}</div>
+            <div class="col-md-6 mb-3"><label for="{{ form.orgao_emissor.id_for_label }}" class="form-label form-label-sm">{{ form.orgao_emissor.label }}</label>{{ form.orgao_emissor }} {% if form.orgao_emissor.errors %}<div class="invalid-feedback d-block">{{ form.orgao_emissor.errors|join:", " }}</div>{% endif %}</div>
+            <div class="col-md-6 mb-3"><label for="{{ form.data_nascimento.id_for_label }}" class="form-label form-label-sm">{{ form.data_nascimento.label }}</label>{{ form.data_nascimento }} {% if form.data_nascimento.errors %}<div class="invalid-feedback d-block">{{ form.data_nascimento.errors|join:", " }}</div>{% endif %}</div>
+            <div class="col-md-6 mb-3"><label for="{{ form.estado_civil.id_for_label }}" class="form-label form-label-sm">{{ form.estado_civil.label }}</label>{{ form.estado_civil }} {% if form.estado_civil.errors %}<div class="invalid-feedback d-block">{{ form.estado_civil.errors|join:", " }}</div>{% endif %}</div>
+            <div class="col-md-6 mb-3"><label for="{{ form.profissao.id_for_label }}" class="form-label form-label-sm">{{ form.profissao.label }}</label>{{ form.profissao }} {% if form.profissao.errors %}<div class="invalid-feedback d-block">{{ form.profissao.errors|join:", " }}</div>{% endif %}</div>
+            <div class="col-md-6 mb-3"><label for="{{ form.nacionalidade.id_for_label }}" class="form-label form-label-sm">{{ form.nacionalidade.label }}</label>{{ form.nacionalidade }} {% if form.nacionalidade.errors %}<div class="invalid-feedback d-block">{{ form.nacionalidade.errors|join:", " }}</div>{% endif %}</div>
+        </div>
+    </div>
+
+    <div id="campos-pj" style="display: {% if form.instance.tipo_pessoa == 'PJ' %}block{% else %}none{% endif %};">
+        <h6 class="mt-4 mb-3 text-muted small">Dados Pessoa Jurídica</h6>
+        <div class="row">
+            <div class="col-md-6 mb-3"><label for="{{ form.nome_fantasia.id_for_label }}" class="form-label form-label-sm">{{ form.nome_fantasia.label }}</label>{{ form.nome_fantasia }} {% if form.nome_fantasia.errors %}<div class="invalid-feedback d-block">{{ form.nome_fantasia.errors|join:", " }}</div>{% endif %}</div>
+            <div class="col-md-6 mb-3"><label for="{{ form.nire.id_for_label }}" class="form-label form-label-sm">{{ form.nire.label }}</label>{{ form.nire }} {% if form.nire.errors %}<div class="invalid-feedback d-block">{{ form.nire.errors|join:", " }}</div>{% endif %}</div>
+            <div class="col-md-6 mb-3"><label for="{{ form.inscricao_estadual.id_for_label }}" class="form-label form-label-sm">{{ form.inscricao_estadual.label }}</label>{{ form.inscricao_estadual }} {% if form.inscricao_estadual.errors %}<div class="invalid-feedback d-block">{{ form.inscricao_estadual.errors|join:", " }}</div>{% endif %}</div>
+            <div class="col-md-6 mb-3"><label for="{{ form.inscricao_municipal.id_for_label }}" class="form-label form-label-sm">{{ form.inscricao_municipal.label }}</label>{{ form.inscricao_municipal }} {% if form.inscricao_municipal.errors %}<div class="invalid-feedback d-block">{{ form.inscricao_municipal.errors|join:", " }}</div>{% endif %}</div>
+        </div>
+    </div>
+    
+    <h6 class="mt-4 mb-3 text-muted small">Endereço</h6>
+    <div class="row">
+        <div class="col-md-4 mb-3"><label for="{{ form.cep.id_for_label }}" class="form-label form-label-sm">{{ form.cep.label }}</label>{{ form.cep }} {% if form.cep.errors %}<div class="invalid-feedback d-block">{{ form.cep.errors|join:", " }}</div>{% endif %}</div>
+        <div class="col-md-8 mb-3"><label for="{{ form.rua.id_for_label }}" class="form-label form-label-sm">{{ form.rua.label }}</label>{{ form.rua }} {% if form.rua.errors %}<div class="invalid-feedback d-block">{{ form.rua.errors|join:", " }}</div>{% endif %}</div>
+    </div>
+    <div class="row">
+        <div class="col-md-3 mb-3"><label for="{{ form.numero.id_for_label }}" class="form-label form-label-sm">{{ form.numero.label }}</label>{{ form.numero }} {% if form.numero.errors %}<div class="invalid-feedback d-block">{{ form.numero.errors|join:", " }}</div>{% endif %}</div>
+        <div class="col-md-5 mb-3"><label for="{{ form.bairro.id_for_label }}" class="form-label form-label-sm">{{ form.bairro.label }}</label>{{ form.bairro }} {% if form.bairro.errors %}<div class="invalid-feedback d-block">{{ form.bairro.errors|join:", " }}</div>{% endif %}</div>
+        <div class="col-md-4 mb-3"><label for="{{ form.cidade.id_for_label }}" class="form-label form-label-sm">{{ form.cidade.label }}</label>{{ form.cidade }} {% if form.cidade.errors %}<div class="invalid-feedback d-block">{{ form.cidade.errors|join:", " }}</div>{% endif %}</div>
+    </div>
+     <div class="row">
+        <div class="col-md-6 mb-3"><label for="{{ form.estado.id_for_label }}" class="form-label form-label-sm">{{ form.estado.label }}</label>{{ form.estado }} {% if form.estado.errors %}<div class="invalid-feedback d-block">{{ form.estado.errors|join:", " }}</div>{% endif %}</div>
+        <div class="col-md-6 mb-3"><label for="{{ form.pais.id_for_label }}" class="form-label form-label-sm">{{ form.pais.label }}</label>{{ form.pais }} {% if form.pais.errors %}<div class="invalid-feedback d-block">{{ form.pais.errors|join:", " }}</div>{% endif %}</div>
+    </div>
+
+    <h6 class="mt-4 mb-3 text-muted small">Contato</h6>
+    <div class="row">
+        <div class="col-md-6 mb-3"><label for="{{ form.telefone.id_for_label }}" class="form-label form-label-sm">{{ form.telefone.label }}</label>{{ form.telefone }} {% if form.telefone.errors %}<div class="invalid-feedback d-block">{{ form.telefone.errors|join:", " }}</div>{% endif %}</div>
+        <div class="col-md-6 mb-3"><label for="{{ form.email.id_for_label }}" class="form-label form-label-sm">{{ form.email.label }}</label>{{ form.email }} {% if form.email.errors %}<div class="invalid-feedback d-block">{{ form.email.errors|join:", " }}</div>{% endif %}</div>
+    </div>
+    
+    <div class="mb-3">
+        <label for="{{ form.notas_gerais.id_for_label }}" class="form-label form-label-sm">{{ form.notas_gerais.label }}</label>
+        {{ form.notas_gerais }}
+        {% if form.notas_gerais.errors %}<div class="invalid-feedback d-block">{{ form.notas_gerais.errors|join:", " }}</div>{% endif %}
+    </div>
+
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary">Salvar</button>
+        <a href="{% url 'gestao:cliente_list' %}" class="btn btn-secondary ms-2">Cancelar</a>
+    </div>
+</form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const tipoPessoaSelect = document.getElementById('{{ form.tipo_pessoa.id_for_label }}'); // Usa o ID gerado pelo Django
+        const camposPf = document.getElementById('campos-pf');
+        const camposPj = document.getElementById('campos-pj');
+
+        function toggleCampos() {
+            if (!tipoPessoaSelect || !camposPf || !camposPj) return; // Garante que os elementos existem
+
+            if (tipoPessoaSelect.value === 'PF') {
+                camposPf.style.display = 'block';
+                camposPj.style.display = 'none';
+            } else if (tipoPessoaSelect.value === 'PJ') {
+                camposPf.style.display = 'none';
+                camposPj.style.display = 'block';
+            } else { // Caso nenhum esteja selecionado ou valor inválido
+                camposPf.style.display = 'none';
+                camposPj.style.display = 'none';
+            }
+        }
+        
+        if(tipoPessoaSelect) {
+            tipoPessoaSelect.addEventListener('change', toggleCampos);
+            toggleCampos(); // Chama na carga inicial para definir o estado correto
+        }
+    });
+</script>
+{% endblock %}
+```
+```html
+{% extends "gestao/base.html" %}
+
+{% block title %}Confirmar Deleção de Cliente{% endblock %}
+
+{% block content %}
+<div class="pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Confirmar Deleção</h1>
+</div>
+<p>Tem certeza que deseja deletar o cliente "<strong>{{ object.nome_razao_social }}</strong>"?</p>
+<p class="text-danger">Esta ação não pode ser desfeita e pode afetar registros associados (casos, recebimentos, etc.).</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Sim, deletar</button>
+    <a href="{% url 'gestao:cliente_detail' object.pk %}" class="btn btn-secondary ms-2">Cancelar</a>
+</form>
+{% endblock %}
+```
+```html
+{% extends "gestao/base.html" %}
+
+{% block title %}Confirmar Deleção{% endblock %}
+
+{% block content %}
+<div class="pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Confirmar Deleção</h1>
+</div>
+<p>Tem certeza que deseja deletar este item: "<strong>{{ object }}</strong>"?</p>
+<p class="text-danger">Esta ação não pode ser desfeita.</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Sim, deletar</button>
+    {# Tenta voltar para a lista da entidade, ou para o dashboard se não houver URL de "list" específica #}
+    {# Este link de cancelar pode precisar ser ajustado dependendo da entidade #}
+    <a href="{% if 'cliente' in request.resolver_match.url_name %}{% url 'gestao:cliente_list' %}
+              {% elif 'caso' in request.resolver_match.url_name %}{% url 'gestao:caso_list' %}
+              {% elif 'recebimento' in request.resolver_match.url_name %}{% url 'gestao:recebimento_list' %}
+              {% elif 'despesa' in request.resolver_match.url_name %}{% url 'gestao:despesa_list' %}
+              {% elif 'evento' in request.resolver_match.url_name %}{% url 'gestao:evento_list' %}
+              {% elif 'documento' in request.resolver_match.url_name %}{% url 'gestao:documento_list' %}
+              {% else %}{% url 'gestao:dashboard' %}{% endif %}" 
+       class="btn btn-secondary ms-2">Cancelar</a>
+</form>
+{% endblock %}

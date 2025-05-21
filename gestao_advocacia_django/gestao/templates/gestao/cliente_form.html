@@ -1,0 +1,18 @@
+{% extends "gestao/base.html" %}
+{% load static %} 
+{% comment %} Se for usar crispy_forms, adicione: {% load crispy_forms_tags %} {% endcomment %}
+
+{% block title %}{{ titulo_pagina }}{% endblock %}
+
+{% block content %}
+<h2>{{ titulo_pagina }}</h2>
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    {{ form.as_p }} {# Renderiza o formulário como parágrafos. Para mais controle, use {{ form.field_name }} #}
+    {% comment %} Ou, se usar crispy_forms: {{ form|crispy }} {% endcomment %}
+
+    <button type="submit" class="btn btn-primary mt-3">Salvar</button>
+    <a href="{% url 'gestao:cliente_list' %}" class="btn btn-secondary mt-3 ms-2">Cancelar</a>
+</form>
+{% endblock %}

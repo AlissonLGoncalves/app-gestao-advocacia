@@ -1,0 +1,15 @@
+:
+
+{% extends "gestao/base.html" %}
+
+{% block title %}Confirmar Deleção{% endblock %}
+
+{% block content %}
+<h2>Confirmar Deleção</h2>
+<p>Tem certeza que deseja deletar o cliente "{{ object.nome_razao_social }}"?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Sim, deletar</button>
+    <a href="{% url 'gestao:cliente_list' %}" class="btn btn-secondary ms-2">Cancelar</a>
+</form>
+{% endblock %}
