@@ -1,6 +1,5 @@
 // src/EventoAgendaList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-// Corrigido o caminho de importação para config.js
 import { API_URL } from './config.js'; 
 import {
   PencilSquareIcon, TrashIcon, CheckCircleIcon, XCircleIcon,
@@ -35,18 +34,25 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
 
   const fetchClientesECasosParaFiltro = useCallback(async () => {
     console.log("EventoAgendaList: fetchClientesECasosParaFiltro chamado. Cliente para filtro de casos:", clienteFilter);
+    const token = localStorage.getItem('token');
+    if (!token) {
+        console.warn("EventoAgendaList: Token não encontrado para fetchClientesECasosParaFiltro.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
     try {
-      const clientesRes = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`);
+      const clientesRes = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders });
       if (!clientesRes.ok) throw new Error('Falha ao carregar clientes para filtro.');
       const clientesData = await clientesRes.json();
       setClientes(clientesData.clientes || []);
       console.log("EventoAgendaList: Clientes para filtro carregados:", clientesData.clientes);
 
-      let casosUrl = `${API_URL}/casos?sort_by=titulo&order=asc`;
+      let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`;
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`;
       }
-      const casosRes = await fetch(casosUrl);
+      const casosRes = await fetch(casosUrl, { headers: authHeaders });
       if (!casosRes.ok) throw new Error('Falha ao carregar casos para filtro.');
       const casosData = await casosRes.json();
       setCasos(casosData.casos || []);
@@ -61,7 +67,17 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     console.log("EventoAgendaList: fetchEventos chamado. Ordenação:", sortConfig, "Filtros:", { searchTerm, clienteFilter, casoFilter, tipoEventoFilter, statusConclusaoFilter, dataInicioRangeStart, dataInicioRangeEnd });
     setLoading(true);
     setError('');
-    let url = `${API_URL}/eventos?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+        setError("Autenticação necessária. Por favor, faça login.");
+        setLoading(false);
+        toast.error("Sessão expirada ou inválida.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+    let url = `${API_URL}/eventos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
 
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
     if (tipoEventoFilter) url += `&tipo_evento=${encodeURIComponent(tipoEventoFilter)}`;
@@ -72,11 +88,8 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       } else {
         url += `&caso_id=${casoFilter}`;
       }
-    } else if (clienteFilter) {
-      // Se a API suportar um filtro de cliente_id para eventos (para buscar todos os eventos de casos daquele cliente)
-      // url += `&cliente_id_para_eventos=${clienteFilter}`; 
-      // Por enquanto, a filtragem por cliente é indireta (via seleção de caso) ou não aplicada se nenhum caso for selecionado.
     }
+    // Não há filtro direto por cliente_id para eventos, apenas indireto por caso.
 
     if (statusConclusaoFilter === 'concluido') url += `&concluido=true`;
     if (statusConclusaoFilter === 'pendente') url += `&concluido=false`;
@@ -85,7 +98,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     if (dataInicioRangeEnd) url += `&data_inicio_lte=${dataInicioRangeEnd}`;
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) {
         const resData = await response.json().catch(() => ({}));
         console.error("EventoAgendaList: Erro da API ao buscar eventos:", resData);
@@ -97,6 +110,9 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     } catch (err) {
       console.error("EventoAgendaList: Erro detalhado ao buscar eventos:", err);
       setError(`Erro ao carregar eventos: ${err.message}`);
+      if (!err.message.includes("Autenticação")) {
+        toast.error(`Erro ao carregar eventos: ${err.message}`);
+      }
     } finally {
       setLoading(false);
       console.log("EventoAgendaList: fetchEventos finalizado.");
@@ -113,11 +129,18 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
 
   const handleDeleteClick = async (id) => {
     console.log("EventoAgendaList: handleDeleteClick chamado para ID:", id);
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.error("Autenticação expirada. Faça login novamente.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
     if (window.confirm(`Tem certeza que deseja excluir o evento/prazo ID ${id}?`)) {
       setDeletingId(id);
       setError(null);
       try {
-        const response = await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: authHeaders });
         if (!response.ok) {
           const resData = await response.json().catch(() => ({}));
           throw new Error(resData.erro || `Erro HTTP: ${response.status}`);
@@ -136,19 +159,27 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
 
   const handleToggleConcluido = async (evento) => {
     console.log("EventoAgendaList: handleToggleConcluido chamado para evento ID:", evento.id, "Novo status:", !evento.concluido);
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.error("Autenticação expirada. Faça login novamente.");
+        return;
+    }
+    const authHeaders = { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    };
     setTogglingId(evento.id);
     setError(null);
 
     const dadosAtualizados = {
-      // ...evento, // Evita enviar todo o objeto evento, especialmente se tiver dados aninhados como cliente/caso
       tipo_evento: evento.tipo_evento,
       titulo: evento.titulo,
       descricao: evento.descricao,
       data_inicio: evento.data_inicio ? new Date(evento.data_inicio).toISOString() : null,
       data_fim: evento.data_fim ? new Date(evento.data_fim).toISOString() : null,
       local: evento.local,
-      concluido: !evento.concluido, // Inverte o status
-      caso_id: evento.caso_id // Mantém o caso_id
+      concluido: !evento.concluido,
+      caso_id: evento.caso_id 
     };
     
     console.log("EventoAgendaList: Enviando para atualizar status:", dadosAtualizados);
@@ -156,7 +187,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     try {
       const response = await fetch(`${API_URL}/eventos/${evento.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify(dadosAtualizados)
       });
       if (!response.ok) {
@@ -213,6 +244,10 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
         <span className="ms-3 text-muted">A carregar agenda...</span>
       </div>
     );
+  }
+
+  if (error && eventos.length === 0) {
+    return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
   }
 
   console.log("EventoAgendaList: Renderizando tabela de eventos ou mensagem de erro/lista vazia.");
@@ -314,7 +349,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
         )}
       </div>
 
-      {error && <div className="alert alert-danger m-3 small" role="alert">{error}</div>}
+      {error && eventos.length > 0 && <div className="alert alert-warning m-3 small" role="alert">Erro ao atualizar a lista: {error}. Exibindo dados anteriores.</div>}
 
       <div className="table-responsive">
         <table className="table table-hover table-striped table-sm mb-0 align-middle">
@@ -332,10 +367,10 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
             {loading && eventos.length > 0 && (
               <tr><td colSpan="6" className="text-center p-4"><div className="spinner-border spinner-border-sm text-primary" role="status"><span className="visually-hidden">A atualizar...</span></div></td></tr>
             )}
-            {!loading && eventos.length === 0 ? (
+            {!loading && eventos.length === 0 && !error && (
               <tr><td colSpan="6" className="text-center text-muted p-4">Nenhum evento/prazo encontrado com os filtros aplicados.</td></tr>
-            ) : (
-              eventos.map((evento) => (
+            )}
+            {eventos.map((evento) => (
                 <tr key={evento.id} className={evento.concluido ? 'table-light text-muted' : ''} style={evento.concluido ? {textDecoration: 'line-through'} : {}}>
                   <td className="px-3 py-2">
                     {evento.data_inicio ? new Date(evento.data_inicio).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
@@ -365,8 +400,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
                     </button>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>

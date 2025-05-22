@@ -1,5 +1,4 @@
 // src/pages/DashboardPage.jsx
-import React from 'react';
 import Dashboard from '../Dashboard.jsx'; // Certifique-se que o caminho para Dashboard.jsx está correto
 import { useNavigate } from 'react-router-dom';
 

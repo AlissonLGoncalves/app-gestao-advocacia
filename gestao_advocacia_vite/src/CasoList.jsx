@@ -1,6 +1,6 @@
 // src/CasoList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js'; // Ajuste o caminho se config.js não estiver em src/
+import { API_URL } from './config.js';
 import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 
@@ -8,12 +8,11 @@ function CasoList({ onEditCaso, refreshKey }) {
   console.log("CasoList: Renderizando. RefreshKey:", refreshKey);
 
   const [casos, setCasos] = useState([]);
-  const [clientes, setClientes] = useState([]); // Para o filtro de cliente
+  const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
 
-  // Estados para filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [clienteFilter, setClienteFilter] = useState('');
@@ -23,13 +22,19 @@ function CasoList({ onEditCaso, refreshKey }) {
   const [dataAtualizacaoFimFilter, setDataAtualizacaoFimFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Estado para ordenação
   const [sortConfig, setSortConfig] = useState({ key: 'data_atualizacao', direction: 'desc' });
 
   const fetchClientesParaFiltro = useCallback(async () => {
     console.log("CasoList: fetchClientesParaFiltro chamado.");
+    const token = localStorage.getItem('token');
+    if (!token) {
+      // Não precisa setar erro aqui, pois o fetchCasos também fará a checagem
+      return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
     try {
-      const response = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`);
+      const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders }); // Adicionada barra final
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.erro || 'Falha ao carregar clientes para filtro');
@@ -41,13 +46,23 @@ function CasoList({ onEditCaso, refreshKey }) {
       console.error("CasoList: Erro ao buscar clientes para filtro:", err);
       toast.error(`Erro ao carregar clientes para filtro: ${err.message}`);
     }
-  }, []); // API_URL como dependência se vier de contexto/props
+  }, []);
 
   const fetchCasos = useCallback(async () => {
-    console.log("CasoList: fetchCasos chamado. Configuração de ordenação:", sortConfig, "Filtros:", { searchTerm, statusFilter, clienteFilter /*...outros filtros*/ });
+    console.log("CasoList: fetchCasos chamado. Configuração de ordenação:", sortConfig, "Filtros:", { searchTerm, statusFilter, clienteFilter });
     setLoading(true);
     setError('');
-    let url = `${API_URL}/casos?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError("Autenticação necessária.");
+      setLoading(false);
+      toast.error("Sessão expirada ou inválida. Por favor, faça login novamente.");
+      return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+    let url = `${API_URL}/casos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`; // Adicionada barra final
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
     if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
     if (clienteFilter) url += `&cliente_id=${clienteFilter}`;
@@ -57,7 +72,7 @@ function CasoList({ onEditCaso, refreshKey }) {
     if (dataAtualizacaoFimFilter) url += `&data_atualizacao_fim=${dataAtualizacaoFimFilter}`;
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) {
         const resData = await response.json().catch(() => ({}));
         console.error("CasoList: Erro da API ao buscar casos:", resData);
@@ -69,7 +84,9 @@ function CasoList({ onEditCaso, refreshKey }) {
     } catch (err) {
       console.error("CasoList: Erro detalhado ao buscar casos:", err);
       setError(`Erro ao carregar casos: ${err.message}`);
-      toast.error(`Erro ao carregar casos: ${err.message}`);
+      if (!err.message.includes("Autenticação")) {
+        toast.error(`Erro ao carregar casos: ${err.message}`);
+      }
     } finally {
       setLoading(false);
       console.log("CasoList: fetchCasos finalizado.");
@@ -82,23 +99,29 @@ function CasoList({ onEditCaso, refreshKey }) {
 
   useEffect(() => {
     fetchCasos();
-  }, [fetchCasos, refreshKey]); // refreshKey força a re-busca quando um item é adicionado/editado
+  }, [fetchCasos, refreshKey]);
 
   const handleDeleteClick = async (id) => {
     console.log("CasoList: handleDeleteClick chamado para ID:", id);
-    // Substituir window.confirm por um modal customizado se preferir
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error("Autenticação expirada. Faça login novamente.");
+      return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
     if (window.confirm(`Tem certeza que deseja excluir o caso ID ${id}? Esta ação pode ser irreversível e afetar registos associados.`)) {
       setDeletingId(id);
       setError(null);
       try {
-        const response = await fetch(`${API_URL}/casos/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_URL}/casos/${id}`, { method: 'DELETE', headers: authHeaders });
         if (!response.ok) {
           const resData = await response.json().catch(() => ({}));
           console.error("CasoList: Erro da API ao deletar caso:", resData);
           throw new Error(resData.erro || `Erro HTTP: ${response.status}`);
         }
         toast.success(`Caso ID ${id} excluído com sucesso!`);
-        fetchCasos(); // Re-busca a lista após a exclusão
+        fetchCasos();
       } catch (err) {
         console.error(`CasoList: Erro ao deletar caso ${id}:`, err);
         setError(`Erro ao deletar caso: ${err.message}`);
@@ -135,8 +158,6 @@ function CasoList({ onEditCaso, refreshKey }) {
     setDataAtualizacaoInicioFilter('');
     setDataAtualizacaoFimFilter('');
     setShowFilters(false);
-    // Considerar resetar sortConfig para o padrão também, se desejado
-    // setSortConfig({ key: 'data_atualizacao', direction: 'desc' });
   };
 
   const getStatusBadge = (status) => {
@@ -144,12 +165,12 @@ function CasoList({ onEditCaso, refreshKey }) {
         case 'Ativo': return 'bg-success-subtle text-success-emphasis';
         case 'Encerrado': return 'bg-secondary-subtle text-secondary-emphasis';
         case 'Suspenso': return 'bg-warning-subtle text-warning-emphasis';
-        case 'Arquivado': return 'bg-info-subtle text-info-emphasis'; // Usando info para Arquivado
+        case 'Arquivado': return 'bg-info-subtle text-info-emphasis';
         default: return 'bg-light text-dark';
     }
   };
 
-  if (loading && casos.length === 0) { // Mostra loading apenas se a lista estiver vazia para evitar piscar
+  if (loading && casos.length === 0) {
     console.log("CasoList: Renderizando estado de carregamento inicial.");
     return (
       <div className="d-flex justify-content-center align-items-center p-5">
@@ -159,6 +180,10 @@ function CasoList({ onEditCaso, refreshKey }) {
         <span className="ms-3 text-muted">A carregar casos...</span>
       </div>
     );
+  }
+
+  if (error && casos.length === 0) {
+    return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
   }
 
   console.log("CasoList: Renderizando tabela de casos ou mensagem de erro/lista vazia.");
@@ -219,7 +244,7 @@ function CasoList({ onEditCaso, refreshKey }) {
               <option value="Arquivado">Arquivado</option>
             </select>
           </div>
-          <div className="col-lg-2 col-md-12 text-lg-end mt-2 mt-lg-0"> {/* Ajuste para responsividade */}
+          <div className="col-lg-2 col-md-12 text-lg-end mt-2 mt-lg-0">
             <button onClick={resetFilters} className="btn btn-sm btn-outline-secondary py-1 px-2 w-100">Limpar Filtros</button>
           </div>
         </div>
@@ -248,7 +273,7 @@ function CasoList({ onEditCaso, refreshKey }) {
         )}
       </div>
 
-      {error && <div className="alert alert-danger m-3 small" role="alert">{error}</div>}
+      {error && casos.length > 0 && <div className="alert alert-warning m-3 small" role="alert">Erro ao atualizar a lista: {error}. Exibindo dados anteriores.</div>}
 
       <div className="table-responsive">
         <table className="table table-hover table-striped table-sm mb-0 align-middle">
@@ -264,15 +289,15 @@ function CasoList({ onEditCaso, refreshKey }) {
             </tr>
           </thead>
           <tbody>
-            {loading && casos.length > 0 && ( // Spinner sobre a tabela se já houver dados
+            {loading && casos.length > 0 && (
               <tr><td colSpan="7" className="text-center p-4"><div className="spinner-border spinner-border-sm text-primary" role="status"><span className="visually-hidden">A atualizar...</span></div></td></tr>
             )}
-            {!loading && casos.length === 0 ? (
+            {!loading && casos.length === 0 && !error && (
               <tr>
                 <td colSpan="7" className="text-center text-muted p-4">Nenhum caso encontrado com os filtros aplicados.</td>
               </tr>
-            ) : (
-              casos.map((caso) => (
+            )}
+            {casos.map((caso) => (
                 <tr key={caso.id}>
                   <td className="px-3 py-2">{caso.titulo}</td>
                   <td className="px-3 py-2">{caso.cliente?.nome_razao_social || 'N/A'}</td>
@@ -307,8 +332,7 @@ function CasoList({ onEditCaso, refreshKey }) {
                     </button>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>

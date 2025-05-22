@@ -1,6 +1,6 @@
 // src/DespesaList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js'; // Ajuste o caminho se config.js não estiver em src/
+import { API_URL } from './config.js';
 import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 
@@ -8,42 +8,46 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   console.log("DespesaList: Renderizando. RefreshKey:", refreshKey);
 
   const [despesas, setDespesas] = useState([]);
-  const [clientes, setClientes] = useState([]); // Para filtrar casos associados a despesas
-  const [casos, setCasos] = useState([]);     // Para filtrar despesas por caso
+  const [clientes, setClientes] = useState([]);
+  const [casos, setCasos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
 
-  // Estados para filtros
   const [searchTerm, setSearchTerm] = useState('');
-  const [clienteFilter, setClienteFilter] = useState(''); // Filtro de cliente para refinar a lista de casos
-  const [casoFilter, setCasoFilter] = useState('');     // Filtro de caso para despesas
+  const [clienteFilter, setClienteFilter] = useState('');
+  const [casoFilter, setCasoFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [dataVencimentoInicio, setDataVencimentoInicio] = useState('');
   const [dataVencimentoFim, setDataVencimentoFim] = useState('');
-  const [dataDespesaInicio, setDataDespesaInicio] = useState(''); // Data da efetivação da despesa
+  const [dataDespesaInicio, setDataDespesaInicio] = useState('');
   const [dataDespesaFim, setDataDespesaFim] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Estado para ordenação
   const [sortConfig, setSortConfig] = useState({ key: 'data_vencimento', direction: 'desc' });
 
   const fetchClientesECasosParaFiltro = useCallback(async () => {
     console.log("DespesaList: fetchClientesECasosParaFiltro chamado. Cliente para filtro de casos:", clienteFilter);
+    const token = localStorage.getItem('token');
+    if (!token) {
+        // Não é ideal mostrar toast aqui, pois o fetch principal também verificará
+        console.warn("DespesaList: Token não encontrado para fetchClientesECasosParaFiltro.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
     try {
-      // Buscar Clientes
-      const clientesRes = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`);
+      const clientesRes = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders });
       if (!clientesRes.ok) throw new Error('Falha ao carregar clientes para filtro.');
       const clientesData = await clientesRes.json();
       setClientes(clientesData.clientes || []);
       console.log("DespesaList: Clientes para filtro carregados:", clientesData.clientes);
 
-      // Buscar Casos (pode ser filtrado por clienteFilter se este estiver selecionado)
-      let casosUrl = `${API_URL}/casos?sort_by=titulo&order=asc`;
+      let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`;
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`;
       }
-      const casosRes = await fetch(casosUrl);
+      const casosRes = await fetch(casosUrl, { headers: authHeaders });
       if (!casosRes.ok) throw new Error('Falha ao carregar casos para filtro.');
       const casosData = await casosRes.json();
       setCasos(casosData.casos || []);
@@ -53,36 +57,36 @@ function DespesaList({ onEditDespesa, refreshKey }) {
       console.error("DespesaList: Erro ao buscar clientes/casos para filtro:", err);
       toast.error(`Erro ao carregar dados para filtros: ${err.message}`);
     }
-  }, [clienteFilter]); // API_URL como dependência se vier de contexto/props
+  }, [clienteFilter]);
 
   const fetchDespesas = useCallback(async () => {
-    console.log("DespesaList: fetchDespesas chamado. Configuração de ordenação:", sortConfig, "Filtros:", { searchTerm, clienteFilter, casoFilter, statusFilter /*...outros filtros*/ });
+    console.log("DespesaList: fetchDespesas chamado. Configuração de ordenação:", sortConfig, "Filtros:", { searchTerm, clienteFilter, casoFilter, statusFilter });
     setLoading(true);
     setError('');
-    let url = `${API_URL}/despesas?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+        setError("Autenticação necessária. Por favor, faça login.");
+        setLoading(false);
+        toast.error("Sessão expirada ou inválida.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+    let url = `${API_URL}/despesas/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
     
-    // Se casoFilter for "DESPESA_GERAL", queremos despesas sem caso_id
-    // Se casoFilter for um ID, filtramos por esse caso_id
-    // Se casoFilter estiver vazio mas clienteFilter estiver preenchido, a API deve idealmente
-    // retornar despesas de todos os casos daquele cliente OU despesas gerais.
-    // A lógica atual da API para despesas parece lidar com `caso_id=-1` para despesas gerais.
     if (casoFilter) {
         if (casoFilter === "DESPESA_GERAL") {
-            url += `&caso_id=-1`; // Indica para a API buscar despesas sem caso
+            url += `&caso_id=-1`; 
         } else {
             url += `&caso_id=${casoFilter}`;
         }
     } else if (clienteFilter) {
-        // Se um cliente é selecionado mas nenhum caso específico (ou "Despesa Geral") é selecionado,
-        // pode-se optar por não filtrar por caso aqui, ou a API pode ter uma lógica
-        // para retornar despesas de todos os casos do cliente + despesas gerais.
-        // Por simplicidade, se apenas clienteFilter está ativo, não adicionamos filtro de caso_id específico aqui,
-        // mas a API pode precisar ser ajustada se o comportamento desejado for diferente.
-        // Para filtrar por despesas de um cliente específico (independente do caso ou incluindo gerais),
-        // a API precisaria de um parâmetro como `cliente_id_para_despesas`.
-        // No momento, o filtro de cliente aqui serve para popular o dropdown de casos.
         // A filtragem de despesas por cliente é indireta através do caso selecionado.
+        // Se desejar filtrar despesas diretamente por cliente_id (incluindo gerais do cliente),
+        // a API precisaria de um parâmetro como `cliente_id_para_despesas=${clienteFilter}`.
+        // Por ora, o filtro de cliente apenas refina o dropdown de casos.
     }
 
     if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
@@ -92,7 +96,7 @@ function DespesaList({ onEditDespesa, refreshKey }) {
     if (dataDespesaFim) url += `&data_despesa_fim=${dataDespesaFim}`;
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) {
         const resData = await response.json().catch(() => ({}));
         console.error("DespesaList: Erro da API ao buscar despesas:", resData);
@@ -104,7 +108,9 @@ function DespesaList({ onEditDespesa, refreshKey }) {
     } catch (err) {
       console.error("DespesaList: Erro detalhado ao buscar despesas:", err);
       setError(`Erro ao carregar despesas: ${err.message}`);
-      // toast.error(`Erro ao carregar despesas: ${err.message}`);
+      if (!err.message.includes("Autenticação")) {
+        toast.error(`Erro ao carregar despesas: ${err.message}`);
+      }
     } finally {
       setLoading(false);
       console.log("DespesaList: fetchDespesas finalizado.");
@@ -113,7 +119,7 @@ function DespesaList({ onEditDespesa, refreshKey }) {
 
   useEffect(() => {
     fetchClientesECasosParaFiltro();
-  }, [fetchClientesECasosParaFiltro]); // Chamado quando clienteFilter muda
+  }, [fetchClientesECasosParaFiltro]);
 
   useEffect(() => {
     fetchDespesas();
@@ -121,11 +127,18 @@ function DespesaList({ onEditDespesa, refreshKey }) {
 
   const handleDeleteClick = async (id) => {
     console.log("DespesaList: handleDeleteClick chamado para ID:", id);
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.error("Autenticação expirada. Faça login novamente.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
     if (window.confirm(`Tem certeza que deseja excluir a despesa ID ${id}?`)) {
       setDeletingId(id);
       setError(null);
       try {
-        const response = await fetch(`${API_URL}/despesas/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_URL}/despesas/${id}`, { method: 'DELETE', headers: authHeaders });
         if (!response.ok) {
           const resData = await response.json().catch(() => ({}));
           throw new Error(resData.erro || `Erro HTTP: ${response.status}`);
@@ -171,8 +184,8 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   const resetFilters = () => {
     console.log("DespesaList: resetFilters chamado.");
     setSearchTerm('');
-    setClienteFilter(''); // Reseta filtro de cliente
-    setCasoFilter('');     // Reseta filtro de caso
+    setClienteFilter('');
+    setCasoFilter('');
     setStatusFilter('');
     setDataVencimentoInicio('');
     setDataVencimentoFim('');
@@ -191,6 +204,10 @@ function DespesaList({ onEditDespesa, refreshKey }) {
         <span className="ms-3 text-muted">A carregar despesas...</span>
       </div>
     );
+  }
+
+  if (error && despesas.length === 0) {
+    return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
   }
 
   console.log("DespesaList: Renderizando tabela de despesas ou mensagem de erro/lista vazia.");
@@ -229,7 +246,7 @@ function DespesaList({ onEditDespesa, refreshKey }) {
               value={clienteFilter} 
               onChange={(e) => {
                 setClienteFilter(e.target.value);
-                setCasoFilter(''); // Limpa o filtro de caso quando o cliente muda
+                setCasoFilter('');
               }}
             >
               <option value="">Todos Clientes (para Casos)</option>
@@ -243,7 +260,7 @@ function DespesaList({ onEditDespesa, refreshKey }) {
               className="form-select form-select-sm" 
               value={casoFilter} 
               onChange={(e) => setCasoFilter(e.target.value)}
-              disabled={!clienteFilter && casos.length === 0} // Desabilita se não houver cliente selecionado e nenhum caso carregado
+              disabled={!clienteFilter && casos.length === 0}
             >
               <option value="">Todos os Casos/Despesas Gerais</option>
               <option value="DESPESA_GERAL">Apenas Despesas Gerais (Sem Caso)</option>
@@ -290,8 +307,8 @@ function DespesaList({ onEditDespesa, refreshKey }) {
         )}
       </div>
 
-      {error && <div className="alert alert-danger m-3 small" role="alert">{error}</div>}
-
+      {error && despesas.length > 0 && <div className="alert alert-warning m-3 small" role="alert">Erro ao atualizar a lista: {error}. Exibindo dados anteriores.</div>}
+      
       <div className="table-responsive">
         <table className="table table-hover table-striped table-sm mb-0 align-middle">
           <thead className="table-light">
@@ -309,15 +326,14 @@ function DespesaList({ onEditDespesa, refreshKey }) {
             {loading && despesas.length > 0 && (
               <tr><td colSpan="7" className="text-center p-4"><div className="spinner-border spinner-border-sm text-primary" role="status"><span className="visually-hidden">A atualizar...</span></div></td></tr>
             )}
-            {!loading && despesas.length === 0 ? (
+            {!loading && despesas.length === 0 && !error && (
               <tr><td colSpan="7" className="text-center text-muted p-4">Nenhuma despesa encontrada com os filtros aplicados.</td></tr>
-            ) : (
-              despesas.map((d) => (
+            )}
+            {despesas.map((d) => (
                 <tr key={d.id}>
                   <td className="px-3 py-2">{d.descricao}</td>
                   <td className="px-3 py-2">{d.caso_titulo || 'Despesa Geral'}</td>
                   <td className="px-3 py-2 text-end">
-                    {/* Garante que o valor é um número antes de formatar */}
                     {typeof d.valor === 'number' || (typeof d.valor === 'string' && !isNaN(parseFloat(d.valor)))
                       ? parseFloat(d.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                       : 'N/A'}
@@ -332,8 +348,7 @@ function DespesaList({ onEditDespesa, refreshKey }) {
                     </button>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>

@@ -1,16 +1,16 @@
 // src/DespesaForm.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js'; // Ajuste o caminho se config.js não estiver em src/
+import { API_URL } from './config.js';
 import { toast } from 'react-toastify';
 
 const initialState = {
-    caso_id: '', // Permite despesa geral se vazio
+    caso_id: '', 
     descricao: '',
-    categoria: 'Custas Processuais', // Valor padrão
+    categoria: 'Custas Processuais',
     valor: '',
-    data_vencimento: new Date().toISOString().split('T')[0], // Data atual como padrão
-    data_despesa: '', // Data do pagamento/efetivação da despesa
-    status: 'A Pagar', // Valor padrão
+    data_vencimento: new Date().toISOString().split('T')[0],
+    data_despesa: '',
+    status: 'A Pagar',
     forma_pagamento: '',
     notas: ''
 };
@@ -19,9 +19,9 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
   console.log("DespesaForm: Renderizando. Despesa para editar:", despesaParaEditar);
 
   const [formData, setFormData] = useState(initialState);
-  const [clientes, setClientes] = useState([]); // Para filtrar casos
-  const [casos, setCasos] = useState([]);     // Para associar despesa a um caso
-  const [selectedClienteId, setSelectedClienteId] = useState(''); // Para o dropdown de filtro de cliente
+  const [clientes, setClientes] = useState([]);
+  const [casos, setCasos] = useState([]);
+  const [selectedClienteId, setSelectedClienteId] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -32,8 +32,14 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
 
   const fetchClientes = useCallback(async () => {
     console.log("DespesaForm: fetchClientes chamado.");
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.warn("Sessão não encontrada para carregar clientes.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
     try {
-      const response = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`);
+      const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders });
       if (!response.ok) throw new Error('Falha ao carregar clientes');
       const data = await response.json();
       setClientes(data.clientes || []);
@@ -46,15 +52,18 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
 
   const fetchCasos = useCallback(async (clienteId = null) => {
     console.log("DespesaForm: fetchCasos chamado. Cliente ID para filtro:", clienteId);
-    let url = `${API_URL}/casos?sort_by=titulo&order=asc`;
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.warn("Sessão não encontrada para carregar casos.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+    let url = `${API_URL}/casos/?sort_by=titulo&order=asc`;
     if (clienteId) {
       url += `&cliente_id=${clienteId}`;
     }
-    // Se não houver clienteId, busca todos os casos (ou nenhum, dependendo da sua lógica de API)
-    // Para despesas gerais, o utilizador pode não querer associar a um caso específico,
-    // ou pode querer ver todos os casos se não filtrar por cliente.
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) throw new Error('Falha ao carregar casos');
       const data = await response.json();
       setCasos(data.casos || []);
@@ -67,12 +76,10 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
 
   useEffect(() => {
     fetchClientes();
-    // Carrega todos os casos inicialmente, ou apenas os do cliente selecionado se houver um
-    // Se estiver a editar, o useEffect abaixo tratará de carregar o cliente e os casos corretos.
     if (!despesaParaEditar) {
         fetchCasos(selectedClienteId || null);
     }
-  }, [fetchClientes, despesaParaEditar, selectedClienteId]); // Removido fetchCasos daqui para evitar loop excessivo
+  }, [fetchClientes, despesaParaEditar, selectedClienteId]);
 
   useEffect(() => {
     console.log("DespesaForm: useEffect para despesaParaEditar. Valor:", despesaParaEditar);
@@ -96,42 +103,39 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       setIsEditing(true);
       console.log("DespesaForm: Modo de edição. FormData definido:", dadosEdit);
 
-      // Se a despesa editada tem um caso_id, tenta encontrar o cliente_id desse caso
-      // para pré-selecionar o filtro de cliente e carregar os casos corretos.
-      if (dadosEdit.caso_id && casos.length > 0) {
-        const casoAssociado = casos.find(c => String(c.id) === dadosEdit.caso_id);
-        if (casoAssociado && casoAssociado.cliente_id) {
-          setSelectedClienteId(String(casoAssociado.cliente_id));
-          // O fetchCasos será chamado pelo useEffect de selectedClienteId
-        }
-      } else if (dadosEdit.caso_id) {
-        // Se os casos ainda não foram carregados, busca o caso para obter o cliente_id
-        fetch(`${API_URL}/casos/${dadosEdit.caso_id}`)
-          .then(res => res.ok ? res.json() : Promise.reject('Caso não encontrado'))
-          .then(casoData => {
-            if (casoData && casoData.cliente_id) {
-              setSelectedClienteId(String(casoData.cliente_id));
-              fetchCasos(String(casoData.cliente_id)); // Carrega casos para este cliente
+      if (dadosEdit.caso_id) {
+        const casoOriginal = despesaParaEditar.caso_associado_ref; // Supondo que a API envie esta referência
+        if (casoOriginal && casoOriginal.cliente_id) {
+            setSelectedClienteId(String(casoOriginal.cliente_id));
+        } else {
+            // Fallback se a referência não vier, busca o caso para achar o cliente
+            const token = localStorage.getItem('token');
+            if(token) {
+                fetch(`${API_URL}/casos/${dadosEdit.caso_id}`, { headers: { 'Authorization': `Bearer ${token}` } })
+                  .then(res => res.ok ? res.json() : Promise.reject('Caso não encontrado para despesa'))
+                  .then(casoData => {
+                    if (casoData && casoData.cliente_id) {
+                      setSelectedClienteId(String(casoData.cliente_id));
+                    }
+                  })
+                  .catch(err => console.warn("DespesaForm: Não foi possível determinar o cliente do caso para edição.", err));
             }
-          })
-          .catch(err => console.warn("DespesaForm: Não foi possível determinar o cliente do caso para edição.", err));
+        }
+      } else {
+        setSelectedClienteId('');
       }
-
-
     } else {
       setFormData(initialState);
       setIsEditing(false);
-      setSelectedClienteId(''); // Limpa o filtro de cliente
-      console.log("DespesaForm: Modo de adição ou despesaParaEditar inválida. FormData resetado.");
+      setSelectedClienteId('');
+      console.log("DespesaForm: Modo de adição. FormData resetado.");
     }
-  }, [despesaParaEditar, clearValidationErrors, casos]); // Adicionado casos como dependência
+  }, [despesaParaEditar, clearValidationErrors]);
 
-  // useEffect para recarregar casos quando selectedClienteId muda
   useEffect(() => {
     console.log("DespesaForm: selectedClienteId mudou para:", selectedClienteId, ". A recarregar casos.");
     fetchCasos(selectedClienteId || null);
   }, [selectedClienteId, fetchCasos]);
-
 
   const validateForm = () => {
     const errors = {};
@@ -157,10 +161,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
     if (name === "selectedClienteId") {
       console.log("DespesaForm: Filtro de cliente alterado para:", value);
       setSelectedClienteId(value);
-      // Limpa o caso_id selecionado quando o filtro de cliente muda,
-      // pois os casos disponíveis serão diferentes.
       setFormData(prev => ({ ...prev, caso_id: '' }));
-      // O useEffect de selectedClienteId tratará de chamar fetchCasos
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -174,23 +175,34 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       toast.error('Por favor, corrija os erros indicados no formulário.');
       return;
     }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.error("Autenticação necessária para salvar. Faça login.");
+        setLoading(false);
+        return;
+    }
+    const authHeaders = { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    };
     setLoading(true);
 
     const dadosParaEnviar = {
       ...formData,
       valor: parseFloat(formData.valor),
-      caso_id: formData.caso_id ? parseInt(formData.caso_id, 10) : null, // Envia null se não houver caso_id
+      caso_id: formData.caso_id ? parseInt(formData.caso_id, 10) : null,
       data_vencimento: formData.data_vencimento || null,
       data_despesa: formData.data_despesa || null,
     };
     console.log("DespesaForm: Enviando dados para API:", dadosParaEnviar);
 
     try {
-      const url = isEditing ? `${API_URL}/despesas/${despesaParaEditar.id}` : `${API_URL}/despesas`;
+      const url = isEditing ? `${API_URL}/despesas/${despesaParaEditar.id}` : `${API_URL}/despesas/`; // Adicionada barra final para POST
       const method = isEditing ? 'PUT' : 'POST';
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify(dadosParaEnviar),
       });
       const responseData = await response.json();
@@ -202,6 +214,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       if (typeof onDespesaChange === 'function') {
         onDespesaChange();
       }
+      if (!isEditing) setFormData(initialState); // Resetar apenas se for novo
     } catch (error) {
       console.error("DespesaForm: Erro no handleSubmit:", error);
       toast.error(error.message || 'Erro desconhecido ao salvar a despesa.');
@@ -233,7 +246,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
               <label htmlFor="caso_id_desp" className="form-label form-label-sm">Associar ao Caso (Opcional)</label>
               <select name="caso_id" id="caso_id_desp" className="form-select form-select-sm" value={formData.caso_id || ''} onChange={handleChange} disabled={casos.length === 0 && !selectedClienteId}>
                 <option value="">Nenhum caso (Despesa Geral)</option>
-                {/* Filtra casos com base no cliente selecionado, ou mostra todos se nenhum cliente selecionado */}
                 {(selectedClienteId ? casos.filter(c => String(c.cliente_id) === selectedClienteId) : casos).map(cs => (
                   <option key={cs.id} value={cs.id}>{cs.titulo} ({cs.cliente?.nome_razao_social || 'Cliente N/A'})</option>
                 ))}
@@ -272,7 +284,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
             </div>
             <div className="col-md-6 mb-3">
               <label htmlFor="data_despesa_desp" className="form-label form-label-sm">Data da Despesa/Pagamento</label>
-              <input type="date" name="data_despesa" id="data_despesa_desp" className="form-control form-control-sm" value={formData.data_despesa} onChange={handleChange} />
+              <input type="date" name="data_despesa" id="data_despesa_desp" className="form-control form-control-sm" value={formData.data_despesa || ''} onChange={handleChange} />
             </div>
           </div>
 

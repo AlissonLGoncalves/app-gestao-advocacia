@@ -1,6 +1,7 @@
 // src/ContasAPagarReport.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js'; // Ajuste o caminho se config.js não estiver em src/
+import { API_URL } from './config.js';
+import { toast } from 'react-toastify'; // Importar toast
 
 function ContasAPagarReport() {
   console.log("ContasAPagarReport: Renderizando componente.");
@@ -13,8 +14,18 @@ function ContasAPagarReport() {
     console.log("ContasAPagarReport: fetchContasAPagar chamado.");
     setLoading(true);
     setError('');
+    const token = localStorage.getItem('token');
+    if (!token) {
+        setError("Autenticação necessária para visualizar relatórios.");
+        setLoading(false);
+        toast.error("Sessão expirada ou inválida. Faça login.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
     try {
-      const response = await fetch(`${API_URL}/relatorios/contas-a-pagar`);
+      // A API de relatórios pode não ter uma barra final, verifique a definição da rota no backend.
+      const response = await fetch(`${API_URL}/relatorios/contas-a-pagar`, { headers: authHeaders });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ erro: `Erro HTTP: ${response.status}` }));
         console.error("ContasAPagarReport: Erro da API ao buscar relatório:", errorData);
@@ -22,7 +33,6 @@ function ContasAPagarReport() {
       }
       const data = await response.json();
       console.log("ContasAPagarReport: Dados do relatório recebidos:", data);
-      // Garante que os valores padrão sejam usados se a API não retornar a estrutura esperada
       setReportData({
         items: data.items || [],
         total_geral: data.total_geral || "0.00",
@@ -30,12 +40,15 @@ function ContasAPagarReport() {
       });
     } catch (err) {
       console.error("ContasAPagarReport: Erro detalhado ao buscar relatório:", err);
-      setError(`Erro ao carregar relatório de contas a pagar: ${err.message}`);
+      setError(`Erro ao carregar relatório: ${err.message}`);
+      if (!err.message.includes("Autenticação")) {
+        toast.error(`Erro ao carregar relatório: ${err.message}`);
+      }
     } finally {
       setLoading(false);
       console.log("ContasAPagarReport: fetchContasAPagar finalizado.");
     }
-  }, []); // API_URL como dependência se vier de contexto/props
+  }, []);
 
   useEffect(() => {
     fetchContasAPagar();
@@ -83,7 +96,6 @@ function ContasAPagarReport() {
                     <td>{item.descricao}</td>
                     <td>{item.caso_titulo || 'Despesa Geral'}</td>
                     <td className="text-end">
-                      {/* Garante que o valor é um número antes de formatar */}
                       {typeof item.valor === 'number' || (typeof item.valor === 'string' && !isNaN(parseFloat(item.valor)))
                         ? parseFloat(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                         : 'N/A'}
@@ -93,7 +105,7 @@ function ContasAPagarReport() {
                       <span className={`badge ${
                         item.status === 'A Pagar' ? 'bg-warning-subtle text-warning-emphasis' :
                         item.status === 'Vencida' ? 'bg-danger-subtle text-danger-emphasis' :
-                        item.status === 'Paga' ? 'bg-success-subtle text-success-emphasis' : // Adicionado para consistência
+                        item.status === 'Paga' ? 'bg-success-subtle text-success-emphasis' :
                         'bg-light text-dark'
                       }`}>
                         {item.status}
@@ -106,7 +118,6 @@ function ContasAPagarReport() {
                 <tr className="table-light fw-bold">
                   <td colSpan="2" className="text-end">Total Geral a Pagar:</td>
                   <td className="text-end">
-                    {/* Garante que total_geral é um número antes de formatar */}
                     {typeof reportData.total_geral === 'number' || (typeof reportData.total_geral === 'string' && !isNaN(parseFloat(reportData.total_geral)))
                       ? parseFloat(reportData.total_geral).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                       : 'R$ 0,00'}

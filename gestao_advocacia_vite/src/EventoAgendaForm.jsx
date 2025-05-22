@@ -1,11 +1,9 @@
 // src/EventoAgendaForm.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-// Corrigido o caminho de importação para config.js
 import { API_URL } from './config.js'; 
 import { toast } from 'react-toastify';
 import { useLocation } from 'react-router-dom';
 
-// Função para formatar data e hora para o input datetime-local (YYYY-MM-DDTHH:mm)
 const formatDateTimeForInput = (dateTimeString) => {
   if (!dateTimeString) return '';
   try {
@@ -60,8 +58,14 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
 
   const fetchClientes = useCallback(async () => {
     console.log("EventoAgendaForm: fetchClientes chamado.");
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.warn("Sessão não encontrada para carregar clientes.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
     try {
-      const response = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`);
+      const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders });
       if (!response.ok) throw new Error('Falha ao carregar clientes');
       const data = await response.json();
       setClientes(data.clientes || []);
@@ -74,12 +78,18 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
 
   const fetchCasos = useCallback(async (clienteId = null) => {
     console.log("EventoAgendaForm: fetchCasos chamado. Cliente ID para filtro:", clienteId);
-    let url = `${API_URL}/casos?sort_by=titulo&order=asc`;
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.warn("Sessão não encontrada para carregar casos.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+    let url = `${API_URL}/casos/?sort_by=titulo&order=asc`;
     if (clienteId) {
       url += `&cliente_id=${clienteId}`;
     }
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) throw new Error('Falha ao carregar casos');
       const data = await response.json();
       setCasos(data.casos || []);
@@ -97,7 +107,7 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
   useEffect(() => {
     console.log("EventoAgendaForm: useEffect para eventoParaEditar. Valor:", eventoParaEditar, "Location state:", location.state);
     clearValidationErrors();
-    if (eventoParaEditar && eventoParaEditar.id) { // Modo Edição
+    if (eventoParaEditar && eventoParaEditar.id) { 
       const dadosEdit = { ...initialState, ...eventoParaEditar };
       dadosEdit.data_inicio = formatDateTimeForInput(dadosEdit.data_inicio);
       dadosEdit.data_fim = formatDateTimeForInput(dadosEdit.data_fim);
@@ -113,19 +123,22 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
         if (casoOriginal && casoOriginal.cliente_id) {
             setSelectedClienteId(String(casoOriginal.cliente_id));
         } else {
-            fetch(`${API_URL}/casos/${dadosEdit.caso_id}`)
-              .then(res => res.ok ? res.json() : Promise.reject('Caso não encontrado para o evento'))
-              .then(casoData => {
-                if (casoData && casoData.cliente_id) {
-                  setSelectedClienteId(String(casoData.cliente_id));
-                }
-              })
-              .catch(err => console.warn("EventoAgendaForm: Não foi possível determinar o cliente do caso para edição do evento.", err));
+            const token = localStorage.getItem('token');
+            if(token){
+                fetch(`${API_URL}/casos/${dadosEdit.caso_id}`, { headers: { 'Authorization': `Bearer ${token}` }})
+                  .then(res => res.ok ? res.json() : Promise.reject('Caso não encontrado para o evento'))
+                  .then(casoData => {
+                    if (casoData && casoData.cliente_id) {
+                      setSelectedClienteId(String(casoData.cliente_id));
+                    }
+                  })
+                  .catch(err => console.warn("EventoAgendaForm: Não foi possível determinar o cliente do caso para edição do evento.", err));
+            }
         }
       } else {
         setSelectedClienteId('');
       }
-    } else { // Modo Adição
+    } else { 
       const defaultValuesFromState = location.state || {};
       const newEventInitialState = {
         ...initialState,
@@ -197,6 +210,16 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       return;
     }
     setLoading(true);
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.error("Autenticação necessária para salvar. Faça login.");
+        setLoading(false);
+        return;
+    }
+    const authHeaders = { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    };
 
     const dataInicioISO = formData.data_inicio ? new Date(formData.data_inicio).toISOString() : null;
     const dataFimISO = formData.data_fim ? new Date(formData.data_fim).toISOString() : null;
@@ -211,11 +234,11 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
     console.log("EventoAgendaForm: Enviando dados para API:", dadosParaEnviar);
 
     try {
-      const url = isEditing ? `${API_URL}/eventos/${eventoParaEditar.id}` : `${API_URL}/eventos`;
+      const url = isEditing ? `${API_URL}/eventos/${eventoParaEditar.id}` : `${API_URL}/eventos/`; // Barra final para POST
       const method = isEditing ? 'PUT' : 'POST';
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify(dadosParaEnviar),
       });
       const responseData = await response.json();
@@ -227,6 +250,7 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       if (typeof onEventoChange === 'function') {
         onEventoChange();
       }
+      if (!isEditing) setFormData(initialState);
     } catch (error) {
       console.error("EventoAgendaForm: Erro no handleSubmit:", error);
       toast.error(error.message || 'Erro desconhecido ao salvar o evento.');

@@ -103,13 +103,28 @@ function Dashboard({ mudarSecao }) { // mudarSecao é recebida como prop de Dash
     console.log("Dashboard: fetchDashboardData iniciado.");
     setLoading(true);
     setErro('');
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setErro("Autenticação necessária. Faça login para visualizar o dashboard.");
+      setLoading(false);
+      // Idealmente, redirecionar para a página de login aqui se não houver token
+      // Ex: navigate('/login'); // Se `Maps` estiver disponível
+      return;
+    }
+
+    const authHeaders = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+
     try {
       const apiRequests = [
-        fetch(`${API_URL}/clientes?count_only=true`),
-        fetch(`${API_URL}/casos?status=Ativo&count_only=true`),
-        fetch(`${API_URL}/eventos?sort_by=data_inicio&order=asc&limit=5&concluido=false`), // Busca eventos não concluídos
-        fetch(`${API_URL}/recebimentos?status=Pendente`), // API deve filtrar por pendente e vencido
-        fetch(`${API_URL}/despesas?status=A Pagar`),      // API deve filtrar por a pagar e vencida
+        fetch(`${API_URL}/clientes/?count_only=true`, { headers: authHeaders }),
+        fetch(`${API_URL}/casos/?status=Ativo&count_only=true`, { headers: authHeaders }),
+        fetch(`${API_URL}/eventos/?sort_by=data_inicio&order=asc&limit=5&concluido=false`, { headers: authHeaders }),
+        fetch(`${API_URL}/recebimentos/?status=Pendente`, { headers: authHeaders }),
+        fetch(`${API_URL}/despesas/?status=A Pagar`, { headers: authHeaders }),
       ];
       
       const responses = await Promise.all(apiRequests);
@@ -117,15 +132,37 @@ function Dashboard({ mudarSecao }) { // mudarSecao é recebida como prop de Dash
 
       const processResponse = async (res, entityName) => {
         if (!res.ok) {
+          if (res.status === 401) { // Erro de não autorizado
+             console.error(`Dashboard: Erro 401 (Não Autorizado) ao buscar ${entityName}. Token pode ser inválido ou expirado.`);
+             throw new Error(`Falha na autenticação ao carregar dados de ${entityName.toLowerCase()}. Por favor, tente fazer login novamente.`);
+          }
           let errorBody = `Status: ${res.status}`;
           try {
-            const errorJson = await res.json();
-            errorBody = errorJson.erro || errorJson.message || JSON.stringify(errorJson);
+            // Tenta ler como texto primeiro, pois pode ser HTML ou texto plano
+            const errorText = await res.text();
+            errorBody = errorText; // Para log
+            // Tenta parsear como JSON apenas se parecer JSON
+            if (errorText.startsWith('{') && errorText.endsWith('}')) {
+                const errorJson = JSON.parse(errorText);
+                errorBody = errorJson.erro || errorJson.message || JSON.stringify(errorJson);
+            }
           } catch (e) {
-            // Ignora se o corpo não for JSON válido
+            // Se o parse falhar, usa o texto bruto ou o status.
+             console.warn(`Dashboard: Corpo do erro para ${entityName} não é JSON válido ou não pôde ser lido. Status: ${res.status}. Texto: ${errorBody.substring(0,100)}`);
           }
           console.error(`Dashboard: Erro na API ao buscar ${entityName}: ${errorBody}`);
-          throw new Error(`Falha ao carregar dados de ${entityName.toLowerCase()}.`);
+          throw new Error(`Falha ao carregar dados de ${entityName.toLowerCase()}. Detalhe: ${errorBody.substring(0,100)}`);
+        }
+        // Verifica se a resposta tem conteúdo antes de tentar parsear JSON
+        const contentType = res.headers.get("content-type");
+        if (res.status === 204 || !contentType || !contentType.includes("application/json")) {
+            // Para 204 No Content, ou se não for JSON, retorna um valor padrão (ex: objeto vazio ou array)
+            // ou null, dependendo do que o código de consumo espera.
+            console.warn(`Dashboard: Resposta OK para ${entityName} mas não é JSON ou está vazia (Status: ${res.status}).`);
+            if (entityName === 'Próximos Eventos' || entityName === 'Recebimentos Pendentes' || entityName === 'Despesas a Pagar') {
+                return { [entityName.toLowerCase().replace(/\s+/g, '_')]: [] }; // Ex: { proximos_eventos: [] }
+            }
+            return {}; // Para contagens, pode ser um objeto vazio
         }
         return res.json();
       };
@@ -141,7 +178,6 @@ function Dashboard({ mudarSecao }) { // mudarSecao é recebida como prop de Dash
       ]);
       console.log("Dashboard: Dados da API processados:", { clientesData, casosData, eventosData, recebimentosData, despesasData });
 
-      // A API deve retornar os status corretos para estes filtros
       const recebimentosPendentes = (recebimentosData.recebimentos || []);
       const totalPendenteValor = recebimentosPendentes.reduce((acc, curr) => acc + parseFloat(curr.valor || 0), 0);
 

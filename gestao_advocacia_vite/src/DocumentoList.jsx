@@ -1,43 +1,45 @@
 // src/DocumentoList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js'; // Ajuste o caminho se config.js não estiver em src/
-import { PencilSquareIcon, TrashIcon, ArrowDownTrayIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon } from '@heroicons/react/24/outline'; // Removido FunnelIcon se não usado aqui
+import { API_URL } from './config.js';
+import { PencilSquareIcon, TrashIcon, ArrowDownTrayIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 
 function DocumentoList({ onEditDocumento, refreshKey }) {
   console.log("DocumentoList: Renderizando. RefreshKey:", refreshKey);
 
   const [documentos, setDocumentos] = useState([]);
-  const [clientes, setClientes] = useState([]); // Para o filtro de cliente
-  const [casos, setCasos] = useState([]);     // Para o filtro de caso
+  const [clientes, setClientes] = useState([]);
+  const [casos, setCasos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
 
-  // Estados para filtros
   const [searchTerm, setSearchTerm] = useState('');
-  const [clienteFilter, setClienteFilter] = useState(''); // Filtro de cliente para refinar a lista de casos
-  const [casoFilter, setCasoFilter] = useState('');     // Filtro de caso para documentos
+  const [clienteFilter, setClienteFilter] = useState('');
+  const [casoFilter, setCasoFilter] = useState('');
 
-  // Estado para ordenação
   const [sortConfig, setSortConfig] = useState({ key: 'data_upload', direction: 'desc' });
 
   const fetchClientesECasosParaFiltro = useCallback(async () => {
     console.log("DocumentoList: fetchClientesECasosParaFiltro chamado. Cliente para filtro de casos:", clienteFilter);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.warn("DocumentoList: Token não encontrado para fetchClientesECasosParaFiltro.");
+      return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
     try {
-      // Buscar Clientes
-      const clientesRes = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`);
+      const clientesRes = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders });
       if (!clientesRes.ok) throw new Error('Falha ao carregar clientes para filtro.');
       const clientesData = await clientesRes.json();
       setClientes(clientesData.clientes || []);
       console.log("DocumentoList: Clientes para filtro carregados:", clientesData.clientes);
 
-      // Buscar Casos (filtrado por clienteFilter se este estiver selecionado)
-      let casosUrl = `${API_URL}/casos?sort_by=titulo&order=asc`;
+      let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`;
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`;
       }
-      const casosRes = await fetch(casosUrl);
+      const casosRes = await fetch(casosUrl, { headers: authHeaders });
       if (!casosRes.ok) throw new Error('Falha ao carregar casos para filtro.');
       const casosData = await casosRes.json();
       setCasos(casosData.casos || []);
@@ -47,33 +49,36 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       console.error("DocumentoList: Erro ao buscar clientes/casos para filtro:", err);
       toast.error(`Erro ao carregar dados para filtros de documentos: ${err.message}`);
     }
-  }, [clienteFilter]); // API_URL como dependência se vier de contexto/props
+  }, [clienteFilter]);
 
   const fetchDocumentos = useCallback(async () => {
     console.log("DocumentoList: fetchDocumentos chamado. Configuração de ordenação:", sortConfig, "Filtros:", { searchTerm, clienteFilter, casoFilter });
     setLoading(true);
     setError('');
-    let url = `${API_URL}/documentos?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
+    const token = localStorage.getItem('token');
+    if (!token) {
+        setError("Autenticação necessária. Por favor, faça login.");
+        setLoading(false);
+        toast.error("Sessão expirada ou inválida.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+    let url = `${API_URL}/documentos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
     
-    // Se casoFilter for "DOCUMENTO_GERAL_CLIENTE" e clienteFilter estiver preenchido,
-    // queremos documentos associados diretamente ao cliente, mas sem caso.
-    // Se casoFilter for um ID de caso, filtramos por esse caso_id.
-    // Se apenas clienteFilter estiver preenchido e casoFilter vazio,
-    // a API pode precisar de uma lógica para retornar todos os docs daquele cliente (com ou sem caso).
     if (casoFilter) {
         if (casoFilter === "DOCUMENTO_GERAL_CLIENTE" && clienteFilter) {
-            url += `&cliente_id=${clienteFilter}&sem_caso=true`; // Exemplo de como a API poderia tratar isso
+            url += `&cliente_id=${clienteFilter}&sem_caso=true`;
         } else if (casoFilter !== "DOCUMENTO_GERAL_CLIENTE") {
             url += `&caso_id=${casoFilter}`;
         }
     } else if (clienteFilter) {
-        url += `&cliente_id=${clienteFilter}`; // Documentos do cliente (com ou sem caso, depende da API)
+        url += `&cliente_id=${clienteFilter}`;
     }
-    // Se ambos vazios, busca todos os documentos (ou conforme lógica padrão da API)
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) {
         const resData = await response.json().catch(() => ({}));
         console.error("DocumentoList: Erro da API ao buscar documentos:", resData);
@@ -85,7 +90,9 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
     } catch (err) {
       console.error("DocumentoList: Erro detalhado ao buscar documentos:", err);
       setError(`Erro ao carregar documentos: ${err.message}`);
-      // toast.error(`Erro ao carregar documentos: ${err.message}`);
+      if (!err.message.includes("Autenticação")) {
+        toast.error(`Erro ao carregar documentos: ${err.message}`);
+      }
     } finally {
       setLoading(false);
       console.log("DocumentoList: fetchDocumentos finalizado.");
@@ -102,11 +109,18 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
 
   const handleDeleteClick = async (id) => {
     console.log("DocumentoList: handleDeleteClick chamado para ID:", id);
+    const token = localStorage.getItem('token');
+    if (!token) {
+        toast.error("Autenticação expirada. Faça login novamente.");
+        return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
     if (window.confirm(`Tem certeza que deseja excluir o documento ID ${id}? Esta ação também removerá o arquivo físico do servidor.`)) {
       setDeletingId(id);
       setError(null);
       try {
-        const response = await fetch(`${API_URL}/documentos/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_URL}/documentos/${id}`, { method: 'DELETE', headers: authHeaders });
         if (!response.ok) {
           const resData = await response.json().catch(() => ({}));
           throw new Error(resData.erro || `Erro HTTP: ${response.status}`);
@@ -167,6 +181,10 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
     );
   }
 
+  if (error && documentos.length === 0) {
+    return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
+  }
+
   console.log("DocumentoList: Renderizando tabela de documentos ou mensagem de erro/lista vazia.");
   return (
     <div className="card shadow-sm">
@@ -192,7 +210,7 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
               value={clienteFilter} 
               onChange={(e) => {
                 setClienteFilter(e.target.value);
-                setCasoFilter(''); // Limpa o filtro de caso quando o cliente muda
+                setCasoFilter('');
               }}
             >
               <option value="">Todos os Clientes</option>
@@ -206,10 +224,9 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
               className="form-select form-select-sm" 
               value={casoFilter} 
               onChange={(e) => setCasoFilter(e.target.value)}
-              disabled={!clienteFilter && casos.length === 0} // Desabilita se não houver cliente selecionado e nenhum caso carregado
+              disabled={!clienteFilter && casos.length === 0}
             >
               <option value="">Todos os Casos/Documentos do Cliente</option>
-              {/* Opção para documentos apenas do cliente, sem caso específico */}
               {clienteFilter && <option value="DOCUMENTO_GERAL_CLIENTE">Apenas Documentos do Cliente (Sem Caso)</option>}
               {(clienteFilter ? casos.filter(c => String(c.cliente_id) === clienteFilter) : casos).map(cs => (
                 <option key={cs.id} value={cs.id}>{cs.titulo}</option>
@@ -222,7 +239,7 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
         </div>
       </div>
 
-      {error && <div className="alert alert-danger m-3 small" role="alert">{error}</div>}
+      {error && documentos.length > 0 && <div className="alert alert-warning m-3 small" role="alert">Erro ao atualizar a lista: {error}. Exibindo dados anteriores.</div>}
 
       <div className="table-responsive">
         <table className="table table-hover table-striped table-sm mb-0 align-middle">
@@ -241,10 +258,10 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
             {loading && documentos.length > 0 && (
               <tr><td colSpan="7" className="text-center p-4"><div className="spinner-border spinner-border-sm text-primary" role="status"><span className="visually-hidden">A atualizar...</span></div></td></tr>
             )}
-            {!loading && documentos.length === 0 ? (
+            {!loading && documentos.length === 0 && !error && (
               <tr><td colSpan="7" className="text-center text-muted p-4">Nenhum documento encontrado com os filtros aplicados.</td></tr>
-            ) : (
-              documentos.map((doc) => (
+            )}
+            {documentos.map((doc) => (
                 <tr key={doc.id}>
                   <td className="px-3 py-2 text-truncate" style={{maxWidth: '200px'}} title={doc.nome_original_arquivo}>{doc.nome_original_arquivo}</td>
                   <td className="px-3 py-2 text-truncate" style={{maxWidth: '250px'}} title={doc.descricao}>{doc.descricao || '-'}</td>
@@ -254,7 +271,7 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
                   <td className="px-3 py-2">{formatBytes(doc.tamanho_bytes)}</td>
                   <td className="px-3 py-2 text-center">
                     <a
-                      href={`${API_URL}/documentos/download/${doc.nome_armazenado}`}
+                      href={`${API_URL}/documentos/download/${doc.id}`} // Alterado para usar ID, API precisa ser ajustada
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-sm btn-outline-success me-1 p-1 lh-1"
@@ -269,8 +286,7 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
                     </button>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>

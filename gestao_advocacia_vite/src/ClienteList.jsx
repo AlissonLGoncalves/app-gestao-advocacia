@@ -1,7 +1,6 @@
 // src/ClienteList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-// src/DocumentoList.jsx (ou qualquer outro componente)
-import { API_URL } from './config.js'; // CORRETO: sem a barra no final do nome do arquivo
+import { API_URL } from './config.js';
 import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 
@@ -22,7 +21,18 @@ function ClienteList({ onEditCliente, refreshKey }) {
     console.log("ClienteList: fetchClientes chamado. Ordenação:", sortConfig, "Filtros:", { searchTerm, tipoPessoaFilter });
     setLoading(true);
     setError('');
-    let url = `${API_URL}/clientes?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError("Autenticação necessária.");
+      setLoading(false);
+      toast.error("Sessão expirada ou inválida. Por favor, faça login novamente.");
+      // Idealmente, redirecionar para login
+      return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+    let url = `${API_URL}/clientes/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`; // Adicionada barra final
     if (searchTerm) {
       url += `&search=${encodeURIComponent(searchTerm)}`;
     }
@@ -31,7 +41,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
     }
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) {
         const resData = await response.json().catch(() => ({}));
         console.error("ClienteList: Erro da API ao buscar clientes:", resData);
@@ -43,6 +53,9 @@ function ClienteList({ onEditCliente, refreshKey }) {
     } catch (err) {
       console.error("ClienteList: Erro detalhado ao buscar clientes:", err);
       setError(`Erro ao carregar clientes: ${err.message}`);
+      if (!err.message.includes("Autenticação")) { // Evita duplicar toast se já foi de token
+        toast.error(`Erro ao carregar clientes: ${err.message}`);
+      }
     } finally {
       setLoading(false);
       console.log("ClienteList: fetchClientes finalizado.");
@@ -55,15 +68,22 @@ function ClienteList({ onEditCliente, refreshKey }) {
 
   const handleDeleteClick = async (id) => {
     console.log("ClienteList: handleDeleteClick chamado para ID:", id);
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error("Autenticação expirada. Faça login novamente.");
+      return;
+    }
+    const authHeaders = { 'Authorization': `Bearer ${token}` };
+
     if (window.confirm(`Tem certeza que deseja excluir o cliente ID ${id}? Esta ação pode ser irreversível e afetar registos associados (casos, recebimentos, etc.).`)) {
       setDeletingId(id);
       setError(null);
       try {
-        const response = await fetch(`${API_URL}/clientes/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_URL}/clientes/${id}`, { method: 'DELETE', headers: authHeaders });
         if (!response.ok) {
           const resData = await response.json().catch(() => ({}));
           console.error("ClienteList: Erro da API ao deletar cliente:", resData);
-          // Verifica se o erro é devido a CASCATA/FK
           if (response.status === 409 || (resData.erro && resData.erro.toLowerCase().includes("associados"))) {
              toast.error(resData.erro || "Não é possível deletar o cliente pois existem registos associados a ele.");
           } else {
@@ -76,7 +96,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
       } catch (err) {
         console.error(`ClienteList: Erro ao deletar cliente ${id}:`, err);
         setError(`Erro ao deletar cliente: ${err.message}`);
-        if (!err.message.toLowerCase().includes("associados")) { // Evita toast duplicado
+        if (!err.message.toLowerCase().includes("associados")) { 
             toast.error(`Erro ao deletar cliente: ${err.message}`);
         }
       } finally {
@@ -118,6 +138,10 @@ function ClienteList({ onEditCliente, refreshKey }) {
       </div>
     );
   }
+  
+  if (error && clientes.length === 0) {
+    return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
+  }
 
   console.log("ClienteList: Renderizando tabela de clientes ou mensagem de erro/lista vazia.");
   return (
@@ -154,7 +178,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
         </div>
       </div>
 
-      {error && <div className="alert alert-danger m-3 small" role="alert">{error}</div>}
+      {error && clientes.length > 0 && <div className="alert alert-warning m-3 small" role="alert">Erro ao atualizar a lista: {error}. Exibindo dados anteriores.</div>}
 
       <div className="table-responsive">
         <table className="table table-hover table-striped table-sm mb-0 align-middle">
@@ -172,12 +196,12 @@ function ClienteList({ onEditCliente, refreshKey }) {
             {loading && clientes.length > 0 && (
               <tr><td colSpan="6" className="text-center p-4"><div className="spinner-border spinner-border-sm text-primary" role="status"><span className="visually-hidden">A atualizar...</span></div></td></tr>
             )}
-            {!loading && clientes.length === 0 ? (
+            {!loading && clientes.length === 0 && !error && (
               <tr>
                 <td colSpan="6" className="text-center text-muted p-4">Nenhum cliente encontrado com os filtros aplicados.</td>
               </tr>
-            ) : (
-              clientes.map((cliente) => (
+            )}
+            {clientes.map((cliente) => (
                 <tr key={cliente.id}>
                   <td className="px-3 py-2">
                     {cliente.nome_razao_social}
@@ -218,8 +242,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
                     </button>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>

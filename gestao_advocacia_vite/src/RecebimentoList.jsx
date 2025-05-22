@@ -1,6 +1,4 @@
 // Arquivo: src/RecebimentoList.jsx
-// v2: Estilização refinada, filtros completos e ordenação.
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
 import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
@@ -14,7 +12,6 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
     const [error, setError] = useState('');
     const [deletingId, setDeletingId] = useState(null);
 
-    // Estados para filtros
     const [searchTerm, setSearchTerm] = useState('');
     const [clienteFilter, setClienteFilter] = useState('');
     const [casoFilter, setCasoFilter] = useState('');
@@ -25,21 +22,24 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
     const [dataRecebimentoFim, setDataRecebimentoFim] = useState('');
     const [showFilters, setShowFilters] = useState(false);
 
-    // Estado para ordenação
     const [sortConfig, setSortConfig] = useState({ key: 'data_vencimento', direction: 'desc' });
 
     const fetchClientesECasosParaFiltro = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const authHeaders = { 'Authorization': `Bearer ${token}` };
+
         try {
-            const clientesRes = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`);
+            const clientesRes = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders }); // Adicionada barra final
             if (!clientesRes.ok) throw new Error('Falha ao carregar clientes');
             const clientesData = await clientesRes.json();
             setClientes(clientesData.clientes || []);
 
-            let casosUrl = `${API_URL}/casos?sort_by=titulo&order=asc`;
+            let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`; // Adicionada barra final
             if (clienteFilter) {
                 casosUrl += `&cliente_id=${clienteFilter}`;
             }
-            const casosRes = await fetch(casosUrl);
+            const casosRes = await fetch(casosUrl, { headers: authHeaders });
             if (!casosRes.ok) throw new Error('Falha ao carregar casos');
             const casosData = await casosRes.json();
             setCasos(casosData.casos || []);
@@ -53,7 +53,16 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
     const fetchRecebimentos = useCallback(async () => {
         setLoading(true);
         setError('');
-        let url = `${API_URL}/recebimentos?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`;
+        const token = localStorage.getItem('token');
+        if (!token) {
+            setError("Autenticação necessária.");
+            setLoading(false);
+            toast.error("Sessão expirada. Faça login.");
+            return;
+        }
+        const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+        let url = `${API_URL}/recebimentos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`; // Adicionada barra final
         if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
         if (clienteFilter) url += `&cliente_id=${clienteFilter}`;
         if (casoFilter) url += `&caso_id=${casoFilter}`;
@@ -64,7 +73,7 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
         if (dataRecebimentoFim) url += `&data_recebimento_fim=${dataRecebimentoFim}`;
 
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: authHeaders });
             if (!response.ok) {
                 const resData = await response.json().catch(() => null);
                 throw new Error(resData?.erro || `Erro HTTP: ${response.status}`);
@@ -74,7 +83,9 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
         } catch (err) {
             console.error("Erro ao buscar recebimentos:", err);
             setError(`Erro ao carregar recebimentos: ${err.message}`);
-            toast.error(`Erro ao carregar recebimentos: ${err.message}`);
+            if (!err.message.includes("Autenticação")) {
+              toast.error(`Erro ao carregar recebimentos: ${err.message}`);
+            }
         } finally {
             setLoading(false);
         }
@@ -89,11 +100,18 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
     }, [fetchRecebimentos, refreshKey]);
 
     const handleDeleteClick = async (id) => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error("Autenticação expirada. Faça login novamente.");
+          return;
+        }
+        const authHeaders = { 'Authorization': `Bearer ${token}` };
+
         if (window.confirm(`Tem certeza que deseja excluir o recebimento ID ${id}?`)) {
             setDeletingId(id);
             setError(null);
             try {
-                const response = await fetch(`${API_URL}/recebimentos/${id}`, { method: 'DELETE' });
+                const response = await fetch(`${API_URL}/recebimentos/${id}`, { method: 'DELETE', headers: authHeaders });
                 if (!response.ok) {
                     const resData = await response.json().catch(() => ({}));
                     throw new Error(resData.erro || `Erro HTTP: ${response.status}`);
@@ -156,6 +174,10 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                 <span className="ms-3 text-muted">Carregando recebimentos...</span>
             </div>
         );
+    }
+    
+    if (error && recebimentos.length === 0) {
+      return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
     }
 
     return (
@@ -237,8 +259,8 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                 )}
             </div>
 
-            {error && <div className="alert alert-danger m-3 small" role="alert">{error}</div>}
-
+            {error && recebimentos.length > 0 && <div className="alert alert-warning m-3 small" role="alert">Erro ao atualizar a lista: {error}. Exibindo dados anteriores.</div>}
+            
             <div className="table-responsive">
                 <table className="table table-hover table-striped table-sm mb-0 align-middle">
                     <thead className="table-light">
@@ -254,10 +276,13 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {recebimentos.length === 0 && !loading ? (
+                        {loading && recebimentos.length > 0 && (
+                            <tr><td colSpan="8" className="text-center p-4"><div className="spinner-border spinner-border-sm text-primary" role="status"><span className="visually-hidden">A atualizar...</span></div></td></tr>
+                        )}
+                        {!loading && recebimentos.length === 0 && !error &&(
                             <tr><td colSpan="8" className="text-center text-muted p-4">Nenhum recebimento encontrado.</td></tr>
-                        ) : (
-                            recebimentos.map((r) => (
+                        )}
+                        {recebimentos.map((r) => (
                                 <tr key={r.id}>
                                     <td className="px-3 py-2">{r.descricao}</td>
                                     <td className="px-3 py-2">{r.cliente_nome || '-'}</td>
@@ -273,12 +298,11 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                                         </button>
                                     </td>
                                 </tr>
-                            ))
-                        )}
+                            ))}
                     </tbody>
                 </table>
             </div>
-            {recebimentos.length > 0 && (
+            {!loading && recebimentos.length > 0 && (
                 <div className="card-footer bg-light text-muted p-2 text-end small">
                     {recebimentos.length} recebimento(s) encontrado(s)
                 </div>
