@@ -1,6 +1,6 @@
 // src/Dashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js'; // Certifique-se de que este caminho está correto
+import { API_URL } from './config.js'; // CORRETO: sem a barra no final do nome do arquivo
 
 // Importação dos ícones da biblioteca Heroicons
 import {

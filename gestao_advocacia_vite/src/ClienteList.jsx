@@ -1,6 +1,7 @@
 // src/ClienteList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js'; // Ajuste o caminho se config.js não estiver em src/
+// src/DocumentoList.jsx (ou qualquer outro componente)
+import { API_URL } from './config.js'; // CORRETO: sem a barra no final do nome do arquivo
 import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 

@@ -1,58 +1,55 @@
-# CAMINHO: gestao_advocacia/config.py
+# ==============================================================================
+# ARQUIVO: gestao_advocacia/config.py
+# Modificado para incluir configurações do APScheduler e do Job CNJ.
+# ==============================================================================
 import os
 from dotenv import load_dotenv
 
-# Define o diretório base do projeto (onde este arquivo config.py está)
-basedir = os.path.abspath(os.path.dirname(__file__))
+# Determina o diretório base do projeto (um nível acima de 'gestao_advocacia')
+# Isso garante que o .env seja encontrado corretamente, mesmo que config.py esteja em uma subpasta.
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+dotenv_path = os.path.join(BASE_DIR, '.env') 
 
-# Carrega variáveis de ambiente do arquivo .env que deve estar na MESMA PASTA que config.py
-# Crie um arquivo .env na pasta 'gestao_advocacia' se ainda não tiver, 
-# para FLASK_SECRET_KEY e DATABASE_URL (se não for usar a string direta abaixo)
-dotenv_path = os.path.join(basedir, '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
-    print(f"Arquivo .env carregado de: {dotenv_path}")
+    # print(f"INFO: Arquivo .env carregado de: {dotenv_path}") # Para depuração
 else:
-    print(f"Aviso: Arquivo .env não encontrado em {dotenv_path}. Usando valores padrão ou variáveis de ambiente globais.")
+    # Fallback se o .env não estiver na raiz, mas isso geralmente não é o ideal.
+    env_local_path = os.path.join(os.path.dirname(__file__), '.env')
+    if os.path.exists(env_local_path):
+        load_dotenv(env_local_path)
+        # print(f"INFO: Arquivo .env carregado de: {env_local_path}") # Para depuração
+    # else:
+        # print(f"AVISO: Arquivo .env não encontrado em '{dotenv_path}' nem em '{env_local_path}'. Usando valores padrão ou de ambiente do sistema.")
+
 
 class Config:
-    """Configurações base da aplicação Flask."""
+    """Configurações base da aplicação."""
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev_secret_key_fallback' # Use uma chave forte em produção
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'dev_jwt_secret_key_fallback' # Use uma chave forte
     
-    # CHAVE SECRETA: Mude para algo único e seguro em produção!
-    # Pode ser definida pela variável de ambiente FLASK_SECRET_KEY
-    SECRET_KEY = os.environ.get('FLASK_SECRET_KEY') or 'minha-chave-secreta-flask-super-segura-12345'
-    
-    # Configuração do Banco de Dados:
-    # Prioriza DATABASE_URL do ambiente (útil para Heroku/produção ou se definida no .env)
-    # Se não encontrar, usa a string para PostgreSQL local.
-    # Certifique-se de que seu servidor PostgreSQL está rodando e acessível com estas credenciais.
-    # E que a base de dados 'advocacia_db' existe.
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'postgresql://postgres:Alisson075*@localhost:5432/advocacia_db'
-        # Exemplo alternativo para SQLite (mais simples para desenvolvimento inicial se não quiser usar PostgreSQL):
-        # 'sqlite:///' + os.path.join(basedir, 'app_flask.db') 
-    
-    SQLALCHEMY_TRACK_MODIFICATIONS = False # Desabilita o tracking de modificações do SQLAlchemy (melhora performance)
+        'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db') # Fallback para SQLite
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ECHO = False # Mude para True para logar queries SQL em desenvolvimento, se útil
 
-    # Configurações para Upload de Arquivos
-    UPLOAD_FOLDER = os.path.join(basedir, 'uploads') # Pasta para armazenar uploads
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # Limite de 16MB para uploads
-    ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'}
+    UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
 
-    # A criação da pasta UPLOAD_FOLDER é melhor feita no app.py para garantir o contexto correto da aplicação.
-    # No entanto, se quiser garantir aqui, pode descomentar e ajustar:
-    # if not os.path.exists(UPLOAD_FOLDER):
-    #     try:
-    #         os.makedirs(UPLOAD_FOLDER)
-    #         print(f"Pasta de uploads criada em: {UPLOAD_FOLDER}")
-    #     except Exception as e:
-    #         print(f"Erro ao criar pasta de uploads {UPLOAD_FOLDER}: {e}")
+    CNJ_API_KEY = os.environ.get('CNJ_API_KEY')
+    APP_VERSION = os.environ.get('APP_VERSION') or '1.0.0'
 
-# Você pode adicionar outras classes de configuração se precisar (ex: DevelopmentConfig, TestingConfig)
-# class DevelopmentConfig(Config):
-#     DEBUG = True
-#
-# class TestingConfig(Config):
-#     TESTING = True
-#     SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL') or \
-#         'sqlite:///' + os.path.join(basedir, 'test_flask.db') # Banco de dados de teste separado
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+
+    # --- Configurações do APScheduler e do Job CNJ ---
+    CNJ_JOB_ENABLED = os.environ.get('CNJ_JOB_ENABLED', 'True').lower() == 'true'
+    CNJ_JOB_INTERVAL_HOURS = int(os.environ.get('CNJ_JOB_INTERVAL_HOURS', 12))
+    CNJ_JOB_INTERVAL_MINUTES = int(os.environ.get('CNJ_JOB_INTERVAL_MINUTES', 0))
+    CNJ_JOB_REQUEST_DELAY_SECONDS = int(os.environ.get('CNJ_JOB_REQUEST_DELAY_SECONDS', 5))
+    CNJ_JOB_MAX_CASES_PER_RUN = int(os.environ.get('CNJ_JOB_MAX_CASES_PER_RUN', 10))
+
+    # Configurações do APScheduler
+    SCHEDULER_API_ENABLED = True # Permite gerenciar jobs via API REST (opcional, provido pelo Flask-APScheduler)
+    SCHEDULER_TIMEZONE = os.environ.get('SCHEDULER_TIMEZONE', "America/Sao_Paulo") # Fuso horário para o scheduler
+
+
