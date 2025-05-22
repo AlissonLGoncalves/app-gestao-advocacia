@@ -398,7 +398,8 @@ def create_app(config_class=Config):
             
             if user and user.check_password(password):
                 expires = timedelta(days=app.config.get('JWT_ACCESS_TOKEN_EXPIRES_DAYS', 1))
-                access_token = create_access_token(identity=user.id, expires_delta=expires)
+                # Converta user.id para string AQUI:
+                access_token = create_access_token(identity=str(user.id), expires_delta=expires) 
                 app.logger.info(f"Usuário {user.username} (ID: {user.id}) logado com sucesso.")
                 return {'access_token': access_token}, 200
             app.logger.warning(f"Tentativa de login falhou para: {username_or_email}")
@@ -1135,12 +1136,10 @@ def create_app(config_class=Config):
                 
     return app
 
-# Permite executar com 'python app.py' para desenvolvimento, se não estiver usando 'flask run'
+# No final de gestao_advocacia/app.py
 if __name__ == '__main__':
    app = create_app()
-   # O reloader do Flask pode iniciar o scheduler duas vezes se debug=True.
-   # A lógica dentro de create_app com WERKZEUG_RUN_MAIN tenta mitigar isso.
-   # Para produção, use um servidor WSGI como Gunicorn ou uWSGI.
-   app.run(debug=(os.environ.get('FLASK_ENV') == 'development'), 
+   app.run(debug=(os.environ.get('FLASK_ENV') == 'development'),
+           # Remova ou altere a linha abaixo se existir e estiver como port=5001
+           # port=5000, # Garanta que seja 5000 ou remova para usar o padrão
            use_reloader=(os.environ.get('FLASK_ENV') == 'development' and os.environ.get('WERKZEUG_RUN_MAIN') != 'true'))
-

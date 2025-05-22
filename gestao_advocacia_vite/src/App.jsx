@@ -1,51 +1,49 @@
 // src/App.jsx
 import React from 'react';
-import { Routes, Route, NavLink, Outlet, useLocation, Navigate } from 'react-router-dom'; // Adicionado Navigate
-import { ToastContainer } from 'react-toastify';
+import { Routes, Route, NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify'; // toast importado aqui para uso no MainLayout
 import 'react-toastify/dist/ReactToastify.css';
 import "bootstrap-icons/font/bootstrap-icons.css";
+import { useNavigate } from 'react-router-dom';
 
 // Importação dos componentes de página
 import DashboardPage from './pages/DashboardPage.jsx';
 import ClientesPage from './pages/ClientesPage.jsx';
 import CasosPage from './pages/CasosPage.jsx';
+import CasoDetalhePage from './pages/CasoDetalhePage.jsx'; // IMPORTAÇÃO ADICIONADA/VERIFICADA
 import RecebimentosPage from './pages/RecebimentosPage.jsx';
 import DespesasPage from './pages/DespesasPage.jsx';
 import AgendaPage from './pages/AgendaPage.jsx';
 import DocumentosPage from './pages/DocumentosPage.jsx';
 import RelatoriosPage from './pages/RelatoriosPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
-import LoginPage from './pages/auth/LoginPage.jsx'; // Importa a LoginPage
+import LoginPage from './pages/auth/LoginPage.jsx';
 
 // Importação dos ícones
 import {
   HomeIcon, UsersIcon, BriefcaseIcon, DocumentTextIcon,
   CurrencyDollarIcon, CalendarDaysIcon, ChartBarIcon, CreditCardIcon, ArrowLeftOnRectangleIcon
 } from '@heroicons/react/24/outline';
-import { useNavigate } from 'react-router-dom'; // Importar useNavigate
 
 console.log("Módulo App.jsx carregado.");
 
-// Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) {
-    // Usuário não autenticado, redireciona para a página de login
     return <Navigate to="/login" replace />;
   }
-  return children; // Usuário autenticado, renderiza o componente filho
+  return children;
 };
-
 
 const MainLayout = () => {
   const location = useLocation();
-  const navigate = useNavigate(); // Hook para navegação
+  const navigate = useNavigate();
   console.log("MainLayout renderizado. Pathname:", location.pathname);
 
   const handleLogout = () => {
-    localStorage.removeItem('token'); // Remove o token
+    localStorage.removeItem('token');
     toast.info("Logout realizado com sucesso!");
-    navigate('/login'); // Redireciona para a página de login
+    navigate('/login');
   };
 
   const getPageTitle = () => {
@@ -59,8 +57,12 @@ const MainLayout = () => {
     if (baseSegment === '' || baseSegment === 'dashboard') return 'Dashboard';
     
     let titlePrefix = '';
+    // Verifica se é uma rota de detalhe
+    if (baseSegment === 'casos' && actionSegment === 'detalhe' && idSegment) return 'Detalhes do Caso';
+
     if (actionSegment === 'novo') titlePrefix = 'Novo ';
     else if (actionSegment === 'editar' && idSegment) titlePrefix = 'Editar ';
+
 
     let baseTitle = '';
     switch (baseSegment) {
@@ -82,7 +84,6 @@ const MainLayout = () => {
     const finalTitle = `${titlePrefix}${baseTitle}`;
     return finalTitle.charAt(0).toUpperCase() + finalTitle.slice(1);
   };
-
 
   const NavButton = ({ to, icon: IconComponent, children }) => (
     <NavLink
@@ -140,10 +141,7 @@ function App() {
     <>
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover theme="colored" />
       <Routes>
-        {/* Rota de Login fora do MainLayout */}
         <Route path="/login" element={<LoginPage />} />
-
-        {/* Rotas Protegidas que usam MainLayout */}
         <Route 
           path="/" 
           element={
@@ -152,7 +150,7 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} /> {/* Redireciona / para /dashboard */}
+          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           
           <Route path="clientes" element={<ClientesPage />} />
@@ -162,7 +160,7 @@ function App() {
           <Route path="casos" element={<CasosPage />} />
           <Route path="casos/novo" element={<CasosPage />} />
           <Route path="casos/editar/:casoId" element={<CasosPage />} />
-          <Route path="casos/detalhe/:casoId" element={<CasoDetalhePage />} /> {/* Adicionada rota de detalhe */}
+          <Route path="casos/detalhe/:casoId" element={<CasoDetalhePage />} />
 
 
           <Route path="recebimentos" element={<RecebimentosPage />} />

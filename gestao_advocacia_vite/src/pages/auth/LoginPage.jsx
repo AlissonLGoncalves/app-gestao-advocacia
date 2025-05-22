@@ -1,9 +1,10 @@
 // Arquivo: gestao_advocacia_vite/src/pages/auth/LoginPage.jsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { API_URL } from '../../config'; // Ajuste o caminho se config.js estiver em outro local
+import { useNavigate } from 'react-router-dom'; // CORRIGIDO AQUI
+import { API_URL } from '../../config';
 import { toast } from 'react-toastify';
 import { LockClosedIcon, UserIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom'; // Adicionado para o link de registro, se desejar
 
 function LoginPage() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
@@ -14,7 +15,7 @@ function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    toast.dismiss(); // Limpa toasts anteriores
+    toast.dismiss(); 
 
     if (!usernameOrEmail || !password) {
         toast.error("Por favor, preencha o nome de usuário/email e a senha.");
@@ -23,6 +24,7 @@ function LoginPage() {
     }
 
     try {
+      // A rota de login no backend é /api/auth/login, não precisa de barra final.
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -33,7 +35,7 @@ function LoginPage() {
       if (response.ok) {
         localStorage.setItem('token', data.access_token);
         toast.success("Login bem-sucedido! Redirecionando...");
-        navigate('/dashboard'); // Ou para a rota que desejar após o login
+        navigate('/dashboard'); 
       } else {
         toast.error(data.message || "Falha no login. Verifique suas credenciais.");
       }
@@ -97,7 +99,7 @@ function LoginPage() {
               )}
             </button>
           </form>
-          {/* Opcional: Link para registro
+          {/* // Se você tiver uma rota de registro, pode adicionar este link:
           <div className="text-center mt-4">
             <p className="text-muted">
               Não tem uma conta? <Link to="/register">Registre-se aqui</Link>
