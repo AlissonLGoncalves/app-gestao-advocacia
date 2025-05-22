@@ -1,27 +1,35 @@
 // src/pages/DashboardPage.jsx
 import React from 'react';
-import Dashboard from '../Dashboard.jsx'; // Ajuste o caminho se Dashboard.jsx não estiver na raiz de src
+import Dashboard from '../Dashboard.jsx'; // Certifique-se que o caminho para Dashboard.jsx está correto
 import { useNavigate } from 'react-router-dom';
+
+// Mapeamento das ANTIGAS constantes de SECOES para os NOVOS caminhos de rota
+// O componente Dashboard.jsx ainda pode estar passando as strings como 'CLIENTES', 'CASOS', etc.
+const SECAO_ANTIGA_PARA_ROTA = {
+  CLIENTES: '/clientes',
+  CASOS: '/casos',
+  RECEBIMENTOS: '/recebimentos',
+  DESPESAS: '/despesas',
+  AGENDA: '/agenda',
+  DOCUMENTOS: '/documentos',
+  RELATORIOS: '/relatorios',
+  DASHBOARD: '/dashboard'
+  // Adicione outras seções que o Dashboard.jsx possa tentar navegar
+};
 
 function DashboardPage() {
   const navigate = useNavigate();
 
-  // A função mudarSecao original passada para o Dashboard agora usará navigate
-  const handleMudarSecao = (caminhoDaSecao) => {
-    // O Dashboard enviava constantes como SECOES.CLIENTES.
-    // Precisamos mapear isso para caminhos de rota.
-    // Exemplo simples, pode precisar de um mapeamento mais robusto.
-    let targetPath = '/dashboard'; // Padrão
-    if (caminhoDaSecao === 'CLIENTES') targetPath = '/clientes';
-    else if (caminhoDaSecao === 'CASOS') targetPath = '/casos';
-    else if (caminhoDaSecao === 'RECEBIMENTOS') targetPath = '/recebimentos';
-    else if (caminhoDaSecao === 'DESPESAS') targetPath = '/despesas';
-    else if (caminhoDaSecao === 'AGENDA') targetPath = '/agenda';
-    // Adicione outros mapeamentos conforme necessário
-
+  // Esta função será passada para o componente Dashboard.jsx
+  // Ela precisa traduzir o valor antigo (string como 'CLIENTES') para um caminho de rota.
+  const handleMudarSecao = (secaoAntigaConstante) => {
+    // Verifica se o valor recebido é uma chave no nosso mapeamento
+    const targetPath = SECAO_ANTIGA_PARA_ROTA[secaoAntigaConstante] || '/dashboard'; // '/dashboard' como fallback
     navigate(targetPath);
   };
 
+  // O componente Dashboard.jsx não deve mais importar SECOES do App.jsx
+  // Ele receberá a função handleMudarSecao e a usará.
   return <Dashboard mudarSecao={handleMudarSecao} />;
 }
 

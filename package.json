@@ -10,16 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fullcalendar/bootstrap5": "^6.1.17",
-    "@fullcalendar/daygrid": "^6.1.17",
-    "@fullcalendar/interaction": "^6.1.17",
-    "@fullcalendar/list": "^6.1.17",
-    "@fullcalendar/react": "^6.1.17",
-    "@fullcalendar/timegrid": "^6.1.17",
     "@heroicons/react": "^2.2.0",
     "@popperjs/core": "^2.11.8",
     "bootstrap": "^5.3.6",
-    "bootstrap-icons": "^1.13.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.0",

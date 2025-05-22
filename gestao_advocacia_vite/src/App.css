@@ -1,10 +1,10 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+/* src/App.css */
+/* Este arquivo pode ser usado para estilos específicos do componente App.jsx
+   ou para outros estilos globais que não se encaixam em index.css.
+   Muitos dos estilos originais eram do template Vite e podem não ser mais necessários. */
 
+/* Estilos de logo (remover se não estiver a usar o logo padrão do Vite/React) */
+/*
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -32,11 +32,43 @@
     animation: logo-spin infinite 20s linear;
   }
 }
+*/
 
+/* Estilo para .card (considere se é necessário ou se usa o padrão Bootstrap) */
+/* Se precisar de um padding específico para todos os cards, pode manter.
 .card {
   padding: 2em;
 }
+*/
 
+/* Estilo .read-the-docs (remover se não estiver a usar) */
+/*
 .read-the-docs {
   color: #888;
 }
+*/
+
+/* Adicione aqui quaisquer outros estilos globais ou específicos do App.jsx que você precise.
+   Por exemplo, se o MainLayout precisar de algum estilo específico que não seja
+   facilmente aplicado com classes Bootstrap, você pode adicioná-lo aqui. */
+
+/* Exemplo: Estilo para a área de conteúdo principal (Outlet) se desejar um fundo diferente */
+/* O <main> no App.jsx já tem style={{ backgroundColor: '#f8f9fa' }}
+   Se quiser controlar isso via CSS:
+*/
+/*
+.main-content-area {
+  background-color: #f8f9fa; // Cor de fundo padrão do Bootstrap para light
+  flex-grow: 1;
+  overflow: auto;
+  padding: 1.5rem; // Exemplo de padding
+}
+*/
+
+/* Ajustes para a sidebar se necessário, além das classes Bootstrap */
+/*
+.app-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+}
+*/

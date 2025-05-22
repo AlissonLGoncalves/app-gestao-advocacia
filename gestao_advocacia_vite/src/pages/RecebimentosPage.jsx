@@ -1,108 +1,112 @@
 // src/pages/RecebimentosPage.jsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import RecebimentoList from '../RecebimentoList.jsx'; // Ajuste o caminho se necessário
-import RecebimentoForm from '../RecebimentoForm.jsx'; // Ajuste o caminho se necessário
-import { API_URL } from '../config.js'; // Para buscar dados para edição
-
-// Botão Adicionar genérico (pode ser movido para um componente compartilhado)
-const BotaoAdicionar = ({ onClick, texto }) => (
-  <button
-    onClick={onClick}
-    className="btn btn-primary mb-3 d-flex align-items-center"
-  >
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="me-2" width="18" height="18">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-    </svg>
-    {texto}
-  </button>
-);
+import RecebimentoList from '../RecebimentoList.jsx'; // Ajuste o caminho se RecebimentoList.jsx não estiver em src/
+import RecebimentoForm from '../RecebimentoForm.jsx'; // Ajuste o caminho se RecebimentoForm.jsx não estiver em src/
+import BotaoAdicionar from '../components/BotaoAdicionar.jsx'; // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
+import { API_URL } from '../config.js'; // Ajuste o caminho se config.js não estiver em src/
 
 function RecebimentosPage() {
   const navigate = useNavigate();
   const params = useParams(); // Para pegar :recebimentoId da URL
-  const location = useLocation();
+  const location = useLocation(); // Para verificar a rota atual e determinar o modo
 
-  const [refreshKey, setRefreshKey] = useState(0);
+  console.log("RecebimentosPage: Renderizando. Pathname:", location.pathname);
+  console.log("RecebimentosPage: Params:", params);
+
+  const [refreshKey, setRefreshKey] = useState(0); // Para forçar a atualização da lista
   const [recebimentoParaEditar, setRecebimentoParaEditar] = useState(null);
   const [loadingItem, setLoadingItem] = useState(false); // Estado para carregamento do item para edição
 
-  const urlPath = location.pathname;
-  const mostrarFormulario = urlPath.includes('/novo') || urlPath.includes('/editar');
-  const modoFormulario = urlPath.includes('/novo') ? 'novo' : (urlPath.includes('/editar') ? 'editar' : null);
+  // Determina se o formulário deve ser mostrado e em qual modo com base na URL
+  const urlPath = location.pathname.toLowerCase();
+  const mostrarFormulario = urlPath.includes('/recebimentos/novo') || urlPath.startsWith('/recebimentos/editar/');
+  const modoFormulario = urlPath.includes('/recebimentos/novo') ? 'novo' : (urlPath.startsWith('/recebimentos/editar/') ? 'editar' : null);
 
-  // Busca dados do recebimento para edição
+  console.log("RecebimentosPage: mostrarFormulario:", mostrarFormulario, "modoFormulario:", modoFormulario);
+
+  // Busca dados do recebimento para edição se estiver no modo de edição e recebimentoId estiver presente
   useEffect(() => {
+    console.log("RecebimentosPage: useEffect disparado. Modo:", modoFormulario, "ID:", params.recebimentoId);
     if (modoFormulario === 'editar' && params.recebimentoId) {
       setLoadingItem(true);
-      // Implementar a busca do recebimento específico pela API
-      fetch(`${API_URL}/recebimentos/${params.recebimentoId}`) // Adapte a URL da sua API conforme necessário
+      console.log(`RecebimentosPage: Buscando recebimento com ID: ${params.recebimentoId}`);
+      fetch(`${API_URL}/recebimentos/${params.recebimentoId}`)
         .then(response => {
           if (!response.ok) {
-            throw new Error('Falha ao buscar dados do recebimento para edição.');
+            console.error(`RecebimentosPage: Falha ao buscar recebimento ${params.recebimentoId}. Status: ${response.status}`);
+            throw new Error('Falha ao buscar recebimento para edição.');
           }
           return response.json();
         })
         .then(data => {
+          console.log("RecebimentosPage: Dados do recebimento recebidos para edição:", data);
           setRecebimentoParaEditar(data);
         })
         .catch(error => {
-          console.error("Erro ao buscar recebimento:", error);
-          // Tratar erro (ex: redirecionar para lista, mostrar toast)
-          navigate('/recebimentos');
+          console.error("RecebimentosPage: Erro ao buscar recebimento:", error);
+          navigate('/recebimentos'); // Volta para a lista em caso de erro
         })
         .finally(() => {
           setLoadingItem(false);
+          console.log("RecebimentosPage: Busca de recebimento para edição finalizada.");
         });
-    } else {
-      setRecebimentoParaEditar(null);
+    } else if (modoFormulario === 'novo') {
+      console.log("RecebimentosPage: Modo novo, limpando recebimentoParaEditar.");
+      setRecebimentoParaEditar(null); // Garante que não há dados de edição anteriores
     }
   }, [modoFormulario, params.recebimentoId, navigate]);
 
   const handleAdicionarClick = () => {
+    console.log("RecebimentosPage: handleAdicionarClick chamado.");
+    setRecebimentoParaEditar(null); // Limpa qualquer estado de edição anterior
     navigate('/recebimentos/novo');
   };
 
   const handleEditarRecebimento = (recebimento) => {
-    // Os dados do recebimento já devem ser passados aqui pela lista,
-    // mas a navegação para a URL de edição acionará o useEffect acima para buscar os dados mais recentes se necessário.
-    setRecebimentoParaEditar(recebimento);
+    console.log("RecebimentosPage: handleEditarRecebimento chamado com:", recebimento);
     navigate(`/recebimentos/editar/${recebimento.id}`);
   };
 
   const handleFormularioFechado = useCallback(() => {
+    console.log("RecebimentosPage: handleFormularioFechado chamado.");
     setRefreshKey(prevKey => prevKey + 1);
+    setRecebimentoParaEditar(null); // Limpa o estado de edição
     navigate('/recebimentos'); // Volta para a lista após fechar/salvar o formulário
   }, [navigate]);
 
   if (loadingItem && modoFormulario === 'editar') {
+    console.log("RecebimentosPage: Renderizando estado de carregamento para edição.");
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: '200px' }}>
+      <div className="d-flex justify-content-center align-items-center p-5">
         <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Carregando dados do recebimento...</span>
+          <span className="visually-hidden">A carregar recebimento...</span>
         </div>
-        <p className="ms-3 text-muted">Carregando dados do recebimento...</p>
+        <span className="ms-3 text-muted">A carregar dados do recebimento...</span>
       </div>
     );
   }
 
   if (mostrarFormulario) {
+    console.log("RecebimentosPage: Renderizando RecebimentoForm. Modo:", modoFormulario, "Recebimento para editar:", recebimentoParaEditar);
     return (
       <RecebimentoForm
-        recebimentoParaEditar={recebimentoParaEditar} // Passa o item carregado ou null para novo
+        recebimentoParaEditar={recebimentoParaEditar} // Se for novo, será null
         onRecebimentoChange={handleFormularioFechado}
-        onCancel={() => navigate('/recebimentos')}
+        onCancel={() => {
+          console.log("RecebimentosPage: Formulário cancelado.");
+          setRecebimentoParaEditar(null);
+          navigate('/recebimentos');
+        }}
       />
     );
   }
 
+  console.log("RecebimentosPage: Renderizando RecebimentoList. RefreshKey:", refreshKey);
   return (
     <>
       <BotaoAdicionar texto="Adicionar Novo Recebimento" onClick={handleAdicionarClick} />
-      <RecebimentoList
-        key={refreshKey}
-        onEditRecebimento={handleEditarRecebimento}
-      />
+      <RecebimentoList key={refreshKey} onEditRecebimento={handleEditarRecebimento} />
     </>
   );
 }

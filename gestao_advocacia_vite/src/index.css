@@ -1,25 +1,41 @@
-/* Arquivo: src/index.css */
-/* Este arquivo é para seus estilos globais personalizados ou para sobrescrever estilos do Bootstrap. */
-/* NÃO inclua diretivas do Tailwind CSS como @tailwind base; aqui. */
+/* src/index.css */
+/* Este arquivo é para os seus estilos globais personalizados ou para sobrescrever estilos do Bootstrap. */
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* O Bootstrap já define um fundo para o body.
-     Se quiser sobrescrever para um fundo cinza claro específico, como tínhamos antes,
-     você pode descomentar e ajustar a linha abaixo: */
+  /* O Bootstrap já define um fundo para o body (geralmente branco).
+    Se quiser sobrescrever para um fundo cinza claro específico, como tinha antes,
+    pode descomentar e ajustar a linha abaixo. No entanto, a área de conteúdo principal
+    no App.jsx já tem um backgroundColor: '#f8f9fa'.
+  */
   /* background-color: #f8f9fa; */ /* Exemplo: Bootstrap light gray */
   /* color: #212529; */ /* Exemplo: Bootstrap default text color */
   margin: 0; /* Garante que não há margens padrão no body */
+  /* Garante que o body ocupe a altura total para o layout flex do App.jsx funcionar corretamente */
+  height: 100vh; 
+  overflow-x: hidden; /* Previne scroll horizontal indesejado no nível do body */
 }
+
+/* A div#root é o ponto de montagem do React.
+  Para que o layout flex do App.jsx (que usa d-flex vh-100) funcione corretamente
+  e ocupe toda a altura da viewport, a div#root também precisa ocupar 100% da altura.
+*/
+#root {
+  height: 100%;
+  display: flex; /* Para garantir que o conteúdo dentro dele possa usar flex completamente */
+  flex-direction: column; /* Se o App.jsx for o único filho direto */
+}
+
 
 /* Seus outros estilos globais personalizados podem vir aqui.
    Por exemplo, se você tinha estilos importantes no seu App.css antigo (que não eram do Tailwind)
    e decidiu não manter o App.css, você pode movê-los para cá.
 
    Lembre-se que as classes do Tailwind (como p-4, text-blue-500, rounded-lg, etc.)
-   NÃO funcionarão mais. Você precisará usar classes do Bootstrap ou criar suas próprias classes CSS.
+   NÃO funcionarão mais se você as removeu do projeto. Você precisará usar classes do Bootstrap
+   ou criar suas próprias classes CSS.
 */
 
 /* Exemplo de estilo global (apenas para ilustração):
@@ -27,3 +43,33 @@ body {
      color: #333;
    }
 */
+
+/* Estilos para o FullCalendar se você adicionou o plugin de Bootstrap 5 */
+/* Geralmente, o plugin @fullcalendar/bootstrap5 lida com isso, mas pode precisar de ajustes. */
+/* Se você adicionou classes personalizadas como fc-event-concluido ou fc-event-prazo */
+.fc-event-concluido {
+  background-color: #d1e7dd !important; /* Verde claro Bootstrap para sucesso */
+  border-color: #badbcc !important;
+  color: #0f5132 !important;
+}
+.fc-event-concluido .fc-event-title,
+.fc-event-concluido .fc-event-time { /* Garante que o texto do horário também seja afetado */
+  text-decoration: line-through;
+  color: #0f5132 !important; /* Mantém a cor do texto consistente */
+}
+
+.fc-event-prazo {
+  background-color: #f8d7da !important; /* Vermelho claro Bootstrap para perigo */
+  border-color: #f5c2c7 !important;
+  color: #842029 !important;
+}
+.fc-event-prazo .fc-event-title,
+.fc-event-prazo .fc-event-time {
+    color: #842029 !important; /* Mantém a cor do texto consistente */
+}
+
+/* Ajustes para garantir que os ícones do Bootstrap 5 funcionem bem com FullCalendar */
+.fc-theme-bootstrap5 .fc-icon {
+  font-family: 'bootstrap-icons' !important; /* Garante que a fonte correta seja usada */
+  /* Outros ajustes podem ser necessários dependendo da sua configuração de ícones */
+}

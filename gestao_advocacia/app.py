@@ -17,8 +17,6 @@ app = Flask(__name__)
 app.config.from_object(config.Config)
 
 # Configuração para Upload de Arquivos
-# UPLOAD_FOLDER já é definido em config.Config e carregado acima.
-# A criação da pasta é melhor feita aqui para garantir que 'app.root_path' está correto.
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     try:
         os.makedirs(app.config['UPLOAD_FOLDER'])
@@ -26,33 +24,40 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
     except Exception as e:
         print(f"Erro ao criar pasta de uploads {app.config['UPLOAD_FOLDER']}: {e}")
 
-# Habilita CORS para permitir requisições do frontend (React/Vite)
-CORS(app, resources={r"/api/*": {"origins": "*"}}) # Permite todas as origens para /api/* em desenvolvimento. Ajuste para produção.
-
-# Inicializa o SQLAlchemy para interação com o banco de dados
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 db = SQLAlchemy(app)
-# Inicializa o Flask-Migrate para gerenciar as migrações do banco de dados
 migrate = Migrate(app, db)
 
 # --- Modelos do Banco de Dados (SQLAlchemy Models) ---
-# (Os modelos que você forneceu estão aqui. Eles parecem corretos.)
 
 class Cliente(db.Model):
     __tablename__ = 'clientes'
     id = db.Column(db.Integer, primary_key=True)
     nome_razao_social = db.Column(db.String(255), nullable=False)
-    cpf_cnpj = db.Column(db.String(18), nullable=False, unique=True)
+    cpf_cnpj = db.Column(db.String(18), nullable=False, unique=True) # CNPJ/CPF Principal
     tipo_pessoa = db.Column(db.String(2), nullable=False)
+    
+    # Campos para Pessoa Física
     rg = db.Column(db.String(20), nullable=True)
     orgao_emissor = db.Column(db.String(50), nullable=True)
     data_nascimento = db.Column(db.Date, nullable=True)
     estado_civil = db.Column(db.String(50), nullable=True)
     profissao = db.Column(db.String(100), nullable=True)
     nacionalidade = db.Column(db.String(100), nullable=True)
+    
+    # Campos para Pessoa Jurídica
     nome_fantasia = db.Column(db.String(255), nullable=True)
     nire = db.Column(db.String(50), nullable=True)
     inscricao_estadual = db.Column(db.String(50), nullable=True)
     inscricao_municipal = db.Column(db.String(50), nullable=True)
+
+    # Novos campos para CNPJs adicionais (Opção B)
+    cnpj_secundario = db.Column(db.String(18), nullable=True, unique=True)
+    descricao_cnpj_secundario = db.Column(db.String(255), nullable=True)
+    cnpj_terciario = db.Column(db.String(18), nullable=True, unique=True)
+    descricao_cnpj_terciario = db.Column(db.String(255), nullable=True)
+    
+    # Endereço
     cep = db.Column(db.String(9), nullable=True)
     rua = db.Column(db.String(255), nullable=True)
     numero = db.Column(db.String(20), nullable=True)
@@ -60,12 +65,17 @@ class Cliente(db.Model):
     cidade = db.Column(db.String(100), nullable=True)
     estado = db.Column(db.String(2), nullable=True)
     pais = db.Column(db.String(50), default='Brasil', nullable=True)
+    
+    # Contato e Notas
     telefone = db.Column(db.String(20), nullable=True)
     email = db.Column(db.String(255), nullable=True)
     notas_gerais = db.Column(db.Text, nullable=True)
+    
+    # Timestamps
     data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     data_atualizacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
+    # Relacionamentos
     casos = db.relationship('Caso', backref='cliente', lazy=True, cascade="all, delete-orphan")
     recebimentos = db.relationship('Recebimento', backref='cliente_ref', lazy='dynamic', cascade="all, delete-orphan")
     documentos = db.relationship('Documento', backref='cliente_ref_doc', lazy='dynamic', cascade="all, delete-orphan")
@@ -78,8 +88,15 @@ class Cliente(db.Model):
             'tipo_pessoa': self.tipo_pessoa, 'rg': self.rg, 'orgao_emissor': self.orgao_emissor,
             'data_nascimento': self.data_nascimento.isoformat() if self.data_nascimento else None,
             'estado_civil': self.estado_civil, 'profissao': self.profissao, 'nacionalidade': self.nacionalidade,
-            'nome_fantasia': self.nome_fantasia, 'nire': self.nire, 'inscricao_estadual': self.inscricao_estadual,
-            'inscricao_municipal': self.inscricao_municipal, 'cep': self.cep, 'rua': self.rua, 'numero': self.numero,
+            'nome_fantasia': self.nome_fantasia, 'nire': self.nire, 
+            'inscricao_estadual': self.inscricao_estadual, 'inscricao_municipal': self.inscricao_municipal,
+            # Inclusão dos novos campos de CNPJ
+            'cnpj_secundario': self.cnpj_secundario,
+            'descricao_cnpj_secundario': self.descricao_cnpj_secundario,
+            'cnpj_terciario': self.cnpj_terciario,
+            'descricao_cnpj_terciario': self.descricao_cnpj_terciario,
+            # Restante dos campos
+            'cep': self.cep, 'rua': self.rua, 'numero': self.numero,
             'bairro': self.bairro, 'cidade': self.cidade, 'estado': self.estado, 'pais': self.pais,
             'telefone': self.telefone, 'email': self.email, 'notas_gerais': self.notas_gerais,
             'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None,
@@ -113,7 +130,7 @@ class Caso(db.Model):
     def __repr__(self): return f'<Caso {self.id}: {self.titulo}>'
     
     def to_dict(self):
-        cliente_info = self.cliente.to_dict() if self.cliente else None
+        cliente_info = self.cliente.to_dict() if self.cliente else None # Evita erro se cliente for None
         return {
             'id': self.id, 'cliente_id': self.cliente_id, 'titulo': self.titulo,
             'numero_processo': self.numero_processo, 'status': self.status,
@@ -125,20 +142,23 @@ class Caso(db.Model):
             'notas_caso': self.notas_caso,
             'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None,
             'data_atualizacao': self.data_atualizacao.isoformat() if self.data_atualizacao else None,
-            'cliente': cliente_info
+            'cliente': cliente_info # Retorna o objeto cliente completo
         }
+
+# ... (Restante dos seus modelos: Recebimento, Despesa, EventoAgenda, Documento) ...
+# Mantenha os outros modelos como estão por enquanto.
 
 class Recebimento(db.Model):
     __tablename__ = 'recebimentos'
     id = db.Column(db.Integer, primary_key=True)
     caso_id = db.Column(db.Integer, db.ForeignKey('casos.id'), nullable=False)
-    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False) # Adicionado para referência direta
     data_recebimento = db.Column(db.Date, nullable=True)
     data_vencimento = db.Column(db.Date, nullable=False)
     descricao = db.Column(db.String(255), nullable=False)
     categoria = db.Column(db.String(100), nullable=False)
     valor = db.Column(db.Numeric(15, 2), nullable=False)
-    status = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(50), nullable=False) # Ex: Pendente, Pago, Vencido
     forma_pagamento = db.Column(db.String(50), nullable=True)
     notas = db.Column(db.Text, nullable=True)
     data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -163,13 +183,13 @@ class Recebimento(db.Model):
 class Despesa(db.Model):
     __tablename__ = 'despesas'
     id = db.Column(db.Integer, primary_key=True)
-    caso_id = db.Column(db.Integer, db.ForeignKey('casos.id'), nullable=True)
-    data_despesa = db.Column(db.Date, nullable=True)
+    caso_id = db.Column(db.Integer, db.ForeignKey('casos.id'), nullable=True) # Pode ser uma despesa geral do escritório
+    data_despesa = db.Column(db.Date, nullable=True) # Data em que a despesa ocorreu ou foi paga
     data_vencimento = db.Column(db.Date, nullable=False)
     descricao = db.Column(db.String(255), nullable=False)
     categoria = db.Column(db.String(100), nullable=False)
     valor = db.Column(db.Numeric(15, 2), nullable=False)
-    status = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(50), nullable=False) # Ex: A Pagar, Paga, Vencida
     forma_pagamento = db.Column(db.String(50), nullable=True)
     notas = db.Column(db.Text, nullable=True)
     data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -187,18 +207,18 @@ class Despesa(db.Model):
             'status': self.status, 'forma_pagamento': self.forma_pagamento, 'notas': self.notas,
             'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None,
             'data_atualizacao': self.data_atualizacao.isoformat() if self.data_atualizacao else None,
-            'caso_titulo': self.caso_ref.titulo if self.caso_ref else "Despesa Geral"
+            'caso_titulo': self.caso_ref.titulo if self.caso_ref else "Despesa Geral" # Adiciona título do caso
         }
 
 class EventoAgenda(db.Model):
     __tablename__ = 'eventos_agenda'
     id = db.Column(db.Integer, primary_key=True)
-    caso_id = db.Column(db.Integer, db.ForeignKey('casos.id'), nullable=True)
-    tipo_evento = db.Column(db.String(50), nullable=False)
+    caso_id = db.Column(db.Integer, db.ForeignKey('casos.id'), nullable=True) # Evento pode ser geral
+    tipo_evento = db.Column(db.String(50), nullable=False) # Ex: Prazo, Audiência, Reunião, Lembrete
     titulo = db.Column(db.String(255), nullable=False)
     descricao = db.Column(db.Text, nullable=True)
-    data_inicio = db.Column(db.DateTime, nullable=False)
-    data_fim = db.Column(db.DateTime, nullable=True)
+    data_inicio = db.Column(db.DateTime, nullable=False) # Usar DateTime para incluir hora
+    data_fim = db.Column(db.DateTime, nullable=True)    # Usar DateTime para incluir hora
     local = db.Column(db.String(255), nullable=True)
     concluido = db.Column(db.Boolean, default=False)
     data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -210,24 +230,24 @@ class EventoAgenda(db.Model):
         return {
             'id': self.id, 'caso_id': self.caso_id, 'tipo_evento': self.tipo_evento,
             'titulo': self.titulo, 'descricao': self.descricao,
-            'data_inicio': self.data_inicio.isoformat() if self.data_inicio else None,
-            'data_fim': self.data_fim.isoformat() if self.data_fim else None,
+            'data_inicio': self.data_inicio.isoformat() if self.data_inicio else None, # Enviar em formato ISO
+            'data_fim': self.data_fim.isoformat() if self.data_fim else None,         # Enviar em formato ISO
             'local': self.local, 'concluido': self.concluido,
             'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None,
             'data_atualizacao': self.data_atualizacao.isoformat() if self.data_atualizacao else None,
-            'caso_titulo': self.caso_ref.titulo if self.caso_ref else None
+            'caso_titulo': self.caso_ref.titulo if self.caso_ref else None # Adiciona título do caso
         }
 
 class Documento(db.Model):
     __tablename__ = 'documentos'
     id = db.Column(db.Integer, primary_key=True)
-    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
-    caso_id = db.Column(db.Integer, db.ForeignKey('casos.id'), nullable=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True) # Opcional
+    caso_id = db.Column(db.Integer, db.ForeignKey('casos.id'), nullable=True)       # Opcional
     nome_original_arquivo = db.Column(db.String(255), nullable=False)
-    nome_armazenado = db.Column(db.String(255), nullable=False, unique=True)
+    nome_armazenado = db.Column(db.String(255), nullable=False, unique=True) # Nome seguro no servidor
     tipo_mime = db.Column(db.String(100), nullable=True)
     tamanho_bytes = db.Column(db.BigInteger, nullable=True)
-    descricao = db.Column(db.Text, nullable=True)
+    descricao = db.Column(db.Text, nullable=True) # Descrição/notas sobre o documento
     data_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     def __repr__(self): return f'<Documento {self.id}: {self.nome_original_arquivo}>'
@@ -249,33 +269,24 @@ class Documento(db.Model):
 
 # --- Funções Auxiliares ---
 def parse_date(date_string):
-    """Converte uma string de data ISO para um objeto date."""
     if not date_string: return None
     try: return date.fromisoformat(date_string)
     except (ValueError, TypeError): return None
 
 def parse_datetime(datetime_string):
-    """Converte uma string de datetime ISO (com ou sem Z/offset) para um objeto datetime."""
     if not datetime_string: return None
     try:
-        # Remove 'Z' e trata como UTC se presente, ou lida com outros formatos ISO
-        dt_str = datetime_string.replace('Z', '+00:00')
-        return datetime.fromisoformat(dt_str)
+        dt_str = datetime_string.replace('Z', '+00:00') if isinstance(datetime_string, str) else datetime_string
+        dt_obj = datetime.fromisoformat(dt_str)
+        return dt_obj.astimezone(timezone.utc) if dt_obj.tzinfo else dt_obj.replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
-        # Tenta formatos alternativos se fromisoformat falhar
         for fmt in ('%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
             try:
-                dt_obj = datetime.strptime(datetime_string, fmt)
-                # Se for apenas data, converte para datetime com hora 00:00:00 e torna timezone-aware (UTC)
-                if fmt == '%Y-%m-%d':
-                    return datetime.combine(dt_obj.date(), datetime.min.time(), tzinfo=timezone.utc)
-                # Se for datetime sem timezone, assume UTC
-                if dt_obj.tzinfo is None:
-                    return dt_obj.replace(tzinfo=timezone.utc)
-                return dt_obj
+                dt_obj = datetime.strptime(str(datetime_string), fmt)
+                return dt_obj.replace(tzinfo=timezone.utc) if dt_obj.tzinfo is None else dt_obj.astimezone(timezone.utc)
             except (ValueError, TypeError):
                 continue
-        print(f"Alerta: Falha ao parsear datetime: {datetime_string} com formatos conhecidos.")
+        app.logger.warning(f"Falha ao parsear datetime: {datetime_string}")
         return None
 
 # --- Rotas da API (Endpoints) ---
@@ -286,6 +297,10 @@ def index():
 # --- Rotas para Clientes ---
 @app.route('/api/clientes', methods=['GET'])
 def get_clientes():
+    # ... (código existente para GET /api/clientes) ...
+    # Nenhuma alteração necessária aqui para os CNPJs adicionais,
+    # pois o to_dict() já os inclui.
+    # A lógica de busca precisará ser atualizada se quiser buscar por CNPJs adicionais.
     try:
         search_term = request.args.get('search', None, type=str)
         tipo_pessoa_filter = request.args.get('tipo_pessoa', None, type=str)
@@ -300,9 +315,14 @@ def get_clientes():
         
         if search_term:
             search_like = f"%{search_term}%"
-            # Usar func.lower para busca case-insensitive no PostgreSQL
-            query = query.filter(or_(func.lower(Cliente.nome_razao_social).ilike(func.lower(search_like)),
-                                     func.lower(Cliente.cpf_cnpj).ilike(func.lower(search_like))))
+            query = query.filter(or_(
+                Cliente.nome_razao_social.ilike(search_like),
+                Cliente.cpf_cnpj.ilike(search_like),
+                # Adicionar busca nos CNPJs adicionais se desejado
+                Cliente.cnpj_secundario.ilike(search_like),
+                Cliente.cnpj_terciario.ilike(search_like),
+                Cliente.email.ilike(search_like) # Exemplo
+            ))
         
         if count_only:
             total_clientes = query.count()
@@ -321,33 +341,33 @@ def get_clientes():
         todos_clientes = query.all()
         return jsonify({"clientes": [c.to_dict() for c in todos_clientes]}), 200
     except Exception as e:
-        print(f"Erro ao buscar clientes: {e}")
         app.logger.error(f"Erro em get_clientes: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao buscar clientes"}), 500
+
 
 @app.route('/api/clientes', methods=['POST'])
 def create_cliente():
     dados = request.get_json()
-    if not dados:
-        return jsonify({"erro": "Nenhum dado recebido"}), 400
+    if not dados or not dados.get('nome_razao_social') or not dados.get('cpf_cnpj') or not dados.get('tipo_pessoa'):
+        return jsonify({"erro": "Dados incompletos (nome_razao_social, cpf_cnpj, tipo_pessoa são obrigatórios)"}), 400
+    
+    # Verifica duplicidade para o CNPJ/CPF principal
+    if Cliente.query.filter_by(cpf_cnpj=dados['cpf_cnpj']).first():
+        return jsonify({"erro": f"Cliente com CPF/CNPJ {dados['cpf_cnpj']} já existe."}), 409
 
-    # Validação de campos obrigatórios
-    campos_obrigatorios = ['nome_razao_social', 'cpf_cnpj', 'tipo_pessoa']
-    for campo in campos_obrigatorios:
-        if not dados.get(campo):
-            return jsonify({"erro": f"Campo '{campo}' é obrigatório."}), 400
-    
-    cpf_cnpj_formatado = dados['cpf_cnpj'] # Assumindo que o frontend já envia formatado ou sem formatação
-    
-    # Verifica se o CPF/CNPJ já existe (case-insensitive para evitar duplicidade por formatação)
-    cliente_existente = Cliente.query.filter(func.lower(Cliente.cpf_cnpj) == func.lower(cpf_cnpj_formatado)).first()
-    if cliente_existente:
-        return jsonify({"erro": f"Cliente com CPF/CNPJ {cpf_cnpj_formatado} já existe."}), 409 # 409 Conflict
-    
+    # Verifica duplicidade para CNPJs adicionais, se fornecidos e não vazios
+    if dados.get('cnpj_secundario') and Cliente.query.filter(or_(Cliente.cpf_cnpj == dados['cnpj_secundario'], Cliente.cnpj_secundario == dados['cnpj_secundario'], Cliente.cnpj_terciario == dados['cnpj_secundario'])).first():
+        return jsonify({"erro": f"CNPJ secundário {dados['cnpj_secundario']} já está em uso."}), 409
+    if dados.get('cnpj_terciario') and Cliente.query.filter(or_(Cliente.cpf_cnpj == dados['cnpj_terciario'], Cliente.cnpj_secundario == dados['cnpj_terciario'], Cliente.cnpj_terciario == dados['cnpj_terciario'])).first():
+        return jsonify({"erro": f"CNPJ terciário {dados['cnpj_terciario']} já está em uso."}), 409
+    if dados.get('cnpj_secundario') and dados.get('cnpj_terciario') and dados['cnpj_secundario'] == dados['cnpj_terciario']:
+        return jsonify({"erro": "CNPJ secundário e terciário não podem ser iguais."}), 400
+
+
     try:
         novo_cliente = Cliente(
             nome_razao_social=dados['nome_razao_social'],
-            cpf_cnpj=cpf_cnpj_formatado,
+            cpf_cnpj=dados['cpf_cnpj'],
             tipo_pessoa=dados['tipo_pessoa'],
             rg=dados.get('rg'),
             orgao_emissor=dados.get('orgao_emissor'),
@@ -359,65 +379,102 @@ def create_cliente():
             nire=dados.get('nire'),
             inscricao_estadual=dados.get('inscricao_estadual'),
             inscricao_municipal=dados.get('inscricao_municipal'),
-            cep=dados.get('cep'),
-            rua=dados.get('rua'),
-            numero=dados.get('numero'),
-            bairro=dados.get('bairro'),
-            cidade=dados.get('cidade'),
-            estado=dados.get('estado'),
-            pais=dados.get('pais', 'Brasil'),
-            telefone=dados.get('telefone'),
-            email=dados.get('email'),
-            notas_gerais=dados.get('notas_gerais')
-            # data_criacao e data_atualizacao são definidos por default/onupdate
+            # Novos campos de CNPJ
+            cnpj_secundario=dados.get('cnpj_secundario') if dados.get('tipo_pessoa') == 'PJ' else None,
+            descricao_cnpj_secundario=dados.get('descricao_cnpj_secundario') if dados.get('tipo_pessoa') == 'PJ' else None,
+            cnpj_terciario=dados.get('cnpj_terciario') if dados.get('tipo_pessoa') == 'PJ' else None,
+            descricao_cnpj_terciario=dados.get('descricao_cnpj_terciario') if dados.get('tipo_pessoa') == 'PJ' else None,
+            # Restante dos campos
+            cep=dados.get('cep'), rua=dados.get('rua'), numero=dados.get('numero'),
+            bairro=dados.get('bairro'), cidade=dados.get('cidade'), estado=dados.get('estado'),
+            pais=dados.get('pais', 'Brasil'), telefone=dados.get('telefone'),
+            email=dados.get('email'), notas_gerais=dados.get('notas_gerais')
         )
         db.session.add(novo_cliente)
         db.session.commit()
-        return jsonify(novo_cliente.to_dict()), 201 # 201 Created
+        return jsonify(novo_cliente.to_dict()), 201
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao criar cliente: {e}")
         app.logger.error(f"Erro em create_cliente: {e}", exc_info=True)
-        return jsonify({"erro": "Erro interno ao salvar cliente no banco de dados."}), 500
+        return jsonify({"erro": "Erro interno ao salvar cliente."}), 500
 
 @app.route('/api/clientes/<int:id>', methods=['GET'])
 def get_cliente(id):
+    # ... (código existente para GET /api/clientes/:id) ...
+    # Nenhuma alteração necessária aqui, pois to_dict() já inclui os novos campos.
     try:
         cliente = db.session.get(Cliente, id)
         if cliente is None:
             return jsonify({"erro": "Cliente não encontrado"}), 404
         return jsonify(cliente.to_dict()), 200
     except Exception as e:
-        print(f"Erro ao buscar cliente {id}: {e}")
         app.logger.error(f"Erro em get_cliente(id={id}): {e}", exc_info=True)
-        return jsonify({"erro": "Erro interno ao buscar cliente"}), 500
+        return jsonify({"erro": "Erro ao buscar cliente"}), 500
 
 @app.route('/api/clientes/<int:id>', methods=['PUT'])
 def update_cliente(id):
     dados = request.get_json()
     if not dados: return jsonify({"erro": "Nenhum dado fornecido para atualização"}), 400
+    
+    cliente = db.session.get(Cliente, id)
+    if cliente is None:
+        return jsonify({"erro": "Cliente não encontrado para atualizar"}), 404
+
+    # Validação de duplicidade para CNPJs adicionais, se estiverem a ser alterados
+    # e forem diferentes do CNPJ principal do cliente atual ou de outros clientes
+    if 'cnpj_secundario' in dados and dados['cnpj_secundario'] and dados['cnpj_secundario'] != cliente.cnpj_secundario:
+        if Cliente.query.filter(Cliente.id != id, or_(Cliente.cpf_cnpj == dados['cnpj_secundario'], Cliente.cnpj_secundario == dados['cnpj_secundario'], Cliente.cnpj_terciario == dados['cnpj_secundario'])).first():
+            return jsonify({"erro": f"CNPJ secundário {dados['cnpj_secundario']} já está em uso por outro cliente."}), 409
+    if 'cnpj_terciario' in dados and dados['cnpj_terciario'] and dados['cnpj_terciario'] != cliente.cnpj_terciario:
+        if Cliente.query.filter(Cliente.id != id, or_(Cliente.cpf_cnpj == dados['cnpj_terciario'], Cliente.cnpj_secundario == dados['cnpj_terciario'], Cliente.cnpj_terciario == dados['cnpj_terciario'])).first():
+            return jsonify({"erro": f"CNPJ terciário {dados['cnpj_terciario']} já está em uso por outro cliente."}), 409
+    
+    # Validação para não permitir que os CNPJs adicionais sejam iguais entre si ou ao principal (dentro do mesmo cliente)
+    cnpj_principal_atual = dados.get('cpf_cnpj', cliente.cpf_cnpj) # Pega o novo ou o existente
+    cnpj_sec_atual = dados.get('cnpj_secundario', cliente.cnpj_secundario)
+    cnpj_ter_atual = dados.get('cnpj_terciario', cliente.cnpj_terciario)
+
+    if cnpj_sec_atual and cnpj_sec_atual == cnpj_principal_atual:
+        return jsonify({"erro": "CNPJ secundário não pode ser igual ao CNPJ principal."}), 400
+    if cnpj_ter_atual and cnpj_ter_atual == cnpj_principal_atual:
+        return jsonify({"erro": "CNPJ terciário não pode ser igual ao CNPJ principal."}), 400
+    if cnpj_sec_atual and cnpj_ter_atual and cnpj_sec_atual == cnpj_ter_atual:
+        return jsonify({"erro": "CNPJ secundário e terciário não podem ser iguais."}), 400
+
+
     try:
-        cliente = db.session.get(Cliente, id)
-        if cliente is None:
-            return jsonify({"erro": "Cliente não encontrado para atualizar"}), 404
-        
-        # Atualiza os campos fornecidos
         for key, value in dados.items():
             if hasattr(cliente, key):
                 if key == 'data_nascimento':
                     setattr(cliente, key, parse_date(value))
-                # Adicionar parse para outros campos de data/datetime se necessário
+                elif key in ['cnpj_secundario', 'cnpj_terciario'] and cliente.tipo_pessoa != 'PJ':
+                    # Ignora CNPJs adicionais se o tipo não for PJ
+                    continue
                 else:
                     setattr(cliente, key, value)
         
-        # data_atualizacao é atualizada automaticamente pelo onupdate no modelo
+        # Se o tipo de pessoa for mudado de PJ para PF, limpar os campos de CNPJ adicionais
+        if 'tipo_pessoa' in dados and dados['tipo_pessoa'] == 'PF':
+            cliente.cnpj_secundario = None
+            cliente.descricao_cnpj_secundario = None
+            cliente.cnpj_terciario = None
+            cliente.descricao_cnpj_terciario = None
+            # Também limpar campos específicos de PJ como nome_fantasia, nire, etc.
+            cliente.nome_fantasia = None
+            cliente.nire = None
+            cliente.inscricao_estadual = None
+            cliente.inscricao_municipal = None
+
+
         db.session.commit()
         return jsonify(cliente.to_dict()), 200
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao atualizar cliente {id}: {e}")
         app.logger.error(f"Erro em update_cliente(id={id}): {e}", exc_info=True)
-        return jsonify({"erro": "Erro ao atualizar cliente"}), 500
+        return jsonify({"erro": "Erro ao atualizar cliente."}), 500
+
+# ... (Restante das suas rotas: /api/clientes/:id DELETE, /api/casos, etc.) ...
+# Mantenha as outras rotas como estão por enquanto.
 
 @app.route('/api/clientes/<int:id>', methods=['DELETE'])
 def delete_cliente(id):
@@ -425,27 +482,28 @@ def delete_cliente(id):
         cliente = db.session.get(Cliente, id)
         if cliente is None:
             return jsonify({"erro": "Cliente não encontrado para deletar"}), 404
+        
+        # Verificar se há casos associados
+        if cliente.casos: # Se a lista não estiver vazia
+             return jsonify({"erro": "Não é possível deletar o cliente pois existem casos associados a ele. Remova ou desassocie os casos primeiro."}), 409
+
         db.session.delete(cliente)
         db.session.commit()
         return jsonify({"mensagem": f"Cliente {id} deletado com sucesso"}), 200
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao deletar cliente {id}: {e}")
         app.logger.error(f"Erro em delete_cliente(id={id}): {e}", exc_info=True)
-        # Verifica se o erro é de violação de chave estrangeira (ex: cliente tem casos)
-        if "violates foreign key constraint" in str(e).lower() or "FOREIGN KEY constraint failed" in str(e): # SQLite usa outra msg
-            return jsonify({"erro": "Não é possível deletar o cliente pois existem registros (casos, recebimentos, etc.) associados a ele."}), 409 # 409 Conflict
+        if "violates foreign key constraint" in str(e).lower() or "FOREIGN KEY constraint failed" in str(e):
+            return jsonify({"erro": "Não é possível deletar o cliente pois existem registos (casos, recebimentos, etc.) associados a ele."}), 409
         return jsonify({"erro": "Erro ao deletar cliente."}), 500
 
-# --- Rotas para Casos ---
-# (As rotas de Casos, Recebimentos, Despesas, Eventos, Documentos, Relatórios seguem o mesmo padrão)
-# (O código completo para elas está no app.py que você forneceu anteriormente)
-# Vou incluir a rota GET /api/casos como exemplo de como as outras devem ser
+
+# --- ROTAS PARA CASOS ---
 @app.route('/api/casos', methods=['GET'])
 def get_casos():
     try:
-        cliente_id_filtro = request.args.get('cliente_id', None, type=int)
-        status_filtro = request.args.get('status', None, type=str)
+        cliente_id_filtro = request.args.get('cliente_id', type=int)
+        status_filtro = request.args.get('status', type=str)
         search_term = request.args.get('search', None, type=str)
         data_criacao_inicio_str = request.args.get('data_criacao_inicio', None, type=str)
         data_criacao_fim_str = request.args.get('data_criacao_fim', None, type=str)
@@ -456,7 +514,7 @@ def get_casos():
         sort_order = request.args.get('sort_order', 'desc', type=str) 
         count_only = request.args.get('count_only', 'false', type=str).lower() == 'true'
 
-        query = Caso.query.join(Cliente, Caso.cliente_id == Cliente.id) # Join para poder ordenar/filtrar por nome do cliente
+        query = Caso.query.join(Cliente, Caso.cliente_id == Cliente.id) 
 
         if cliente_id_filtro:
             query = query.filter(Caso.cliente_id == cliente_id_filtro)
@@ -466,11 +524,11 @@ def get_casos():
             search_like = f"%{search_term}%"
             query = query.filter(
                 or_(
-                    func.lower(Caso.titulo).ilike(func.lower(search_like)),
-                    func.lower(Caso.numero_processo).ilike(func.lower(search_like)),
-                    func.lower(Caso.parte_contraria).ilike(func.lower(search_like)),
-                    func.lower(Caso.tipo_acao).ilike(func.lower(search_like)),
-                    func.lower(Cliente.nome_razao_social).ilike(func.lower(search_like)) # Busca no nome do cliente
+                    Caso.titulo.ilike(search_like),
+                    Caso.numero_processo.ilike(search_like),
+                    Caso.parte_contraria.ilike(search_like),
+                    Caso.tipo_acao.ilike(search_like),
+                    Cliente.nome_razao_social.ilike(search_like) 
                 )
             )
         if data_criacao_inicio_str:
@@ -508,7 +566,6 @@ def get_casos():
         todos_casos = query.all()
         return jsonify({"casos": [c.to_dict() for c in todos_casos]}), 200
     except Exception as e: 
-        print(f"Erro ao buscar casos: {e}")
         app.logger.error(f"Erro em get_casos: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao buscar casos"}), 500
 
@@ -536,7 +593,6 @@ def create_caso():
         return jsonify(novo_caso.to_dict()), 201
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao criar caso: {e}")
         app.logger.error(f"Erro em create_caso: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao salvar caso"}), 500
 
@@ -548,7 +604,6 @@ def get_caso(id):
             return jsonify({"erro": "Caso não encontrado"}), 404
         return jsonify(caso.to_dict()), 200
     except Exception as e:
-        print(f"Erro ao buscar caso {id}: {e}")
         app.logger.error(f"Erro em get_caso(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao buscar caso"}), 500
 
@@ -561,11 +616,15 @@ def update_caso(id):
         if caso is None:
             return jsonify({"erro": "Caso não encontrado para atualizar"}), 404
         
+        # Não permitir alterar cliente_id de um caso existente via este endpoint
+        # Se precisar mudar o cliente de um caso, seria uma operação mais complexa.
+        if 'cliente_id' in dados and dados['cliente_id'] != caso.cliente_id:
+            return jsonify({"erro": "Não é permitido alterar o cliente de um caso existente por esta rota."}), 400
+
         for key, value in dados.items():
-            if hasattr(caso, key):
+            if hasattr(caso, key) and key != 'cliente_id': # Ignora cliente_id
                 if key == 'data_distribuicao':
                     setattr(caso, key, parse_date(value))
-                # Adicionar parse para outros campos de data/datetime se necessário
                 else:
                     setattr(caso, key, value)
         
@@ -573,7 +632,6 @@ def update_caso(id):
         return jsonify(caso.to_dict()), 200
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao atualizar caso {id}: {e}")
         app.logger.error(f"Erro em update_caso(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao atualizar caso"}), 500
 
@@ -588,18 +646,11 @@ def delete_caso(id):
         return jsonify({"mensagem": f"Caso {id} deletado com sucesso"}), 200
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao deletar caso {id}: {e}")
         app.logger.error(f"Erro em delete_caso(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao deletar caso."}), 500
 
-# --- Rotas para Recebimentos ---
-# (As rotas para Recebimentos, Despesas, Eventos, Documentos, Relatórios
-#  seguem o mesmo padrão das rotas de Clientes e Casos,
-#  com as devidas adaptações para os campos e filtros específicos de cada modelo.
-#  O código completo que você forneceu anteriormente para estas rotas está correto
-#  e deve ser mantido aqui.)
 
-# Exemplo para Recebimentos (GET) - As outras (POST, PUT, DELETE) seriam similares
+# --- ROTAS PARA RECEBIMENTOS ---
 @app.route('/api/recebimentos', methods=['GET'])
 def get_recebimentos():
     try:
@@ -607,7 +658,11 @@ def get_recebimentos():
         caso_id_filtro = request.args.get('caso_id', type=int)
         status_filtro = request.args.get('status', type=str)
         search_term = request.args.get('search', None, type=str)
-        # Adicionar filtros de data se necessário
+        data_vencimento_inicio = request.args.get('data_vencimento_inicio', type=str)
+        data_vencimento_fim = request.args.get('data_vencimento_fim', type=str)
+        data_recebimento_inicio = request.args.get('data_recebimento_inicio', type=str)
+        data_recebimento_fim = request.args.get('data_recebimento_fim', type=str)
+
         sort_by = request.args.get('sort_by', 'data_vencimento', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
 
@@ -623,10 +678,22 @@ def get_recebimentos():
         if search_term:
             search_like = f"%{search_term}%"
             query = query.filter(or_(
-                func.lower(Recebimento.descricao).ilike(func.lower(search_like)),
-                func.lower(Recebimento.categoria).ilike(func.lower(search_like))
+                Recebimento.descricao.ilike(search_like),
+                Recebimento.categoria.ilike(search_like)
             ))
-        # Adicionar lógica de filtro por data aqui
+        if data_vencimento_inicio:
+            dt = parse_date(data_vencimento_inicio)
+            if dt: query = query.filter(Recebimento.data_vencimento >= dt)
+        if data_vencimento_fim:
+            dt = parse_date(data_vencimento_fim)
+            if dt: query = query.filter(Recebimento.data_vencimento <= dt)
+        if data_recebimento_inicio:
+            dt = parse_date(data_recebimento_inicio)
+            if dt: query = query.filter(Recebimento.data_recebimento >= dt)
+        if data_recebimento_fim:
+            dt = parse_date(data_recebimento_fim)
+            if dt: query = query.filter(Recebimento.data_recebimento <= dt)
+
 
         colunas_ordenaveis = {
             'descricao': Recebimento.descricao, 'cliente_nome': Cliente.nome_razao_social, 
@@ -646,7 +713,6 @@ def get_recebimentos():
         todos_recebimentos = query.all()
         return jsonify({"recebimentos": [r.to_dict() for r in todos_recebimentos]}), 200
     except Exception as e: 
-        print(f"Erro ao buscar recebimentos: {e}")
         app.logger.error(f"Erro em get_recebimentos: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao buscar recebimentos"}), 500
 
@@ -676,11 +742,21 @@ def create_recebimento():
         return jsonify(novo_recebimento.to_dict()), 201
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao criar recebimento: {e}")
         app.logger.error(f"Erro em create_recebimento: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao salvar recebimento"}), 500
 
-# ... (Implementar PUT e DELETE para Recebimentos de forma similar)
+@app.route('/api/recebimentos/<int:id>', methods=['GET'])
+def get_recebimento(id):
+    try:
+        recebimento = db.session.get(Recebimento, id)
+        if recebimento is None:
+            return jsonify({"erro": "Recebimento não encontrado"}), 404
+        return jsonify(recebimento.to_dict()), 200
+    except Exception as e:
+        app.logger.error(f"Erro em get_recebimento(id={id}): {e}", exc_info=True)
+        return jsonify({"erro": "Erro ao buscar recebimento"}), 500
+
+
 @app.route('/api/recebimentos/<int:id>', methods=['PUT'])
 def update_recebimento(id):
     dados = request.get_json()
@@ -690,16 +766,12 @@ def update_recebimento(id):
         if recebimento is None: 
             return jsonify({"erro": "Recebimento não encontrado para atualizar"}), 404
         
-        # Validações de FKs se forem alteradas
+        # Não permitir alterar cliente_id e caso_id diretamente aqui para simplificar
+        # Se precisar mudar, seria uma operação mais controlada.
         if 'cliente_id' in dados and dados['cliente_id'] != recebimento.cliente_id:
-            if not db.session.get(Cliente, dados['cliente_id']):
-                return jsonify({"erro": f"Novo Cliente com ID {dados['cliente_id']} não encontrado."}), 404
-            recebimento.cliente_id = dados['cliente_id']
-        
+            return jsonify({"erro": "Alteração de cliente_id não permitida nesta rota."}), 400
         if 'caso_id' in dados and dados['caso_id'] != recebimento.caso_id:
-            if not db.session.get(Caso, dados['caso_id']):
-                return jsonify({"erro": f"Novo Caso com ID {dados['caso_id']} não encontrado."}), 404
-            recebimento.caso_id = dados['caso_id']
+            return jsonify({"erro": "Alteração de caso_id não permitida nesta rota."}), 400
 
         recebimento.data_recebimento = parse_date(dados.get('data_recebimento', str(recebimento.data_recebimento) if recebimento.data_recebimento else None))
         recebimento.data_vencimento = parse_date(dados.get('data_vencimento', str(recebimento.data_vencimento)))
@@ -714,7 +786,6 @@ def update_recebimento(id):
         return jsonify(recebimento.to_dict()), 200
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao atualizar recebimento {id}: {e}")
         app.logger.error(f"Erro em update_recebimento(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao atualizar recebimento"}), 500
 
@@ -729,41 +800,60 @@ def delete_recebimento(id):
         return jsonify({"mensagem": f"Recebimento {id} deletado com sucesso"}), 200
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao deletar recebimento {id}: {e}")
         app.logger.error(f"Erro em delete_recebimento(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao deletar recebimento."}), 500
 
 
-# --- Rotas para Despesas ---
+# --- ROTAS PARA DESPESAS ---
 @app.route('/api/despesas', methods=['GET'])
 def get_despesas():
     try:
-        cliente_id_filtro = request.args.get('cliente_id', type=int)
-        caso_id_filtro = request.args.get('caso_id', type=int)
+        # cliente_id_filtro = request.args.get('cliente_id', type=int) # Para filtrar casos de um cliente
+        caso_id_filtro = request.args.get('caso_id', type=int) # -1 para despesas gerais
         status_filtro = request.args.get('status', type=str)
         search_term = request.args.get('search', None, type=str)
-        # Adicionar filtros de data se necessário
+        data_vencimento_inicio = request.args.get('data_vencimento_inicio', type=str)
+        data_vencimento_fim = request.args.get('data_vencimento_fim', type=str)
+        data_despesa_inicio = request.args.get('data_despesa_inicio', type=str)
+        data_despesa_fim = request.args.get('data_despesa_fim', type=str)
+
         sort_by = request.args.get('sort_by', 'data_vencimento', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
 
         query = Despesa.query.outerjoin(Caso, Despesa.caso_id == Caso.id)\
-                             .outerjoin(Cliente, Caso.cliente_id == Cliente.id)
+                             .outerjoin(Cliente, Caso.cliente_id == Cliente.id) # Para ordenar por nome de cliente/caso
 
-        if cliente_id_filtro:
-            query = query.filter(Caso.cliente_id == cliente_id_filtro)
-        if caso_id_filtro == -1: # Para despesas gerais (sem caso)
+        if caso_id_filtro == -1: 
             query = query.filter(Despesa.caso_id.is_(None))
         elif caso_id_filtro:
             query = query.filter(Despesa.caso_id == caso_id_filtro)
+        
+        # Se precisar filtrar por cliente diretamente (despesas de todos os casos de um cliente + gerais)
+        # if cliente_id_filtro:
+        #     query = query.filter(or_(Caso.cliente_id == cliente_id_filtro, Despesa.caso_id.is_(None)))
+
+
         if status_filtro:
             query = query.filter(Despesa.status == status_filtro)
         if search_term:
             search_like = f"%{search_term}%"
             query = query.filter(or_(
-                func.lower(Despesa.descricao).ilike(func.lower(search_like)),
-                func.lower(Despesa.categoria).ilike(func.lower(search_like))
+                Despesa.descricao.ilike(search_like),
+                Despesa.categoria.ilike(search_like)
             ))
-        # Adicionar lógica de filtro por data aqui
+        if data_vencimento_inicio:
+            dt = parse_date(data_vencimento_inicio)
+            if dt: query = query.filter(Despesa.data_vencimento >= dt)
+        if data_vencimento_fim:
+            dt = parse_date(data_vencimento_fim)
+            if dt: query = query.filter(Despesa.data_vencimento <= dt)
+        if data_despesa_inicio:
+            dt = parse_date(data_despesa_inicio)
+            if dt: query = query.filter(Despesa.data_despesa >= dt)
+        if data_despesa_fim:
+            dt = parse_date(data_despesa_fim)
+            if dt: query = query.filter(Despesa.data_despesa <= dt)
+
 
         colunas_ordenaveis = {
             'descricao': Despesa.descricao, 'caso_titulo': Caso.titulo, 
@@ -783,7 +873,6 @@ def get_despesas():
         todas_despesas = query.all()
         return jsonify({"despesas": [d.to_dict() for d in todas_despesas]}), 200
     except Exception as e: 
-        print(f"Erro ao buscar despesas: {e}")
         app.logger.error(f"Erro em get_despesas: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao buscar despesas"}), 500
 
@@ -811,11 +900,20 @@ def create_despesa():
         return jsonify(nova_despesa.to_dict()), 201
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao criar despesa: {e}")
         app.logger.error(f"Erro em create_despesa: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao salvar despesa"}), 500
 
-# ... (Implementar PUT e DELETE para Despesas de forma similar)
+@app.route('/api/despesas/<int:id>', methods=['GET'])
+def get_despesa(id):
+    try:
+        despesa = db.session.get(Despesa, id)
+        if despesa is None:
+            return jsonify({"erro": "Despesa não encontrada"}), 404
+        return jsonify(despesa.to_dict()), 200
+    except Exception as e:
+        app.logger.error(f"Erro em get_despesa(id={id}): {e}", exc_info=True)
+        return jsonify({"erro": "Erro ao buscar despesa"}), 500
+
 @app.route('/api/despesas/<int:id>', methods=['PUT'])
 def update_despesa(id):
     dados = request.get_json()
@@ -825,9 +923,12 @@ def update_despesa(id):
         if despesa is None: 
             return jsonify({"erro": "Despesa não encontrada para atualizar"}), 404
         
-        despesa.caso_id = dados.get('caso_id', despesa.caso_id) 
-        if 'caso_id' in dados and dados['caso_id'] and not db.session.get(Caso, dados['caso_id']):
-             return jsonify({"erro": f"Novo Caso com ID {dados['caso_id']} não encontrado."}), 404
+        new_caso_id = dados.get('caso_id')
+        if 'caso_id' in dados: # Permite desassociar ou associar
+            if new_caso_id and not db.session.get(Caso, new_caso_id):
+                return jsonify({"erro": f"Novo Caso com ID {new_caso_id} não encontrado."}), 404
+            despesa.caso_id = new_caso_id if new_caso_id else None
+
 
         despesa.data_despesa = parse_date(dados.get('data_despesa', str(despesa.data_despesa) if despesa.data_despesa else None))
         despesa.data_vencimento = parse_date(dados.get('data_vencimento', str(despesa.data_vencimento)))
@@ -842,7 +943,6 @@ def update_despesa(id):
         return jsonify(despesa.to_dict()), 200
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao atualizar despesa {id}: {e}")
         app.logger.error(f"Erro em update_despesa(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao atualizar despesa"}), 500
 
@@ -857,18 +957,16 @@ def delete_despesa(id):
         return jsonify({"mensagem": f"Despesa {id} deletada com sucesso"}), 200
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao deletar despesa {id}: {e}")
         app.logger.error(f"Erro em delete_despesa(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao deletar despesa."}), 500
 
-# --- Rotas para Eventos da Agenda ---
+# --- ROTAS PARA EVENTOS DA AGENDA ---
 @app.route('/api/eventos', methods=['GET'])
 def get_eventos():
     try:
-        cliente_id_filtro = request.args.get('cliente_id', type=int)
-        caso_id_filtro = request.args.get('caso_id', type=int)
-        data_inicio_filtro_str = request.args.get('start') # Usado por FullCalendar
-        data_fim_filtro_str = request.args.get('end')     # Usado por FullCalendar
+        caso_id_filtro = request.args.get('caso_id', type=int) # -1 para eventos gerais
+        data_inicio_gte_str = request.args.get('data_inicio_gte', type=str) # Para filtros de range
+        data_inicio_lte_str = request.args.get('data_inicio_lte', type=str) # Para filtros de range
         status_concluido_str = request.args.get('concluido', type=str) 
         tipo_evento_filtro = request.args.get('tipo_evento', type=str)
         search_term = request.args.get('search', None, type=str)
@@ -879,38 +977,36 @@ def get_eventos():
         query = EventoAgenda.query.outerjoin(Caso, EventoAgenda.caso_id == Caso.id)\
                                  .outerjoin(Cliente, Caso.cliente_id == Cliente.id)
 
-        if cliente_id_filtro:
-            query = query.filter(Caso.cliente_id == cliente_id_filtro)
-        if caso_id_filtro == -1: # Para eventos gerais (sem caso)
+        if caso_id_filtro == -1: 
             query = query.filter(EventoAgenda.caso_id.is_(None))
         elif caso_id_filtro:
             query = query.filter(EventoAgenda.caso_id == caso_id_filtro)
+        
         if tipo_evento_filtro:
             query = query.filter(EventoAgenda.tipo_evento == tipo_evento_filtro)
+        
         if status_concluido_str is not None:
-            if status_concluido_str.lower() == 'true':
-                query = query.filter(EventoAgenda.concluido == True)
-            elif status_concluido_str.lower() == 'false':
-                query = query.filter(EventoAgenda.concluido == False)
+            concluido_bool = status_concluido_str.lower() == 'true'
+            query = query.filter(EventoAgenda.concluido == concluido_bool)
+        
         if search_term:
             search_like = f"%{search_term}%"
             query = query.filter(or_(
-                func.lower(EventoAgenda.titulo).ilike(func.lower(search_like)),
-                func.lower(EventoAgenda.descricao).ilike(func.lower(search_like))
+                EventoAgenda.titulo.ilike(search_like),
+                EventoAgenda.descricao.ilike(search_like)
             ))
         
-        # Filtro de período para FullCalendar e listas
-        if data_inicio_filtro_str: 
-            dt_inicio = parse_datetime(data_inicio_filtro_str)
-            if dt_inicio: query = query.filter(EventoAgenda.data_fim >= dt_inicio if EventoAgenda.data_fim else EventoAgenda.data_inicio >= dt_inicio)
-        if data_fim_filtro_str: 
-            dt_fim = parse_datetime(data_fim_filtro_str)
+        if data_inicio_gte_str: 
+            dt_inicio = parse_datetime(data_inicio_gte_str) # Use parse_datetime para campos de data e hora
+            if dt_inicio: query = query.filter(EventoAgenda.data_inicio >= dt_inicio)
+        if data_inicio_lte_str: 
+            dt_fim = parse_datetime(data_inicio_lte_str)
             if dt_fim: query = query.filter(EventoAgenda.data_inicio <= dt_fim)
         
         colunas_ordenaveis = {
             'data_inicio': EventoAgenda.data_inicio, 'titulo': EventoAgenda.titulo,
             'tipo_evento': EventoAgenda.tipo_evento, 'concluido': EventoAgenda.concluido,
-            'caso_titulo': Caso.titulo, 'cliente_nome': Cliente.nome_razao_social
+            'caso_titulo': Caso.titulo # Assumindo que Caso.titulo existe e é ordenável
         }
         if sort_by in colunas_ordenaveis:
             coluna_ordenacao = colunas_ordenaveis[sort_by]
@@ -927,7 +1023,6 @@ def get_eventos():
         todos_eventos = query.all()
         return jsonify({"eventos": [e.to_dict() for e in todos_eventos]}), 200
     except Exception as e: 
-        print(f"Erro ao buscar eventos: {e}")
         app.logger.error(f"Erro em get_eventos: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao buscar eventos"}), 500
 
@@ -935,7 +1030,7 @@ def get_eventos():
 def create_evento():
     dados = request.get_json()
     if not dados or not dados.get('tipo_evento') or not dados.get('titulo') or not dados.get('data_inicio'):
-        return jsonify({"erro": "Dados incompletos"}), 400
+        return jsonify({"erro": "Dados incompletos (tipo_evento, titulo, data_inicio são obrigatórios)"}), 400
     
     caso_id = dados.get('caso_id')
     if caso_id and not db.session.get(Caso, caso_id):
@@ -965,30 +1060,43 @@ def create_evento():
         return jsonify(novo_evento.to_dict()), 201
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao criar evento: {e}")
         app.logger.error(f"Erro em create_evento: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao salvar evento"}), 500
 
-# ... (Implementar PUT e DELETE para Eventos de forma similar)
+@app.route('/api/eventos/<int:id>', methods=['GET'])
+def get_evento(id):
+    try:
+        evento = db.session.get(EventoAgenda, id)
+        if evento is None:
+            return jsonify({"erro": "Evento não encontrado"}), 404
+        return jsonify(evento.to_dict()), 200
+    except Exception as e:
+        app.logger.error(f"Erro em get_evento(id={id}): {e}", exc_info=True)
+        return jsonify({"erro": "Erro ao buscar evento"}), 500
+
+
 @app.route('/api/eventos/<int:id>', methods=['PUT'])
 def update_evento(id):
     dados = request.get_json()
     if not dados: return jsonify({"erro": "Nenhum dado fornecido"}), 400
+    
+    evento = db.session.get(EventoAgenda, id)
+    if evento is None: 
+        return jsonify({"erro": "Evento não encontrado para atualizar"}), 404
+    
     try:
-        evento = db.session.get(EventoAgenda, id)
-        if evento is None: 
-            return jsonify({"erro": "Evento não encontrado para atualizar"}), 404
-        
-        data_inicio_dt = parse_datetime(dados.get('data_inicio', str(evento.data_inicio)))
-        data_fim_dt = parse_datetime(dados.get('data_fim', str(evento.data_fim) if evento.data_fim else None))
+        data_inicio_dt = parse_datetime(dados.get('data_inicio', evento.data_inicio.isoformat()))
+        data_fim_dt = parse_datetime(dados.get('data_fim', evento.data_fim.isoformat() if evento.data_fim else None))
         
         if 'data_inicio' in dados and not data_inicio_dt: return jsonify({"erro": "Formato inválido para data_inicio"}), 400
         if 'data_fim' in dados and dados.get('data_fim') and not data_fim_dt: return jsonify({"erro": "Formato inválido para data_fim"}), 400
         
-        if 'caso_id' in dados and dados['caso_id'] and not db.session.get(Caso, dados['caso_id']):
-            return jsonify({"erro": f"Novo Caso com ID {dados['caso_id']} não encontrado."}), 404
+        new_caso_id = dados.get('caso_id')
+        if 'caso_id' in dados: # Permite desassociar ou associar
+            if new_caso_id and not db.session.get(Caso, new_caso_id):
+                return jsonify({"erro": f"Novo Caso com ID {new_caso_id} não encontrado."}), 404
+            evento.caso_id = new_caso_id if new_caso_id else None
         
-        evento.caso_id = dados.get('caso_id', evento.caso_id) 
         evento.tipo_evento = dados.get('tipo_evento', evento.tipo_evento)
         evento.titulo = dados.get('titulo', evento.titulo)
         evento.descricao = dados.get('descricao', evento.descricao)
@@ -1001,7 +1109,6 @@ def update_evento(id):
         return jsonify(evento.to_dict()), 200
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao atualizar evento {id}: {e}")
         app.logger.error(f"Erro em update_evento(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao atualizar evento"}), 500
 
@@ -1016,14 +1123,11 @@ def delete_evento(id):
         return jsonify({"mensagem": f"Evento {id} deletado com sucesso"}), 200
     except Exception as e: 
         db.session.rollback()
-        print(f"Erro ao deletar evento {id}: {e}")
         app.logger.error(f"Erro em delete_evento(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao deletar evento."}), 500
 
-
 # --- ROTAS PARA DOCUMENTOS ---
 def allowed_file(filename):
-    """Verifica se a extensão do arquivo é permitida."""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
@@ -1038,7 +1142,6 @@ def upload_documento():
 
     if file and allowed_file(file.filename):
         filename_original = secure_filename(file.filename)
-        # Cria um nome de arquivo único para armazenamento para evitar colisões
         timestamp = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
         filename_armazenado = f"{timestamp}_{filename_original}"
         caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], filename_armazenado)
@@ -1050,24 +1153,20 @@ def upload_documento():
             caso_id_str = request.form.get('caso_id')
             descricao = request.form.get('descricao', '')
 
-            cliente_id = int(cliente_id_str) if cliente_id_str and cliente_id_str != 'null' else None
-            caso_id = int(caso_id_str) if caso_id_str and caso_id_str != 'null' else None
+            cliente_id = int(cliente_id_str) if cliente_id_str and cliente_id_str != 'null' and cliente_id_str.isdigit() else None
+            caso_id = int(caso_id_str) if caso_id_str and caso_id_str != 'null' and caso_id_str.isdigit() else None
 
-            # Validações de FK
             if cliente_id and not db.session.get(Cliente, cliente_id):
-                 os.remove(caminho_arquivo) # Remove o arquivo se o cliente não for válido
+                 os.remove(caminho_arquivo)
                  return jsonify({"erro": f"Cliente com ID {cliente_id} não encontrado."}), 404
             if caso_id and not db.session.get(Caso, caso_id):
-                 os.remove(caminho_arquivo) # Remove o arquivo se o caso não for válido
+                 os.remove(caminho_arquivo)
                  return jsonify({"erro": f"Caso com ID {caso_id} não encontrado."}), 404
 
             novo_documento = Documento(
-                cliente_id=cliente_id,
-                caso_id=caso_id,
-                nome_original_arquivo=filename_original,
-                nome_armazenado=filename_armazenado, # Salva o nome único
-                tipo_mime=file.mimetype,
-                tamanho_bytes=os.path.getsize(caminho_arquivo),
+                cliente_id=cliente_id, caso_id=caso_id,
+                nome_original_arquivo=filename_original, nome_armazenado=filename_armazenado,
+                tipo_mime=file.mimetype, tamanho_bytes=os.path.getsize(caminho_arquivo),
                 descricao=descricao
             )
             db.session.add(novo_documento)
@@ -1075,10 +1174,7 @@ def upload_documento():
             return jsonify(novo_documento.to_dict()), 201
         except Exception as e:
             db.session.rollback()
-            # Se o arquivo foi salvo mas houve erro no BD, remove o arquivo
-            if os.path.exists(caminho_arquivo):
-                os.remove(caminho_arquivo)
-            print(f"Erro ao salvar documento: {e}")
+            if os.path.exists(caminho_arquivo): os.remove(caminho_arquivo)
             app.logger.error(f"Erro em upload_documento: {e}", exc_info=True)
             return jsonify({"erro": "Erro ao salvar documento"}), 500
     else:
@@ -1088,26 +1184,31 @@ def upload_documento():
 def get_documentos():
     try:
         cliente_id_filtro = request.args.get('cliente_id', type=int)
-        caso_id_filtro = request.args.get('caso_id', type=int)
+        caso_id_filtro = request.args.get('caso_id', type=int) # -1 para docs gerais do cliente
+        sem_caso_filtro = request.args.get('sem_caso', type=str, default='false').lower() == 'true'
+
         search_term = request.args.get('search', None, type=str)
         sort_by = request.args.get('sort_by', 'data_upload', type=str)
         sort_order = request.args.get('sort_order', 'desc', type=str)
         
         query = Documento.query.outerjoin(Cliente, Documento.cliente_id == Cliente.id)\
                                .outerjoin(Caso, Documento.caso_id == Caso.id)
-        if cliente_id_filtro:
-            query = query.filter(Documento.cliente_id == cliente_id_filtro)
         
-        if caso_id_filtro == -1: # Documentos gerais (sem caso específico)
-             query = query.filter(Documento.caso_id.is_(None))
-        elif caso_id_filtro:
-            query = query.filter(Documento.caso_id == caso_id_filtro)
+        if cliente_id_filtro:
+            if sem_caso_filtro: # Documentos do cliente, mas sem caso específico
+                query = query.filter(Documento.cliente_id == cliente_id_filtro, Documento.caso_id.is_(None))
+            else: # Documentos do cliente (pode ou não ter caso, a menos que caso_id_filtro também seja usado)
+                query = query.filter(Documento.cliente_id == cliente_id_filtro)
+        
+        if caso_id_filtro: # Se caso_id_filtro é fornecido, ele tem precedência para filtrar por caso
+             query = query.filter(Documento.caso_id == caso_id_filtro)
+
 
         if search_term:
             search_like = f"%{search_term}%"
             query = query.filter(or_(
-                func.lower(Documento.nome_original_arquivo).ilike(func.lower(search_like)),
-                func.lower(Documento.descricao).ilike(func.lower(search_like))
+                Documento.nome_original_arquivo.ilike(search_like),
+                Documento.descricao.ilike(search_like)
             ))
         
         colunas_ordenaveis = {
@@ -1118,7 +1219,7 @@ def get_documentos():
         coluna_ordenacao_obj = None
         if sort_by in colunas_ordenaveis:
             coluna_ordenacao_obj = colunas_ordenaveis[sort_by]
-        elif hasattr(Documento, sort_by): # Fallback para campos diretos do modelo Documento
+        elif hasattr(Documento, sort_by): 
              coluna_ordenacao_obj = getattr(Documento, sort_by)
 
         if coluna_ordenacao_obj is not None:
@@ -1132,16 +1233,14 @@ def get_documentos():
         todos_documentos = query.all()
         return jsonify({"documentos": [d.to_dict() for d in todos_documentos]}), 200
     except Exception as e:
-        print(f"Erro ao buscar documentos: {e}")
         app.logger.error(f"Erro em get_documentos: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao buscar documentos"}), 500
 
 @app.route('/api/documentos/download/<path:nome_armazenado>', methods=['GET'])
 def download_documento(nome_armazenado):
     try:
-        # Sanitize o nome do arquivo para evitar path traversal
         safe_nome_armazenado = secure_filename(nome_armazenado)
-        if safe_nome_armazenado != nome_armazenado: # Se secure_filename alterou, pode ser malicioso
+        if safe_nome_armazenado != nome_armazenado:
             return jsonify({"erro": "Nome de arquivo inválido"}), 400
 
         doc_metadata = Documento.query.filter_by(nome_armazenado=safe_nome_armazenado).first()
@@ -1149,21 +1248,21 @@ def download_documento(nome_armazenado):
             return jsonify({"erro": "Metadados do documento não encontrados ou nome de arquivo inválido"}), 404
         
         caminho_completo = os.path.join(app.config['UPLOAD_FOLDER'], safe_nome_armazenado)
-        if not os.path.exists(caminho_completo):
+        if not os.path.isfile(caminho_completo): # Verifica se é um arquivo
+            app.logger.error(f"Tentativa de download de caminho que não é arquivo ou não existe: {caminho_completo}")
             return jsonify({"erro": "Arquivo físico não encontrado no servidor"}), 404
             
         return send_from_directory(
             directory=app.config['UPLOAD_FOLDER'], 
             path=safe_nome_armazenado, 
             as_attachment=True, 
-            download_name=doc_metadata.nome_original_arquivo # Usa o nome original para o download
+            download_name=doc_metadata.nome_original_arquivo
         )
     except Exception as e:
-        print(f"Erro ao baixar documento {nome_armazenado}: {e}")
         app.logger.error(f"Erro em download_documento (nome_armazenado={nome_armazenado}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao baixar documento"}), 500
 
-@app.route('/api/documentos/<int:id>', methods=['PUT']) # Para atualizar metadados
+@app.route('/api/documentos/<int:id>', methods=['PUT'])
 def update_documento_metadados(id):
     dados = request.get_json()
     if not dados:
@@ -1175,32 +1274,29 @@ def update_documento_metadados(id):
 
         documento.descricao = dados.get('descricao', documento.descricao)
         
-        # Atualizar cliente_id e caso_id se fornecidos e válidos
         new_cliente_id = dados.get('cliente_id')
         new_caso_id = dados.get('caso_id')
 
-        if 'cliente_id' in dados: # Permite desassociar passando null ou ""
+        if 'cliente_id' in dados:
             if new_cliente_id:
                 if not db.session.get(Cliente, new_cliente_id):
                     return jsonify({"erro": f"Cliente com ID {new_cliente_id} não encontrado."}), 404
                 documento.cliente_id = new_cliente_id
             else:
-                documento.cliente_id = None
+                documento.cliente_id = None # Permite desassociar
         
-        if 'caso_id' in dados: # Permite desassociar passando null ou ""
+        if 'caso_id' in dados:
             if new_caso_id:
                 if not db.session.get(Caso, new_caso_id):
                     return jsonify({"erro": f"Caso com ID {new_caso_id} não encontrado."}), 404
                 documento.caso_id = new_caso_id
             else:
-                documento.caso_id = None
+                documento.caso_id = None # Permite desassociar
         
-        # Não se altera o arquivo em si aqui, apenas metadados
         db.session.commit()
         return jsonify(documento.to_dict()), 200
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao atualizar metadados do documento {id}: {e}")
         app.logger.error(f"Erro em update_documento_metadados(id={id}): {e}", exc_info=True)
         return jsonify({"erro": "Erro ao atualizar metadados do documento"}), 500
 
@@ -1214,24 +1310,20 @@ def delete_documento(id):
         
         caminho_arquivo = os.path.join(app.config['UPLOAD_FOLDER'], documento.nome_armazenado)
         
-        db.session.delete(documento) # Deleta o registro do BD primeiro
+        db.session.delete(documento) 
         
-        # Tenta deletar o arquivo físico
-        if os.path.exists(caminho_arquivo):
+        if os.path.exists(caminho_arquivo) and os.path.isfile(caminho_arquivo):
             try:
                 os.remove(caminho_arquivo)
             except Exception as e_file:
-                # Loga o erro, mas não impede a resposta de sucesso se o registro do BD foi deletado
-                print(f"Aviso: Erro ao deletar arquivo físico {documento.nome_armazenado} durante a exclusão do registro ID {id}: {e_file}")
-                app.logger.warning(f"Erro ao deletar arquivo físico {documento.nome_armazenado}: {e_file}")
+                app.logger.warning(f"Erro ao deletar arquivo físico {documento.nome_armazenado} durante a exclusão do registo ID {id}: {e_file}")
         
         db.session.commit()
         return jsonify({"mensagem": f"Documento ID {id} e arquivo associado (se existia) deletados com sucesso"}), 200
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao deletar documento {id}: {e}")
         app.logger.error(f"Erro em delete_documento(id={id}): {e}", exc_info=True)
-        return jsonify({"erro": "Erro ao deletar registro do documento"}), 500
+        return jsonify({"erro": "Erro ao deletar registo do documento"}), 500
 
 # --- ROTAS DE RELATÓRIOS ---
 @app.route('/api/relatorios/contas-a-receber', methods=['GET'])
@@ -1242,11 +1334,10 @@ def get_contas_a_receber():
         ).order_by(Recebimento.data_vencimento.asc()).all()
         
         resultado = [r.to_dict() for r in contas]
-        total_geral = sum(r.valor for r in contas if r.valor is not None) # Soma direta de Decimal
+        total_geral = sum(r.valor for r in contas if r.valor is not None)
 
         return jsonify({ "items": resultado, "total_geral": str(total_geral) if total_geral is not None else "0.00", "quantidade_items": len(resultado) }), 200
     except Exception as e:
-        print(f"Erro ao buscar contas a receber: {e}")
         app.logger.error(f"Erro em get_contas_a_receber: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao buscar contas a receber"}), 500
 
@@ -1258,29 +1349,24 @@ def get_contas_a_pagar():
         ).order_by(Despesa.data_vencimento.asc()).all()
         
         resultado = [d.to_dict() for d in contas]
-        total_geral = sum(d.valor for d in contas if d.valor is not None) # Soma direta de Decimal
+        total_geral = sum(d.valor for d in contas if d.valor is not None)
 
         return jsonify({ "items": resultado, "total_geral": str(total_geral) if total_geral is not None else "0.00", "quantidade_items": len(resultado) }), 200
     except Exception as e:
-        print(f"Erro ao buscar contas a pagar: {e}")
         app.logger.error(f"Erro em get_contas_a_pagar: {e}", exc_info=True)
         return jsonify({"erro": "Erro ao buscar contas a pagar"}), 500
 
+
 # --- Ponto de Entrada ---
 if __name__ == '__main__':
-    # Configuração de logging básico para Flask
-    if not app.debug: # Não configurar logging se o debug do Flask já estiver ativo e configurando
+    if not app.debug:
         import logging
-        # Log para stdout (útil para Heroku e outros ambientes de container)
         stream_handler = logging.StreamHandler()
         stream_handler.setLevel(logging.INFO)
         app.logger.addHandler(stream_handler)
-        # Você também pode configurar para logar em arquivo:
-        # file_handler = logging.FileHandler('flask_app.log')
-        # file_handler.setLevel(logging.INFO)
-        # app.logger.addHandler(file_handler)
         app.logger.setLevel(logging.INFO)
         app.logger.info('Aplicação de Gestão Advocacia iniciada')
 
-    port = int(os.environ.get('PORT', 5000)) # Porta padrão 5000, mas pode ser definida por variável de ambiente
-    app.run(host='0.0.0.0', port=port, debug=app.config.get("DEBUG", True)) # Usa DEBUG de config.Config
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=app.config.get("DEBUG", True))
+
