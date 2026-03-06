@@ -1,46 +1,51 @@
-// Arquivo: gestao_advocacia_vite/src/pages/auth/LoginPage.jsx
+// Arquivo: gestao_advocacia_vite/src/pages/auth/RegisterPage.jsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // CORRIGIDO AQUI
+import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../../config';
 import { toast } from 'react-toastify';
-import { LockClosedIcon, UserIcon } from '@heroicons/react/24/outline';
-import { Link } from 'react-router-dom'; // Adicionado para o link de registro, se desejar
+import { LockClosedIcon, UserIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
 
-function LoginPage() {
-  const [usernameOrEmail, setUsernameOrEmail] = useState('');
+function RegisterPage() {
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     toast.dismiss(); 
 
-    if (!usernameOrEmail || !password) {
-        toast.error("Por favor, preencha o nome de usuário/email e a senha.");
+    if (!username || !email || !password) {
+        toast.error("Por favor, preencha todos os campos.");
+        setLoading(false);
+        return;
+    }
+
+    if (password.length < 6) {
+        toast.error("A senha deve ter no mínimo 6 caracteres.");
         setLoading(false);
         return;
     }
 
     try {
-      // A rota de login no backend é /api/auth/login, não precisa de barra final.
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username_or_email: usernameOrEmail, password: password })
+        body: JSON.stringify({ username, email, password })
       });
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('token', data.access_token);
-        toast.success("Login bem-sucedido! Redirecionando...");
-        navigate('/dashboard'); 
+        toast.success(data.message || "Conta criada com sucesso! Você já pode fazer login.");
+        navigate('/login'); 
       } else {
-        toast.error(data.message || "Falha no login. Verifique suas credenciais.");
+        toast.error(data.message || "Falha no registro. Verifique os dados.");
       }
     } catch (error) {
-      console.error("Erro ao tentar fazer login:", error);
+      console.error("Erro ao tentar registrar:", error);
       toast.error("Erro de rede ou servidor indisponível. Tente novamente.");
     } finally {
       setLoading(false);
@@ -53,21 +58,37 @@ function LoginPage() {
         <div className="card-body p-4 p-md-5">
           <div className="text-center mb-4">
             <h3 className="card-title text-primary fw-bold">ALG Jurídico</h3>
-            <p className="text-muted">Bem-vindo! Faça login para continuar.</p>
+            <p className="text-muted">Crie sua conta para começar.</p>
           </div>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleRegister}>
             <div className="mb-3">
-              <label htmlFor="usernameOrEmail" className="form-label">
+              <label htmlFor="username" className="form-label">
                 <UserIcon className="d-inline-block me-1" style={{ width: '16px', verticalAlign: 'text-bottom' }} />
-                Usuário ou Email
+                Nome de Usuário
               </label>
               <input
                 type="text"
                 className="form-control"
-                id="usernameOrEmail"
-                value={usernameOrEmail}
-                onChange={(e) => setUsernameOrEmail(e.target.value)}
-                placeholder="Digite seu usuário ou email"
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Exemplo: joaosilva"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="mb-3">
+              <label htmlFor="email" className="form-label">
+                <EnvelopeIcon className="d-inline-block me-1" style={{ width: '16px', verticalAlign: 'text-bottom' }} />
+                Email
+              </label>
+              <input
+                type="email"
+                className="form-control"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seuemail@exemplo.com"
                 required
                 disabled={loading}
               />
@@ -83,9 +104,10 @@ function LoginPage() {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Digite sua senha"
+                placeholder="Mínimo de 6 caracteres"
                 required
                 disabled={loading}
+                minLength="6"
               />
             </div>
             <button type="submit" className="btn btn-primary w-100" disabled={loading}>
@@ -95,13 +117,13 @@ function LoginPage() {
                   Aguarde...
                 </>
               ) : (
-                'Entrar'
+                'Criar Conta'
               )}
             </button>
           </form>
           <div className="text-center mt-4">
             <p className="text-muted">
-              Não tem uma conta? <Link to="/register">Registre-se aqui</Link>
+              Já tem uma conta? <Link to="/login">Faça login aqui</Link>
             </p>
           </div>
         </div>
@@ -110,4 +132,4 @@ function LoginPage() {
   );
 }
 
-export default LoginPage;
+export default RegisterPage;

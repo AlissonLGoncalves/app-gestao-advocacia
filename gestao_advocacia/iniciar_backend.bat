@@ -5,7 +5,7 @@
 echo Iniciando Servidor Backend Flask...
 
 :: Caminho para a pasta do seu ambiente virtual (venv)
-set VENV_PATH=.\venv 
+set VENV_PATH=..\venv
 
 :: Caminho para o script de ativação do venv
 set ACTIVATE_SCRIPT=%VENV_PATH%\Scripts\activate.bat

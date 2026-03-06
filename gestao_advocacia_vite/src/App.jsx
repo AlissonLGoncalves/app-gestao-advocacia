@@ -18,6 +18,7 @@ import DocumentosPage from './pages/DocumentosPage.jsx';
 import RelatoriosPage from './pages/RelatoriosPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import LoginPage from './pages/auth/LoginPage.jsx';
+import RegisterPage from './pages/auth/RegisterPage.jsx';
 
 // Importação dos ícones
 import {
@@ -142,6 +143,7 @@ function App() {
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover theme="colored" />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route 
           path="/" 
           element={
