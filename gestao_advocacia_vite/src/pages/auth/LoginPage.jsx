@@ -52,7 +52,8 @@ function LoginPage() {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-brand">
-          <h1>⚖️ Patronus</h1>
+          <img src="/logo.png" alt="Patronus Logo" className="mb-3" style={{ width: '75px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+          <h1 className="fw-bolder" style={{color: '#1d4ed8'}}>Patronus</h1>
           <p>Bem-vindo! Faça login para continuar.</p>
         </div>
         <form onSubmit={handleLogin}>

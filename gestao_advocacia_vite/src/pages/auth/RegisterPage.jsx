@@ -125,6 +125,7 @@ function RegisterPage() {
           {/* Painel Esquerdo: Marketing / SaaS Message */}
           <div className="col-md-5 text-white p-5 d-flex flex-column justify-content-between" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}>
             <div>
+              <img src="/logo.png" alt="Patronus Logo" className="mb-4 shadow-sm" style={{ width: '80px', borderRadius: '14px' }} />
               <h2 className="fw-bolder mb-3">Patronus</h2>
               <p className="lead fw-normal text-white-50">Sua Advocacia sem Fronteiras.</p>
               
