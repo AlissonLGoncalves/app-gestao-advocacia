@@ -16,55 +16,50 @@ function TermsPage() {
 
         <div className="text-justify" style={{ lineHeight: '1.8', color: '#374151' }}>
           
-          <h4 className="fw-bold mb-3 text-dark border-bottom pb-2">1. Das Definições e do Objeto</h4>
+          <h4 className="fw-bold mb-3 text-dark border-bottom pb-2">1. ACEITAÇÃO DOS TERMOS E CONDIÇÕES</h4>
           <p>
-            O presente instrumento jurídico ("Termos") estabelece e disciplina a relação de licenciamento de uso de software corporativo na modalidade <strong>Software as a Service (SaaS)</strong>, doravante denominado <strong>Patronus</strong>, de titularidade exclusiva de seus desenvolvedores. 
-            O <strong>Usuário/Contratante</strong>, pessoa física devidamente inscrita na Ordem dos Advogados do Brasil (OAB) ou pessoa jurídica constituída sob a forma de Sociedade de Advogados, ao concluir o processo de cadastro e clique na caixa de aceite (<i>Clickwrap Agreement</i>), manifesta sua concordância tácita, inequivocável e irrevogável com todos os preceitos arrolados.
+            Ao criar uma conta, utilizar os softwares, acessar as APIs ou usufruir de qualquer serviço disponibilizado por este <strong>Software as a Service (SaaS)</strong>, doravante denominado <strong>Patronus</strong>, o USUÁRIO (Advogado, Sociedade de Advogados ou preposto autorizado) declara sua concordância plena, expressa, incondicional e irrevogável com os presentes Termos de Uso e Contrato de Licenciamento de Usuário Final (EULA), bem como com a Política de Privacidade e Tratamento de Dados (LGPD). Caso não concorde com qualquer disposição enumerada, o USUÁRIO deverá abster-se imediatamente de utilizar a plataforma.
           </p>
 
-          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">2. Da Licença de Uso, Escopo e Restrições</h4>
+          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">2. OBJETO E LICENCIAMENTO DO SOFTWARE</h4>
           <p>
-            É concedida ao Usuário uma licença não exclusiva, temporária, revogável e intransferível de uso do Software para fins estritamente vinculados ao gerenciamento interno de sua própria carteira de clientes, acompanhamento de prazos, monitoramento processual automatizado, faturamento financeiro (Honorários) e emissão de relatórios de Business Intelligence.
+            O Patronus consiste em uma solução de computação em nuvem destinada à gestão de atividades inerentes ao exercício da advocacia (controle processual, financeiro, captura OCR de documentos e agenda). A PLATAFORMA concede ao USUÁRIO, de forma não exclusiva, intransferível, temporária e onerosa (mediante planos de assinatura mensal/anual), o direito de uso remoto das funcionalidades sistêmicas. Fica terminantemente vedado, sob pena de infrações puníveis pela Lei nº 9.609/98:
           </p>
           <ul className="mb-4">
-            <li>É terminantemente proibido o sublicenciamento, a venda, cessão, engenharia reversa (<i>reverse engineering</i>), descompilação ou qualquer tentativa de extração do código-fonte, algoritmos de Machine Learning e OCR acoplados ao Patronus.</li>
-            <li>A Plataforma emprega a arquitetura <strong>Multi-Tenant isolada</strong>. É vedado ao Usuário fornecer suas credenciais (Tokens de Acesso JWT) a terceiros estranhos ao seu escritório, sob pena de bloqueio imediato e apuração de dolo corporativo em caso de vazamento cruzado.</li>
+            <li>Proceder com qualquer modalidade de engenharia reversa, descompilação ou desestruturação sintática do código-fonte e algoritmos proprietários embutidos na infraestrutura.</li>
+            <li>Comercializar, sublicenciar, ceder, transferir, alugar ou exibir dados mediante a técnica de *web scraping* não autorizada em massa.</li>
+            <li>A Plataforma emprega a arquitetura <strong>Multi-Tenant isolada</strong>. É vedado ao Usuário fornecer suas chaves criptográficas de autenticação a corporações estranhas ao Tenant cadastrado.</li>
           </ul>
 
-          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">3. Limitação de Responsabilidade e Falibilidade Técnica</h4>
+          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">3. ANS, SLA DE DISPONIBILIDADE E RESPONSABILIDADES</h4>
           <p>
-            O Patronus atua como um <strong>Facilitador Tecnológico e Repositório Digital</strong>. Não ostentamos a natureza de ferramenta fiduciária imune a falhas intercorrentes de conectividade global. A responsabilidade originária, moral e civil, por atos processuais e judiciais, pertence integralmente ao causídico (Advogado) cadastrado.
+            A Plataforma assume o compromisso empresarial de envidar seus melhores e maiores esforços práticos para manter a disponibilidade ininterrupta das conexões provisionadas (SLA global de 99,8% de *Uptime*), blindando os arquivos contra ataques cibernéticos rotineiros (via instâncias Vercel Firewall e Render Private Networks). Contudo, imperfeições na conectividade intrínseca mundial isentam o Patronus do instituto de falha da prestação civil em panes gerais de provedores.
           </p>
-          <div className="bg-light p-4 rounded-3 border mb-4">
-            <h6 className="fw-bold text-danger">Cláusula de Isenção (Safe Harbor) - Prazos e Alertas CRON</h6>
-            <p className="mb-0 small">
-              O sistema possui "Cron Jobs" autônomos que realizam rotinas computacionais diárias na nuvem (AWS/Render) com a finalidade de notificar o Usuário, via E-mail, sobre audiências e prazos fatais com 7 e 3 dias de antecedência. 
-              <strong> Contudo, a Plataforma declara e o Usuário consente que atrasos em filas de e-mail (SMTP), bloqueios por filtros de Spam, *downtimes* de instâncias, ou lapsos no cômputo da contagem não geram qualquer responsabilidade material ou moral para o Patronus face a eventuais perdas de Prazos Processuais. A verificação manual dos expedientes junto aos Tribunais permanece como dever intransferível da Assessoria Jurídica contratante.</strong>
+          <div className="bg-light p-4 rounded-3 border border-danger mb-4 shadow-sm">
+            <h6 className="fw-bold text-danger">3.1 Cláusula de Isenção Transacional (Safe Harbor) - Perda de Prazos</h4>
+            <p className="mb-0 text-dark" style={{fontSize: '0.9rem', lineHeight: '1.6'}}>
+              Em virtude do software operar algoritmos reativos aos Diários e tribunais externos, bem como disparar ações de notificação via serviços vitais de terceiros (SMTP E-mails), o software possui limites técnicos. <strong>Em hipótese alguma a Plataforma, seus idealizadores patrimoniais, diretores executivos ou consultores de arquitetura Cloud poderão ser responsabilizados cível, criminal, moral ou materialmente por eventuais lides perdedoras, danos operacionais de escritórios e perdas de prazos (incluindo preclusões, revelias e sentenças desfavoráveis). Falhas de Cronograma que impeçam a chegada dos e-mails temporais não constituem descumprimento material de serviço. A verificação manual incansável dos andamentos cartorários permanece obrigação primária do causídico signatário.</strong>
             </p>
           </div>
-          <p>
-            Acordamos um Service Level Agreement (SLA) de 99,9% de Uptime anual das APIs operadas pela arquitetura Render e do Frontend Vercel Edge Networks, não computadas interrupções programadas para manutenção ("Janelas de Manutenção") e atos de Força Maior.
-          </p>
 
-          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">4. Lei Geral de Proteção de Dados (Compliance Ativo LGPD)</h4>
+          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">4. COMPLIANCE LGPD E SEGURANÇA DA INFORMAÇÃO</h4>
           <p>
-            Este dispositivo encontra-se em estrita consonância com a Lei nº 13.709/2018 (Lei Geral de Proteção de Dados - LGPD). Fica delineada a seguinte matriz de competências:
+            O tratamento eletrônico executado dentro dos limites sistêmicos da plataforma subsiste em rígida anuência às orientações propostas pelo ordenamento sancionado na LGPD Brasileira. A simetria processual se assenta na separação basilar a respeito das competências vigentes:
           </p>
           <ul className="mb-4">
-            <li className="mb-2"><strong>Papel dos Atores:</strong> O Usuário/Escritório é definido, para todos os efeitos legais, como o <strong>Controlador de Dados</strong> de seus clientes ("Titulares"). O Patronus atua única e exclusivamente como <strong>Operador</strong>, processando logs, encriptando senhas e acautelando bancos de dados em nuvem.</li>
-            <li className="mb-2"><strong>Base Legal e Prevenção:</strong> A inserção de dados sensíveis médicos, criminais ou familiares de terceiros pelo Usuário dentro das *Pastas Virtuais* do Patronus requer que o Advogado já possua procuração, contrato e base legal devidamente lastreadas com seu cliente (Titular).</li>
-            <li className="mb-2"><strong>Logs de Auditoria e Imutabilidade:</strong> Nós utilizamos registros de sistemas (Audit Trails) rastreando o acesso aos dados sensíveis para fins de colaboração com autoridades e comprovação de higidez contra invasões.</li>
-            <li className="mb-2"><strong>Direito ao Esquecimento e Inanonimização:</strong> Ao receber um pleito de eliminação previsto no Art. 18 da LGPD, o Advogado/Controlador se obriga a extinguir diretamente as informações ativas em seu painel usando a funcionalidade de "Exclusão Definitiva" ou de "Ofuscamento Parcial", momento no qual o Patronus providenciará a exclusão nos nós do Banco de Dados PostgreSQL sem possibilidade de resgate por espelhos.</li>
+            <li className="mb-2"><strong>Papel dos Atores:</strong> O Escritório Contratante responde como o Único e Absoluto <strong>Controlador do Banco de Dados Primário</strong> sob custódia, atestando ter base jurídica consolidada que autorize atar a submissão dos dados pessoais sensíveis de partes, testemunhas e litigantes nas interfaces virtuais do sistema.</li>
+            <li className="mb-2"><strong>Limitações do Operador:</strong> O Patronus é unicamente definido como <strong>Operador Digital</strong> de repositório, isentando-se de averiguar a veracidade dos dados sensíveis informados, possuindo como incumbência puramente atuar no acautelamento com Hash Criptográfico das senhas e garantir o isolamento arquitetônico dos nós do banco SQL.</li>
+            <li className="mb-2"><strong>Direito Autônomo ao Esquecimento:</strong> Caso o Controlador (Escritório) seja notificado judicial ou extra-judicialmente pelo titular para obliteração de memórias, cabe a ele manusear os botões de eliminação dispostos nas telas do administrador para zerar o dossiê daquele cliente em trâmite na nuvem, finalizando irreversivelmente suas referências ativas (Art. 18, Lei 13.709).</li>
           </ul>
 
-          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">5. Das Disposições Finais e Preços</h4>
+          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">5. PROPRIEDADE MESTRA E ASSINATURAS FINANCEIRAS</h4>
           <p>
-            Os honorários pelo licenciamento do software ocorrerão na modalidade de recorrência contínua (SaaS - Planos Mensais/Anuais), sem direito a retenção de base estrutural em caso de inadimplência, garantido o direito inalienável do Usuário de exportar sua carteira de contatos via recursos CSV/PDF oficiais antes de eventuais cancelamentos.
+            Toda a engenharia de dados, *front-end*, interface visual, logos e arranjos vetoriais hospedados neste código não são vendidas, mas apenas locadas. Alterações drásticas no sistema podem exigir readequação contratual ou alteração dos cronogramas preexistentes dos planos de subscrição mensal ou anual. Inadimplementos de faturas prolongados geram a automática reversão do acesso, mantido por 30 (trinta) dias de margem um portal provisório de salvamento das memórias (CSV Files) por parte do caloteiro ou remanescente financeiro temporário, após o qual o banco entra em modo de Reciclagem Periódica.
           </p>
 
-          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">6. Foro</h4>
+          <h4 className="fw-bold mt-5 mb-3 text-dark border-bottom pb-2">6. ESTATUTO DECISÓRIO (FORO)</h4>
           <p>
-            Para dirimir quaisquer controvérsias decorrentes das obrigações previstas nestes Termos, ou oriundas das relações de licenciamento B2B, as partes elegem livremente o foro da Comarca na qual o Usuário possui sede principal registrada, dispensando-se câmaras de mediação preliminares, exceto quando imposto por legislação pátria suprema.
+            O texto encontra repouso nas diretrizes ordenadas pelos Tribunais Judiciários do Brasil. Ocasional animosidade oriunda destas linhas, uma vez transcorrida em branco a tentativa de aproximação negociada entre as Partes, se compromete a eleger a circunscrição cível da cidade-sede dos desenvolvedores proprietários do sistema para a instauração processual impeditiva, excluindo quaisquer demais por maior proximidade do Cliente.
           </p>
         </div>
 

@@ -317,34 +317,42 @@ function RegisterPage() {
             </div>
             
             {/* CORPO DE TEXTO ROLÁVEL */}
-            <div className="p-4" style={{overflowY: 'auto', flex: 1, backgroundColor: '#fcfcfc'}} onScroll={handleScrollTerms}>
-              <h4 className="fw-bold mb-3 text-dark border-bottom pb-2">1. Das Definições e do Objeto</h4>
-              <p className="text-secondary" style={{lineHeight: '1.7'}}>O presente instrumento jurídico estabelece e disciplina a relação de licenciamento de uso de software corporativo na modalidade <strong>Software as a Service (SaaS)</strong>, doravante denominado <strong>Patronus</strong>. O Usuário/Contratante, pessoa física devidamente inscrita na Ordem dos Advogados do Brasil (OAB) ou pessoa jurídica constituída sob a forma de Sociedade de Advogados, ao concluir o processo de cadastro e clique na caixa de aceite, manifesta sua concordância tácita, inequivocável e irrevogável com todos os preceitos arrolados.</p>
+            <div className="p-4" style={{overflowY: 'auto', flex: 1, backgroundColor: '#fcfcfc', textAlign: 'justify'}} onScroll={handleScrollTerms}>
+              <h5 className="fw-bold mb-3 text-dark border-bottom pb-2">1. ACEITAÇÃO DOS TERMOS E CONDIÇÕES</h5>
+              <p className="text-secondary" style={{lineHeight: '1.7', fontSize: '0.9rem'}}>Ao criar uma conta, utilizar os softwares, acessar as APIs ou usufruir de qualquer serviço disponibilizado por este <strong>Software as a Service (SaaS)</strong>, doravante denominado <strong>Patronus</strong>, o USUÁRIO (Advogado, Sociedade de Advogados ou preposto autorizado) declara sua concordância plena, expressa, incondicional e irrevogável com os presentes Termos de Uso e Contrato de Licenciamento de Usuário Final (EULA), bem como com a Política de Privacidade e Tratamento de Dados (LGPD). Caso não concorde com qualquer disposição enumerada, o USUÁRIO deverá abster-se imediatamente de utilizar a plataforma.</p>
 
-              <h4 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">2. Da Licença de Uso e Restrições</h4>
-              <p className="text-secondary" style={{lineHeight: '1.7'}}>É concedida ao Usuário uma licença não exclusiva, temporária, revogável e intransferível de uso do Software para fins estritamente vinculados ao gerenciamento interno de sua própria carteira de clientes, acompanhamento de prazos, monitoramento processual automatizado, faturamento financeiro e emissão de relatórios.</p>
-              <ul className="text-secondary" style={{lineHeight: '1.7'}}>
-                <li>É terminantemente proibido o sublicenciamento, a venda, cessão, engenharia reversa (<i>reverse engineering</i>), descompilação ou qualquer tentativa de extração do código-fonte.</li>
-                <li>A Plataforma emprega a arquitetura <strong>Multi-Tenant isolada</strong>. É vedado ao Usuário fornecer suas credenciais a terceiros estranhos ao seu escritório, sob pena de bloqueio imediato.</li>
+              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">2. OBJETO E LICENCIAMENTO DO SOFTWARE</h5>
+              <p className="text-secondary" style={{lineHeight: '1.7', fontSize: '0.9rem'}}>O Patronus consiste em uma solução de computação em nuvem destinada à gestão de atividades inerentes ao exercício da advocacia (controle processual, financeiro, captura OCR de documentos e agenda). A PLATAFORMA concede ao USUÁRIO, de forma não exclusiva, intransferível, temporária e onerosa (mediante planos de assinatura), o direito de uso remoto das funcionalidades sistêmicas. Fica terminantemente vedado, sob pena de infração à Lei nº 9.609/98 (Proteção da Propriedade Intelectual de Softwares):</p>
+              <ul className="text-secondary" style={{lineHeight: '1.7', fontSize: '0.9rem'}}>
+                <li>Proceder com qualquer modalidade de engenharia reversa, descompilação ou desestruturação do código-fonte e algoritmos (Machine Learning e OCR) embarcados na infraestrutura.</li>
+                <li>Comercializar, sublicenciar, ceder, transferir, alugar ou compartilhar as credenciais de acesso com terceiros estranhos ao Escritório (Tenant) cadastrado.</li>
               </ul>
 
-              <h4 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">3. Limitação de Falibilidade Técnica</h4>
-              <p className="text-secondary" style={{lineHeight: '1.7'}}>O Patronus atua como um <strong>Facilitador Tecnológico</strong>. A responsabilidade originária, moral e civil, por atos processuais pertence integralmente ao advogado cadastrado.</p>
+              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">3. ANS, SLA DE DISPONIBILIDADE E RESPONSABILIDADES</h5>
+              <p className="text-secondary" style={{lineHeight: '1.7', fontSize: '0.9rem'}}>A Plataforma assume o compromisso de envidar seus melhores esforços para manter a disponibilidade transacional através da infraestrutura distribuída na AWS/Render, visando um Acordo de Nível de Serviço (SLA) de 99,8% de "Uptime" mensal, excetuando-se as janelas de manutenção programadas previamente comunicadas. Contudo, em virtude da complexidade intrínseca da infraestrutura mundial de internet:</p>
               <div className="bg-white p-3 rounded border border-danger mb-4 shadow-sm">
-                <h6 className="fw-bold text-danger">Cláusula de Isenção (Safe Harbor) - Alertas CRON</h6>
-                <p className="mb-0 text-dark small" style={{lineHeight: '1.5'}}>
-                  O sistema possui rotinas computacionais ativas na nuvem (AWS/Render) para notificar o Usuário sobre prazos com 7 e 3 dias de antecedência. Contudo, <strong>atrasos em filas de e-mail (SMTP), bloqueios por filtros de Spam, *downtimes* de servidores ou lapsos no cômputo da contagem não geram qualquer responsabilidade material ou moral para o Patronus face a eventuais perdas de Prazos. A verificação manual dos expedientes permanece como dever intransferível do Escritório.</strong>
+                <h6 className="fw-bold text-danger">3.1 Cláusula de Isenção (Safe Harbor) - Perda de Prazos</h6>
+                <p className="mb-0 text-dark" style={{lineHeight: '1.6', fontSize: '0.85rem'}}>
+                  O Patronus opera de forma a prover avisos automatizados através de tarefas ativas na nuvem ("Cron Jobs") para notificar o USUÁRIO sobre prazos e audiências processuais. <strong>Em hipótese alguma a Plataforma, seus diretores, programadores ou sócios poderão ser responsabilizados cível, moral ou materialmente por eventuais intempéries judiciais, incluindo perda de prazos cabais (preclusão). Eventual atraso no envio do email SMTP por latência, bloqueios de antispam das provedoras globais (Google/Microsoft), quedas de instâncias virtuais ou lapsos de sincronicidade não constituem falha de prestação de serviço garantidor. A verificação rotineira, manual e fidedigna dos autos junto aos Diários de Justiça Eletrônicos (DJe) e Tribunais permanece como encargo único, inalienável e soberano do Advogado constituído.</strong>
                 </p>
               </div>
 
-              <h4 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">4. Lei Geral de Proteção de Dados (LGPD)</h4>
-              <ul className="text-secondary" style={{lineHeight: '1.7'}}>
-                <li>O Usuário/Escritório é definido como o <strong>Controlador de Dados</strong>. O Patronus atua única e exclusivamente como <strong>Operador</strong>, encriptando senhas e acautelando bancos de dados.</li>
-                <li>A inserção de dados sensíveis médicos, criminais ou processuais requer que o Advogado já possua procuração e consentimento de seu cliente.</li>
-                <li>Ao receber um pleito de eliminação previsto no Art. 18 da LGPD, o Advogado Controlador se obriga a extinguir diretamente as informações ativas em seu painel usando as ferramentas de eliminação do Patronus.</li>
+              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">4. COMPLIANCE LGPD E SEGURANÇA DA INFORMAÇÃO</h5>
+              <p className="text-secondary" style={{lineHeight: '1.7', fontSize: '0.9rem'}}>As Partes declaram conformidade perene com as diretrizes e determinações da Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais). Para tal, os papéis processuais enquadram-se na seguinte tipificação rigorosa:</p>
+              <ul className="text-secondary" style={{lineHeight: '1.7', fontSize: '0.9rem'}}>
+                <li>O USUÁRIO (Escritório) figura de maneira explícita como <strong>Controlador dos Dados</strong> dos seus respectivos clientes e partes processuais, determinando as bases legais de processamento e assegurando possuir os consentimentos ou procurações necessárias para a inserção de dados estritamente confidenciais nos bancos do software.</li>
+                <li>O Patronus atua única e exclusivamente sob a égide jurídica de <strong>Operador dos Dados</strong>, restringindo-se à guarda de backups imutáveis, provisão de túneis encriptados (SSL/TLS v1.3), hash de senhas de acesso e custódia segura do banco de dados (PostgreSQL isolado por arquitetura Multi-Tenant).</li>
+                <li>Em caso de solicitação de "Eliminação dos Dados" (Direito ao Esquecimento) por parte do jurisdicionado, o Controlador (USUÁRIO) obriga-se a operacionalizar o protocolo sistêmico de Exclusão Definitiva no Painel de Adminstração, de forma autônoma e imediata.</li>
               </ul>
 
-              <br/><br/><br/>
+              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">5. PROPRIEDADE INTELECTUAL E VIGÊNCIA</h5>
+              <p className="text-secondary" style={{lineHeight: '1.7', fontSize: '0.9rem'}}>Os códigos, layouts estruturais, bancos de dados integrados, domínios, arquitetura UX/UI, logomarca oficial e sistemas operantes permanecem de plena e única propriedade intelectual da operadora original do sistema Patrimônio Tecnológico Patronus, sem que o acesso irrestrito fornecido configure aquisição de ações corporativas.</p>
+              <p className="text-secondary" style={{lineHeight: '1.7', fontSize: '0.9rem'}}>Este instrumento surtirá efeitos imediatos e ostentará validade sistêmica duradoura, ressalvado o direito do Patronus de atualizar, retificar ou encorpar ditames judiciais neste EULA, com notificação prévia de 05 (cinco) dias úteis por via de comunicação massiva no balcão de avisos do painel.</p>
+
+              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">6. FORO E LEGISLAÇÃO APLICÁVEL</h5>
+              <p className="text-secondary" style={{lineHeight: '1.7', fontSize: '0.9rem'}}>O Contrato será regido e parametrizado pelas normas vigentes no ordenamento jurídico da República Federativa do Brasil, elegendo-se o foro da Comarca na qual o Desenvolvedor Primário mantêm as operações societárias como único competente para pacificar embargos ou controvérsias originárias, renunciando aos patronos outras instâncias territoriais mais acessíveis.</p>
+
+              <br/><br/>
             </div>
             
             <div className="p-3 border-top d-flex justify-content-between align-items-center bg-white">
