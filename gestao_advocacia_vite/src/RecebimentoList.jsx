@@ -1,8 +1,9 @@
 // Arquivo: src/RecebimentoList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
-import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
+import { exportarParaPDF } from './utils/pdfGenerator.js';
 
 function RecebimentoList({ onEditRecebimento, refreshKey }) {
     const [recebimentos, setRecebimentos] = useState([]);
@@ -165,6 +166,32 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
         setShowFilters(false);
     };
 
+    const handleExportPDF = () => {
+        if (recebimentos.length === 0) {
+            toast.warn("Não existem dados para exportar com os filtros atuais.");
+            return;
+        }
+
+        const headers = ["Descrição", "Cliente", "Caso Associado", "Valor", "Vencimento", "Recebimento", "Status"];
+        const dados = recebimentos.map(r => {
+            const valorStr = (typeof r.valor === 'number' || (typeof r.valor === 'string' && !isNaN(parseFloat(r.valor))))
+                ? parseFloat(r.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                : 'N/A';
+            return [
+                r.descricao || '-',
+                r.cliente_nome || '-',
+                r.caso_titulo || '-',
+                valorStr,
+                r.data_vencimento ? new Date(r.data_vencimento).toLocaleDateString() : '-',
+                r.data_recebimento ? new Date(r.data_recebimento).toLocaleDateString() : '-',
+                r.status || '-'
+            ];
+        });
+
+        exportarParaPDF('Relatório de Títulos a Receber', headers, dados, 'relatorio_recebimentos.pdf');
+        toast.success("PDF gerado com sucesso!");
+    };
+
     if (loading && recebimentos.length === 0) {
         return (
             <div className="d-flex justify-content-center align-items-center p-5">
@@ -185,15 +212,25 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
             <div className="card-header bg-light p-3">
                 <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
                     <h6 className="mb-0 text-secondary me-3">Filtros e Busca de Recebimentos</h6>
-                    <button 
-                        className="btn btn-sm btn-outline-secondary py-1 px-2 d-flex align-items-center"
-                        onClick={() => setShowFilters(!showFilters)}
-                        aria-expanded={showFilters}
-                        aria-controls="filtrosAvancadosRecebimentos"
-                    >
-                        <FunnelIcon style={{width: '16px', height: '16px'}} className="me-1" />
-                        {showFilters ? 'Ocultar Avançados' : 'Mostrar Avançados'}
-                    </button>
+                    <div>
+                        <button
+                            className="btn btn-sm btn-outline-danger py-1 px-2 me-2 d-inline-flex align-items-center"
+                            onClick={handleExportPDF}
+                            title="Gerar e Baixar Relatório em PDF dos recebimentos listados"
+                        >
+                            <DocumentArrowDownIcon style={{width: '16px', height: '16px'}} className="me-1" />
+                            Exportar PDF
+                        </button>
+                        <button 
+                            className="btn btn-sm btn-outline-secondary py-1 px-2 d-inline-flex align-items-center"
+                            onClick={() => setShowFilters(!showFilters)}
+                            aria-expanded={showFilters}
+                            aria-controls="filtrosAvancadosRecebimentos"
+                        >
+                            <FunnelIcon style={{width: '16px', height: '16px'}} className="me-1" />
+                            {showFilters ? 'Ocultar Avançados' : 'Mostrar Avançados'}
+                        </button>
+                    </div>
                 </div>
                 <div className="row g-2 align-items-end">
                     <div className="col-lg-3 col-md-6">

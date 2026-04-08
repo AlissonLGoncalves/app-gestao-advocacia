@@ -31,6 +31,8 @@ const formatDateTimeForInput = (dateTimeString) => {
 const initialState = {
     caso_id: '',
     tipo_evento: 'Lembrete',
+    prioridade: 'Normal',
+    status_evento: 'Pendente',
     titulo: '',
     descricao: '',
     data_inicio: formatDateTimeForInput(new Date().toISOString()),
@@ -41,8 +43,6 @@ const initialState = {
 
 function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
   const location = useLocation();
-  console.log("EventoAgendaForm: Renderizando. Evento para editar:", eventoParaEditar, "Location state:", location.state);
-
   const [formData, setFormData] = useState(initialState);
   const [clientes, setClientes] = useState([]);
   const [casos, setCasos] = useState([]);
@@ -57,7 +57,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
   }, []);
 
   const fetchClientes = useCallback(async () => {
-    console.log("EventoAgendaForm: fetchClientes chamado.");
     const token = localStorage.getItem('token');
     if (!token) {
         toast.warn("Sessão não encontrada para carregar clientes.");
@@ -69,7 +68,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       if (!response.ok) throw new Error('Falha ao carregar clientes');
       const data = await response.json();
       setClientes(data.clientes || []);
-      console.log("EventoAgendaForm: Clientes carregados:", data.clientes);
     } catch (error) {
       console.error("EventoAgendaForm: Erro ao buscar clientes:", error);
       toast.error(`Erro ao carregar clientes: ${error.message}`);
@@ -77,7 +75,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
   }, []);
 
   const fetchCasos = useCallback(async (clienteId = null) => {
-    console.log("EventoAgendaForm: fetchCasos chamado. Cliente ID para filtro:", clienteId);
     const token = localStorage.getItem('token');
     if (!token) {
         toast.warn("Sessão não encontrada para carregar casos.");
@@ -93,7 +90,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       if (!response.ok) throw new Error('Falha ao carregar casos');
       const data = await response.json();
       setCasos(data.casos || []);
-      console.log("EventoAgendaForm: Casos carregados:", data.casos);
     } catch (error) {
       console.error("EventoAgendaForm: Erro ao buscar casos:", error);
       toast.error(`Erro ao carregar casos: ${error.message}`);
@@ -105,7 +101,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
   }, [fetchClientes]);
 
   useEffect(() => {
-    console.log("EventoAgendaForm: useEffect para eventoParaEditar. Valor:", eventoParaEditar, "Location state:", location.state);
     clearValidationErrors();
     if (eventoParaEditar && eventoParaEditar.id) { 
       const dadosEdit = { ...initialState, ...eventoParaEditar };
@@ -116,8 +111,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
 
       setFormData(dadosEdit);
       setIsEditing(true);
-      console.log("EventoAgendaForm: Modo de edição. FormData definido:", dadosEdit);
-
       if (dadosEdit.caso_id) {
         const casoOriginal = eventoParaEditar.caso_ref; 
         if (casoOriginal && casoOriginal.cliente_id) {
@@ -148,12 +141,10 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       setFormData(newEventInitialState);
       setIsEditing(false);
       setSelectedClienteId('');
-      console.log("EventoAgendaForm: Modo de adição. FormData inicial:", newEventInitialState);
     }
   }, [eventoParaEditar, clearValidationErrors, location.state]);
 
   useEffect(() => {
-    console.log("EventoAgendaForm: selectedClienteId mudou para:", selectedClienteId, ". A recarregar casos.");
     fetchCasos(selectedClienteId || null);
   }, [selectedClienteId, fetchCasos]);
 
@@ -179,7 +170,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
     }
     setValidationErrors(errors);
     const isValid = Object.keys(errors).length === 0;
-    console.log("EventoAgendaForm: Validação. Válido:", isValid, "Erros:", errors);
     return isValid;
   };
 
@@ -190,7 +180,7 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
     }
 
     if (name === "selectedClienteId") {
-      console.log("EventoAgendaForm: Filtro de cliente (para casos) alterado para:", value);
+
       setSelectedClienteId(value);
       setFormData(prev => ({ ...prev, caso_id: '' })); 
     } else {
@@ -203,7 +193,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("EventoAgendaForm: handleSubmit. FormData:", formData);
     clearValidationErrors();
     if (!validateForm()) {
       toast.error('Por favor, corrija os erros indicados no formulário.');
@@ -231,8 +220,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       data_fim: dataFimISO,
       concluido: formData.concluido || false,
     };
-    console.log("EventoAgendaForm: Enviando dados para API:", dadosParaEnviar);
-
     try {
       const url = isEditing ? `${API_URL}/eventos/${eventoParaEditar.id}` : `${API_URL}/eventos/`; // Barra final para POST
       const method = isEditing ? 'PUT' : 'POST';
@@ -282,7 +269,29 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
               </select>
               {validationErrors.tipo_evento && <div className="invalid-feedback d-block">{validationErrors.tipo_evento}</div>}
             </div>
-            <div className="col-md-6 mb-3">
+            
+            <div className="col-md-3 mb-3">
+              <label htmlFor="prioridade" className="form-label form-label-sm">Prioridade *</label>
+              <select name="prioridade" id="prioridade" className="form-select form-select-sm" value={formData.prioridade} onChange={handleChange}>
+                <option value="Baixa">Baixa</option>
+                <option value="Normal">Normal</option>
+                <option value="Alta">Alta</option>
+                <option value="Urgente">Urgente</option>
+              </select>
+            </div>
+
+            <div className="col-md-3 mb-3">
+              <label htmlFor="status_evento" className="form-label form-label-sm">Status *</label>
+              <select name="status_evento" id="status_evento" className="form-select form-select-sm" value={formData.status_evento} onChange={handleChange}>
+                <option value="Pendente">Pendente</option>
+                <option value="Concluído">Concluído</option>
+                <option value="Cancelado">Cancelado</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="col-md-12 mb-3">
               <label htmlFor="selectedClienteIdEvento" className="form-label form-label-sm">Filtrar Casos por Cliente (Opcional)</label>
               <select name="selectedClienteId" id="selectedClienteIdEvento" className="form-select form-select-sm" value={selectedClienteId} onChange={handleChange}>
                 <option value="">Todos os clientes (para casos)</option>

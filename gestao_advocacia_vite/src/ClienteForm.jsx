@@ -27,8 +27,6 @@ const initialStatePJ = {
 };
 
 function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
-  console.log("ClienteForm: Renderizando. Cliente para editar:", clienteParaEditar);
-
   const getInitialState = () => {
     if (clienteParaEditar && clienteParaEditar.tipo_pessoa === 'PJ') {
       return initialStatePJ;
@@ -41,6 +39,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
   const [loading, setLoading] = useState(false);
   const [loadingCep, setLoadingCep] = useState(false);
   const [loadingCnpj, setLoadingCnpj] = useState(false);
+  const [loadingOcr, setLoadingOcr] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
 
   const clearValidationErrors = useCallback(() => {
@@ -48,7 +47,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
   }, []);
 
   useEffect(() => {
-    console.log("ClienteForm: useEffect para clienteParaEditar. Valor:", clienteParaEditar);
     clearValidationErrors();
     if (clienteParaEditar && clienteParaEditar.id) {
       const initialStateForEdit = clienteParaEditar.tipo_pessoa === 'PJ' ? initialStatePJ : initialStatePF;
@@ -71,11 +69,9 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
 
       setFormData(dadosEdit);
       setIsEditing(true);
-      console.log("ClienteForm: Modo de edição. FormData definido:", dadosEdit);
     } else {
       setFormData(initialStatePF);
       setIsEditing(false);
-      console.log("ClienteForm: Modo de adição. FormData resetado para PF.");
     }
   }, [clienteParaEditar, clearValidationErrors]);
 
@@ -117,7 +113,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     
     setValidationErrors(errors);
     const isValid = Object.keys(errors).length === 0;
-    console.log("ClienteForm: Validação. Válido:", isValid, "Erros:", errors);
     return isValid;
   };
 
@@ -130,7 +125,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     let newFormData = { ...formData, [name]: value };
 
     if (name === "tipo_pessoa") {
-      console.log("ClienteForm: Tipo de pessoa alterado para:", value);
       const commonData = {
         nome_razao_social: formData.nome_razao_social,
         cep: formData.cep, rua: formData.rua, numero: formData.numero, bairro: formData.bairro,
@@ -196,7 +190,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
       return;
     }
     setLoadingCep(true);
-    console.log("ClienteForm: Buscando CEP:", apenasNumeros);
     try {
       const response = await fetch(`https://viacep.com.br/ws/${apenasNumeros}/json/`);
       if (!response.ok) throw new Error('Falha ao buscar CEP na API ViaCEP.');
@@ -227,7 +220,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     if (apenasNumeros.length !== 14) return;
 
     setLoadingCnpj(true);
-    console.log("ClienteForm: Buscando dados do CNPJ:", apenasNumeros, "para o campo:", campoOrigem);
     try {
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${apenasNumeros}`);
       if (!response.ok) {
@@ -236,8 +228,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
         return;
       }
       const data = await response.json();
-      console.log("ClienteForm: Dados do CNPJ recebidos:", data);
-
       if (campoOrigem === "cpf_cnpj") { // Apenas preenche tudo se for o CNPJ principal
         setFormData(prev => ({
           ...prev,
@@ -276,10 +266,102 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     }
   };
 
+  const handleFileUploadOcr = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    let totalSize = 0;
+    Array.from(files).forEach(f => { totalSize += f.size });
+    if (totalSize > 100 * 1024 * 1024) {
+        toast.warn("O tamanho total dos arquivos excede o limite de 100MB do Lote.");
+        return;
+    }
+
+    const permitidos = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'image/jpg'
+    ];
+    
+    let hasInvalid = false;
+    Array.from(files).forEach(file => {
+      if (!permitidos.includes(file.type) && !file.name.match(/\.(pdf|docx|xlsx|xls|txt|jpg|jpeg|png)$/i)) {
+          hasInvalid = true;
+      }
+    });
+
+    if (hasInvalid) {
+        toast.warn("Algum formato inválido no Lote. Envie apenas Documentos, Planilhas, Textos ou Imagens JPG/PNG.");
+        return;
+    }
+
+    setLoadingOcr(true);
+    const dataToSend = new FormData();
+    Array.from(files).forEach(file => {
+        dataToSend.append('documentos', file);
+    });
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/clientes/extrair-dados-doc`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: dataToSend
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Falha ao processar o documento PDF pelo OCR.');
+
+        let messageExtraida = [];
+        setFormData(prev => {
+            let updates = { ...prev };
+            if (data.cpf) {
+                updates.cpf_cnpj = formatCPFCNPJ(data.cpf, 'PF', false);
+                messageExtraida.push("CPF");
+            }
+            if (data.nome_razao_social) {
+                updates.nome_razao_social = data.nome_razao_social;
+                messageExtraida.push("Nome/Razão Social");
+            }
+            if (data.rg) {
+                updates.rg = data.rg;
+                messageExtraida.push("RG");
+            }
+            if (data.data_nascimento) {
+                updates.data_nascimento = data.data_nascimento;
+                messageExtraida.push("Data Nasc.");
+            }
+            if (data.nome_mae) {
+                const maeStr = `Nome da Mãe: ${data.nome_mae}`;
+                updates.notas_gerais = updates.notas_gerais ? `${updates.notas_gerais}\n${maeStr}` : maeStr;
+                messageExtraida.push("Filiação");
+            }
+            return updates;
+        });
+        
+        if (messageExtraida.length > 0) {
+            toast.success(`Leitura Mágica (OCR) de PDF concluída! Campos preenchidos: ${messageExtraida.join(', ')}`);
+        } else {
+            toast.info("Leitura concluída, mas as chaves biométricas não foram identificadas no arquivo submetido.");
+        }
+
+    } catch (err) {
+        console.error("ClienteForm OCR Error:", err);
+        toast.error(`Falha no OCR: ${err.message}`);
+    } finally {
+        setLoadingOcr(false);
+        // Reseta o input file para permitir o mesmo arquivo se necessário
+        e.target.value = null;
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("ClienteForm: handleSubmit chamado. FormData atual:", formData);
     clearValidationErrors();
     if (!validateForm()) {
       toast.error('Por favor, corrija os erros indicados no formulário.');
@@ -306,16 +388,13 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
         delete dadosParaEnviar.nome_fantasia; delete dadosParaEnviar.nire;
         delete dadosParaEnviar.inscricao_estadual; delete dadosParaEnviar.inscricao_municipal;
     }
-
-
-    console.log("ClienteForm: Enviando dados para API:", dadosParaEnviar);
-
     try {
       const url = isEditing ? `${API_URL}/clientes/${clienteParaEditar.id}` : `${API_URL}/clientes`;
       const method = isEditing ? 'PUT' : 'POST';
+      const token = localStorage.getItem('token');
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(dadosParaEnviar),
       });
 
@@ -443,6 +522,34 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
         <h5 className="mb-0">{isEditing ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</h5>
       </div>
       <div className="card-body p-4">
+        
+        {!isEditing && (
+            <div className="alert alert-secondary d-flex align-items-center mb-4" role="alert">
+                <div className="me-3">
+                    <span className="fs-3">📄✨</span>
+                </div>
+                <div className="flex-grow-1">
+                    <h6 className="mb-1 text-dark fw-bold">Auto-Preenchimento Mágico (Leitura IA)</h6>
+                    <p className="mb-0 small text-muted">Envie um arquivo PDF, Word, Excel, Imagem ou Texto e deixe nossa ferramenta extrair CNH/RG por você!</p>
+                </div>
+                <div>
+                    <input 
+                        type="file" 
+                        multiple
+                        accept="application/pdf, .docx, .xlsx, .xls, .txt, image/png, image/jpeg, image/jpg"
+                        id="documento_ocr" 
+                        style={{ display: 'none' }} 
+                        onChange={handleFileUploadOcr}
+                    />
+                    <label htmlFor="documento_ocr" className="btn btn-primary btn-sm ms-2 mb-0" style={{ cursor: 'pointer' }}>
+                        {loadingOcr ? (
+                            <><span className="spinner-border spinner-border-sm me-2"></span> Analisando Lote...</>
+                        ) : 'Importar Lote (Arqs/Fots)'}
+                    </label>
+                </div>
+            </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           <div className="row">
             <div className="col-md-6 mb-3">

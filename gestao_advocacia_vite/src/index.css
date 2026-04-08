@@ -1,75 +1,516 @@
-/* src/index.css */
-/* Este arquivo é para os seus estilos globais personalizados ou para sobrescrever estilos do Bootstrap. */
+/* src/index.css — Tema Moderno para Gestão Advocacia */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ===== VARIÁVEIS DE TEMA ===== */
+:root {
+  --sidebar-bg: #1a1d2e;
+  --sidebar-hover: #252840;
+  --sidebar-active: #3b5bdb;
+  --sidebar-text: #9ca3af;
+  --sidebar-text-active: #ffffff;
+  --sidebar-width: 260px;
+
+  --primary: #3b5bdb;
+  --primary-light: #dbe4ff;
+  --primary-hover: #364fc7;
+  --accent-success: #40c057;
+  --accent-warning: #fab005;
+  --accent-danger: #fa5252;
+  --accent-info: #15aabf;
+
+  --bg-main: #f1f3f5;
+  --bg-card: #ffffff;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-muted: #adb5bd;
+  --border-color: #e9ecef;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --transition: all 0.2s ease;
+}
+
+/* ===== RESET E BASE ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* O Bootstrap já define um fundo para o body (geralmente branco).
-    Se quiser sobrescrever para um fundo cinza claro específico, como tinha antes,
-    pode descomentar e ajustar a linha abaixo. No entanto, a área de conteúdo principal
-    no App.jsx já tem um backgroundColor: '#f8f9fa'.
-  */
-  /* background-color: #f8f9fa; */ /* Exemplo: Bootstrap light gray */
-  /* color: #212529; */ /* Exemplo: Bootstrap default text color */
-  margin: 0; /* Garante que não há margens padrão no body */
-  /* Garante que o body ocupe a altura total para o layout flex do App.jsx funcionar corretamente */
-  height: 100vh; 
-  overflow-x: hidden; /* Previne scroll horizontal indesejado no nível do body */
+  margin: 0;
+  height: 100vh;
+  overflow-x: hidden;
+  color: var(--text-primary);
+  background-color: var(--bg-main);
 }
 
-/* A div#root é o ponto de montagem do React.
-  Para que o layout flex do App.jsx (que usa d-flex vh-100) funcione corretamente
-  e ocupe toda a altura da viewport, a div#root também precisa ocupar 100% da altura.
-*/
 #root {
   height: 100%;
-  display: flex; /* Para garantir que o conteúdo dentro dele possa usar flex completamente */
-  flex-direction: column; /* Se o App.jsx for o único filho direto */
+  display: flex;
+  flex-direction: column;
 }
 
+/* ===== SIDEBAR ===== */
+.app-sidebar {
+  background: var(--sidebar-bg);
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  transition: var(--transition);
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: none;
+}
 
-/* Seus outros estilos globais personalizados podem vir aqui.
-   Por exemplo, se você tinha estilos importantes no seu App.css antigo (que não eram do Tailwind)
-   e decidiu não manter o App.css, você pode movê-los para cá.
+.sidebar-brand {
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
 
-   Lembre-se que as classes do Tailwind (como p-4, text-blue-500, rounded-lg, etc.)
-   NÃO funcionarão mais se você as removeu do projeto. Você precisará usar classes do Bootstrap
-   ou criar suas próprias classes CSS.
-*/
+.sidebar-brand-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--primary), #5c7cfa);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  color: #fff;
+  flex-shrink: 0;
+}
 
-/* Exemplo de estilo global (apenas para ilustração):
-   h1, h2, h3 {
-     color: #333;
-   }
-*/
+.sidebar-brand-text {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
 
-/* Estilos para o FullCalendar se você adicionou o plugin de Bootstrap 5 */
-/* Geralmente, o plugin @fullcalendar/bootstrap5 lida com isso, mas pode precisar de ajustes. */
-/* Se você adicionou classes personalizadas como fc-event-concluido ou fc-event-prazo */
+.sidebar-brand-sub {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--sidebar-text);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sidebar-nav {
+  padding: 0.75rem 0.75rem;
+  flex: 1;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: var(--transition);
+  margin-bottom: 2px;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-link:hover {
+  background: var(--sidebar-hover);
+  color: #e9ecef;
+  text-decoration: none;
+}
+
+.sidebar-link.active {
+  background: var(--sidebar-active);
+  color: var(--sidebar-text-active);
+  box-shadow: 0 2px 8px rgba(59, 91, 219, 0.3);
+}
+
+.sidebar-link-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.sidebar-link.active .sidebar-link-icon {
+  opacity: 1;
+}
+
+.sidebar-footer {
+  padding: 0.75rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: auto;
+}
+
+.sidebar-footer .sidebar-link {
+  color: var(--accent-danger);
+}
+
+.sidebar-footer .sidebar-link:hover {
+  background: rgba(250, 82, 82, 0.1);
+  color: #ff6b6b;
+}
+
+.sidebar-copyright {
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.2);
+  text-align: center;
+  padding: 0.5rem;
+}
+
+/* ===== HEADER ===== */
+.app-header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+}
+
+.app-header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* ===== CONTEÚDO PRINCIPAL ===== */
+.app-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background: var(--bg-main);
+}
+
+/* ===== CARDS MODERNOS ===== */
+.card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+  background: var(--bg-card);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.card-header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  padding: 1rem 1.25rem;
+  font-weight: 600;
+}
+
+/* ===== BOTÕES ===== */
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  box-shadow: 0 2px 8px rgba(59, 91, 219, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-outline-primary {
+  color: var(--primary);
+  border-color: var(--primary);
+  border-radius: var(--radius-sm);
+}
+
+.btn-outline-primary:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.btn {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: var(--transition);
+}
+
+/* ===== TABELAS ===== */
+.table {
+  font-size: 0.875rem;
+}
+
+.table thead th {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border-color);
+  padding: 0.75rem 1rem;
+}
+
+.table tbody td {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  border-color: var(--border-color);
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(59, 91, 219, 0.03);
+}
+
+/* ===== FORMULÁRIOS ===== */
+.form-control,
+.form-select {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  transition: var(--transition);
+  font-size: 0.875rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.15);
+}
+
+.form-label {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* ===== BADGES ===== */
+.badge {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: 50px;
+  padding: 0.35em 0.75em;
+}
+
+/* ===== ALERTS ===== */
+.alert {
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: 0.875rem;
+}
+
+/* ===== TOAST OVERRIDES ===== */
+.Toastify__toast {
+  border-radius: var(--radius-md) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.875rem !important;
+}
+
+/* ===== SPINNER ===== */
+.spinner-border {
+  color: var(--primary);
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ced4da;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #adb5bd;
+}
+
+/* Sidebar scrollbar */
+.app-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+}
+
+.app-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+/* ===== ANIMAÇÕES ===== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-main > * {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* ===== STAT CARDS (Dashboard) ===== */
+.card[role="button"] {
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.card[role="button"]:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ===== LOGIN / REGISTER ===== */
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1d2e 0%, #252840 50%, #2c3e6b 100%);
+}
+
+.auth-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 440px;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.auth-brand {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.auth-brand h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.02em;
+}
+
+.auth-brand p {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* ===== FULLCALENDAR OVERRIDES ===== */
 .fc-event-concluido {
-  background-color: #d1e7dd !important; /* Verde claro Bootstrap para sucesso */
+  background-color: #d1e7dd !important;
   border-color: #badbcc !important;
   color: #0f5132 !important;
 }
 .fc-event-concluido .fc-event-title,
-.fc-event-concluido .fc-event-time { /* Garante que o texto do horário também seja afetado */
+.fc-event-concluido .fc-event-time {
   text-decoration: line-through;
-  color: #0f5132 !important; /* Mantém a cor do texto consistente */
+  color: #0f5132 !important;
 }
 
 .fc-event-prazo {
-  background-color: #f8d7da !important; /* Vermelho claro Bootstrap para perigo */
+  background-color: #f8d7da !important;
   border-color: #f5c2c7 !important;
   color: #842029 !important;
 }
 .fc-event-prazo .fc-event-title,
 .fc-event-prazo .fc-event-time {
-    color: #842029 !important; /* Mantém a cor do texto consistente */
+  color: #842029 !important;
 }
 
-/* Ajustes para garantir que os ícones do Bootstrap 5 funcionem bem com FullCalendar */
 .fc-theme-bootstrap5 .fc-icon {
-  font-family: 'bootstrap-icons' !important; /* Garante que a fonte correta seja usada */
-  /* Outros ajustes podem ser necessários dependendo da sua configuração de ícones */
+  font-family: 'bootstrap-icons' !important;
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    height: 100vh;
+    z-index: 1050;
+    transition: left 0.3s ease;
+  }
+
+  .app-sidebar.open {
+    left: 0;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+  }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1040;
+  }
+
+  .sidebar-overlay.active {
+    display: block;
+  }
+
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+
+  .app-main {
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-menu-btn {
+    display: none !important;
+  }
+
+  .sidebar-overlay {
+    display: none !important;
+  }
+}
+
+.mobile-menu-btn {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  display: none;
+}
+
+.mobile-menu-btn svg {
+  width: 24px;
+  height: 24px;
 }

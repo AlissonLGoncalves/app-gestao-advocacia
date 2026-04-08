@@ -1,12 +1,11 @@
 // src/DespesaList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
-import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
+import { exportarParaPDF } from './utils/pdfGenerator.js';
 
 function DespesaList({ onEditDespesa, refreshKey }) {
-  console.log("DespesaList: Renderizando. RefreshKey:", refreshKey);
-
   const [despesas, setDespesas] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [casos, setCasos] = useState([]);
@@ -27,7 +26,6 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   const [sortConfig, setSortConfig] = useState({ key: 'data_vencimento', direction: 'desc' });
 
   const fetchClientesECasosParaFiltro = useCallback(async () => {
-    console.log("DespesaList: fetchClientesECasosParaFiltro chamado. Cliente para filtro de casos:", clienteFilter);
     const token = localStorage.getItem('token');
     if (!token) {
         // Não é ideal mostrar toast aqui, pois o fetch principal também verificará
@@ -41,8 +39,6 @@ function DespesaList({ onEditDespesa, refreshKey }) {
       if (!clientesRes.ok) throw new Error('Falha ao carregar clientes para filtro.');
       const clientesData = await clientesRes.json();
       setClientes(clientesData.clientes || []);
-      console.log("DespesaList: Clientes para filtro carregados:", clientesData.clientes);
-
       let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`;
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`;
@@ -51,8 +47,6 @@ function DespesaList({ onEditDespesa, refreshKey }) {
       if (!casosRes.ok) throw new Error('Falha ao carregar casos para filtro.');
       const casosData = await casosRes.json();
       setCasos(casosData.casos || []);
-      console.log("DespesaList: Casos para filtro carregados:", casosData.casos);
-
     } catch (err) {
       console.error("DespesaList: Erro ao buscar clientes/casos para filtro:", err);
       toast.error(`Erro ao carregar dados para filtros: ${err.message}`);
@@ -60,7 +54,6 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   }, [clienteFilter]);
 
   const fetchDespesas = useCallback(async () => {
-    console.log("DespesaList: fetchDespesas chamado. Configuração de ordenação:", sortConfig, "Filtros:", { searchTerm, clienteFilter, casoFilter, statusFilter });
     setLoading(true);
     setError('');
 
@@ -104,7 +97,6 @@ function DespesaList({ onEditDespesa, refreshKey }) {
       }
       const data = await response.json();
       setDespesas(data.despesas || []);
-      console.log("DespesaList: Despesas carregadas:", data.despesas);
     } catch (err) {
       console.error("DespesaList: Erro detalhado ao buscar despesas:", err);
       setError(`Erro ao carregar despesas: ${err.message}`);
@@ -113,7 +105,6 @@ function DespesaList({ onEditDespesa, refreshKey }) {
       }
     } finally {
       setLoading(false);
-      console.log("DespesaList: fetchDespesas finalizado.");
     }
   }, [searchTerm, clienteFilter, casoFilter, statusFilter, dataVencimentoInicio, dataVencimentoFim, dataDespesaInicio, dataDespesaFim, sortConfig]);
 
@@ -126,7 +117,6 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   }, [fetchDespesas, refreshKey]);
 
   const handleDeleteClick = async (id) => {
-    console.log("DespesaList: handleDeleteClick chamado para ID:", id);
     const token = localStorage.getItem('token');
     if (!token) {
         toast.error("Autenticação expirada. Faça login novamente.");
@@ -160,7 +150,6 @@ function DespesaList({ onEditDespesa, refreshKey }) {
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    console.log("DespesaList: requestSort. Nova ordenação:", { key, direction });
     setSortConfig({ key, direction });
   };
 
@@ -182,7 +171,6 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   };
 
   const resetFilters = () => {
-    console.log("DespesaList: resetFilters chamado.");
     setSearchTerm('');
     setClienteFilter('');
     setCasoFilter('');
@@ -194,8 +182,33 @@ function DespesaList({ onEditDespesa, refreshKey }) {
     setShowFilters(false);
   };
 
+  const handleExportPDF = () => {
+    if (despesas.length === 0) {
+      toast.warn("Não existem dados para exportar com os filtros atuais.");
+      return;
+    }
+
+    const headers = ["Descrição", "Caso Associado", "Valor", "Vencimento", "Data da Despesa", "Status"];
+    const dados = despesas.map(d => {
+      const valorStr = (typeof d.valor === 'number' || (typeof d.valor === 'string' && !isNaN(parseFloat(d.valor))))
+        ? parseFloat(d.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        : 'N/A';
+        
+      return [
+        d.descricao || '-',
+        d.caso_titulo || 'Despesa Geral',
+        valorStr,
+        d.data_vencimento ? new Date(d.data_vencimento).toLocaleDateString('pt-BR') : '-',
+        d.data_despesa ? new Date(d.data_despesa).toLocaleDateString('pt-BR') : '-',
+        d.status || '-'
+      ];
+    });
+
+    exportarParaPDF('Relatório de Despesas', headers, dados, 'relatorio_despesas.pdf');
+    toast.success("PDF gerado com sucesso!");
+  };
+
   if (loading && despesas.length === 0) {
-    console.log("DespesaList: Renderizando estado de carregamento inicial.");
     return (
       <div className="d-flex justify-content-center align-items-center p-5">
         <div className="spinner-border text-primary" role="status">
@@ -209,22 +222,30 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   if (error && despesas.length === 0) {
     return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
   }
-
-  console.log("DespesaList: Renderizando tabela de despesas ou mensagem de erro/lista vazia.");
   return (
     <div className="card shadow-sm">
       <div className="card-header bg-light p-3">
         <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
           <h6 className="mb-0 text-secondary me-3">Filtros e Busca de Despesas</h6>
-          <button
-            className="btn btn-sm btn-outline-secondary py-1 px-2 d-flex align-items-center"
-            onClick={() => setShowFilters(!showFilters)}
-            aria-expanded={showFilters}
-            aria-controls="filtrosAvancadosDespesas"
-          >
-            <FunnelIcon style={{width: '16px', height: '16px'}} className="me-1" />
-            {showFilters ? 'Ocultar Avançados' : 'Mostrar Avançados'}
-          </button>
+          <div>
+            <button
+              className="btn btn-sm btn-outline-danger py-1 px-2 me-2 d-inline-flex align-items-center"
+              onClick={handleExportPDF}
+              title="Gerar e Baixar Relatório em PDF das despesas listadas"
+            >
+              <DocumentArrowDownIcon style={{width: '16px', height: '16px'}} className="me-1" />
+              Exportar PDF
+            </button>
+            <button
+              className="btn btn-sm btn-outline-secondary py-1 px-2 d-inline-flex align-items-center"
+              onClick={() => setShowFilters(!showFilters)}
+              aria-expanded={showFilters}
+              aria-controls="filtrosAvancadosDespesas"
+            >
+              <FunnelIcon style={{width: '16px', height: '16px'}} className="me-1" />
+              {showFilters ? 'Ocultar Avançados' : 'Mostrar Avançados'}
+            </button>
+          </div>
         </div>
         <div className="row g-2 align-items-end">
           <div className="col-lg-3 col-md-6">

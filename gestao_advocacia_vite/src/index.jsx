@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App'; // Assume que App.jsx está na mesma pasta src/

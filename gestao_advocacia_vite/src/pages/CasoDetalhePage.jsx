@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { API_URL } from '../config.js'; // Importa API_URL
 import { toast } from 'react-toastify'; // Para notificações
+import HonorariosCasoCard from '../components/HonorariosCasoCard';
 
 // Componente auxiliar para exibir mensagens de status (loading, error, success)
 const StatusDisplay = ({ isLoading, error, successMessage, className = '' }) => {
@@ -228,6 +229,9 @@ function CasoDetalhePage() {
                     </div>
                 </div>
             </div>
+
+            {/* SEÇÃO DE HONORÁRIOS ADVOCATÍCIOS FINANCEIROS */}
+            <HonorariosCasoCard casoId={casoId} clienteId={caso.cliente_id} />
             
             <div className="card shadow-lg">
                 <div className="card-header bg-light py-3">

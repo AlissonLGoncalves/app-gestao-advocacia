@@ -1,17 +1,14 @@
-// src/ContasAPagarReport.jsx
+﻿// src/ContasAPagarReport.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
 import { toast } from 'react-toastify'; // Importar toast
 
 function ContasAPagarReport() {
-  console.log("ContasAPagarReport: Renderizando componente.");
-
   const [reportData, setReportData] = useState({ items: [], total_geral: "0.00", quantidade_items: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const fetchContasAPagar = useCallback(async () => {
-    console.log("ContasAPagarReport: fetchContasAPagar chamado.");
     setLoading(true);
     setError('');
     const token = localStorage.getItem('token');
@@ -32,7 +29,6 @@ function ContasAPagarReport() {
         throw new Error(errorData.erro || `Erro HTTP: ${response.status}`);
       }
       const data = await response.json();
-      console.log("ContasAPagarReport: Dados do relatório recebidos:", data);
       setReportData({
         items: data.items || [],
         total_geral: data.total_geral || "0.00",
@@ -46,7 +42,6 @@ function ContasAPagarReport() {
       }
     } finally {
       setLoading(false);
-      console.log("ContasAPagarReport: fetchContasAPagar finalizado.");
     }
   }, []);
 
@@ -55,7 +50,6 @@ function ContasAPagarReport() {
   }, [fetchContasAPagar]);
 
   if (loading) {
-    console.log("ContasAPagarReport: Renderizando estado de carregamento.");
     return (
       <div className="d-flex justify-content-center align-items-center p-4">
         <div className="spinner-border text-primary spinner-border-sm" role="status">
@@ -70,8 +64,6 @@ function ContasAPagarReport() {
     console.error("ContasAPagarReport: Renderizando estado de erro:", error);
     return <div className="alert alert-danger small" role="alert">Erro ao carregar relatório: {error}</div>;
   }
-
-  console.log("ContasAPagarReport: Renderizando tabela de relatório ou mensagem de lista vazia.");
   return (
     <div>
       <h6 className="mb-3">Relatório de Contas a Pagar</h6>

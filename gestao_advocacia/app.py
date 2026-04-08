@@ -21,7 +21,42 @@ from flask_apscheduler import APScheduler # IMPORT para o Scheduler
 from config import Config 
 from cnj_service import consultar_processo_cnj 
 from tasks import job_verificar_processos_cnj 
+from functools import wraps
+from flask_restx import abort
+from flask_jwt_extended import get_jwt
 
+def finance_access_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        claims = get_jwt()
+        if claims.get('role', '') == 'assistente':
+            abort(403, "Acesso negado: Perfil 'assistente' não tem acesso a dados financeiros.")
+        return fn(*args, **kwargs)
+    return wrapper
+
+def get_list_query(model):
+    user_id = get_jwt_identity()
+    claims = get_jwt()
+    role = claims.get('role', 'advogado')
+    if role in ['admin', 'assistente']:
+        return model.query
+    return model.query.filter_by(user_id=user_id)
+
+def get_item_or_404(model, item_id):
+    user_id = get_jwt_identity()
+    claims = get_jwt()
+    role = claims.get('role', 'advogado')
+    if role in ['admin', 'assistente']:
+        return model.query.get_or_404(item_id)
+    return get_item_or_404(model, item_id)
+
+def get_existing_item(model, **kwargs):
+    user_id = get_jwt_identity()
+    claims = get_jwt()
+    role = claims.get('role', 'advogado')
+    if role in ['admin', 'assistente']:
+        return model.query.filter_by(**kwargs).first()
+    return get_existing_item(model, **kwargs)
 # Inicialização das extensões
 db = SQLAlchemy()
 migrate = Migrate()
@@ -35,6 +70,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False) 
     email = db.Column(db.String(120), unique=True, nullable=False)
+    role = db.Column(db.String(20), nullable=False, default='admin') # admin, advogado, assistente
     
     casos = db.relationship('Caso', backref='responsavel_user', lazy='dynamic', foreign_keys='Caso.user_id')
     clientes = db.relationship('Cliente', backref='advogado_responsavel', lazy='dynamic', foreign_keys='Cliente.user_id')
@@ -42,6 +78,7 @@ class User(db.Model):
     documentos = db.relationship('Documento', backref='uploader_documento', lazy='dynamic', foreign_keys='Documento.user_id')
     despesas = db.relationship('Despesa', backref='registrador_despesa', lazy='dynamic', foreign_keys='Despesa.user_id')
     recebimentos = db.relationship('Recebimento', backref='registrador_recebimento', lazy='dynamic', foreign_keys='Recebimento.user_id')
+    contratos = db.relationship('ContratoHonorario', backref='responsavel_contrato', lazy='dynamic', foreign_keys='ContratoHonorario.user_id')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -50,49 +87,118 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
-        return {'id': self.id, 'username': self.username, 'email': self.email }
+        return {'id': self.id, 'username': self.username, 'email': self.email, 'role': self.role}
 
 class Cliente(db.Model):
     __tablename__ = 'cliente'
     id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(120), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=True)
+    # Dados principais
+    nome_razao_social = db.Column(db.String(200), nullable=False)
+    cpf_cnpj = db.Column(db.String(20), nullable=False)
+    tipo_pessoa = db.Column(db.String(2), nullable=False, default='PF')  # PF ou PJ
+    email = db.Column(db.String(120), nullable=True)
     telefone = db.Column(db.String(20), nullable=True)
+    # Campos PF
+    rg = db.Column(db.String(20), nullable=True)
+    orgao_emissor = db.Column(db.String(20), nullable=True)
+    data_nascimento = db.Column(db.Date, nullable=True)
+    estado_civil = db.Column(db.String(30), nullable=True)
+    profissao = db.Column(db.String(100), nullable=True)
+    nacionalidade = db.Column(db.String(60), nullable=True, default='Brasileiro(a)')
+    # Campos PJ
+    nome_fantasia = db.Column(db.String(200), nullable=True)
+    nire = db.Column(db.String(30), nullable=True)
+    inscricao_estadual = db.Column(db.String(30), nullable=True)
+    inscricao_municipal = db.Column(db.String(30), nullable=True)
+    cnpj_secundario = db.Column(db.String(20), nullable=True)
+    descricao_cnpj_secundario = db.Column(db.String(200), nullable=True)
+    cnpj_terciario = db.Column(db.String(20), nullable=True)
+    descricao_cnpj_terciario = db.Column(db.String(200), nullable=True)
+    # Endereço
+    cep = db.Column(db.String(10), nullable=True)
+    rua = db.Column(db.String(200), nullable=True)
+    numero = db.Column(db.String(20), nullable=True)
+    bairro = db.Column(db.String(100), nullable=True)
+    cidade = db.Column(db.String(100), nullable=True)
+    estado = db.Column(db.String(2), nullable=True)
+    pais = db.Column(db.String(60), nullable=True, default='Brasil')
+    # Outros
+    notas_gerais = db.Column(db.Text, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_cliente_user_id'), nullable=False)
     
     casos = db.relationship('Caso', backref='cliente_associado', lazy='dynamic', cascade="all, delete-orphan")
 
     def to_dict(self):
-        return {'id': self.id, 'nome': self.nome, 'email': self.email, 'telefone': self.telefone, 'user_id': self.user_id}
+        return {
+            'id': self.id, 'nome_razao_social': self.nome_razao_social,
+            'cpf_cnpj': self.cpf_cnpj, 'tipo_pessoa': self.tipo_pessoa,
+            'email': self.email, 'telefone': self.telefone,
+            'rg': self.rg, 'orgao_emissor': self.orgao_emissor,
+            'data_nascimento': self.data_nascimento.isoformat() if self.data_nascimento else None,
+            'estado_civil': self.estado_civil, 'profissao': self.profissao,
+            'nacionalidade': self.nacionalidade,
+            'nome_fantasia': self.nome_fantasia, 'nire': self.nire,
+            'inscricao_estadual': self.inscricao_estadual,
+            'inscricao_municipal': self.inscricao_municipal,
+            'cnpj_secundario': self.cnpj_secundario,
+            'descricao_cnpj_secundario': self.descricao_cnpj_secundario,
+            'cnpj_terciario': self.cnpj_terciario,
+            'descricao_cnpj_terciario': self.descricao_cnpj_terciario,
+            'cep': self.cep, 'rua': self.rua, 'numero': self.numero,
+            'bairro': self.bairro, 'cidade': self.cidade,
+            'estado': self.estado, 'pais': self.pais,
+            'notas_gerais': self.notas_gerais, 'user_id': self.user_id
+        }
 
 class Caso(db.Model):
     __tablename__ = 'caso'
     id = db.Column(db.Integer, primary_key=True)
-    nome_caso = db.Column(db.String(150), nullable=False)
-    numero_processo = db.Column(db.String(30), unique=False, nullable=True, index=True) 
-    descricao = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(255), nullable=True) 
+    titulo = db.Column(db.String(200), nullable=False)
+    numero_processo = db.Column(db.String(30), unique=False, nullable=True, index=True)
+    status = db.Column(db.String(50), nullable=True, default='Ativo')
+    # Dados processuais
+    tipo_acao = db.Column(db.String(100), nullable=True)
+    area_direito = db.Column(db.String(80), nullable=True)
+    fase_processual = db.Column(db.String(80), nullable=True)
+    vara_juizo = db.Column(db.String(100), nullable=True)
+    comarca = db.Column(db.String(100), nullable=True)
+    instancia = db.Column(db.String(50), nullable=True)
+    # Partes
+    parte_contraria = db.Column(db.String(200), nullable=True)
+    adv_parte_contraria = db.Column(db.String(200), nullable=True)
+    # Valores e datas
+    valor_causa = db.Column(db.Numeric(14, 2), nullable=True)
+    data_distribuicao = db.Column(db.Date, nullable=True)
+    notas_caso = db.Column(db.Text, nullable=True)
+    # Timestamps e relações
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id', name='fk_caso_cliente_id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_caso_user_id'), nullable=False)
-    
     data_ultima_verificacao_cnj = db.Column(db.DateTime, nullable=True)
-    
+
     movimentacoes_cnj = db.relationship('MovimentacaoCNJ', backref='caso_cnj_associado', lazy='dynamic', cascade="all, delete-orphan")
     documentos_caso = db.relationship('Documento', backref='caso_documento_associado', lazy='dynamic', cascade="all, delete-orphan")
     despesas_caso = db.relationship('Despesa', backref='caso_despesa_associado', lazy='dynamic', cascade="all, delete-orphan")
     recebimentos_caso = db.relationship('Recebimento', backref='caso_recebimento_associado', lazy='dynamic', cascade="all, delete-orphan")
+    contratos_caso = db.relationship('ContratoHonorario', backref='caso_contrato_associado', lazy='dynamic', cascade="all, delete-orphan")
 
-    def __repr__(self): return f'<Caso {self.id} - {self.nome_caso}>'
+    def __repr__(self): return f'<Caso {self.id} - {self.titulo}>'
     def to_dict(self):
+        cliente_obj = self.cliente_associado if hasattr(self, 'cliente_associado') else None
         return {
-            'id': self.id, 'nome_caso': self.nome_caso, 'numero_processo': self.numero_processo,
-            'descricao': self.descricao, 'status': self.status,
+            'id': self.id, 'titulo': self.titulo, 'numero_processo': self.numero_processo,
+            'status': self.status, 'tipo_acao': self.tipo_acao,
+            'area_direito': self.area_direito, 'fase_processual': self.fase_processual,
+            'vara_juizo': self.vara_juizo, 'comarca': self.comarca, 'instancia': self.instancia,
+            'parte_contraria': self.parte_contraria, 'adv_parte_contraria': self.adv_parte_contraria,
+            'valor_causa': str(self.valor_causa) if self.valor_causa else None,
+            'data_distribuicao': self.data_distribuicao.isoformat() if self.data_distribuicao else None,
+            'notas_caso': self.notas_caso,
             'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None,
             'data_atualizacao': self.data_atualizacao.isoformat() if self.data_atualizacao else None,
             'cliente_id': self.cliente_id,
-            'nome_cliente': self.cliente_associado.nome if hasattr(self, 'cliente_associado') and self.cliente_associado else None,
+            'cliente': {'id': cliente_obj.id, 'nome_razao_social': cliente_obj.nome_razao_social} if cliente_obj else None,
             'user_id': self.user_id,
             'data_ultima_verificacao_cnj': self.data_ultima_verificacao_cnj.isoformat() if self.data_ultima_verificacao_cnj else None,
             'movimentacoes_cnj_count': self.movimentacoes_cnj.count()
@@ -123,12 +229,24 @@ class EventoAgenda(db.Model):
     data_inicio = db.Column(db.DateTime, nullable=False)
     data_fim = db.Column(db.DateTime, nullable=True)
     descricao = db.Column(db.Text, nullable=True)
+    
+    # NOVAS COLUNAS PARA ALERTAS AUTOMÁTICOS
+    tipo_evento = db.Column(db.String(50), nullable=True, default='Outros') # Prazo, Audiência, Reunião, Outros
+    prioridade = db.Column(db.String(30), nullable=True, default='Normal') # Baixa, Normal, Alta, Urgente
+    status_evento = db.Column(db.String(30), nullable=True, default='Pendente') # Pendente, Concluído, Cancelado
+    notificacoes_enviadas = db.Column(db.JSON, nullable=True, default=dict) # Guarda estado {"7d": True, "3d": False}
+
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_evento_user_id'), nullable=False)
 
     def to_dict(self):
-        return {'id': self.id, 'title': self.titulo, 'start': self.data_inicio.isoformat(),
-                'end': self.data_fim.isoformat() if self.data_fim else None,
-                'description': self.descricao, 'user_id': self.user_id}
+        return {
+            'id': self.id, 'title': self.titulo, 'start': self.data_inicio.isoformat(),
+            'end': self.data_fim.isoformat() if self.data_fim else None,
+            'description': self.descricao, 
+            'tipo_evento': self.tipo_evento, 'prioridade': self.prioridade, 
+            'status_evento': self.status_evento, 'notificacoes_enviadas': self.notificacoes_enviadas,
+            'user_id': self.user_id
+        }
 
 class Documento(db.Model):
     __tablename__ = 'documento'
@@ -145,6 +263,32 @@ class Documento(db.Model):
                 'caso_id': self.caso_id, 'user_id': self.user_id,
                 'url_download': f"/api/documentos/download/{self.id}"
                 }
+
+class ContratoHonorario(db.Model):
+    __tablename__ = 'contrato_honorario'
+    id = db.Column(db.Integer, primary_key=True)
+    tipo_honorario = db.Column(db.String(50), nullable=False) # Fixo, Êxito, Mensal, Horas
+    valor_total = db.Column(db.Numeric(14, 2), nullable=True)
+    percentual_exito = db.Column(db.Numeric(5, 2), nullable=True)
+    data_assinatura = db.Column(db.Date, nullable=True)
+    status = db.Column(db.String(30), nullable=True, default='Ativo')
+    notas_condicoes = db.Column(db.Text, nullable=True)
+    
+    caso_id = db.Column(db.Integer, db.ForeignKey('caso.id', name='fk_contrato_caso_id'), nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id', name='fk_contrato_cliente_id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_contrato_user_id'), nullable=False)
+
+    recebimentos_contrato = db.relationship('Recebimento', backref='contrato_recebimento_associado', lazy='dynamic', cascade="all, delete-orphan")
+
+    def to_dict(self):
+        return {
+            'id': self.id, 'tipo_honorario': self.tipo_honorario,
+            'valor_total': str(self.valor_total) if self.valor_total else None,
+            'percentual_exito': str(self.percentual_exito) if self.percentual_exito else None,
+            'data_assinatura': self.data_assinatura.isoformat() if self.data_assinatura else None,
+            'status': self.status, 'notas_condicoes': self.notas_condicoes,
+            'caso_id': self.caso_id, 'cliente_id': self.cliente_id, 'user_id': self.user_id
+        }
 
 class Despesa(db.Model):
     __tablename__ = 'despesa'
@@ -170,11 +314,12 @@ class Recebimento(db.Model):
     recebido = db.Column(db.Boolean, default=False)
     caso_id = db.Column(db.Integer, db.ForeignKey('caso.id', name='fk_recebimento_caso_id'), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_recebimento_user_id'), nullable=False)
+    contrato_id = db.Column(db.Integer, db.ForeignKey('contrato_honorario.id', name='fk_recebimento_contrato_id'), nullable=True)
 
     def to_dict(self):
         return {'id': self.id, 'descricao': self.descricao, 'valor': str(self.valor),
                 'data_recebimento': self.data_recebimento.isoformat(), 'recebido': self.recebido,
-                'caso_id': self.caso_id, 'user_id': self.user_id}
+                'caso_id': self.caso_id, 'user_id': self.user_id, 'contrato_id': self.contrato_id}
 # --- FIM DOS MODELOS SQLAlchemy ---
 
 
@@ -224,6 +369,8 @@ def create_app(config_class=Config):
     documentos_ns = Namespace('documentos', description='Operações de Documentos')
     despesas_ns = Namespace('despesas', description='Operações de Despesas')
     recebimentos_ns = Namespace('recebimentos', description='Operações de Recebimentos')
+    dashboard_ns = Namespace('dashboard', description='Dados agregados para o Dashboard')
+    contratos_ns = Namespace('contratos', description='Operações relacionadas aos Contratos de Honorários')
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -232,59 +379,116 @@ def create_app(config_class=Config):
     api.add_namespace(documentos_ns)
     api.add_namespace(despesas_ns)
     api.add_namespace(recebimentos_ns)
+    api.add_namespace(dashboard_ns)
+    api.add_namespace(contratos_ns)
 
     # --- DEFINIÇÃO DOS MODELOS DA API (DTOs - Data Transfer Objects) para Flask-RESTx ---
     user_model_dto = auth_ns.model('UserRegistration', {
         'username': fields.String(required=True, description='Nome de usuário único'),
         'email': fields.String(required=True, description='Email único do usuário', format='email'),
-        'password': fields.String(required=True, description='Senha do usuário (mínimo 6 caracteres)', min_length=6)
+        'password': fields.String(required=True, description='Senha do usuário (mínimo 6 caracteres)', min_length=6),
+        'role': fields.String(description='Papel do usuário (admin, advogado, assistente)', default='admin', enum=['admin', 'advogado', 'assistente'])
     })
     login_model_dto = auth_ns.model('UserLogin', {
         'username_or_email': fields.String(required=True, description='Nome de usuário ou email para login'),
         'password': fields.String(required=True, description='Senha para login')
     })
-    token_model_dto = auth_ns.model('Token', {
-        'access_token': fields.String(description='Token de Acesso JWT gerado após login bem-sucedido')
-    })
     user_output_model_dto = auth_ns.model('UserOutput', {
         'id': fields.Integer(readonly=True, description='ID único do usuário'),
         'username': fields.String(description='Nome de usuário'),
-        'email': fields.String(description='Email do usuário')
+        'email': fields.String(description='Email do usuário'),
+        'role': fields.String(description='Papel do usuário no sistema')
+    })
+    token_model_dto = auth_ns.model('Token', {
+        'access_token': fields.String(description='Token de Acesso JWT gerado após login bem-sucedido'),
+        'user': fields.Nested(user_output_model_dto, description='Dados do usuário', skip_none=True)
     })
 
     cliente_input_model_dto = clientes_ns.model('ClienteInput', {
-        'nome': fields.String(required=True, description='Nome completo do cliente'),
-        'email': fields.String(description='Email do cliente (opcional, mas útil para contato)'),
-        'telefone': fields.String(description='Telefone do cliente (opcional)')
+        'nome_razao_social': fields.String(required=True, description='Nome completo ou Razão Social'),
+        'cpf_cnpj': fields.String(required=True, description='CPF ou CNPJ principal'),
+        'tipo_pessoa': fields.String(required=True, description='PF ou PJ', enum=['PF', 'PJ']),
+        'email': fields.String(description='Email do cliente'),
+        'telefone': fields.String(description='Telefone do cliente'),
+        'rg': fields.String(description='RG (PF)'),
+        'orgao_emissor': fields.String(description='Órgão emissor do RG'),
+        'data_nascimento': fields.String(description='Data de nascimento (YYYY-MM-DD)'),
+        'estado_civil': fields.String(description='Estado civil'),
+        'profissao': fields.String(description='Profissão'),
+        'nacionalidade': fields.String(description='Nacionalidade'),
+        'nome_fantasia': fields.String(description='Nome Fantasia (PJ)'),
+        'nire': fields.String(description='NIRE (PJ)'),
+        'inscricao_estadual': fields.String(description='Inscrição Estadual (PJ)'),
+        'inscricao_municipal': fields.String(description='Inscrição Municipal (PJ)'),
+        'cnpj_secundario': fields.String(description='CNPJ Secundário (PJ)'),
+        'descricao_cnpj_secundario': fields.String(description='Descrição do CNPJ Secundário'),
+        'cnpj_terciario': fields.String(description='CNPJ Terciário (PJ)'),
+        'descricao_cnpj_terciario': fields.String(description='Descrição do CNPJ Terciário'),
+        'cep': fields.String(description='CEP'),
+        'rua': fields.String(description='Rua/Logradouro'),
+        'numero': fields.String(description='Número'),
+        'bairro': fields.String(description='Bairro'),
+        'cidade': fields.String(description='Cidade'),
+        'estado': fields.String(description='Estado (UF)'),
+        'pais': fields.String(description='País'),
+        'notas_gerais': fields.String(description='Notas gerais sobre o cliente'),
     })
     cliente_model_dto = clientes_ns.model('ClienteOutput', {
         'id': fields.Integer(readonly=True, description='ID único do cliente'),
-        'nome': fields.String(required=True, description='Nome do cliente'),
+        'nome_razao_social': fields.String(description='Nome completo ou Razão Social'),
+        'cpf_cnpj': fields.String(description='CPF ou CNPJ principal'),
+        'tipo_pessoa': fields.String(description='PF ou PJ'),
         'email': fields.String(description='Email do cliente'),
         'telefone': fields.String(description='Telefone do cliente'),
+        'rg': fields.String, 'orgao_emissor': fields.String,
+        'data_nascimento': fields.String,
+        'estado_civil': fields.String, 'profissao': fields.String,
+        'nacionalidade': fields.String,
+        'nome_fantasia': fields.String, 'nire': fields.String,
+        'inscricao_estadual': fields.String, 'inscricao_municipal': fields.String,
+        'cnpj_secundario': fields.String, 'descricao_cnpj_secundario': fields.String,
+        'cnpj_terciario': fields.String, 'descricao_cnpj_terciario': fields.String,
+        'cep': fields.String, 'rua': fields.String, 'numero': fields.String,
+        'bairro': fields.String, 'cidade': fields.String,
+        'estado': fields.String, 'pais': fields.String,
+        'notas_gerais': fields.String,
         'user_id': fields.Integer(description='ID do usuário advogado responsável')
     })
 
     caso_input_model_dto = casos_ns.model('CasoInput', {
-        'nome_caso': fields.String(required=True, description='Título ou nome identificador do caso'),
-        'numero_processo': fields.String(description='Número do processo no formato CNJ (ex: NNNNNNN-DD.AAAA.J.TR.OOOO)'),
-        'descricao': fields.String(description='Descrição detalhada ou anotações sobre o caso'),
-        'status': fields.String(description='Status atual do caso (ex: Em Andamento, Concluído, Suspenso)'),
-        'cliente_id': fields.Integer(required=True, description='ID do cliente ao qual este caso está associado')
+        'titulo': fields.String(required=True, description='Título do caso'),
+        'numero_processo': fields.String(description='Número do processo CNJ'),
+        'status': fields.String(description='Status (Ativo, Suspenso, Encerrado, Arquivado)'),
+        'tipo_acao': fields.String(description='Tipo de ação'),
+        'area_direito': fields.String(description='Área do direito'),
+        'fase_processual': fields.String(description='Fase processual'),
+        'vara_juizo': fields.String(description='Vara/Juízo'),
+        'comarca': fields.String(description='Comarca'),
+        'instancia': fields.String(description='Instância'),
+        'parte_contraria': fields.String(description='Parte contrária'),
+        'adv_parte_contraria': fields.String(description='Advogado da parte contrária'),
+        'valor_causa': fields.Float(description='Valor da causa em R$'),
+        'data_distribuicao': fields.String(description='Data de distribuição (YYYY-MM-DD)'),
+        'notas_caso': fields.String(description='Notas sobre o caso'),
+        'cliente_id': fields.Integer(required=True, description='ID do cliente associado')
     })
     caso_model_dto = casos_ns.model('CasoOutput', {
         'id': fields.Integer(readonly=True),
-        'nome_caso': fields.String,
-        'numero_processo': fields.String,
-        'descricao': fields.String,
+        'titulo': fields.String, 'numero_processo': fields.String,
         'status': fields.String,
+        'tipo_acao': fields.String, 'area_direito': fields.String,
+        'fase_processual': fields.String,
+        'vara_juizo': fields.String, 'comarca': fields.String, 'instancia': fields.String,
+        'parte_contraria': fields.String, 'adv_parte_contraria': fields.String,
+        'valor_causa': fields.String, 'data_distribuicao': fields.String,
+        'notas_caso': fields.String,
         'data_criacao': fields.DateTime(dt_format='iso8601'),
         'data_atualizacao': fields.DateTime(dt_format='iso8601'),
         'cliente_id': fields.Integer,
-        'nome_cliente': fields.String(attribute='cliente_associado.nome', description='Nome do cliente associado (se disponível e carregado)'),
+        'cliente': fields.Raw(description='Objeto cliente {id, nome_razao_social}'),
         'user_id': fields.Integer,
-        'data_ultima_verificacao_cnj': fields.DateTime(dt_format='iso8601', nullable=True, description='Data da última verificação de atualizações no CNJ'),
-        'movimentacoes_cnj_count': fields.Integer(description='Quantidade de movimentações do CNJ registradas para este caso')
+        'data_ultima_verificacao_cnj': fields.DateTime(dt_format='iso8601', nullable=True),
+        'movimentacoes_cnj_count': fields.Integer
     })
 
     movimentacao_cnj_output_model_dto = casos_ns.model('MovimentacaoCNJOutput', {
@@ -297,9 +501,12 @@ def create_app(config_class=Config):
     
     evento_input_model_dto = eventos_ns.model('EventoInput', {
         'titulo': fields.String(required=True, description='Título do evento da agenda'),
-        'data_inicio': fields.DateTime(required=True, description='Data e hora de início do evento (formato ISO 8601)'),
-        'data_fim': fields.DateTime(description='Data e hora de término do evento (formato ISO 8601, opcional)'),
-        'descricao': fields.String(description='Descrição ou detalhes adicionais sobre o evento')
+        'data_inicio': fields.DateTime(required=True, description='Data e hora de início (formato ISO 8601)'),
+        'data_fim': fields.DateTime(description='Data e hora de término (formato ISO 8601)'),
+        'descricao': fields.String(description='Descrição extra'),
+        'tipo_evento': fields.String(description='Prazo, Audiência, Reunião, Outros'),
+        'prioridade': fields.String(description='Baixa, Normal, Alta, Urgente'),
+        'status_evento': fields.String(description='Pendente, Concluído, Cancelado')
     })
     evento_model_dto = eventos_ns.model('EventoOutput', {
         'id': fields.Integer(readonly=True),
@@ -307,6 +514,10 @@ def create_app(config_class=Config):
         'start': fields.DateTime(attribute='data_inicio', dt_format='iso8601', description='Início do evento (compatível com FullCalendar)'),
         'end': fields.DateTime(attribute='data_fim', dt_format='iso8601', nullable=True, description='Fim do evento (compatível com FullCalendar)'),
         'description': fields.String(attribute='descricao', nullable=True, description='Descrição do evento'),
+        'tipo_evento': fields.String,
+        'prioridade': fields.String,
+        'status_evento': fields.String,
+        'notificacoes_enviadas': fields.Raw(description='Dicionário controlando as notificações já enviadas'),
         'user_id': fields.Integer(description='ID do usuário criador do evento')
     })
 
@@ -354,6 +565,89 @@ def create_app(config_class=Config):
     })
 
 
+
+    contrato_input_model_dto = contratos_ns.model('ContratoInput', {
+        'tipo_honorario': fields.String(required=True, description='Fixo, Êxito, Mensal ou Horas', enum=['Fixo', 'Êxito', 'Mensal', 'Horas']),
+        'valor_total': fields.Float(description='Valor total ou Mensal (se aplicável)', min=0.0),
+        'percentual_exito': fields.Float(description='Percentual de Êxito (%) se aplicável', min=0.0, max=100.0),
+        'data_assinatura': fields.Date(description='Data de assinatura do contrato (YYYY-MM-DD)'),
+        'status': fields.String(description='Status', default='Ativo', enum=['Ativo', 'Finalizado', 'Cancelado', 'Inadimplente']),
+        'notas_condicoes': fields.String(description='Notas/Condições'),
+        'caso_id': fields.Integer(required=True, description='ID do caso vinculado'),
+        'cliente_id': fields.Integer(required=True, description='ID do cliente')
+    })
+    contrato_model_dto = contratos_ns.model('ContratoOutput', {
+        'id': fields.Integer(readonly=True),
+        'tipo_honorario': fields.String,
+        'valor_total': fields.String(attribute=lambda x: str(x.valor_total) if x.valor_total else None),
+        'percentual_exito': fields.String(attribute=lambda x: str(x.percentual_exito) if x.percentual_exito else None),
+        'data_assinatura': fields.Date(dt_format='iso8601'),
+        'status': fields.String,
+        'notas_condicoes': fields.String,
+        'caso_id': fields.Integer,
+        'cliente_id': fields.Integer,
+        'user_id': fields.Integer
+    })
+
+    # --- ENDPOINT DO DASHBOARD ---
+    @dashboard_ns.route('/stats')
+    class DashboardStatsAPI(Resource):
+        @jwt_required()
+        @dashboard_ns.doc(security='jsonWebToken', description="Retorna estatísticas consolidadas para o Dashboard.")
+        def get(self):
+            user_id = get_jwt_identity()
+
+            # Total de clientes
+            total_clientes = Cliente.query.filter_by(user_id=user_id).count()
+
+            # Casos ativos (status diferente de 'Concluído', 'Arquivado', 'Encerrado')
+            status_inativos = ['Concluído', 'Arquivado', 'Encerrado']
+            casos_ativos = Caso.query.filter(
+                Caso.user_id == user_id,
+                ~Caso.status.in_(status_inativos)
+            ).count()
+
+            # Recebimentos pendentes (não recebidos)
+            recebimentos_pendentes = Recebimento.query.filter_by(user_id=user_id, recebido=False).all()
+            recebimentos_pendentes_qtd = len(recebimentos_pendentes)
+            recebimentos_pendentes_valor = sum(float(r.valor) for r in recebimentos_pendentes)
+
+            # Despesas a pagar (não pagas)
+            despesas_a_pagar = Despesa.query.filter_by(user_id=user_id, pago=False).all()
+            despesas_a_pagar_qtd = len(despesas_a_pagar)
+            despesas_a_pagar_valor = sum(float(d.valor) for d in despesas_a_pagar)
+
+            # Próximos eventos (futuros, ordenados por data, limite de 5)
+            agora = datetime.utcnow()
+            proximos_eventos = EventoAgenda.query.filter(
+                EventoAgenda.user_id == user_id,
+                EventoAgenda.data_inicio >= agora
+            ).order_by(EventoAgenda.data_inicio.asc()).limit(5).all()
+
+            eventos_lista = []
+            for ev in proximos_eventos:
+                eventos_lista.append({
+                    'id': ev.id,
+                    'titulo': ev.titulo,
+                    'data_inicio': ev.data_inicio.isoformat() if ev.data_inicio else None,
+                    'data_fim': ev.data_fim.isoformat() if ev.data_fim else None,
+                    'descricao': ev.descricao
+                })
+
+            return {
+                'total_clientes': total_clientes,
+                'casos_ativos': casos_ativos,
+                'recebimentos_pendentes': {
+                    'quantidade': recebimentos_pendentes_qtd,
+                    'valor_total': round(recebimentos_pendentes_valor, 2)
+                },
+                'despesas_a_pagar': {
+                    'quantidade': despesas_a_pagar_qtd,
+                    'valor_total': round(despesas_a_pagar_valor, 2)
+                },
+                'proximos_eventos': eventos_lista
+            }, 200
+
     # --- ROTAS DA API (Endpoints) ---
     @auth_ns.route('/register')
     class UserRegister(Resource):
@@ -366,6 +660,10 @@ def create_app(config_class=Config):
             username = data.get('username')
             email = data.get('email')
             password = data.get('password')
+            role = data.get('role', 'admin')
+
+            if role not in ['admin', 'advogado', 'assistente']:
+                return {"message": "Role deve ser admin, advogado ou assistente."}, 400
 
             if not username or not email or not password:
                 return {"message": "Todos os campos (username, email, password) são obrigatórios."}, 400
@@ -377,7 +675,7 @@ def create_app(config_class=Config):
             if User.query.filter_by(email=email).first():
                 return {"message": "Email já cadastrado."}, 409
             
-            new_user = User(username=username, email=email)
+            new_user = User(username=username, email=email, role=role)
             new_user.set_password(password)
             db.session.add(new_user)
             db.session.commit()
@@ -398,10 +696,10 @@ def create_app(config_class=Config):
             
             if user and user.check_password(password):
                 expires = timedelta(days=app.config.get('JWT_ACCESS_TOKEN_EXPIRES_DAYS', 1))
-                # Converta user.id para string AQUI:
-                access_token = create_access_token(identity=str(user.id), expires_delta=expires) 
+                # Converta user.id para string AQUI e adicione role como claim_adicional:
+                access_token = create_access_token(identity=str(user.id), additional_claims={'role': user.role}, expires_delta=expires) 
                 app.logger.info(f"Usuário {user.username} (ID: {user.id}) logado com sucesso.")
-                return {'access_token': access_token}, 200
+                return {'access_token': access_token, 'user': user.to_dict()}, 200
             app.logger.warning(f"Tentativa de login falhou para: {username_or_email}")
             return {'message': 'Nome de usuário/email ou senha inválidos.'}, 401
 
@@ -419,6 +717,92 @@ def create_app(config_class=Config):
                 return {"message": "Usuário associado ao token não encontrado."}, 404
             return user, 200
 
+    def _preencher_cliente_from_data(cliente, data):
+        """Helper para preencher campos do cliente a partir dos dados recebidos."""
+        cliente.nome_razao_social = data.get('nome_razao_social', cliente.nome_razao_social)
+        cliente.tipo_pessoa = data.get('tipo_pessoa', cliente.tipo_pessoa)
+        cliente.email = data.get('email', cliente.email)
+        cliente.telefone = data.get('telefone', cliente.telefone)
+        # Campos PF
+        cliente.rg = data.get('rg', cliente.rg)
+        cliente.orgao_emissor = data.get('orgao_emissor', cliente.orgao_emissor)
+        dn = data.get('data_nascimento')
+        if dn:
+            try:
+                cliente.data_nascimento = datetime.strptime(dn, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                pass
+        elif dn == '' or dn is None:
+            cliente.data_nascimento = None
+        cliente.estado_civil = data.get('estado_civil', cliente.estado_civil)
+        cliente.profissao = data.get('profissao', cliente.profissao)
+        cliente.nacionalidade = data.get('nacionalidade', cliente.nacionalidade)
+        # Campos PJ
+        cliente.nome_fantasia = data.get('nome_fantasia', cliente.nome_fantasia)
+        cliente.nire = data.get('nire', cliente.nire)
+        cliente.inscricao_estadual = data.get('inscricao_estadual', cliente.inscricao_estadual)
+        cliente.inscricao_municipal = data.get('inscricao_municipal', cliente.inscricao_municipal)
+        cliente.cnpj_secundario = data.get('cnpj_secundario', cliente.cnpj_secundario)
+        cliente.descricao_cnpj_secundario = data.get('descricao_cnpj_secundario', cliente.descricao_cnpj_secundario)
+        cliente.cnpj_terciario = data.get('cnpj_terciario', cliente.cnpj_terciario)
+        cliente.descricao_cnpj_terciario = data.get('descricao_cnpj_terciario', cliente.descricao_cnpj_terciario)
+        # Endereço
+        cliente.cep = data.get('cep', cliente.cep)
+        cliente.rua = data.get('rua', cliente.rua)
+        cliente.numero = data.get('numero', cliente.numero)
+        cliente.bairro = data.get('bairro', cliente.bairro)
+        cliente.cidade = data.get('cidade', cliente.cidade)
+        cliente.estado = data.get('estado', cliente.estado)
+        cliente.pais = data.get('pais', cliente.pais)
+        # Outros
+        cliente.notas_gerais = data.get('notas_gerais', cliente.notas_gerais)
+        return cliente
+
+    from werkzeug.datastructures import FileStorage
+    upload_parser = clientes_ns.parser()
+    upload_parser.add_argument('documentos', location='files', type=FileStorage, required=True, action='append', help='Arquivos para OCR Biométrico (Até 100MB)')
+
+    @clientes_ns.route('/extrair-dados-doc')
+    class ClienteExtrairDadosAPI(Resource):
+        @jwt_required()
+        @clientes_ns.doc(security='jsonWebToken', description="Processa um Lote de Documentos com OCR nativo para extração de dados.")
+        def post(self):
+            user_id = get_jwt_identity()
+            if 'documentos' not in request.files:
+                return {"message": "Nenhum arquivo 'documentos' foi enviado no form-data."}, 400
+            
+            files = request.files.getlist('documentos')
+            if not files or files[0].filename == '':
+                return {"message": "Nenhum arquivo selecionado."}, 400
+                
+            PERMITIDOS = ['.pdf', '.txt', '.docx', '.xlsx', '.xls', '.jpg', '.jpeg', '.png']
+            
+            try:
+                from gestao_advocacia.ocr_service import extract_client_data_from_file
+                combined_data = {}
+                
+                for file in files:
+                    extensao = '.' + file.filename.split('.')[-1].lower() if '.' in file.filename else ''
+                    if extensao not in PERMITIDOS:
+                        continue
+                        
+                    dados = extract_client_data_from_file(file.stream, file.filename)
+                    file.stream.seek(0)
+                    
+                    if "error" not in dados:
+                        for k, v in dados.items():
+                            if v and not combined_data.get(k):
+                                combined_data[k] = v
+                
+                if not combined_data:
+                    return {"message": "Motor finalizado sem identificar Biometrias visíveis nesta bateria de arquivos."}, 422
+                    
+                app.logger.info(f"Dados OCR LOTE extraídos com sucesso para usuário {user_id}. CPF Pescado: {combined_data.get('cpf', 'N/A')}")
+                return combined_data, 200
+            except Exception as e:
+                app.logger.error(f"Erro Crítico de OCR: {str(e)}")
+                return {"message": f"Erro interno de processamento dos arquivos: {str(e)}"}, 500
+
     @clientes_ns.route('/')
     class ClienteListAPI(Resource):
         @jwt_required()
@@ -426,7 +810,7 @@ def create_app(config_class=Config):
         @clientes_ns.doc(security='jsonWebToken', description="Lista todos os clientes do usuário autenticado.")
         def get(self):
             user_id = get_jwt_identity()
-            clientes = Cliente.query.filter_by(user_id=user_id).order_by(Cliente.nome.asc()).all()
+            clientes = get_list_query(Cliente).order_by(Cliente.nome_razao_social.asc()).all()
             return clientes
 
         @jwt_required()
@@ -436,16 +820,20 @@ def create_app(config_class=Config):
         def post(self):
             user_id = get_jwt_identity()
             data = request.get_json()
-            if not data.get('nome'): 
-                return {"message": "O nome do cliente é um campo obrigatório."}, 400
-            if data.get('email'):
-                email_existente = Cliente.query.filter_by(user_id=user_id, email=data.get('email')).first()
-                if email_existente:
-                     return {"message": f"Um cliente com o email '{data.get('email')}' já está cadastrado."}, 409
-            novo_cliente = Cliente(nome=data['nome'], email=data.get('email'), telefone=data.get('telefone'), user_id=user_id)
+            if not data.get('nome_razao_social') or not data.get('cpf_cnpj') or not data.get('tipo_pessoa'):
+                return {"message": "Nome/Razão Social, CPF/CNPJ e Tipo de Pessoa são obrigatórios."}, 400
+            if data['tipo_pessoa'] not in ('PF', 'PJ'):
+                return {"message": "Tipo de pessoa deve ser 'PF' ou 'PJ'."}, 400
+            # Verificar CPF/CNPJ duplicado para o mesmo usuário
+            cpf_cnpj_limpo = data['cpf_cnpj'].strip()
+            existente = get_existing_item(Cliente, cpf_cnpj=cpf_cnpj_limpo)
+            if existente:
+                return {"message": f"Já existe um cliente com o CPF/CNPJ '{cpf_cnpj_limpo}'."}, 409
+            novo_cliente = Cliente(cpf_cnpj=cpf_cnpj_limpo, user_id=user_id)
+            _preencher_cliente_from_data(novo_cliente, data)
             db.session.add(novo_cliente)
             db.session.commit()
-            app.logger.info(f"Novo cliente '{novo_cliente.nome}' (ID: {novo_cliente.id}) criado para usuário ID {user_id}.")
+            app.logger.info(f"Novo cliente '{novo_cliente.nome_razao_social}' (ID: {novo_cliente.id}) criado para usuário ID {user_id}.")
             return novo_cliente, 201
 
     @clientes_ns.route('/<int:cliente_id_param>')
@@ -457,7 +845,7 @@ def create_app(config_class=Config):
         @clientes_ns.doc(security='jsonWebToken', description="Obtém os detalhes de um cliente específico.")
         def get(self, cliente_id_param):
             user_id = get_jwt_identity()
-            cliente = Cliente.query.filter_by(id=cliente_id_param, user_id=user_id).first_or_404()
+            cliente = get_item_or_404(Cliente, cliente_id_param)
             return cliente
 
         @jwt_required()
@@ -466,17 +854,11 @@ def create_app(config_class=Config):
         @clientes_ns.doc(security='jsonWebToken', description="Atualiza os dados de um cliente existente.")
         def put(self, cliente_id_param):
             user_id = get_jwt_identity()
-            cliente = Cliente.query.filter_by(id=cliente_id_param, user_id=user_id).first_or_404()
+            cliente = get_item_or_404(Cliente, cliente_id_param)
             data = request.get_json()
-            if not data.get('nome'):
-                return {"message": "O nome do cliente é obrigatório."}, 400
-            novo_email = data.get('email')
-            if novo_email and novo_email != cliente.email:
-                if Cliente.query.filter(Cliente.user_id == user_id, Cliente.email == novo_email, Cliente.id != cliente_id_param).first():
-                    return {"message": f"Outro cliente já utiliza o email '{novo_email}'."}, 409
-            cliente.nome = data['nome']
-            cliente.email = novo_email if novo_email is not None else cliente.email
-            cliente.telefone = data.get('telefone', cliente.telefone)
+            if not data.get('nome_razao_social'):
+                return {"message": "Nome/Razão Social é obrigatório."}, 400
+            _preencher_cliente_from_data(cliente, data)
             db.session.commit()
             app.logger.info(f"Cliente ID {cliente.id} atualizado pelo usuário ID {user_id}.")
             return cliente
@@ -487,13 +869,42 @@ def create_app(config_class=Config):
         @clientes_ns.doc(security='jsonWebToken', description="Deleta um cliente, se não houver casos associados.")
         def delete(self, cliente_id_param):
             user_id = get_jwt_identity()
-            cliente = Cliente.query.filter_by(id=cliente_id_param, user_id=user_id).first_or_404()
+            cliente = get_item_or_404(Cliente, cliente_id_param)
             if cliente.casos.first():
                 return {"message": "Não é possível deletar cliente com casos associados."}, 400
             db.session.delete(cliente)
             db.session.commit()
-            app.logger.info(f"Cliente ID {cliente.id} ('{cliente.nome}') deletado pelo usuário ID {user_id}.")
+            app.logger.info(f"Cliente ID {cliente.id} ('{cliente.nome_razao_social}') deletado pelo usuário ID {user_id}.")
             return '', 204
+
+    def _preencher_caso_from_data(caso, data):
+        """Helper para preencher campos do caso a partir dos dados recebidos."""
+        caso.titulo = data.get('titulo', caso.titulo)
+        caso.status = data.get('status', caso.status)
+        caso.tipo_acao = data.get('tipo_acao', caso.tipo_acao)
+        caso.area_direito = data.get('area_direito', caso.area_direito)
+        caso.fase_processual = data.get('fase_processual', caso.fase_processual)
+        caso.vara_juizo = data.get('vara_juizo', caso.vara_juizo)
+        caso.comarca = data.get('comarca', caso.comarca)
+        caso.instancia = data.get('instancia', caso.instancia)
+        caso.parte_contraria = data.get('parte_contraria', caso.parte_contraria)
+        caso.adv_parte_contraria = data.get('adv_parte_contraria', caso.adv_parte_contraria)
+        vc = data.get('valor_causa')
+        if vc is not None:
+            try:
+                caso.valor_causa = float(vc) if vc != '' else None
+            except (ValueError, TypeError):
+                pass
+        dd = data.get('data_distribuicao')
+        if dd:
+            try:
+                caso.data_distribuicao = datetime.strptime(dd, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                pass
+        elif dd == '' or dd is None:
+            caso.data_distribuicao = None
+        caso.notas_caso = data.get('notas_caso', caso.notas_caso)
+        return caso
 
     @casos_ns.route('/')
     class CasoListAPI(Resource):
@@ -502,7 +913,7 @@ def create_app(config_class=Config):
         @casos_ns.doc(security='jsonWebToken', description="Lista todos os casos jurídicos do usuário.")
         def get(self):
             user_id = get_jwt_identity()
-            casos = Caso.query.filter_by(user_id=user_id).order_by(Caso.data_atualizacao.desc()).all()
+            casos = get_list_query(Caso).order_by(Caso.data_atualizacao.desc()).all()
             return casos
 
         @jwt_required()
@@ -512,22 +923,23 @@ def create_app(config_class=Config):
         def post(self):
             user_id = get_jwt_identity()
             data = request.get_json()
-            if not data.get('nome_caso') or data.get('cliente_id') is None:
-                return {"message": "Nome do caso e ID do cliente são obrigatórios."}, 400
+            if not data.get('titulo') or data.get('cliente_id') is None:
+                return {"message": "Título do caso e ID do cliente são obrigatórios."}, 400
             cliente = Cliente.query.filter_by(id=data['cliente_id'], user_id=user_id).first()
             if not cliente:
                 return {"message": f"Cliente com ID {data['cliente_id']} não encontrado."}, 404
             num_proc_strip = data.get('numero_processo', '').strip() or None
-            if num_proc_strip and Caso.query.filter_by(user_id=user_id, numero_processo=num_proc_strip).first():
+            if num_proc_strip and get_existing_item(Caso, numero_processo=num_proc_strip):
                 return {"message": f"Já existe um caso com o número de processo '{num_proc_strip}'."}, 409
             novo_caso = Caso(
-                nome_caso=data['nome_caso'], numero_processo=num_proc_strip,
-                descricao=data.get('descricao'), status=data.get('status', 'Aberto'),
+                titulo=data['titulo'], numero_processo=num_proc_strip,
+                status=data.get('status', 'Ativo'),
                 cliente_id=data['cliente_id'], user_id=user_id
             )
+            _preencher_caso_from_data(novo_caso, data)
             db.session.add(novo_caso)
             db.session.commit()
-            app.logger.info(f"Novo caso '{novo_caso.nome_caso}' (ID: {novo_caso.id}) criado para usuário ID {user_id}.")
+            app.logger.info(f"Novo caso '{novo_caso.titulo}' (ID: {novo_caso.id}) criado para usuário ID {user_id}.")
             return novo_caso, 201
 
     @casos_ns.route('/<int:caso_id_param>')
@@ -539,7 +951,7 @@ def create_app(config_class=Config):
         @casos_ns.doc(security='jsonWebToken', description="Obtém os detalhes de um caso jurídico.")
         def get(self, caso_id_param):
             user_id = get_jwt_identity()
-            caso = Caso.query.filter_by(id=caso_id_param, user_id=user_id).first_or_404()
+            caso = get_item_or_404(Caso, caso_id_param)
             return caso
 
         @jwt_required()
@@ -548,23 +960,16 @@ def create_app(config_class=Config):
         @casos_ns.doc(security='jsonWebToken', description="Atualiza um caso jurídico existente.")
         def put(self, caso_id_param):
             user_id = get_jwt_identity()
-            caso = Caso.query.filter_by(id=caso_id_param, user_id=user_id).first_or_404()
+            caso = get_item_or_404(Caso, caso_id_param)
             data = request.get_json()
-            if not data.get('nome_caso') or data.get('cliente_id') is None:
-                return {"message": "Nome do caso e ID do cliente são obrigatórios."}, 400
-            novo_cliente_id = data.get('cliente_id')
-            if novo_cliente_id != caso.cliente_id:
-                if not Cliente.query.filter_by(id=novo_cliente_id, user_id=user_id).first():
-                    return {"message": f"Novo cliente com ID {novo_cliente_id} não encontrado."}, 404
-                caso.cliente_id = novo_cliente_id
+            if not data.get('titulo'):
+                return {"message": "Título do caso é obrigatório."}, 400
             novo_numero_processo = data.get('numero_processo', '').strip() or None
             if novo_numero_processo and novo_numero_processo != caso.numero_processo:
                 if Caso.query.filter(Caso.user_id == user_id, Caso.numero_processo == novo_numero_processo, Caso.id != caso_id_param).first():
                     return {"message": f"Outro caso já utiliza o número de processo '{novo_numero_processo}'."}, 409
-            caso.nome_caso = data['nome_caso']
             caso.numero_processo = novo_numero_processo
-            caso.descricao = data.get('descricao', caso.descricao)
-            caso.status = data.get('status', caso.status)
+            _preencher_caso_from_data(caso, data)
             db.session.commit()
             app.logger.info(f"Caso ID {caso.id} atualizado pelo usuário ID {user_id}.")
             return caso
@@ -574,10 +979,10 @@ def create_app(config_class=Config):
         @casos_ns.doc(security='jsonWebToken', description="Deleta um caso jurídico.")
         def delete(self, caso_id_param):
             user_id = get_jwt_identity()
-            caso = Caso.query.filter_by(id=caso_id_param, user_id=user_id).first_or_404()
+            caso = get_item_or_404(Caso, caso_id_param)
             db.session.delete(caso)
             db.session.commit()
-            app.logger.info(f"Caso ID {caso.id} ('{caso.nome_caso}') deletado pelo usuário ID {user_id}.")
+            app.logger.info(f"Caso ID {caso.id} ('{caso.titulo}') deletado pelo usuário ID {user_id}.")
             return '', 204
 
     @casos_ns.route('/<int:caso_id>/atualizar-cnj')
@@ -729,7 +1134,7 @@ def create_app(config_class=Config):
         @eventos_ns.doc(security='jsonWebToken')
         def get(self):
             user_id = get_jwt_identity()
-            eventos = EventoAgenda.query.filter_by(user_id=user_id).order_by(EventoAgenda.data_inicio.asc()).all()
+            eventos = get_list_query(EventoAgenda).order_by(EventoAgenda.data_inicio.asc()).all()
             return eventos
 
         @jwt_required()
@@ -748,7 +1153,11 @@ def create_app(config_class=Config):
                 return {"message": "Formato de data inválido. Utilize o formato ISO 8601 (ex: YYYY-MM-DDTHH:MM:SS)."}, 400
             novo_evento = EventoAgenda(
                 titulo=data['titulo'], data_inicio=data_inicio_obj, data_fim=data_fim_obj, 
-                descricao=data.get('descricao'), user_id=user_id
+                descricao=data.get('descricao'), 
+                tipo_evento=data.get('tipo_evento', 'Outros'),
+                prioridade=data.get('prioridade', 'Normal'),
+                status_evento=data.get('status_evento', 'Pendente'),
+                user_id=user_id
             )
             db.session.add(novo_evento)
             db.session.commit()
@@ -764,7 +1173,7 @@ def create_app(config_class=Config):
         @eventos_ns.doc(security='jsonWebToken')
         def get(self, evento_id_param):
             user_id = get_jwt_identity()
-            evento = EventoAgenda.query.filter_by(id=evento_id_param, user_id=user_id).first_or_404()
+            evento = get_item_or_404(EventoAgenda, evento_id_param)
             return evento
 
         @jwt_required()
@@ -773,7 +1182,7 @@ def create_app(config_class=Config):
         @eventos_ns.doc(security='jsonWebToken')
         def put(self, evento_id_param):
             user_id = get_jwt_identity()
-            evento = EventoAgenda.query.filter_by(id=evento_id_param, user_id=user_id).first_or_404()
+            evento = get_item_or_404(EventoAgenda, evento_id_param)
             data = request.get_json()
             if not data.get('titulo') or not data.get('data_inicio'):
                  return {"message": "Título e data de início são obrigatórios para atualização do evento."}, 400
@@ -786,6 +1195,9 @@ def create_app(config_class=Config):
             evento.data_inicio = data_inicio_obj
             evento.data_fim = data_fim_obj
             evento.descricao = data.get('descricao', evento.descricao)
+            evento.tipo_evento = data.get('tipo_evento', evento.tipo_evento)
+            evento.prioridade = data.get('prioridade', evento.prioridade)
+            evento.status_evento = data.get('status_evento', evento.status_evento)
             db.session.commit()
             app.logger.info(f"Evento ID {evento.id} atualizado pelo usuário ID {user_id}.")
             return evento
@@ -795,7 +1207,7 @@ def create_app(config_class=Config):
         @eventos_ns.doc(security='jsonWebToken')
         def delete(self, evento_id_param):
             user_id = get_jwt_identity()
-            evento = EventoAgenda.query.filter_by(id=evento_id_param, user_id=user_id).first_or_404()
+            evento = get_item_or_404(EventoAgenda, evento_id_param)
             db.session.delete(evento)
             db.session.commit()
             app.logger.info(f"Evento ID {evento.id} ('{evento.titulo}') deletado pelo usuário ID {user_id}.")
@@ -878,7 +1290,7 @@ def create_app(config_class=Config):
         @documentos_ns.response(500, "Erro no servidor ao tentar enviar o arquivo.")
         def get(self, doc_id_param):
             user_id = get_jwt_identity()
-            documento_db = Documento.query.filter_by(id=doc_id_param, user_id=user_id).first_or_404()
+            documento_db = get_item_or_404(Documento, doc_id_param)
             if not os.path.exists(documento_db.path_arquivo):
                 app.logger.error(f"Arquivo para Doc ID {doc_id_param} não encontrado em '{documento_db.path_arquivo}'.")
                 return {"message": "Arquivo não encontrado no servidor."}, 500
@@ -899,7 +1311,7 @@ def create_app(config_class=Config):
         @documentos_ns.doc(security='jsonWebToken', description="Deleta um documento específico.")
         def delete(self, doc_id_param):
             user_id = get_jwt_identity()
-            documento_db = Documento.query.filter_by(id=doc_id_param, user_id=user_id).first_or_404()
+            documento_db = get_item_or_404(Documento, doc_id_param)
             file_path_on_disk = documento_db.path_arquivo
             document_name_log = documento_db.nome_arquivo
             try:
@@ -915,11 +1327,12 @@ def create_app(config_class=Config):
     @despesas_ns.route('/')
     class DespesaListAPI(Resource):
         @jwt_required()
+        @finance_access_required
         @despesas_ns.marshal_list_with(despesa_model_dto)
         @despesas_ns.doc(security='jsonWebToken')
         def get(self):
             user_id = get_jwt_identity()
-            despesas = Despesa.query.filter_by(user_id=user_id).order_by(Despesa.data_despesa.desc()).all()
+            despesas = get_list_query(Despesa).order_by(Despesa.data_despesa.desc()).all()
             return despesas
         @jwt_required()
         @despesas_ns.expect(despesa_input_model_dto)
@@ -949,11 +1362,12 @@ def create_app(config_class=Config):
     @despesas_ns.param('despesa_id_param', 'O ID da despesa')
     class DespesaDetailAPI(Resource):
         @jwt_required()
+        @finance_access_required
         @despesas_ns.marshal_with(despesa_model_dto)
         @despesas_ns.doc(security='jsonWebToken')
         def get(self, despesa_id_param):
             user_id = get_jwt_identity()
-            despesa = Despesa.query.filter_by(id=despesa_id_param, user_id=user_id).first_or_404()
+            despesa = get_item_or_404(Despesa, despesa_id_param)
             return despesa
         @jwt_required()
         @despesas_ns.expect(despesa_input_model_dto)
@@ -961,7 +1375,7 @@ def create_app(config_class=Config):
         @despesas_ns.doc(security='jsonWebToken')
         def put(self, despesa_id_param):
             user_id = get_jwt_identity()
-            despesa = Despesa.query.filter_by(id=despesa_id_param, user_id=user_id).first_or_404()
+            despesa = get_item_or_404(Despesa, despesa_id_param)
             data = request.get_json()
             if not all(k in data for k in ('descricao', 'valor', 'data_despesa')): return {"message": "Descrição, valor e data são obrigatórios."}, 400
             try:
@@ -988,7 +1402,7 @@ def create_app(config_class=Config):
         @despesas_ns.doc(security='jsonWebToken')
         def delete(self, despesa_id_param):
             user_id = get_jwt_identity()
-            despesa = Despesa.query.filter_by(id=despesa_id_param, user_id=user_id).first_or_404()
+            despesa = get_item_or_404(Despesa, despesa_id_param)
             db.session.delete(despesa)
             db.session.commit()
             app.logger.info(f"Despesa ID {despesa.id} deletada pelo usuário ID {user_id}.")
@@ -997,11 +1411,12 @@ def create_app(config_class=Config):
     @recebimentos_ns.route('/')
     class RecebimentoListAPI(Resource):
         @jwt_required()
+        @finance_access_required
         @recebimentos_ns.marshal_list_with(recebimento_model_dto)
         @recebimentos_ns.doc(security='jsonWebToken')
         def get(self):
             user_id = get_jwt_identity()
-            recebimentos = Recebimento.query.filter_by(user_id=user_id).order_by(Recebimento.data_recebimento.desc()).all()
+            recebimentos = get_list_query(Recebimento).order_by(Recebimento.data_recebimento.desc()).all()
             return recebimentos
         @jwt_required()
         @recebimentos_ns.expect(recebimento_input_model_dto)
@@ -1032,11 +1447,12 @@ def create_app(config_class=Config):
     @recebimentos_ns.param('recebimento_id_param', 'O ID do recebimento')
     class RecebimentoDetailAPI(Resource):
         @jwt_required()
+        @finance_access_required
         @recebimentos_ns.marshal_with(recebimento_model_dto)
         @recebimentos_ns.doc(security='jsonWebToken')
         def get(self, recebimento_id_param):
             user_id = get_jwt_identity()
-            recebimento = Recebimento.query.filter_by(id=recebimento_id_param, user_id=user_id).first_or_404()
+            recebimento = get_item_or_404(Recebimento, recebimento_id_param)
             return recebimento
         @jwt_required()
         @recebimentos_ns.expect(recebimento_input_model_dto)
@@ -1044,7 +1460,7 @@ def create_app(config_class=Config):
         @recebimentos_ns.doc(security='jsonWebToken')
         def put(self, recebimento_id_param):
             user_id = get_jwt_identity()
-            recebimento = Recebimento.query.filter_by(id=recebimento_id_param, user_id=user_id).first_or_404()
+            recebimento = get_item_or_404(Recebimento, recebimento_id_param)
             data = request.get_json()
             if not all(k in data for k in ('descricao', 'valor', 'data_recebimento')): return {"message": "Descrição, valor e data são obrigatórios."}, 400
             try:
@@ -1071,7 +1487,7 @@ def create_app(config_class=Config):
         @recebimentos_ns.doc(security='jsonWebToken')
         def delete(self, recebimento_id_param):
             user_id = get_jwt_identity()
-            recebimento = Recebimento.query.filter_by(id=recebimento_id_param, user_id=user_id).first_or_404()
+            recebimento = get_item_or_404(Recebimento, recebimento_id_param)
             db.session.delete(recebimento)
             db.session.commit()
             app.logger.info(f"Recebimento ID {recebimento.id} deletado pelo usuário ID {user_id}.")
@@ -1094,6 +1510,16 @@ def create_app(config_class=Config):
                             hours=interval_hours, minutes=interval_minutes, replace_existing=True
                         )
                         app.logger.info(f"Job '{job_id}' agendado: {interval_hours}h{interval_minutes}m.")
+                        
+                        # --- NOVO JOB DE E-MAILS DE ALERTA ---
+                        job_alertas_id = 'VerificarAlertasPrazosJob'
+                        if not scheduler.get_job(job_alertas_id):
+                            from gestao_advocacia.alertas_tasks import job_verificar_prazos
+                            scheduler.add_job(
+                                id=job_alertas_id, func=job_verificar_prazos, args=[app], trigger='cron',
+                                hour=6, minute=0, replace_existing=True
+                            )
+                            app.logger.info(f"Job '{job_alertas_id}' agendado para rodar diariamente às 06:00.")
                     except Exception as e_add_job:
                         app.logger.error(f"Falha ao adicionar job '{job_id}': {str(e_add_job)}")
                 if not scheduler.running:
@@ -1134,6 +1560,152 @@ def create_app(config_class=Config):
         app.logger.error(f"Frontend: Arquivo '{path if path else 'index.html'}' não encontrado em '{static_folder_path if static_folder_path else 'CAMINHO_NAO_DEFINIDO'}'.")
         return jsonify({"error": "Recurso do frontend não encontrado."}), 404
                 
+
+    # --- ENDPOINTS DOS CONTRATOS ---
+    @contratos_ns.route('/')
+    class ContratoListAPI(Resource):
+        @jwt_required()
+        @finance_access_required
+        @contratos_ns.marshal_list_with(contrato_model_dto)
+        @contratos_ns.doc(security='jsonWebToken')
+        def get(self):
+            contratos = get_list_query(ContratoHonorario).all()
+            return contratos
+
+        @jwt_required()
+        @finance_access_required
+        @contratos_ns.expect(contrato_input_model_dto)
+        @contratos_ns.marshal_with(contrato_model_dto, code=201)
+        @contratos_ns.doc(security='jsonWebToken')
+        def post(self):
+            user_id = get_jwt_identity()
+            data = request.get_json()
+            
+            caso = Caso.query.filter_by(id=data['caso_id']).first()
+            if not caso:
+                return {"message": "Caso não encontrado."}, 404
+
+            # Validar permissão de Acesso se for advogado
+            from flask_jwt_extended import get_jwt
+            if get_jwt().get('role') == 'advogado' and caso.user_id != user_id:
+                return {"message": "Acesso negado ao caso informado."}, 403
+
+            vt = data.get('valor_total')
+            pe = data.get('percentual_exito')
+            da = data.get('data_assinatura')
+            
+            novo_contrato = ContratoHonorario(
+                tipo_honorario=data['tipo_honorario'],
+                valor_total=float(vt) if vt is not None else None,
+                percentual_exito=float(pe) if pe is not None else None,
+                status=data.get('status', 'Ativo'),
+                notas_condicoes=data.get('notas_condicoes'),
+                caso_id=data['caso_id'],
+                cliente_id=data['cliente_id'],
+                user_id=user_id
+            )
+            
+            if da:
+                from datetime import datetime
+                novo_contrato.data_assinatura = datetime.strptime(da, '%Y-%m-%d').date()
+
+            db.session.add(novo_contrato)
+            db.session.commit()
+            return novo_contrato, 201
+
+    @contratos_ns.route('/<int:id>')
+    class ContratoDetailAPI(Resource):
+        @jwt_required()
+        @finance_access_required
+        @contratos_ns.marshal_with(contrato_model_dto)
+        @contratos_ns.doc(security='jsonWebToken')
+        def get(self, id):
+            contrato = get_item_or_404(ContratoHonorario, id)
+            return contrato
+
+        @jwt_required()
+        @finance_access_required
+        @contratos_ns.expect(contrato_input_model_dto)
+        @contratos_ns.marshal_with(contrato_model_dto)
+        @contratos_ns.doc(security='jsonWebToken')
+        def put(self, id):
+            contrato = get_item_or_404(ContratoHonorario, id)
+            data = request.get_json()
+            contrato.tipo_honorario = data.get('tipo_honorario', contrato.tipo_honorario)
+            vt = data.get('valor_total')
+            contrato.valor_total = float(vt) if vt is not None else None
+            pe = data.get('percentual_exito')
+            contrato.percentual_exito = float(pe) if pe is not None else None
+            da = data.get('data_assinatura')
+            if da:
+                from datetime import datetime
+                contrato.data_assinatura = datetime.strptime(da, '%Y-%m-%d').date()
+            contrato.status = data.get('status', contrato.status)
+            contrato.notas_condicoes = data.get('notas_condicoes', contrato.notas_condicoes)
+            db.session.commit()
+            return contrato
+
+        @jwt_required()
+        @finance_access_required
+        @contratos_ns.response(204, 'Deletado com sucesso')
+        @contratos_ns.doc(security='jsonWebToken')
+        def delete(self, id):
+            contrato = get_item_or_404(ContratoHonorario, id)
+            db.session.delete(contrato)
+            db.session.commit()
+            return '', 204
+
+    @contratos_ns.route('/<int:id>/gerar-parcelas')
+    class ContratoGerarParcelasAPI(Resource):
+        @jwt_required()
+        @finance_access_required
+        @contratos_ns.doc(security='jsonWebToken')
+        def post(self, id):
+            from datetime import timedelta
+            from dateutil.relativedelta import relativedelta
+            
+            user_id = get_jwt_identity()
+            contrato = get_item_or_404(ContratoHonorario, id)
+            data = request.get_json() or {}
+            qtd_parcelas = int(data.get('quantidade_parcelas', 1))
+            primeiro_vencimento = data.get('primeiro_vencimento')
+            
+            if qtd_parcelas <= 0:
+                return {"message": "Quantidade deve ser maior que zero."}, 400
+            
+            if not contrato.valor_total:
+                return {"message": "O contrato deve ter um valor total para parcelar."}, 400
+                
+            valor_parcela = round(float(contrato.valor_total) / qtd_parcelas, 2)
+            
+            from datetime import datetime
+            
+            if primeiro_vencimento:
+                data_base = datetime.strptime(primeiro_vencimento, '%Y-%m-%d').date()
+            else:
+                from datetime import date
+                data_base = date.today()
+
+            novos_recebimentos = []
+            for i in range(qtd_parcelas):
+                desc = f'Parcela {i+1}/{qtd_parcelas} - Cód. contrato {id}'
+                venc = data_base + relativedelta(months=i)
+                
+                novo_rec = Recebimento(
+                    descricao=desc,
+                    valor=valor_parcela,
+                    data_recebimento=venc,
+                    recebido=False,
+                    caso_id=contrato.caso_id,
+                    user_id=user_id,
+                    contrato_id=id
+                )
+                db.session.add(novo_rec)
+                novos_recebimentos.append(novo_rec)
+                
+            db.session.commit()
+            return {"message": f"{qtd_parcelas} parcelas geradas com sucesso!"}, 201
+
     return app
 
 # No final de gestao_advocacia/app.py

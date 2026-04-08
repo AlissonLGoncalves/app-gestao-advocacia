@@ -1,12 +1,10 @@
-// src/DocumentoList.jsx
+﻿// src/DocumentoList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
 import { PencilSquareIcon, TrashIcon, ArrowDownTrayIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 
 function DocumentoList({ onEditDocumento, refreshKey }) {
-  console.log("DocumentoList: Renderizando. RefreshKey:", refreshKey);
-
   const [documentos, setDocumentos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [casos, setCasos] = useState([]);
@@ -21,7 +19,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
   const [sortConfig, setSortConfig] = useState({ key: 'data_upload', direction: 'desc' });
 
   const fetchClientesECasosParaFiltro = useCallback(async () => {
-    console.log("DocumentoList: fetchClientesECasosParaFiltro chamado. Cliente para filtro de casos:", clienteFilter);
     const token = localStorage.getItem('token');
     if (!token) {
       console.warn("DocumentoList: Token não encontrado para fetchClientesECasosParaFiltro.");
@@ -33,8 +30,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       if (!clientesRes.ok) throw new Error('Falha ao carregar clientes para filtro.');
       const clientesData = await clientesRes.json();
       setClientes(clientesData.clientes || []);
-      console.log("DocumentoList: Clientes para filtro carregados:", clientesData.clientes);
-
       let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`;
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`;
@@ -43,8 +38,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       if (!casosRes.ok) throw new Error('Falha ao carregar casos para filtro.');
       const casosData = await casosRes.json();
       setCasos(casosData.casos || []);
-      console.log("DocumentoList: Casos para filtro carregados:", casosData.casos);
-
     } catch (err) {
       console.error("DocumentoList: Erro ao buscar clientes/casos para filtro:", err);
       toast.error(`Erro ao carregar dados para filtros de documentos: ${err.message}`);
@@ -52,7 +45,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
   }, [clienteFilter]);
 
   const fetchDocumentos = useCallback(async () => {
-    console.log("DocumentoList: fetchDocumentos chamado. Configuração de ordenação:", sortConfig, "Filtros:", { searchTerm, clienteFilter, casoFilter });
     setLoading(true);
     setError('');
     const token = localStorage.getItem('token');
@@ -86,7 +78,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       }
       const data = await response.json();
       setDocumentos(data.documentos || []);
-      console.log("DocumentoList: Documentos carregados:", data.documentos);
     } catch (err) {
       console.error("DocumentoList: Erro detalhado ao buscar documentos:", err);
       setError(`Erro ao carregar documentos: ${err.message}`);
@@ -95,7 +86,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       }
     } finally {
       setLoading(false);
-      console.log("DocumentoList: fetchDocumentos finalizado.");
     }
   }, [searchTerm, clienteFilter, casoFilter, sortConfig]);
 
@@ -108,7 +98,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
   }, [fetchDocumentos, refreshKey]);
 
   const handleDeleteClick = async (id) => {
-    console.log("DocumentoList: handleDeleteClick chamado para ID:", id);
     const token = localStorage.getItem('token');
     if (!token) {
         toast.error("Autenticação expirada. Faça login novamente.");
@@ -142,7 +131,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    console.log("DocumentoList: requestSort. Nova ordenação:", { key, direction });
     setSortConfig({ key, direction });
   };
 
@@ -163,14 +151,12 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
   };
   
   const resetFilters = () => {
-    console.log("DocumentoList: resetFilters chamado.");
     setSearchTerm('');
     setClienteFilter('');
     setCasoFilter('');
   };
 
   if (loading && documentos.length === 0) {
-    console.log("DocumentoList: Renderizando estado de carregamento inicial.");
     return (
       <div className="d-flex justify-content-center align-items-center p-5">
         <div className="spinner-border text-primary" role="status">
@@ -184,8 +170,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
   if (error && documentos.length === 0) {
     return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
   }
-
-  console.log("DocumentoList: Renderizando tabela de documentos ou mensagem de erro/lista vazia.");
   return (
     <div className="card shadow-sm">
       <div className="card-header bg-light p-3">

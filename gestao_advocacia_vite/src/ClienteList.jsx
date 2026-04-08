@@ -1,12 +1,10 @@
-// src/ClienteList.jsx
+﻿// src/ClienteList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
 import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 
 function ClienteList({ onEditCliente, refreshKey }) {
-  console.log("ClienteList: Renderizando. RefreshKey:", refreshKey);
-
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -18,7 +16,6 @@ function ClienteList({ onEditCliente, refreshKey }) {
   const [sortConfig, setSortConfig] = useState({ key: 'nome_razao_social', direction: 'asc' });
 
   const fetchClientes = useCallback(async () => {
-    console.log("ClienteList: fetchClientes chamado. Ordenação:", sortConfig, "Filtros:", { searchTerm, tipoPessoaFilter });
     setLoading(true);
     setError('');
 
@@ -49,7 +46,6 @@ function ClienteList({ onEditCliente, refreshKey }) {
       }
       const data = await response.json();
       setClientes(data.clientes || []);
-      console.log("ClienteList: Clientes carregados:", data.clientes);
     } catch (err) {
       console.error("ClienteList: Erro detalhado ao buscar clientes:", err);
       setError(`Erro ao carregar clientes: ${err.message}`);
@@ -58,7 +54,6 @@ function ClienteList({ onEditCliente, refreshKey }) {
       }
     } finally {
       setLoading(false);
-      console.log("ClienteList: fetchClientes finalizado.");
     }
   }, [searchTerm, tipoPessoaFilter, sortConfig]);
 
@@ -67,8 +62,6 @@ function ClienteList({ onEditCliente, refreshKey }) {
   }, [fetchClientes, refreshKey]);
 
   const handleDeleteClick = async (id) => {
-    console.log("ClienteList: handleDeleteClick chamado para ID:", id);
-
     const token = localStorage.getItem('token');
     if (!token) {
       toast.error("Autenticação expirada. Faça login novamente.");
@@ -110,7 +103,6 @@ function ClienteList({ onEditCliente, refreshKey }) {
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    console.log("ClienteList: requestSort. Nova ordenação:", { key, direction });
     setSortConfig({ key, direction });
   };
 
@@ -122,13 +114,11 @@ function ClienteList({ onEditCliente, refreshKey }) {
   };
   
   const resetFilters = () => {
-    console.log("ClienteList: resetFilters chamado.");
     setSearchTerm('');
     setTipoPessoaFilter('');
   };
 
   if (loading && clientes.length === 0) {
-    console.log("ClienteList: Renderizando estado de carregamento inicial.");
     return (
       <div className="d-flex justify-content-center align-items-center p-5">
         <div className="spinner-border text-primary" role="status">
@@ -142,8 +132,6 @@ function ClienteList({ onEditCliente, refreshKey }) {
   if (error && clientes.length === 0) {
     return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
   }
-
-  console.log("ClienteList: Renderizando tabela de clientes ou mensagem de erro/lista vazia.");
   return (
     <div className="card shadow-sm">
       <div className="card-header bg-light p-3">

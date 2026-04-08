@@ -1,12 +1,9 @@
-// src/pages/RelatoriosPage.jsx
+﻿// src/pages/RelatoriosPage.jsx
 import React, { useState } from 'react';
 // Ajuste estes caminhos se ContasAReceberReport.jsx e ContasAPagarReport.jsx estiverem em outro local
 // Por exemplo, se estiverem em src/components/reports/
 import ContasAReceberReport from '../ContasAReceberReport.jsx';
 import ContasAPagarReport from '../ContasAPagarReport.jsx';
-
-console.log("RelatoriosPage.jsx está a ser carregado.");
-
 const TIPOS_RELATORIO = {
   NENHUM: 'NENHUM',
   CONTAS_A_RECEBER: 'CONTAS_A_RECEBER',
@@ -15,10 +12,7 @@ const TIPOS_RELATORIO = {
 
 function RelatoriosPage() {
   const [relatorioAtivo, setRelatorioAtivo] = useState(TIPOS_RELATORIO.NENHUM);
-  console.log("Componente RelatoriosPage está a ser renderizado. Relatório ativo:", relatorioAtivo);
-
   const renderRelatorioSelecionado = () => {
-    console.log("RelatoriosPage: renderRelatorioSelecionado chamado com:", relatorioAtivo);
     switch (relatorioAtivo) {
       case TIPOS_RELATORIO.CONTAS_A_RECEBER:
         return <ContasAReceberReport />;
@@ -43,7 +37,6 @@ function RelatoriosPage() {
               className="form-select form-select-sm"
               value={relatorioAtivo}
               onChange={(e) => {
-                console.log("RelatoriosPage: Novo relatório selecionado:", e.target.value);
                 setRelatorioAtivo(e.target.value);
               }}
             >

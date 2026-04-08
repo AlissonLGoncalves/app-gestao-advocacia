@@ -10,6 +10,7 @@ function RegisterPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('advogado');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -34,7 +35,7 @@ function RegisterPage() {
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password })
+        body: JSON.stringify({ username, email, password, role })
       });
       const data = await response.json();
 
@@ -57,7 +58,7 @@ function RegisterPage() {
       <div className="card shadow-lg" style={{ width: '100%', maxWidth: '400px' }}>
         <div className="card-body p-4 p-md-5">
           <div className="text-center mb-4">
-            <h3 className="card-title text-primary fw-bold">ALG Jurídico</h3>
+            <h3 className="card-title text-primary fw-bold">Patronus</h3>
             <p className="text-muted">Crie sua conta para começar.</p>
           </div>
           <form onSubmit={handleRegister}>
@@ -92,6 +93,23 @@ function RegisterPage() {
                 required
                 disabled={loading}
               />
+            </div>
+            <div className="mb-3">
+              <label htmlFor="role" className="form-label">
+                <UserIcon className="d-inline-block me-1" style={{ width: '16px', verticalAlign: 'text-bottom' }} />
+                Nível de Acesso
+              </label>
+              <select
+                className="form-select"
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                disabled={loading}
+              >
+                <option value="admin">Administrador (Total Acesso)</option>
+                <option value="advogado">Advogado</option>
+                <option value="assistente">Assistente / Secretária</option>
+              </select>
             </div>
             <div className="mb-4">
               <label htmlFor="password" className="form-label">

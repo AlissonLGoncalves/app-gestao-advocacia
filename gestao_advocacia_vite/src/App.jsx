@@ -1,7 +1,7 @@
 // src/App.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
-import { ToastContainer, toast } from 'react-toastify'; // toast importado aqui para uso no MainLayout
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import "bootstrap-icons/font/bootstrap-icons.css";
 import { useNavigate } from 'react-router-dom';
@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardPage from './pages/DashboardPage.jsx';
 import ClientesPage from './pages/ClientesPage.jsx';
 import CasosPage from './pages/CasosPage.jsx';
-import CasoDetalhePage from './pages/CasoDetalhePage.jsx'; // IMPORTAÇÃO ADICIONADA/VERIFICADA
+import CasoDetalhePage from './pages/CasoDetalhePage.jsx';
 import RecebimentosPage from './pages/RecebimentosPage.jsx';
 import DespesasPage from './pages/DespesasPage.jsx';
 import AgendaPage from './pages/AgendaPage.jsx';
@@ -23,10 +23,9 @@ import RegisterPage from './pages/auth/RegisterPage.jsx';
 // Importação dos ícones
 import {
   HomeIcon, UsersIcon, BriefcaseIcon, DocumentTextIcon,
-  CurrencyDollarIcon, CalendarDaysIcon, ChartBarIcon, CreditCardIcon, ArrowLeftOnRectangleIcon
+  CurrencyDollarIcon, CalendarDaysIcon, ChartBarIcon, CreditCardIcon, ArrowLeftOnRectangleIcon,
+  Bars3Icon, XMarkIcon, ScaleIcon
 } from '@heroicons/react/24/outline';
-
-console.log("Módulo App.jsx carregado.");
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -39,10 +38,21 @@ const ProtectedRoute = ({ children }) => {
 const MainLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  console.log("MainLayout renderizado. Pathname:", location.pathname);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const userString = localStorage.getItem('user');
+  let userRole = 'admin'; 
+  try {
+    if (userString) {
+      userRole = JSON.parse(userString).role || 'admin';
+    }
+  } catch (e) {
+    console.error("Erro lendo usuario", e);
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     toast.info("Logout realizado com sucesso!");
     navigate('/login');
   };
@@ -56,14 +66,11 @@ const MainLayout = () => {
     const idSegment = pathSegments[2];
 
     if (baseSegment === '' || baseSegment === 'dashboard') return 'Dashboard';
-    
-    let titlePrefix = '';
-    // Verifica se é uma rota de detalhe
     if (baseSegment === 'casos' && actionSegment === 'detalhe' && idSegment) return 'Detalhes do Caso';
 
+    let titlePrefix = '';
     if (actionSegment === 'novo') titlePrefix = 'Novo ';
     else if (actionSegment === 'editar' && idSegment) titlePrefix = 'Editar ';
-
 
     let baseTitle = '';
     switch (baseSegment) {
@@ -77,58 +84,87 @@ const MainLayout = () => {
       default: baseTitle = baseSegment.replace('-', ' ');
     }
 
-    if (!titlePrefix && baseSegment.endsWith('s') && (baseSegment === 'clientes' || baseSegment === 'casos' || baseSegment === 'recebimentos' || baseSegment === 'despesas' || baseSegment === 'agenda' || baseSegment === 'documentos')) {
-       baseTitle = baseSegment.charAt(0).toUpperCase() + baseSegment.slice(1);
-       return baseTitle;
+    if (!titlePrefix && ['clientes','casos','recebimentos','despesas','agenda','documentos'].includes(baseSegment)) {
+       return baseSegment.charAt(0).toUpperCase() + baseSegment.slice(1);
     }
     
     const finalTitle = `${titlePrefix}${baseTitle}`;
     return finalTitle.charAt(0).toUpperCase() + finalTitle.slice(1);
   };
 
-  const NavButton = ({ to, icon: IconComponent, children }) => (
+  const SidebarLink = ({ to, icon: IconComponent, children }) => (
     <NavLink
       to={to}
+      onClick={() => setSidebarOpen(false)}
       className={({ isActive }) =>
-        `btn w-100 d-flex align-items-center text-start mb-1 ${isActive ? 'btn-primary active' : 'btn-light'}`
+        `sidebar-link ${isActive ? 'active' : ''}`
       }
       title={children}
     >
-      <IconComponent className="me-2" style={{ width: '18px', height: '18px' }} />
-      <span className="ms-1">{children}</span>
+      <IconComponent className="sidebar-link-icon" />
+      <span>{children}</span>
     </NavLink>
   );
 
   return (
     <div className="d-flex vh-100">
-      <aside className="bg-light border-end p-3 d-flex flex-column" style={{ width: '250px', flexShrink: 0 }}>
-        <div className="h3 text-primary mb-4 text-center pt-2">Gestão ADV</div>
-        <NavButton to="/dashboard" icon={HomeIcon}>Dashboard</NavButton>
-        <NavButton to="/clientes" icon={UsersIcon}>Clientes</NavButton>
-        <NavButton to="/casos" icon={BriefcaseIcon}>Casos</NavButton>
-        <NavButton to="/recebimentos" icon={CurrencyDollarIcon}>Recebimentos</NavButton>
-        <NavButton to="/despesas" icon={CreditCardIcon}>Despesas</NavButton>
-        <NavButton to="/agenda" icon={CalendarDaysIcon}>Agenda</NavButton>
-        <NavButton to="/documentos" icon={DocumentTextIcon}>Documentos</NavButton>
-        <NavButton to="/relatorios" icon={ChartBarIcon}>Relatórios</NavButton>
-        <div className="mt-auto pt-3 border-top">
-           <button
-            onClick={handleLogout}
-            className="btn btn-outline-danger w-100 d-flex align-items-center text-start mb-1"
-            title="Sair do Sistema"
-          >
-            <ArrowLeftOnRectangleIcon className="me-2" style={{ width: '18px', height: '18px' }} />
-            <span className="ms-1">Sair</span>
+      {/* Overlay para mobile */}
+      <div
+        className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      {/* Sidebar */}
+      <aside className={`app-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-icon">
+            <ScaleIcon style={{ width: '22px', height: '22px' }} />
+          </div>
+          <div>
+            <div className="sidebar-brand-text">Patronus</div>
+            <div className="sidebar-brand-sub">Gestão Jurídica</div>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          <SidebarLink to="/dashboard" icon={HomeIcon}>Dashboard</SidebarLink>
+          <SidebarLink to="/clientes" icon={UsersIcon}>Clientes</SidebarLink>
+          <SidebarLink to="/casos" icon={BriefcaseIcon}>Casos</SidebarLink>
+          {userRole !== 'assistente' && (
+            <>
+              <SidebarLink to="/recebimentos" icon={CurrencyDollarIcon}>Recebimentos</SidebarLink>
+              <SidebarLink to="/despesas" icon={CreditCardIcon}>Despesas</SidebarLink>
+            </>
+          )}
+          <SidebarLink to="/agenda" icon={CalendarDaysIcon}>Agenda</SidebarLink>
+          <SidebarLink to="/documentos" icon={DocumentTextIcon}>Documentos</SidebarLink>
+          <SidebarLink to="/relatorios" icon={ChartBarIcon}>Relatórios</SidebarLink>
+        </nav>
+
+        <div className="sidebar-footer">
+          <button onClick={handleLogout} className="sidebar-link" title="Sair do Sistema">
+            <ArrowLeftOnRectangleIcon className="sidebar-link-icon" />
+            <span>Sair</span>
           </button>
-          <p className="text-muted small text-center mt-2">&copy; {new Date().getFullYear()} ALG Jurídico</p>
+          <div className="sidebar-copyright">&copy; {new Date().getFullYear()} Patronus</div>
         </div>
       </aside>
+
+      {/* Conteúdo Principal */}
       <div className="flex-grow-1 d-flex flex-column overflow-hidden">
-        <header className="bg-white shadow-sm border-bottom p-3">
-          <h1 className="h5 mb-0 text-capitalize">{getPageTitle()}</h1>
+        <header className="app-header">
+          <div className="d-flex align-items-center gap-3">
+            <button
+              className="mobile-menu-btn"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Menu"
+            >
+              {sidebarOpen ? <XMarkIcon /> : <Bars3Icon />}
+            </button>
+            <h1>{getPageTitle()}</h1>
+          </div>
         </header>
-        <main className="flex-grow-1 overflow-auto p-4" style={{ backgroundColor: '#f8f9fa' }}>
-          {console.log("MainLayout: Outlet a ser renderizado.")}
+        <main className="app-main">
           <Outlet />
         </main>
       </div>
@@ -137,7 +173,6 @@ const MainLayout = () => {
 };
 
 function App() {
-  console.log("Componente App renderizado.");
   return (
     <>
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover theme="colored" />

@@ -7,21 +7,21 @@ const initialState = {
     cliente_id: '',
     titulo: '',
     numero_processo: '',
-    status: 'Ativo', // Valor padrão
+    status: 'Ativo',
     parte_contraria: '',
     adv_parte_contraria: '',
     tipo_acao: '',
+    area_direito: '',
+    fase_processual: '',
     vara_juizo: '',
     comarca: '',
     instancia: '',
     valor_causa: '',
-    data_distribuicao: '', // Deve ser string vazia ou formato YYYY-MM-DD
+    data_distribuicao: '',
     notas_caso: ''
 };
 
 function CasoForm({ casoParaEditar, onCasoChange, onCancel }) {
-  console.log("CasoForm: Renderizando. Caso para editar:", casoParaEditar);
-
   const [formData, setFormData] = useState(initialState);
   const [clientes, setClientes] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -33,16 +33,17 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel }) {
   }, []);
 
   const fetchClientes = useCallback(async () => {
-    console.log("CasoForm: fetchClientes chamado.");
     try {
-      const response = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.erro || 'Falha ao carregar clientes');
       }
       const data = await response.json();
       setClientes(data.clientes || []);
-      console.log("CasoForm: Clientes carregados:", data.clientes);
     } catch (error) {
       console.error("CasoForm: Erro ao buscar clientes:", error);
       toast.error(`Erro ao carregar clientes: ${error.message}`);
@@ -54,7 +55,6 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel }) {
   }, [fetchClientes]);
 
   useEffect(() => {
-    console.log("CasoForm: useEffect para casoParaEditar. Valor:", casoParaEditar);
     clearValidationErrors();
     if (casoParaEditar && casoParaEditar.id) { // Verifica se é um objeto válido e tem ID (para edição)
       const dadosEdit = { ...initialState, ...casoParaEditar }; // Garante todos os campos do initialState
@@ -76,11 +76,9 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel }) {
 
       setFormData(dadosEdit);
       setIsEditing(true);
-      console.log("CasoForm: Modo de edição. FormData definido:", dadosEdit);
     } else {
       setFormData(initialState);
       setIsEditing(false);
-      console.log("CasoForm: Modo de adição ou casoParaEditar inválido. FormData resetado.");
     }
   }, [casoParaEditar, clearValidationErrors]);
 
@@ -96,7 +94,6 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel }) {
     // Adicionar mais validações conforme necessário (ex: formato de número de processo)
     setValidationErrors(errors);
     const isValid = Object.keys(errors).length === 0;
-    console.log("CasoForm: Validação do formulário. É válido:", isValid, "Erros:", errors);
     return isValid;
   };
 
@@ -111,7 +108,6 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("CasoForm: handleSubmit chamado. FormData atual:", formData);
     clearValidationErrors();
     if (!validateForm()) {
       toast.error('Por favor, corrija os erros indicados no formulário.');
@@ -127,15 +123,13 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel }) {
     };
     // Remove campos que não devem ser enviados ou que são apenas para o frontend
     // delete dadosParaEnviar.cliente; // Se 'cliente' for um objeto no formData vindo de to_dict()
-
-    console.log("CasoForm: Enviando dados para API:", dadosParaEnviar);
-
     try {
       const url = isEditing ? `${API_URL}/casos/${casoParaEditar.id}` : `${API_URL}/casos`;
       const method = isEditing ? 'PUT' : 'POST';
+      const token = localStorage.getItem('token');
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(dadosParaEnviar),
       });
 
@@ -228,6 +222,41 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel }) {
             <div className="col-md-4 mb-3">
               <label htmlFor="instancia_caso" className="form-label form-label-sm">Instância</label>
               <input type="text" name="instancia" id="instancia_caso" className="form-control form-control-sm" value={formData.instancia || ''} onChange={handleChange} />
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="col-md-6 mb-3">
+              <label htmlFor="area_direito_caso" className="form-label form-label-sm">Área do Direito</label>
+              <select name="area_direito" id="area_direito_caso" className="form-select form-select-sm" value={formData.area_direito || ''} onChange={handleChange}>
+                <option value="">Selecione...</option>
+                <option value="Cível">Cível</option>
+                <option value="Trabalhista">Trabalhista</option>
+                <option value="Criminal">Criminal</option>
+                <option value="Família">Família</option>
+                <option value="Tributário">Tributário</option>
+                <option value="Empresarial">Empresarial</option>
+                <option value="Previdenciário">Previdenciário</option>
+                <option value="Administrativo">Administrativo</option>
+                <option value="Consumidor">Consumidor</option>
+                <option value="Ambiental">Ambiental</option>
+                <option value="Outro">Outro</option>
+              </select>
+            </div>
+            <div className="col-md-6 mb-3">
+              <label htmlFor="fase_processual_caso" className="form-label form-label-sm">Fase Processual</label>
+              <select name="fase_processual" id="fase_processual_caso" className="form-select form-select-sm" value={formData.fase_processual || ''} onChange={handleChange}>
+                <option value="">Selecione...</option>
+                <option value="Inicial">Inicial</option>
+                <option value="Citação/Intimação">Citação/Intimação</option>
+                <option value="Contestação">Contestação</option>
+                <option value="Instrução">Instrução</option>
+                <option value="Julgamento">Julgamento</option>
+                <option value="Recurso">Recurso</option>
+                <option value="Execução">Execução</option>
+                <option value="Cumprimento de Sentença">Cumprimento de Sentença</option>
+                <option value="Encerrado">Encerrado</option>
+              </select>
             </div>
           </div>
 

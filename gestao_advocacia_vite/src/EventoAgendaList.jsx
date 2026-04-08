@@ -1,4 +1,4 @@
-// src/EventoAgendaList.jsx
+﻿// src/EventoAgendaList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js'; 
 import {
@@ -9,8 +9,6 @@ import {
 import { toast } from 'react-toastify';
 
 function EventoAgendaList({ onEditEvento, refreshKey }) {
-  console.log("EventoAgendaList: Renderizando. RefreshKey:", refreshKey);
-
   const [eventos, setEventos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [casos, setCasos] = useState([]);
@@ -33,7 +31,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
   const tipoEventoOptions = ["Prazo", "Audiência", "Reunião", "Lembrete", "Outro"];
 
   const fetchClientesECasosParaFiltro = useCallback(async () => {
-    console.log("EventoAgendaList: fetchClientesECasosParaFiltro chamado. Cliente para filtro de casos:", clienteFilter);
     const token = localStorage.getItem('token');
     if (!token) {
         console.warn("EventoAgendaList: Token não encontrado para fetchClientesECasosParaFiltro.");
@@ -46,8 +43,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       if (!clientesRes.ok) throw new Error('Falha ao carregar clientes para filtro.');
       const clientesData = await clientesRes.json();
       setClientes(clientesData.clientes || []);
-      console.log("EventoAgendaList: Clientes para filtro carregados:", clientesData.clientes);
-
       let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`;
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`;
@@ -56,7 +51,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       if (!casosRes.ok) throw new Error('Falha ao carregar casos para filtro.');
       const casosData = await casosRes.json();
       setCasos(casosData.casos || []);
-      console.log("EventoAgendaList: Casos para filtro carregados:", casosData.casos);
     } catch (err) {
       console.error("EventoAgendaList: Erro ao buscar clientes/casos para filtro:", err);
       toast.error(`Erro ao carregar dados para filtros da agenda: ${err.message}`);
@@ -64,7 +58,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
   }, [clienteFilter]);
 
   const fetchEventos = useCallback(async () => {
-    console.log("EventoAgendaList: fetchEventos chamado. Ordenação:", sortConfig, "Filtros:", { searchTerm, clienteFilter, casoFilter, tipoEventoFilter, statusConclusaoFilter, dataInicioRangeStart, dataInicioRangeEnd });
     setLoading(true);
     setError('');
 
@@ -106,7 +99,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       }
       const data = await response.json();
       setEventos(data.eventos || []);
-      console.log("EventoAgendaList: Eventos carregados:", data.eventos);
     } catch (err) {
       console.error("EventoAgendaList: Erro detalhado ao buscar eventos:", err);
       setError(`Erro ao carregar eventos: ${err.message}`);
@@ -115,7 +107,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       }
     } finally {
       setLoading(false);
-      console.log("EventoAgendaList: fetchEventos finalizado.");
     }
   }, [searchTerm, clienteFilter, casoFilter, tipoEventoFilter, statusConclusaoFilter, dataInicioRangeStart, dataInicioRangeEnd, sortConfig]);
 
@@ -128,7 +119,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
   }, [fetchEventos, refreshKey]);
 
   const handleDeleteClick = async (id) => {
-    console.log("EventoAgendaList: handleDeleteClick chamado para ID:", id);
     const token = localStorage.getItem('token');
     if (!token) {
         toast.error("Autenticação expirada. Faça login novamente.");
@@ -158,7 +148,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
   };
 
   const handleToggleConcluido = async (evento) => {
-    console.log("EventoAgendaList: handleToggleConcluido chamado para evento ID:", evento.id, "Novo status:", !evento.concluido);
     const token = localStorage.getItem('token');
     if (!token) {
         toast.error("Autenticação expirada. Faça login novamente.");
@@ -181,9 +170,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       concluido: !evento.concluido,
       caso_id: evento.caso_id 
     };
-    
-    console.log("EventoAgendaList: Enviando para atualizar status:", dadosAtualizados);
-
     try {
       const response = await fetch(`${API_URL}/eventos/${evento.id}`, {
         method: 'PUT',
@@ -211,7 +197,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    console.log("EventoAgendaList: requestSort. Nova ordenação:", { key, direction });
     setSortConfig({ key, direction });
   };
 
@@ -223,7 +208,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
   };
 
   const resetFilters = () => {
-    console.log("EventoAgendaList: resetFilters chamado.");
     setSearchTerm('');
     setClienteFilter('');
     setCasoFilter('');
@@ -235,7 +219,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
   };
 
   if (loading && eventos.length === 0) {
-    console.log("EventoAgendaList: Renderizando estado de carregamento inicial.");
     return (
       <div className="d-flex justify-content-center align-items-center p-5">
         <div className="spinner-border text-primary" role="status">
@@ -249,8 +232,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
   if (error && eventos.length === 0) {
     return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
   }
-
-  console.log("EventoAgendaList: Renderizando tabela de eventos ou mensagem de erro/lista vazia.");
   return (
     <div className="card shadow-sm">
       <div className="card-header bg-light p-3">

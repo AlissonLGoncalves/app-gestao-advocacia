@@ -10,7 +10,7 @@ const initialState = {
 };
 
 function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
-  console.log("DocumentoForm: Renderizando. Documento para editar (metadados):", documentoParaEditar);
+
 
   const [formData, setFormData] = useState(initialState);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -29,7 +29,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
   }, []);
 
   const fetchClientes = useCallback(async () => {
-    console.log("DocumentoForm: fetchClientes chamado.");
     const token = localStorage.getItem('token');
     if (!token) {
         toast.warn("Sessão não encontrada para carregar clientes.");
@@ -41,7 +40,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
       if (!response.ok) throw new Error('Falha ao carregar clientes');
       const data = await response.json();
       setClientes(data.clientes || []);
-      console.log("DocumentoForm: Clientes carregados:", data.clientes);
     } catch (error) {
       console.error("DocumentoForm: Erro ao buscar clientes:", error);
       toast.error(`Erro ao carregar clientes: ${error.message}`);
@@ -49,7 +47,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
   }, []);
 
   const fetchCasos = useCallback(async (clienteId = null) => {
-    console.log("DocumentoForm: fetchCasos chamado. Cliente ID para filtro:", clienteId);
     const token = localStorage.getItem('token');
     if (!token) {
         toast.warn("Sessão não encontrada para carregar casos.");
@@ -65,7 +62,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
       if (!response.ok) throw new Error('Falha ao carregar casos');
       const data = await response.json();
       setCasos(data.casos || []);
-      console.log("DocumentoForm: Casos carregados:", data.casos);
     } catch (error) {
       console.error("DocumentoForm: Erro ao buscar casos:", error);
       toast.error(`Erro ao carregar casos: ${error.message}`);
@@ -78,7 +74,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
   }, [fetchClientes, selectedClienteIdForCasoFilter, fetchCasos]);
 
   useEffect(() => {
-    console.log("DocumentoForm: useEffect para documentoParaEditar. Valor:", documentoParaEditar);
     clearValidationErrors();
     setSelectedFile(null);
 
@@ -91,8 +86,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
       setFormData(dadosEdit);
       setFileNameDisplay(documentoParaEditar.nome_original_arquivo || 'Nenhum arquivo associado (apenas metadados)');
       setIsEditing(true);
-      console.log("DocumentoForm: Modo de edição. FormData definido:", dadosEdit);
-
       if (documentoParaEditar.cliente_id) {
         setSelectedClienteIdForCasoFilter(String(documentoParaEditar.cliente_id));
       } else {
@@ -104,7 +97,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
       setFileNameDisplay('');
       setIsEditing(false);
       setSelectedClienteIdForCasoFilter('');
-      console.log("DocumentoForm: Modo de adição. FormData resetado.");
     }
   }, [documentoParaEditar, clearValidationErrors, fetchCasos]); // Adicionado fetchCasos para garantir que é chamado se selectedClienteIdForCasoFilter mudar
 
@@ -118,7 +110,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
     }
     setValidationErrors(errors);
     const isValid = Object.keys(errors).length === 0;
-    console.log("DocumentoForm: Validação. Válido:", isValid, "Erros:", errors);
     return isValid;
   };
 
@@ -130,7 +121,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
       if (validationErrors.arquivo) {
         setValidationErrors(prev => ({ ...prev, arquivo: '' }));
       }
-      console.log("DocumentoForm: Arquivo selecionado:", file.name);
     } else {
       setSelectedFile(null);
       setFileNameDisplay(isEditing ? (documentoParaEditar?.nome_original_arquivo || '') : '');
@@ -144,7 +134,7 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
     }
 
     if (name === "cliente_id") {
-      console.log("DocumentoForm: Filtro de cliente (para casos) alterado para:", value);
+
       setSelectedClienteIdForCasoFilter(value);
       setFormData(prev => ({ ...prev, cliente_id: value, caso_id: '' }));
     } else {
@@ -154,7 +144,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("DocumentoForm: handleSubmit. FormData:", formData, "Arquivo selecionado:", selectedFile);
     clearValidationErrors();
     if (!validateForm()) {
       toast.error('Por favor, corrija os erros indicados no formulário.');
@@ -183,7 +172,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
         cliente_id: formData.cliente_id ? parseInt(formData.cliente_id, 10) : null,
         caso_id: formData.caso_id ? parseInt(formData.caso_id, 10) : null,
       });
-      console.log("DocumentoForm: Editando metadados. Enviando JSON:", body);
       if (selectedFile) {
         toast.warn("Para substituir o arquivo, por favor, apague o antigo e adicione um novo. Apenas os metadados serão atualizados.");
       }
@@ -199,7 +187,6 @@ function DocumentoForm({ documentoParaEditar, onDocumentoChange, onCancel }) {
       // Para FormData, não defina Content-Type manualmente nos headers; o navegador fará isso.
       // Mas o header de Authorization ainda é necessário.
       // delete headers['Content-Type']; // Remova se estiver definido para FormData
-      console.log("DocumentoForm: Adicionando novo documento. Enviando FormData.");
     }
 
     try {

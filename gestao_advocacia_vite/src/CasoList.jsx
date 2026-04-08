@@ -1,12 +1,11 @@
 // src/CasoList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
-import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
+import { exportarParaPDF } from './utils/pdfGenerator.js';
 
 function CasoList({ onEditCaso, refreshKey }) {
-  console.log("CasoList: Renderizando. RefreshKey:", refreshKey);
-
   const [casos, setCasos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +24,6 @@ function CasoList({ onEditCaso, refreshKey }) {
   const [sortConfig, setSortConfig] = useState({ key: 'data_atualizacao', direction: 'desc' });
 
   const fetchClientesParaFiltro = useCallback(async () => {
-    console.log("CasoList: fetchClientesParaFiltro chamado.");
     const token = localStorage.getItem('token');
     if (!token) {
       // Não precisa setar erro aqui, pois o fetchCasos também fará a checagem
@@ -41,7 +39,6 @@ function CasoList({ onEditCaso, refreshKey }) {
       }
       const data = await response.json();
       setClientes(data.clientes || []);
-      console.log("CasoList: Clientes para filtro carregados:", data.clientes);
     } catch (err) {
       console.error("CasoList: Erro ao buscar clientes para filtro:", err);
       toast.error(`Erro ao carregar clientes para filtro: ${err.message}`);
@@ -49,7 +46,6 @@ function CasoList({ onEditCaso, refreshKey }) {
   }, []);
 
   const fetchCasos = useCallback(async () => {
-    console.log("CasoList: fetchCasos chamado. Configuração de ordenação:", sortConfig, "Filtros:", { searchTerm, statusFilter, clienteFilter });
     setLoading(true);
     setError('');
 
@@ -80,7 +76,6 @@ function CasoList({ onEditCaso, refreshKey }) {
       }
       const data = await response.json();
       setCasos(data.casos || []);
-      console.log("CasoList: Casos carregados:", data.casos);
     } catch (err) {
       console.error("CasoList: Erro detalhado ao buscar casos:", err);
       setError(`Erro ao carregar casos: ${err.message}`);
@@ -89,7 +84,6 @@ function CasoList({ onEditCaso, refreshKey }) {
       }
     } finally {
       setLoading(false);
-      console.log("CasoList: fetchCasos finalizado.");
     }
   }, [searchTerm, statusFilter, clienteFilter, dataCriacaoInicioFilter, dataCriacaoFimFilter, dataAtualizacaoInicioFilter, dataAtualizacaoFimFilter, sortConfig]);
 
@@ -102,7 +96,6 @@ function CasoList({ onEditCaso, refreshKey }) {
   }, [fetchCasos, refreshKey]);
 
   const handleDeleteClick = async (id) => {
-    console.log("CasoList: handleDeleteClick chamado para ID:", id);
     const token = localStorage.getItem('token');
     if (!token) {
       toast.error("Autenticação expirada. Faça login novamente.");
@@ -137,7 +130,6 @@ function CasoList({ onEditCaso, refreshKey }) {
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    console.log("CasoList: requestSort. Nova ordenação:", { key, direction });
     setSortConfig({ key, direction });
   };
 
@@ -149,7 +141,6 @@ function CasoList({ onEditCaso, refreshKey }) {
   };
 
   const resetFilters = () => {
-    console.log("CasoList: resetFilters chamado.");
     setSearchTerm('');
     setStatusFilter('');
     setClienteFilter('');
@@ -170,8 +161,27 @@ function CasoList({ onEditCaso, refreshKey }) {
     }
   };
 
+  const handleExportPDF = () => {
+    if (casos.length === 0) {
+      toast.warn("Não existem dados para exportar com os filtros atuais.");
+      return;
+    }
+
+    const headers = ["Título do Caso", "Cliente", "Nº Processo", "Status", "Criação", "Atualização"];
+    const dados = casos.map(caso => [
+      caso.titulo || '-',
+      caso.cliente?.nome_razao_social || 'N/A',
+      caso.numero_processo || '-',
+      caso.status || '-',
+      caso.data_criacao ? new Date(caso.data_criacao).toLocaleDateString() : '-',
+      caso.data_atualizacao ? new Date(caso.data_atualizacao).toLocaleDateString() : '-'
+    ]);
+
+    exportarParaPDF('Relatório de Casos Processuais', headers, dados, 'relatorio_casos.pdf');
+    toast.success("PDF gerado com sucesso!");
+  };
+
   if (loading && casos.length === 0) {
-    console.log("CasoList: Renderizando estado de carregamento inicial.");
     return (
       <div className="d-flex justify-content-center align-items-center p-5">
         <div className="spinner-border text-primary" role="status">
@@ -185,22 +195,30 @@ function CasoList({ onEditCaso, refreshKey }) {
   if (error && casos.length === 0) {
     return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
   }
-
-  console.log("CasoList: Renderizando tabela de casos ou mensagem de erro/lista vazia.");
   return (
     <div className="card shadow-sm">
       <div className="card-header bg-light p-3">
         <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
           <h6 className="mb-0 text-secondary me-3">Filtros e Busca de Casos</h6>
-          <button
-            className="btn btn-sm btn-outline-secondary py-1 px-2 d-flex align-items-center"
-            onClick={() => setShowFilters(!showFilters)}
-            aria-expanded={showFilters}
-            aria-controls="filtrosAvancadosCasos"
-          >
-            <FunnelIcon style={{width: '16px', height: '16px'}} className="me-1" />
-            {showFilters ? 'Ocultar Avançados' : 'Mostrar Avançados'}
-          </button>
+          <div>
+            <button
+              className="btn btn-sm btn-outline-danger py-1 px-2 me-2 d-inline-flex align-items-center"
+              onClick={handleExportPDF}
+              title="Gerar e Baixar Relatório em PDF dos casos listados"
+            >
+              <DocumentArrowDownIcon style={{width: '16px', height: '16px'}} className="me-1" />
+              Exportar PDF
+            </button>
+            <button
+              className="btn btn-sm btn-outline-secondary py-1 px-2 d-inline-flex align-items-center"
+              onClick={() => setShowFilters(!showFilters)}
+              aria-expanded={showFilters}
+              aria-controls="filtrosAvancadosCasos"
+            >
+              <FunnelIcon style={{width: '16px', height: '16px'}} className="me-1" />
+              {showFilters ? 'Ocultar Avançados' : 'Mostrar Avançados'}
+            </button>
+          </div>
         </div>
 
         <div className="row g-2 align-items-end">

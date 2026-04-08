@@ -1,4 +1,4 @@
-// src/DespesaForm.jsx
+﻿// src/DespesaForm.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
 import { toast } from 'react-toastify';
@@ -16,8 +16,6 @@ const initialState = {
 };
 
 function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
-  console.log("DespesaForm: Renderizando. Despesa para editar:", despesaParaEditar);
-
   const [formData, setFormData] = useState(initialState);
   const [clientes, setClientes] = useState([]);
   const [casos, setCasos] = useState([]);
@@ -31,7 +29,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
   }, []);
 
   const fetchClientes = useCallback(async () => {
-    console.log("DespesaForm: fetchClientes chamado.");
     const token = localStorage.getItem('token');
     if (!token) {
         toast.warn("Sessão não encontrada para carregar clientes.");
@@ -43,7 +40,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       if (!response.ok) throw new Error('Falha ao carregar clientes');
       const data = await response.json();
       setClientes(data.clientes || []);
-      console.log("DespesaForm: Clientes carregados:", data.clientes);
     } catch (error) {
       console.error("DespesaForm: Erro ao buscar clientes:", error);
       toast.error(`Erro ao carregar clientes: ${error.message}`);
@@ -51,7 +47,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
   }, []);
 
   const fetchCasos = useCallback(async (clienteId = null) => {
-    console.log("DespesaForm: fetchCasos chamado. Cliente ID para filtro:", clienteId);
     const token = localStorage.getItem('token');
     if (!token) {
         toast.warn("Sessão não encontrada para carregar casos.");
@@ -67,7 +62,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       if (!response.ok) throw new Error('Falha ao carregar casos');
       const data = await response.json();
       setCasos(data.casos || []);
-      console.log("DespesaForm: Casos carregados:", data.casos);
     } catch (error) {
       console.error("DespesaForm: Erro ao buscar casos:", error);
       toast.error(`Erro ao carregar casos: ${error.message}`);
@@ -82,7 +76,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
   }, [fetchClientes, despesaParaEditar, selectedClienteId]);
 
   useEffect(() => {
-    console.log("DespesaForm: useEffect para despesaParaEditar. Valor:", despesaParaEditar);
     clearValidationErrors();
     if (despesaParaEditar && despesaParaEditar.id) {
       const dadosEdit = { ...initialState, ...despesaParaEditar };
@@ -101,8 +94,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
 
       setFormData(dadosEdit);
       setIsEditing(true);
-      console.log("DespesaForm: Modo de edição. FormData definido:", dadosEdit);
-
       if (dadosEdit.caso_id) {
         const casoOriginal = despesaParaEditar.caso_associado_ref; // Supondo que a API envie esta referência
         if (casoOriginal && casoOriginal.cliente_id) {
@@ -128,12 +119,10 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       setFormData(initialState);
       setIsEditing(false);
       setSelectedClienteId('');
-      console.log("DespesaForm: Modo de adição. FormData resetado.");
     }
   }, [despesaParaEditar, clearValidationErrors]);
 
   useEffect(() => {
-    console.log("DespesaForm: selectedClienteId mudou para:", selectedClienteId, ". A recarregar casos.");
     fetchCasos(selectedClienteId || null);
   }, [selectedClienteId, fetchCasos]);
 
@@ -148,7 +137,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
     if (!formData.categoria) errors.categoria = 'Categoria é obrigatória.';
     setValidationErrors(errors);
     const isValid = Object.keys(errors).length === 0;
-    console.log("DespesaForm: Validação. Válido:", isValid, "Erros:", errors);
     return isValid;
   };
 
@@ -159,7 +147,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
     }
     
     if (name === "selectedClienteId") {
-      console.log("DespesaForm: Filtro de cliente alterado para:", value);
       setSelectedClienteId(value);
       setFormData(prev => ({ ...prev, caso_id: '' }));
     } else {
@@ -169,7 +156,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("DespesaForm: handleSubmit. FormData:", formData);
     clearValidationErrors();
     if (!validateForm()) {
       toast.error('Por favor, corrija os erros indicados no formulário.');
@@ -195,8 +181,6 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       data_vencimento: formData.data_vencimento || null,
       data_despesa: formData.data_despesa || null,
     };
-    console.log("DespesaForm: Enviando dados para API:", dadosParaEnviar);
-
     try {
       const url = isEditing ? `${API_URL}/despesas/${despesaParaEditar.id}` : `${API_URL}/despesas/`; // Adicionada barra final para POST
       const method = isEditing ? 'PUT' : 'POST';

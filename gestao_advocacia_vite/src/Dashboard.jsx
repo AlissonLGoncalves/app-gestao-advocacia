@@ -1,8 +1,7 @@
 // src/Dashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js'; // CORRETO: sem a barra no final do nome do arquivo
+import { API_URL } from './config.js';
 
-// Importação dos ícones da biblioteca Heroicons
 import {
   UsersIcon as UsersIconSolid,
   BriefcaseIcon as BriefcaseIconSolid,
@@ -13,10 +12,6 @@ import {
 } from '@heroicons/react/24/solid';
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
 
-// Log para verificar se o módulo Dashboard.jsx está a ser carregado
-console.log("Módulo Dashboard.jsx carregado.");
-
-// Componente reutilizável para os cartões de estatísticas
 const StatCard = ({ title, value, icon: IconComponent, colorClass = "text-primary", bgColorClass = "bg-primary-subtle", onClick }) => (
   <div
     className={`card shadow-sm hover-shadow transition-shadow duration-200 ease-in-out d-flex flex-row align-items-center p-3 ${onClick ? 'cursor-pointer' : ''}`}
@@ -31,25 +26,21 @@ const StatCard = ({ title, value, icon: IconComponent, colorClass = "text-primar
     </div>
     <div className="flex-grow-1">
       <p className="text-muted small text-uppercase mb-1" style={{fontSize: '0.7rem'}}>{title}</p>
-      {/* Exibe '...' se o valor for undefined ou null, indicando carregamento ou ausência de dados */}
       <p className="h5 mb-0 fw-semibold text-dark">{value === undefined || value === null ? '...' : value}</p>
     </div>
   </div>
 );
 
-// Componente para item da lista de eventos
 const EventListItem = ({ evento, onClick }) => {
-  // Validação robusta do objeto evento e suas propriedades
   if (!evento || typeof evento !== 'object' || !evento.id || !evento.data_inicio) {
-    console.warn("EventListItem: Objeto 'evento' inválido ou 'data_inicio' ausente.", evento);
-    return null; // Não renderiza nada se o evento for inválido
+    return null;
   }
 
   let dataFormatada = 'Data inválida';
   let horaFormatada = '';
   try {
     const dataObj = new Date(evento.data_inicio);
-    if (!isNaN(dataObj.getTime())) { // Verifica se a data é válida
+    if (!isNaN(dataObj.getTime())) {
       dataFormatada = dataObj.toLocaleDateString('pt-BR', {
         day: '2-digit', month: 'short',
       });
@@ -70,13 +61,12 @@ const EventListItem = ({ evento, onClick }) => {
     >
       <div className="d-flex align-items-center">
         <div className={`flex-shrink-0 me-2 ${corIconeEvento}`}><IconeEvento style={{ width: '20px', height: '20px' }} /></div>
-        <div className="flex-grow-1 min-w-0"> {/* min-w-0 é importante para o text-truncate funcionar em flex items */}
+        <div className="flex-grow-1 min-w-0">
           <p className="mb-0 fw-medium text-dark text-truncate" style={{fontSize: '0.9rem'}} title={evento.titulo || 'Evento sem título'}>
             {evento.titulo || 'Evento sem título'}
           </p>
-          <p className="small text-muted text-truncate mb-0" style={{fontSize: '0.75rem'}} title={`${dataFormatada} ${horaFormatada && `às ${horaFormatada}`} ${evento.caso_titulo ? `| ${evento.caso_titulo}` : ''}`}>
+          <p className="small text-muted text-truncate mb-0" style={{fontSize: '0.75rem'}}>
             {dataFormatada} {horaFormatada && `às ${horaFormatada}`}
-            {evento.caso_titulo && <span className="ms-1 text-body-secondary">| {evento.caso_titulo}</span>}
           </p>
         </div>
       </div>
@@ -85,12 +75,11 @@ const EventListItem = ({ evento, onClick }) => {
   );
 };
 
-function Dashboard({ mudarSecao }) { // mudarSecao é recebida como prop de DashboardPage
-  console.log("Componente Dashboard está a ser renderizado.");
+function Dashboard({ mudarSecao }) {
   const [stats, setStats] = useState({
-    totalClientes: undefined, // Inicializa como undefined para o StatCard mostrar '...'
+    totalClientes: undefined,
     casosAtivos: undefined,
-    recebimentosPendentesValor: 0, // Mantém 0 para cálculos
+    recebimentosPendentesValor: 0,
     recebimentosPendentesQtd: 0,
     despesasAPagarValor: 0,
     despesasAPagarQtd: 0,
@@ -100,7 +89,6 @@ function Dashboard({ mudarSecao }) { // mudarSecao é recebida como prop de Dash
   const [erro, setErro] = useState('');
 
   const fetchDashboardData = useCallback(async () => {
-    console.log("Dashboard: fetchDashboardData iniciado.");
     setLoading(true);
     setErro('');
 
@@ -108,141 +96,77 @@ function Dashboard({ mudarSecao }) { // mudarSecao é recebida como prop de Dash
     if (!token) {
       setErro("Autenticação necessária. Faça login para visualizar o dashboard.");
       setLoading(false);
-      // Idealmente, redirecionar para a página de login aqui se não houver token
-      // Ex: navigate('/login'); // Se `Maps` estiver disponível
       return;
     }
 
-    const authHeaders = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-
     try {
-      const apiRequests = [
-        fetch(`${API_URL}/clientes/?count_only=true`, { headers: authHeaders }),
-        fetch(`${API_URL}/casos/?status=Ativo&count_only=true`, { headers: authHeaders }),
-        fetch(`${API_URL}/eventos/?sort_by=data_inicio&order=asc&limit=5&concluido=false`, { headers: authHeaders }),
-        fetch(`${API_URL}/recebimentos/?status=Pendente`, { headers: authHeaders }),
-        fetch(`${API_URL}/despesas/?status=A Pagar`, { headers: authHeaders }),
-      ];
-      
-      const responses = await Promise.all(apiRequests);
-      console.log("Dashboard: Respostas da API recebidas.");
-
-      const processResponse = async (res, entityName) => {
-        if (!res.ok) {
-          if (res.status === 401) { // Erro de não autorizado
-             console.error(`Dashboard: Erro 401 (Não Autorizado) ao buscar ${entityName}. Token pode ser inválido ou expirado.`);
-             throw new Error(`Falha na autenticação ao carregar dados de ${entityName.toLowerCase()}. Por favor, tente fazer login novamente.`);
-          }
-          let errorBody = `Status: ${res.status}`;
-          try {
-            // Tenta ler como texto primeiro, pois pode ser HTML ou texto plano
-            const errorText = await res.text();
-            errorBody = errorText; // Para log
-            // Tenta parsear como JSON apenas se parecer JSON
-            if (errorText.startsWith('{') && errorText.endsWith('}')) {
-                const errorJson = JSON.parse(errorText);
-                errorBody = errorJson.erro || errorJson.message || JSON.stringify(errorJson);
-            }
-          } catch (e) {
-            // Se o parse falhar, usa o texto bruto ou o status.
-             console.warn(`Dashboard: Corpo do erro para ${entityName} não é JSON válido ou não pôde ser lido. Status: ${res.status}. Texto: ${errorBody.substring(0,100)}`);
-          }
-          console.error(`Dashboard: Erro na API ao buscar ${entityName}: ${errorBody}`);
-          throw new Error(`Falha ao carregar dados de ${entityName.toLowerCase()}. Detalhe: ${errorBody.substring(0,100)}`);
+      const response = await fetch(`${API_URL}/dashboard/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-        // Verifica se a resposta tem conteúdo antes de tentar parsear JSON
-        const contentType = res.headers.get("content-type");
-        if (res.status === 204 || !contentType || !contentType.includes("application/json")) {
-            // Para 204 No Content, ou se não for JSON, retorna um valor padrão (ex: objeto vazio ou array)
-            // ou null, dependendo do que o código de consumo espera.
-            console.warn(`Dashboard: Resposta OK para ${entityName} mas não é JSON ou está vazia (Status: ${res.status}).`);
-            if (entityName === 'Próximos Eventos' || entityName === 'Recebimentos Pendentes' || entityName === 'Despesas a Pagar') {
-                return { [entityName.toLowerCase().replace(/\s+/g, '_')]: [] }; // Ex: { proximos_eventos: [] }
-            }
-            return {}; // Para contagens, pode ser um objeto vazio
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Sessão expirada. Por favor, faça login novamente.');
         }
-        return res.json();
-      };
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Erro ao carregar dados (status ${response.status})`);
+      }
 
-      const [
-        clientesData, casosData, eventosData, recebimentosData, despesasData
-      ] = await Promise.all([
-        processResponse(responses[0], 'Clientes'),
-        processResponse(responses[1], 'Casos Ativos'),
-        processResponse(responses[2], 'Próximos Eventos'),
-        processResponse(responses[3], 'Recebimentos Pendentes'),
-        processResponse(responses[4], 'Despesas a Pagar')
-      ]);
-      console.log("Dashboard: Dados da API processados:", { clientesData, casosData, eventosData, recebimentosData, despesasData });
-
-      const recebimentosPendentes = (recebimentosData.recebimentos || []);
-      const totalPendenteValor = recebimentosPendentes.reduce((acc, curr) => acc + parseFloat(curr.valor || 0), 0);
-
-      const despesasAPagar = (despesasData.despesas || []);
-      const totalAPagarValor = despesasAPagar.reduce((acc, curr) => acc + parseFloat(curr.valor || 0), 0);
+      const data = await response.json();
 
       setStats({
-        totalClientes: clientesData.total_clientes !== undefined ? clientesData.total_clientes : 0,
-        casosAtivos: casosData.total_casos !== undefined ? casosData.total_casos : 0,
-        recebimentosPendentesValor: totalPendenteValor,
-        recebimentosPendentesQtd: recebimentosPendentes.length,
-        despesasAPagarValor: totalAPagarValor,
-        despesasAPagarQtd: despesasAPagar.length,
+        totalClientes: data.total_clientes ?? 0,
+        casosAtivos: data.casos_ativos ?? 0,
+        recebimentosPendentesValor: data.recebimentos_pendentes?.valor_total ?? 0,
+        recebimentosPendentesQtd: data.recebimentos_pendentes?.quantidade ?? 0,
+        despesasAPagarValor: data.despesas_a_pagar?.valor_total ?? 0,
+        despesasAPagarQtd: data.despesas_a_pagar?.quantidade ?? 0,
       });
-      setProximosEventos(eventosData.eventos || []);
-      console.log("Dashboard: Estado atualizado com sucesso.");
+      setProximosEventos(data.proximos_eventos || []);
 
     } catch (error) {
-      console.error("Dashboard: Erro detalhado no fetchDashboardData:", error);
-      setErro(error.message || "Ocorreu um erro desconhecido ao carregar os dados do dashboard.");
+      console.error("Dashboard: Erro ao carregar dados:", error);
+      setErro(error.message || "Ocorreu um erro ao carregar os dados do dashboard.");
     } finally {
       setLoading(false);
-      console.log("Dashboard: fetchDashboardData finalizado.");
     }
-  }, []); // API_URL deve ser estável ou incluída se vier de contexto/props
+  }, []);
 
   useEffect(() => {
-    console.log("Dashboard: useEffect a chamar fetchDashboardData.");
     fetchDashboardData();
   }, [fetchDashboardData]);
 
   if (loading) {
-    console.log("Dashboard: A renderizar estado de carregamento.");
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: 'calc(100vh - 200px)' }}>
         <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
-          <span className="visually-hidden">A carregar...</span>
+          <span className="visually-hidden">Carregando...</span>
         </div>
-        <p className="ms-3 text-muted fs-5">A carregar Dashboard...</p>
+        <p className="ms-3 text-muted fs-5">Carregando Dashboard...</p>
       </div>
     );
   }
 
   if (erro) {
-    console.error("Dashboard: A renderizar estado de erro:", erro);
     return (
         <div className="alert alert-danger mx-auto mt-5" role="alert" style={{maxWidth: "600px"}}>
             <h4 className="alert-heading">Ocorreu um erro!</h4>
-            <p>Não foi possível carregar os dados do dashboard. Verifique a sua ligação com a API ou tente novamente mais tarde.</p>
+            <p>Não foi possível carregar os dados do dashboard. Verifique sua conexão com a API ou tente novamente.</p>
             <hr />
-            <p className="mb-0 small">Detalhe do erro: {erro}</p>
+            <p className="mb-0 small">Detalhe: {erro}</p>
         </div>
     );
   }
 
   const handleCardClick = (secaoConstante) => {
     if (typeof mudarSecao === 'function') {
-      console.log("Dashboard: handleCardClick a chamar mudarSecao com:", secaoConstante);
-      mudarSecao(secaoConstante); // mudarSecao espera a constante string como 'CLIENTES'
-    } else {
-      console.warn("Dashboard: prop 'mudarSecao' não é uma função ou não foi passada.");
+      mudarSecao(secaoConstante);
     }
   };
 
-  console.log("Dashboard: A renderizar conteúdo principal. Stats:", stats, "Eventos:", proximosEventos);
   return (
     <div className="container-fluid p-0">
       <div className="row g-3">
@@ -260,13 +184,13 @@ function Dashboard({ mudarSecao }) { // mudarSecao é recebida como prop de Dash
         </div>
       </div>
       <div className="card mt-4 shadow-sm">
-        <div className="card-header bg-light"><h2 className="h6 mb-0 text-dark">Próximos Prazos e Eventos (Não Concluídos)</h2></div>
+        <div className="card-header bg-light"><h2 className="h6 mb-0 text-dark">Próximos Prazos e Eventos</h2></div>
         {proximosEventos && proximosEventos.length > 0 ? (
           <ul className="list-group list-group-flush">
             {proximosEventos.map(evento => ( <EventListItem key={evento.id} evento={evento} onClick={() => handleCardClick('AGENDA')} /> ))}
           </ul>
         ) : (
-          <div className="card-body text-center"><p className="text-muted small">Nenhum prazo ou evento pendente e não concluído nos próximos dias.</p></div>
+          <div className="card-body text-center"><p className="text-muted small">Nenhum prazo ou evento pendente nos próximos dias.</p></div>
         )}
       </div>
     </div>

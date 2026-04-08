@@ -34,7 +34,7 @@ class Config:
     SQLALCHEMY_ECHO = False # Mude para True para logar queries SQL em desenvolvimento, se útil
 
     UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
+    MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
     CNJ_API_KEY = os.environ.get('CNJ_API_KEY')
     APP_VERSION = os.environ.get('APP_VERSION') or '1.0.0'

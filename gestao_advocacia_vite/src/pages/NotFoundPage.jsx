@@ -1,11 +1,7 @@
-// src/pages/NotFoundPage.jsx
+﻿// src/pages/NotFoundPage.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
-
-console.log("NotFoundPage.jsx está a ser carregado.");
-
 function NotFoundPage() {
-  console.log("Componente NotFoundPage está a ser renderizado.");
   return (
     <div className="container text-center mt-5">
       <div className="py-5">

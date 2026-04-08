@@ -1,4 +1,4 @@
-// src/components/CalendarView.jsx
+﻿// src/components/CalendarView.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -16,13 +16,11 @@ import { toast } from 'react-toastify';
 // E para os ícones do Bootstrap no calendário: import 'bootstrap-icons/font/bootstrap-icons.css';
 
 function CalendarView() {
-  console.log("CalendarView: Renderizando componente.");
   const [events, setEvents] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const navigate = useNavigate();
 
   const fetchEventsForCalendar = useCallback(async () => {
-    console.log("CalendarView: fetchEventsForCalendar chamado.");
     setLoadingEvents(true);
     try {
       // Busca todos os eventos. A API pode precisar de parâmetros para buscar eventos num range de datas visível.
@@ -34,8 +32,6 @@ function CalendarView() {
         throw new Error(errorData.erro || `Erro HTTP: ${response.status}`);
       }
       const data = await response.json();
-      console.log("CalendarView: Eventos brutos da API:", data.eventos);
-
       const formattedEvents = (data.eventos || []).map(evento => {
         // O FullCalendar espera datas no formato ISO string ou objetos Date.
         // A sua API já deve estar a retornar datas em formato ISO.
@@ -75,7 +71,6 @@ function CalendarView() {
           // borderColor: evento.tipo_evento === 'Prazo' ? '#dc3545' : '#0d6efd',
         };
       });
-      console.log("CalendarView: Eventos formatados para o calendário:", formattedEvents);
       setEvents(formattedEvents);
     } catch (error) {
       console.error("CalendarView: Erro ao buscar eventos para o calendário:", error);
@@ -90,14 +85,12 @@ function CalendarView() {
   }, [fetchEventsForCalendar]);
 
   const handleEventClick = (clickInfo) => {
-    console.log("CalendarView: Evento clicado:", clickInfo.event);
     // Navega para a página de edição do evento
     navigate(`/agenda/editar/${clickInfo.event.id}`);
   };
 
   const handleDateSelect = (selectInfo) => {
     // Permite criar um novo evento ao selecionar um período no calendário
-    console.log('CalendarView: Período selecionado:', selectInfo);
     // Passa as datas de início e fim para o formulário de novo evento
     // O formulário precisará de ser adaptado para receber estas props.
     navigate('/agenda/novo', { 

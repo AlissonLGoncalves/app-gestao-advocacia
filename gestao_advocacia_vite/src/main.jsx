@@ -1,4 +1,4 @@
-// src/main.jsx
+﻿// src/main.jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -9,8 +9,6 @@ import 'bootstrap/dist/css/bootstrap.min.css'; // CSS do Bootstrap
 import './index.css'; // Seus estilos globais personalizados
 
 // Log para indicar que o main.jsx foi carregado
-console.log("Módulo main.jsx carregado e a executar.");
-
 // Verifica se o elemento root existe no DOM
 const rootElement = document.getElementById('root');
 
@@ -25,7 +23,6 @@ if (!rootElement) {
       </BrowserRouter>
     </React.StrictMode>
   );
-  console.log("Aplicação React renderizada no elemento #root.");
 }
 
 // Opcional: Se você usa reportWebVitals e o arquivo existe
