@@ -15,6 +15,24 @@ function RegisterPage() {
   // Gatekeepers LGPD
   const [aceiteTermos, setAceiteTermos] = useState(false);
   const [aceiteLgpd, setAceiteLgpd] = useState(false);
+  
+  // Gatekeeper de Scroll Obrigatório (Termos)
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [scrolledToBottom, setScrolledToBottom] = useState(false);
+
+  // Algoritmo que detecta quando a barra de rolagem atinge o fundo
+  const handleScrollTerms = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    // Se a barra estiver a 10px ou menos do fim, libera.
+    if (scrollHeight - scrollTop <= clientHeight + 10) {
+      setScrolledToBottom(true);
+    }
+  };
+
+  const aceitarNoModal = () => {
+    setAceiteTermos(true);
+    setShowTermsModal(false);
+  };
 
   const [loading, setLoading] = useState(false);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
@@ -243,15 +261,24 @@ function RegisterPage() {
 
               {/* LGPD Gatekeepers */}
               <div className="bg-light p-3 rounded mb-4 border" style={{fontSize: '0.85rem'}}>
-                <div className="form-check mb-2">
-                  <input className="form-check-input" type="checkbox" id="termsBox" checked={aceiteTermos} onChange={(e)=>setAceiteTermos(e.target.checked)} />
-                  <label className="form-check-label text-dark" htmlFor="termsBox">
-                    Eu li, compreendo e aceito os <b className="text-primary" style={{cursor: 'pointer'}}>Termos de Serviço</b> estruturais da Plataforma.
+                <div className="form-check mb-3">
+                  <input 
+                    className="form-check-input mt-1" 
+                    type="checkbox" 
+                    id="termsBox" 
+                    checked={aceiteTermos} 
+                    disabled={!scrolledToBottom} 
+                    onChange={(e)=>setAceiteTermos(e.target.checked)} 
+                    style={{cursor: !scrolledToBottom ? 'not-allowed' : 'pointer', width: '18px', height: '18px'}}
+                  />
+                  <label className="form-check-label text-dark ms-2" htmlFor="termsBox">
+                    Eu li, compreendo e aceito os <b className="text-primary text-decoration-underline" style={{cursor: 'pointer'}} onClick={() => setShowTermsModal(true)}>Termos de Serviço</b> estruturais da Plataforma.
+                    {!scrolledToBottom && <span className="d-block text-danger mt-1" style={{fontSize: '0.75rem'}}>* Você deve abrir e ler os Termos até o final para destravar o aceite.</span>}
                   </label>
                 </div>
                 <div className="form-check">
-                  <input className="form-check-input" type="checkbox" id="lgpdBox" checked={aceiteLgpd} onChange={(e)=>setAceiteLgpd(e.target.checked)} />
-                  <label className="form-check-label text-dark" htmlFor="lgpdBox">
+                  <input className="form-check-input mt-1" type="checkbox" id="lgpdBox" checked={aceiteLgpd} onChange={(e)=>setAceiteLgpd(e.target.checked)} style={{width: '18px', height: '18px'}} />
+                  <label className="form-check-label text-dark ms-2" htmlFor="lgpdBox">
                     Eu autorizo o Tratamento de Dados Pessoais sob custódia e declaro total Compliance com a nova <b>Lei Geral de Proteção de Dados (LGPD)</b>.
                   </label>
                 </div>
@@ -271,6 +298,72 @@ function RegisterPage() {
           </div>
         </div>
       </div>
+
+      {/* MODAL DE TERMOS OVERLAY (NATIVO) */}
+      {showTermsModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, 
+          display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '15px'
+        }}>
+          <div className="bg-white shadow-lg" style={{
+            width: '100%', maxWidth: '750px', height: '85vh', 
+            borderRadius: '16px', display: 'flex', flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            <div className="p-4 border-bottom bg-light d-flex justify-content-between align-items-center">
+               <h5 className="mb-0 fw-bolder text-dark">📜 Termos de Serviço e EULA</h5>
+               <button className="btn-close" onClick={() => setShowTermsModal(false)}></button>
+            </div>
+            
+            {/* CORPO DE TEXTO ROLÁVEL */}
+            <div className="p-4" style={{overflowY: 'auto', flex: 1, backgroundColor: '#fcfcfc'}} onScroll={handleScrollTerms}>
+              <h4 className="fw-bold mb-3 text-dark border-bottom pb-2">1. Das Definições e do Objeto</h4>
+              <p className="text-secondary" style={{lineHeight: '1.7'}}>O presente instrumento jurídico estabelece e disciplina a relação de licenciamento de uso de software corporativo na modalidade <strong>Software as a Service (SaaS)</strong>, doravante denominado <strong>Patronus</strong>. O Usuário/Contratante, pessoa física devidamente inscrita na Ordem dos Advogados do Brasil (OAB) ou pessoa jurídica constituída sob a forma de Sociedade de Advogados, ao concluir o processo de cadastro e clique na caixa de aceite, manifesta sua concordância tácita, inequivocável e irrevogável com todos os preceitos arrolados.</p>
+
+              <h4 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">2. Da Licença de Uso e Restrições</h4>
+              <p className="text-secondary" style={{lineHeight: '1.7'}}>É concedida ao Usuário uma licença não exclusiva, temporária, revogável e intransferível de uso do Software para fins estritamente vinculados ao gerenciamento interno de sua própria carteira de clientes, acompanhamento de prazos, monitoramento processual automatizado, faturamento financeiro e emissão de relatórios.</p>
+              <ul className="text-secondary" style={{lineHeight: '1.7'}}>
+                <li>É terminantemente proibido o sublicenciamento, a venda, cessão, engenharia reversa (<i>reverse engineering</i>), descompilação ou qualquer tentativa de extração do código-fonte.</li>
+                <li>A Plataforma emprega a arquitetura <strong>Multi-Tenant isolada</strong>. É vedado ao Usuário fornecer suas credenciais a terceiros estranhos ao seu escritório, sob pena de bloqueio imediato.</li>
+              </ul>
+
+              <h4 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">3. Limitação de Falibilidade Técnica</h4>
+              <p className="text-secondary" style={{lineHeight: '1.7'}}>O Patronus atua como um <strong>Facilitador Tecnológico</strong>. A responsabilidade originária, moral e civil, por atos processuais pertence integralmente ao advogado cadastrado.</p>
+              <div className="bg-white p-3 rounded border border-danger mb-4 shadow-sm">
+                <h6 className="fw-bold text-danger">Cláusula de Isenção (Safe Harbor) - Alertas CRON</h6>
+                <p className="mb-0 text-dark small" style={{lineHeight: '1.5'}}>
+                  O sistema possui rotinas computacionais ativas na nuvem (AWS/Render) para notificar o Usuário sobre prazos com 7 e 3 dias de antecedência. Contudo, <strong>atrasos em filas de e-mail (SMTP), bloqueios por filtros de Spam, *downtimes* de servidores ou lapsos no cômputo da contagem não geram qualquer responsabilidade material ou moral para o Patronus face a eventuais perdas de Prazos. A verificação manual dos expedientes permanece como dever intransferível do Escritório.</strong>
+                </p>
+              </div>
+
+              <h4 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">4. Lei Geral de Proteção de Dados (LGPD)</h4>
+              <ul className="text-secondary" style={{lineHeight: '1.7'}}>
+                <li>O Usuário/Escritório é definido como o <strong>Controlador de Dados</strong>. O Patronus atua única e exclusivamente como <strong>Operador</strong>, encriptando senhas e acautelando bancos de dados.</li>
+                <li>A inserção de dados sensíveis médicos, criminais ou processuais requer que o Advogado já possua procuração e consentimento de seu cliente.</li>
+                <li>Ao receber um pleito de eliminação previsto no Art. 18 da LGPD, o Advogado Controlador se obriga a extinguir diretamente as informações ativas em seu painel usando as ferramentas de eliminação do Patronus.</li>
+              </ul>
+
+              <br/><br/><br/>
+            </div>
+            
+            <div className="p-3 border-top d-flex justify-content-between align-items-center bg-white">
+               <span className="text-muted small fw-semibold">
+                  {!scrolledToBottom ? '🛑 Role até o final para confirmar a leitura ↓' : '✅ Leitura confirmada!'}
+               </span>
+               <button 
+                 type="button" 
+                 className={`btn fw-bold px-4 ${scrolledToBottom ? 'btn-primary' : 'btn-secondary'}`} 
+                 disabled={!scrolledToBottom} 
+                 onClick={aceitarNoModal}
+               >
+                 Aceitar e Concordar
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
