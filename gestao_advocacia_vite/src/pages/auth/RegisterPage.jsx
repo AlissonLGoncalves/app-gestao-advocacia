@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { API_URL } from '../../config';
 import { toast } from 'react-toastify';
 import { LockClosedIcon, UserIcon, EnvelopeIcon, BuildingOfficeIcon, IdentificationIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
@@ -37,6 +37,8 @@ function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite_token');
 
   // Função para aplicar máscara dinâmica no CPF ou CNPJ
   const handleDocumentChange = (e) => {
@@ -85,14 +87,49 @@ function RegisterPage() {
     setLoading(true);
     toast.dismiss(); 
 
-    if (!nomeOuRazao || !email || !password || !documento) {
-        toast.error("Por favor, preencha todos os campos obrigatórios.");
+    if (!aceiteTermos || !aceiteLgpd) {
+        toast.error("Para prosseguir, você deve aceitar os Termos de Serviço e as Políticas de LGPD.");
         setLoading(false);
         return;
     }
 
-    if (!aceiteTermos || !aceiteLgpd) {
-        toast.error("Para prosseguir, você deve aceitar os Termos de Serviço e as Políticas de LGPD.");
+    if (password.length < 6) {
+        toast.error("A senha deve ter no mínimo 6 caracteres.");
+        setLoading(false);
+        return;
+    }
+
+    // Fluxo 1: Convite Mágico (Associado)
+    if (inviteToken) {
+       if (!nomeOuRazao || !password) {
+           toast.error("Por favor, preencha seu nome e escolha uma senha.");
+           setLoading(false);
+           return;
+       }
+       try {
+          const response = await fetch(`${API_URL}/auth/register-invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invite_token: inviteToken, username: nomeOuRazao, password })
+          });
+          const data = await response.json();
+          if (response.ok) {
+            toast.success(data.message || "Conta ativada com sucesso no ambiente corporativo!");
+            navigate('/login');
+          } else {
+            toast.error(data.message || "Link de Convite expirado ou inválido.");
+          }
+       } catch (error) {
+          toast.error("Erro de rede ao processar o link mágico.");
+       } finally {
+          setLoading(false);
+       }
+       return;
+    }
+
+    // Fluxo 2: Criação de Novo Tenant (Admin / Dono)
+    if (!nomeOuRazao || !email || !password || !documento) {
+        toast.error("Por favor, preencha todos os campos obrigatórios.");
         setLoading(false);
         return;
     }
@@ -161,93 +198,104 @@ function RegisterPage() {
 
           {/* Painel Direito: Formulário de Onboarding */}
           <div className="col-md-7 p-4 p-md-5 bg-white">
-            <h4 className="fw-bold mb-1 text-dark">Cadastrar Escritório</h4>
-            <p className="text-muted small mb-4">Selecione o tipo de registro institucional.</p>
+            <h4 className="fw-bold mb-1 text-dark">
+              {inviteToken ? 'Aceite Seu Convite Mágico' : 'Cadastrar Escritório'}
+            </h4>
+            <p className="text-muted small mb-4">
+              {inviteToken ? 'Você foi convidado para operar no sistema. Preencha seus dados para finalizar.' : 'Selecione o tipo de registro institucional.'}
+            </p>
             
             <form onSubmit={handleRegister}>
               
-              {/* Type Toggle */}
-              <div className="d-flex gap-2 mb-4 bg-light p-1 rounded-3 border">
-                <button 
-                  type="button" 
-                  className={`btn p-2 w-50 fw-semibold rounded-2 border-0 ${tipoPessoa === 'PF' ? 'btn-primary' : 'btn-light text-muted'}`}
-                  onClick={() => { setTipoPessoa('PF'); setDocumento(''); setNomeOuRazao(''); setOab(''); }}
-                >
-                  <UserIcon className="d-inline-block me-2 mb-1" style={{ width: '18px'}} />
-                  Pessoa Física
-                </button>
-                <button 
-                  type="button" 
-                  className={`btn p-2 w-50 fw-semibold rounded-2 border-0 ${tipoPessoa === 'PJ' ? 'btn-primary' : 'btn-light text-muted'}`}
-                  onClick={() => { setTipoPessoa('PJ'); setDocumento(''); setNomeOuRazao(''); setOab(''); }}
-                >
-                  <BuildingOfficeIcon className="d-inline-block me-2 mb-1" style={{ width: '18px'}} />
-                  Pessoa Jurídica
-                </button>
-              </div>
-
-              {/* Documento & OAB */}
-              <div className="row g-3 mb-3">
-                <div className="col-md-8">
-                  <label className="form-label mb-1 text-secondary small fw-bold">
-                    {tipoPessoa === 'PF' ? 'CPF' : 'CNPJ'}
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder={tipoPessoa === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'}
-                    value={documento}
-                    onChange={handleDocumentChange}
-                    required
-                    disabled={loading || buscandoCnpj}
-                  />
-                  {buscandoCnpj && <small className="text-primary d-block mt-1">Consultando Receita Federal...</small>}
-                </div>
-                {tipoPessoa === 'PF' && (
-                  <div className="col-md-4">
-                    <label className="form-label mb-1 text-secondary small fw-bold">OAB (Opcional)</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="UF000000"
-                      value={oab}
-                      onChange={(e) => setOab(e.target.value)}
-                      disabled={loading}
-                    />
+              {/* Type Toggle & Documents - OCULTO SE FOR CONVITE */}
+              {!inviteToken && (
+                <>
+                  <div className="d-flex gap-2 mb-4 bg-light p-1 rounded-3 border">
+                    <button 
+                      type="button" 
+                      className={`btn p-2 w-50 fw-semibold rounded-2 border-0 ${tipoPessoa === 'PF' ? 'btn-primary' : 'btn-light text-muted'}`}
+                      onClick={() => { setTipoPessoa('PF'); setDocumento(''); setNomeOuRazao(''); setOab(''); }}
+                    >
+                      <UserIcon className="d-inline-block me-2 mb-1" style={{ width: '18px'}} />
+                      Pessoa Física
+                    </button>
+                    <button 
+                      type="button" 
+                      className={`btn p-2 w-50 fw-semibold rounded-2 border-0 ${tipoPessoa === 'PJ' ? 'btn-primary' : 'btn-light text-muted'}`}
+                      onClick={() => { setTipoPessoa('PJ'); setDocumento(''); setNomeOuRazao(''); setOab(''); }}
+                    >
+                      <BuildingOfficeIcon className="d-inline-block me-2 mb-1" style={{ width: '18px'}} />
+                      Pessoa Jurídica
+                    </button>
                   </div>
-                )}
-              </div>
+
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-8">
+                      <label className="form-label mb-1 text-secondary small fw-bold">
+                        {tipoPessoa === 'PF' ? 'CPF' : 'CNPJ'}
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder={tipoPessoa === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'}
+                        value={documento}
+                        onChange={handleDocumentChange}
+                        required={!inviteToken}
+                        disabled={loading || buscandoCnpj}
+                      />
+                      {buscandoCnpj && <small className="text-primary d-block mt-1">Consultando Receita Federal...</small>}
+                    </div>
+                    {tipoPessoa === 'PF' && (
+                      <div className="col-md-4">
+                        <label className="form-label mb-1 text-secondary small fw-bold">OAB (Opcional)</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="UF000000"
+                          value={oab}
+                          onChange={(e) => setOab(e.target.value)}
+                          disabled={loading}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* Main Auth Form */}
               <div className="mb-3">
                 <label className="form-label mb-1 text-secondary small fw-bold">
-                  {tipoPessoa === 'PF' ? 'Nome Completo do Advogado' : 'Razão Social do Escritório'}
+                  {inviteToken ? 'Qual seu Nome Completo?' : (tipoPessoa === 'PF' ? 'Nome Completo do Advogado' : 'Razão Social do Escritório')}
                 </label>
                 <input
                   type="text"
                   className="form-control"
                   value={nomeOuRazao}
                   onChange={(e) => setNomeOuRazao(e.target.value)}
-                  placeholder={tipoPessoa === 'PF' ? 'Dr. João Silva' : 'Escritório Silva & Associados'}
+                  placeholder={inviteToken ? 'Nome Sobrenome' : (tipoPessoa === 'PF' ? 'Dr. João Silva' : 'Escritório Silva & Associados')}
                   required
                   disabled={loading}
                 />
               </div>
 
-              <div className="mb-3">
-                <label className="form-label mb-1 text-secondary small fw-bold">Email de Acesso (Administrador)</label>
-                <input
-                  type="email"
-                  className="form-control"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
+              {!inviteToken && (
+                <div className="mb-3">
+                  <label className="form-label mb-1 text-secondary small fw-bold">Email de Acesso (Administrador)</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required={!inviteToken}
+                    disabled={loading}
+                  />
+                </div>
+              )}
 
               <div className="mb-4">
-                <label className="form-label mb-1 text-secondary small fw-bold">Senha Mestre</label>
+                <label className="form-label mb-1 text-secondary small fw-bold">
+                   {inviteToken ? 'Escolha sua Senha de Acesso' : 'Senha Mestre'}
+                </label>
                 <input
                   type="password"
                   className="form-control"
@@ -285,7 +333,7 @@ function RegisterPage() {
               </div>
 
               <button type="submit" className="btn btn-primary w-100 fw-bold py-2 shadow-sm" disabled={loading || buscandoCnpj}>
-                {loading ? 'Preparando Espaço de Trabalho...' : 'Criar Conta de Escritório'}
+                {loading ? 'Processando Informações...' : (inviteToken ? 'Aceitar e Entrar no Escritório' : 'Criar Conta de Escritório')}
               </button>
 
               <div className="text-center mt-4 pt-2 border-top">

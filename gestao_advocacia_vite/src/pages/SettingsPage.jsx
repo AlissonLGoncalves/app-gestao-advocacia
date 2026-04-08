@@ -9,6 +9,11 @@ function SettingsPage() {
      nome: '', email: ''
   });
 
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('advogado');
+  const [isInviting, setIsInviting] = useState(false);
+
   useEffect(() => {
     // Busca informações básicas do usuário local para popular o Form
     const userString = localStorage.getItem('user');
@@ -25,6 +30,37 @@ function SettingsPage() {
   const handleSalvarEscritorio = (e) => {
     e.preventDefault();
     toast.success("Informações do Escritório salvas com sucesso!");
+  };
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail) return toast.error("Preencha o e-mail do convidado.");
+    
+    setIsInviting(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/auth/invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("O Link Mágico criptografado foi disparado para o e-mail com sucesso!");
+        setShowInviteForm(false);
+        setInviteEmail('');
+      } else {
+        toast.error(data.message || "Erro ao convidar. Verifique as permissões.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro de comunicação com o servidor.");
+    } finally {
+      setIsInviting(false);
+    }
   };
 
   return (
@@ -106,8 +142,33 @@ function SettingsPage() {
                    <h5 className="mb-0 fw-bold text-dark">Gestão de Equipe e Associados</h5>
                    <p className="text-muted small mb-0 mt-1">Convide advogados para operar sob a sua assinatura.</p>
                  </div>
-                 <button className="btn btn-dark fw-bold shadow-sm" onClick={() => toast.info("Em breve: O convite gerará um link mágico que atrela o advogado ao cofre do seu Tenant.")}>+ Convidar Advogado</button>
+                 <button className="btn btn-dark fw-bold shadow-sm" onClick={() => setShowInviteForm(!showInviteForm)}>+ Convidar Membro</button>
                </div>
+               
+               {showInviteForm && (
+                 <div className="bg-light p-4 border-bottom">
+                   <h6 className="fw-bold text-primary mb-3">Enviar Convite Mágico (Magic Link)</h6>
+                   <form onSubmit={handleInvite} className="row g-2 align-items-end">
+                     <div className="col-md-5">
+                       <label className="form-label small fw-bold text-secondary">E-mail do Colega</label>
+                       <input type="email" className="form-control" placeholder="advogado@email.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
+                     </div>
+                     <div className="col-md-4">
+                       <label className="form-label small fw-bold text-secondary">Nível de Acesso (Papel)</label>
+                       <select className="form-select" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+                         <option value="advogado">Advogado Associado</option>
+                         <option value="assistente">Assistente/Estagiário</option>
+                       </select>
+                     </div>
+                     <div className="col-md-3">
+                       <button type="submit" className="btn btn-primary w-100 fw-bold" disabled={isInviting}>
+                         {isInviting ? "Gerando..." : "Disparar E-mail"}
+                       </button>
+                     </div>
+                   </form>
+                 </div>
+               )}
+
                <div className="card-body p-0">
                  <div className="table-responsive">
                    <table className="table table-hover align-middle mb-0">
