@@ -142,10 +142,10 @@ const MainLayout = () => {
           <SidebarLink to="/agenda" icon={CalendarDaysIcon}>Agenda</SidebarLink>
           <SidebarLink to="/documentos" icon={DocumentTextIcon}>Documentos</SidebarLink>
           <SidebarLink to="/relatorios" icon={ChartBarIcon}>Relatórios</SidebarLink>
+          <SidebarLink to="/configuracoes" icon={Cog6ToothIcon}>Configurações SaaS</SidebarLink>
         </nav>
 
         <div className="sidebar-footer">
-          <SidebarLink to="/configuracoes" icon={Cog6ToothIcon}>Configurações</SidebarLink>
           <button onClick={handleLogout} className="sidebar-link mt-2 text-danger" title="Sair do Sistema">
             <ArrowLeftOnRectangleIcon className="sidebar-link-icon" />
             <span>Sair</span>
