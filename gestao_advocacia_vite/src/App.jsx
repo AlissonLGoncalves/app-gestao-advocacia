@@ -19,12 +19,14 @@ import RelatoriosPage from './pages/RelatoriosPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import LoginPage from './pages/auth/LoginPage.jsx';
 import RegisterPage from './pages/auth/RegisterPage.jsx';
+import TermsPage from './pages/auth/TermsPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
 
 // Importação dos ícones
 import {
   HomeIcon, UsersIcon, BriefcaseIcon, DocumentTextIcon,
   CurrencyDollarIcon, CalendarDaysIcon, ChartBarIcon, CreditCardIcon, ArrowLeftOnRectangleIcon,
-  Bars3Icon, XMarkIcon, ScaleIcon
+  Bars3Icon, XMarkIcon, ScaleIcon, Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 
 const ProtectedRoute = ({ children }) => {
@@ -81,6 +83,7 @@ const MainLayout = () => {
       case 'agenda': baseTitle = 'Evento'; break;
       case 'documentos': baseTitle = 'Documento'; break;
       case 'relatorios': return 'Relatórios';
+      case 'configuracoes': return 'Configurações do Sistema';
       default: baseTitle = baseSegment.replace('-', ' ');
     }
 
@@ -142,11 +145,12 @@ const MainLayout = () => {
         </nav>
 
         <div className="sidebar-footer">
-          <button onClick={handleLogout} className="sidebar-link" title="Sair do Sistema">
+          <SidebarLink to="/configuracoes" icon={Cog6ToothIcon}>Configurações</SidebarLink>
+          <button onClick={handleLogout} className="sidebar-link mt-2 text-danger" title="Sair do Sistema">
             <ArrowLeftOnRectangleIcon className="sidebar-link-icon" />
             <span>Sair</span>
           </button>
-          <div className="sidebar-copyright">&copy; {new Date().getFullYear()} Patronus</div>
+          <div className="sidebar-copyright mt-3">&copy; {new Date().getFullYear()} Patronus</div>
         </div>
       </aside>
 
@@ -179,6 +183,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/termos" element={<TermsPage />} />
         <Route 
           path="/" 
           element={
@@ -218,6 +223,8 @@ function App() {
           
           <Route path="relatorios" element={<RelatoriosPage />} />
           
+          <Route path="configuracoes" element={<SettingsPage />} />
+
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
