@@ -36,7 +36,7 @@ function TermsPage() {
             A Plataforma assume o compromisso empresarial de envidar seus melhores e maiores esforços práticos para manter a disponibilidade ininterrupta das conexões provisionadas (SLA global de 99,8% de *Uptime*), blindando os arquivos contra ataques cibernéticos rotineiros (via instâncias Vercel Firewall e Render Private Networks). Contudo, imperfeições na conectividade intrínseca mundial isentam o Patronus do instituto de falha da prestação civil em panes gerais de provedores.
           </p>
           <div className="bg-light p-4 rounded-3 border border-danger mb-4 shadow-sm">
-            <h6 className="fw-bold text-danger">3.1 Cláusula de Isenção Transacional (Safe Harbor) - Perda de Prazos</h4>
+            <h6 className="fw-bold text-danger">3.1 Cláusula de Isenção Transacional (Safe Harbor) - Perda de Prazos</h6>
             <p className="mb-0 text-dark" style={{fontSize: '0.9rem', lineHeight: '1.6'}}>
               Em virtude do software operar algoritmos reativos aos Diários e tribunais externos, bem como disparar ações de notificação via serviços vitais de terceiros (SMTP E-mails), o software possui limites técnicos. <strong>Em hipótese alguma a Plataforma, seus idealizadores patrimoniais, diretores executivos ou consultores de arquitetura Cloud poderão ser responsabilizados cível, criminal, moral ou materialmente por eventuais lides perdedoras, danos operacionais de escritórios e perdas de prazos (incluindo preclusões, revelias e sentenças desfavoráveis). Falhas de Cronograma que impeçam a chegada dos e-mails temporais não constituem descumprimento material de serviço. A verificação manual incansável dos andamentos cartorários permanece obrigação primária do causídico signatário.</strong>
             </p>
