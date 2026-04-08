@@ -1,7 +1,7 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from gestao_advocacia.app import db, EventoAgenda, User
-from gestao_advocacia.mail_service import enviar_alerta_email
+from app import db, EventoAgenda, User
+from mail_service import enviar_alerta_email
 
 def job_verificar_prazos(app):
     """

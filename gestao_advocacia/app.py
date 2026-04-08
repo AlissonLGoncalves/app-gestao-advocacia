@@ -778,7 +778,7 @@ def create_app(config_class=Config):
             PERMITIDOS = ['.pdf', '.txt', '.docx', '.xlsx', '.xls', '.jpg', '.jpeg', '.png']
             
             try:
-                from gestao_advocacia.ocr_service import extract_client_data_from_file
+                from ocr_service import extract_client_data_from_file
                 combined_data = {}
                 
                 for file in files:
@@ -1514,7 +1514,7 @@ def create_app(config_class=Config):
                         # --- NOVO JOB DE E-MAILS DE ALERTA ---
                         job_alertas_id = 'VerificarAlertasPrazosJob'
                         if not scheduler.get_job(job_alertas_id):
-                            from gestao_advocacia.alertas_tasks import job_verificar_prazos
+                            from alertas_tasks import job_verificar_prazos
                             scheduler.add_job(
                                 id=job_alertas_id, func=job_verificar_prazos, args=[app], trigger='cron',
                                 hour=6, minute=0, replace_existing=True
