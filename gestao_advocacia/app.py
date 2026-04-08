@@ -34,29 +34,41 @@ def finance_access_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
-def get_list_query(model):
+def get_tenant_id():
+    # Helper central para extrair o Tenant logado. Resolve import circular
+    from flask_jwt_extended import get_jwt_identity
     user_id = get_jwt_identity()
-    claims = get_jwt()
-    role = claims.get('role', 'advogado')
-    if role in ['admin', 'assistente']:
+    user = db.session.get(User, user_id)
+    if not user:
+        abort(401, "Acesso Inválido. Usuário não encontrado no banco.")
+    return user.tenant_id
+
+def get_list_query(model):
+    tenant_id = get_tenant_id()
+    # Se ainda estivermos na transição onde o Tenant do usuario Master é nulo, retorna tudo pra n quebrar
+    # Num SaaS 100% maturado, tenant nulo = error.
+    if not tenant_id:
         return model.query
-    return model.query.filter_by(user_id=user_id)
+    # Se o modelo tem a coluna tenant_id, a query ganha a amarra de isolamento!
+    if hasattr(model, 'tenant_id'):
+        return model.query.filter_by(tenant_id=tenant_id)
+    return model.query
 
 def get_item_or_404(model, item_id):
-    user_id = get_jwt_identity()
-    claims = get_jwt()
-    role = claims.get('role', 'advogado')
-    if role in ['admin', 'assistente']:
-        return model.query.get_or_404(item_id)
-    return get_item_or_404(model, item_id)
+    tenant_id = get_tenant_id()
+    item = model.query.get_or_404(item_id)
+    
+    # Validação Cruzada (Cross-Tenant Breach Prevention)
+    if tenant_id and hasattr(item, 'tenant_id'):
+        if item.tenant_id and item.tenant_id != tenant_id:
+            abort(403, "Acesso Negado (LGPD): Este registro pertence a outro Escritório (Cross-Tenant Request).")
+    return item
 
 def get_existing_item(model, **kwargs):
-    user_id = get_jwt_identity()
-    claims = get_jwt()
-    role = claims.get('role', 'advogado')
-    if role in ['admin', 'assistente']:
-        return model.query.filter_by(**kwargs).first()
-    return get_existing_item(model, **kwargs)
+    tenant_id = get_tenant_id()
+    if tenant_id and hasattr(model, 'tenant_id'):
+        kwargs['tenant_id'] = tenant_id
+    return model.query.filter_by(**kwargs).first()
 # Inicialização das extensões
 db = SQLAlchemy()
 migrate = Migrate()
@@ -64,9 +76,18 @@ jwt = JWTManager()
 scheduler = APScheduler()
 
 # --- MODELOS SQLAlchemy ---
+class Tenant(db.Model):
+    __tablename__ = 'tenant'
+    id = db.Column(db.Integer, primary_key=True)
+    nome_escritorio = db.Column(db.String(250), nullable=False)
+    documento = db.Column(db.String(20), nullable=True) # CNPJ ou CPF
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    users = db.relationship('User', backref='tenant', lazy='dynamic')
+
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_user_tenant_id'), nullable=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False) 
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -92,6 +113,7 @@ class User(db.Model):
 class Cliente(db.Model):
     __tablename__ = 'cliente'
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_cliente_tenant_id'), nullable=True)
     # Dados principais
     nome_razao_social = db.Column(db.String(200), nullable=False)
     cpf_cnpj = db.Column(db.String(20), nullable=False)
@@ -153,6 +175,7 @@ class Cliente(db.Model):
 class Caso(db.Model):
     __tablename__ = 'caso'
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_caso_tenant_id'), nullable=True)
     titulo = db.Column(db.String(200), nullable=False)
     numero_processo = db.Column(db.String(30), unique=False, nullable=True, index=True)
     status = db.Column(db.String(50), nullable=True, default='Ativo')
@@ -225,6 +248,7 @@ class MovimentacaoCNJ(db.Model):
 class EventoAgenda(db.Model):
     __tablename__ = 'evento_agenda'
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_evento_tenant_id'), nullable=True)
     titulo = db.Column(db.String(100), nullable=False)
     data_inicio = db.Column(db.DateTime, nullable=False)
     data_fim = db.Column(db.DateTime, nullable=True)
@@ -251,6 +275,7 @@ class EventoAgenda(db.Model):
 class Documento(db.Model):
     __tablename__ = 'documento'
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_documento_tenant_id'), nullable=True)
     nome_arquivo = db.Column(db.String(255), nullable=False)
     path_arquivo = db.Column(db.String(500), nullable=False)
     data_upload = db.Column(db.DateTime, default=datetime.utcnow)
@@ -267,6 +292,7 @@ class Documento(db.Model):
 class ContratoHonorario(db.Model):
     __tablename__ = 'contrato_honorario'
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_contrato_tenant_id'), nullable=True)
     tipo_honorario = db.Column(db.String(50), nullable=False) # Fixo, Êxito, Mensal, Horas
     valor_total = db.Column(db.Numeric(14, 2), nullable=True)
     percentual_exito = db.Column(db.Numeric(5, 2), nullable=True)
@@ -293,6 +319,7 @@ class ContratoHonorario(db.Model):
 class Despesa(db.Model):
     __tablename__ = 'despesa'
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_despesa_tenant_id'), nullable=True)
     descricao = db.Column(db.String(200), nullable=False)
     valor = db.Column(db.Numeric(10, 2), nullable=False)
     data_despesa = db.Column(db.Date, nullable=False)
@@ -308,6 +335,7 @@ class Despesa(db.Model):
 class Recebimento(db.Model):
     __tablename__ = 'recebimento'
     id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_recebimento_tenant_id'), nullable=True)
     descricao = db.Column(db.String(200), nullable=False)
     valor = db.Column(db.Numeric(10, 2), nullable=False)
     data_recebimento = db.Column(db.Date, nullable=False)
@@ -387,7 +415,10 @@ def create_app(config_class=Config):
         'username': fields.String(required=True, description='Nome de usuário único'),
         'email': fields.String(required=True, description='Email único do usuário', format='email'),
         'password': fields.String(required=True, description='Senha do usuário (mínimo 6 caracteres)', min_length=6),
-        'role': fields.String(description='Papel do usuário (admin, advogado, assistente)', default='admin', enum=['admin', 'advogado', 'assistente'])
+        'role': fields.String(description='Papel do usuário (admin, advogado, assistente)', default='admin', enum=['admin', 'advogado', 'assistente']),
+        'documento_identificacao': fields.String(description='CPF ou CNPJ preenchido no cadastro (SaaS)'),
+        'tipo_pessoa': fields.String(description='PF ou PJ'),
+        'oab': fields.String(description='Registro OAB (se houver)')
     })
     login_model_dto = auth_ns.model('UserLogin', {
         'username_or_email': fields.String(required=True, description='Nome de usuário ou email para login'),
@@ -661,6 +692,7 @@ def create_app(config_class=Config):
             email = data.get('email')
             password = data.get('password')
             role = data.get('role', 'admin')
+            documento = data.get('documento_identificacao')
 
             if role not in ['admin', 'advogado', 'assistente']:
                 return {"message": "Role deve ser admin, advogado ou assistente."}, 400
@@ -675,12 +707,26 @@ def create_app(config_class=Config):
             if User.query.filter_by(email=email).first():
                 return {"message": "Email já cadastrado."}, 409
             
-            new_user = User(username=username, email=email, role=role)
+            # Se for 'admin', significa que é uma criação de NOVO Escritório (Tenant)
+            novo_tenant = None
+            if role == 'admin':
+                novo_tenant = Tenant(nome_escritorio=username, documento=documento)
+                db.session.add(novo_tenant)
+                db.session.flush() # Força injeção do ID pro Tenant para atrelar abaixo
+            
+            # Cria o Super-User
+            new_user = User(
+                username=username, 
+                email=email, 
+                role=role, 
+                tenant_id=novo_tenant.id if novo_tenant else None
+            )
             new_user.set_password(password)
             db.session.add(new_user)
             db.session.commit()
-            app.logger.info(f"Novo usuário registrado: {username} (ID: {new_user.id})")
-            return {"message": "Usuário registrado com sucesso. Faça login para continuar."}, 201
+            
+            app.logger.info(f"Novo Tenant/Escritório registrado: {username} (Logado pelo Master admin ID: {new_user.id})")
+            return {"message": "Ambiente de Escritório criado com sucesso! Faça login para gerenciar sua assinatura."}, 201
 
     @auth_ns.route('/login')
     class UserLogin(Resource):
@@ -1547,18 +1593,12 @@ def create_app(config_class=Config):
             app.logger.warning(f"Pasta de build do frontend não encontrada em '{static_folder_path}' nem em '{static_folder_path_alt}'.")
             static_folder_path = None 
 
-    @app.route('/', defaults={'path': ''})
-    @app.route('/<path:path>')
-    def serve_react_app(path):
-        if static_folder_path and os.path.exists(static_folder_path):
-            if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
-                return send_from_directory(static_folder_path, path)
-            else:
-                index_path = os.path.join(static_folder_path, 'index.html')
-                if os.path.exists(index_path):
-                    return send_from_directory(static_folder_path, 'index.html')
-        app.logger.error(f"Frontend: Arquivo '{path if path else 'index.html'}' não encontrado em '{static_folder_path if static_folder_path else 'CAMINHO_NAO_DEFINIDO'}'.")
-        return jsonify({"error": "Recurso do frontend não encontrado."}), 404
+    @app.route('/')
+    def serve_api_status():
+        return jsonify({
+            "status": "online",
+            "message": "API Patronus (Servidor Backend) operando com sucesso. Utilize o Front-end Vercel para acessar a Interface."
+        }), 200
                 
 
     # --- ENDPOINTS DOS CONTRATOS ---
