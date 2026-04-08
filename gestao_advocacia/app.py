@@ -245,6 +245,58 @@ class MovimentacaoCNJ(db.Model):
             'data_registro_sistema': self.data_registro_sistema.isoformat() if self.data_registro_sistema else None
         }
 
+class AuditLog(db.Model):
+    __tablename__ = 'audit_log'
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_auditlog_tenant_id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_auditlog_user_id'), nullable=False)
+    acao = db.Column(db.String(50), nullable=False) 
+    tabela_afetada = db.Column(db.String(50), nullable=False) 
+    registro_id = db.Column(db.Integer, nullable=True) 
+    detalhes = db.Column(db.Text, nullable=True) 
+    data_hora = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    
+    usuario = db.relationship('User', foreign_keys=[user_id])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tenant_id': self.tenant_id,
+            'user_id': self.user_id,
+            'username': self.usuario.username if self.usuario else 'Sistema',
+            'acao': self.acao,
+            'tabela_afetada': self.tabela_afetada,
+            'registro_id': self.registro_id,
+            'detalhes': self.detalhes,
+            'data_hora': self.data_hora.isoformat() if self.data_hora else None
+        }
+
+def log_audit(acao, tabela_afetada, registro_id=None, detalhes=""):
+    """
+    Registra silenciosamente na tabela de auditoria a ação executada por quem está logado.
+    ATENÇÃO: Deve ser chamado ANTES do db.session.commit() da transação principal se quiser atrelar na mesma.
+    Se não, dê commit.
+    """
+    try:
+        from flask_jwt_extended import get_jwt_identity
+        user_id = get_jwt_identity()
+        if not user_id: return
+        user = db.session.get(User, user_id)
+        if not user or not user.tenant_id: return
+        
+        novo_log = AuditLog(
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            acao=acao,
+            tabela_afetada=tabela_afetada,
+            registro_id=registro_id,
+            detalhes=detalhes
+        )
+        db.session.add(novo_log)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Falha ao registrar AuditLog: {str(e)}")
+
 class EventoAgenda(db.Model):
     __tablename__ = 'evento_agenda'
     id = db.Column(db.Integer, primary_key=True)
@@ -399,6 +451,7 @@ def create_app(config_class=Config):
     recebimentos_ns = Namespace('recebimentos', description='Operações de Recebimentos')
     dashboard_ns = Namespace('dashboard', description='Dados agregados para o Dashboard')
     contratos_ns = Namespace('contratos', description='Operações relacionadas aos Contratos de Honorários')
+    audit_ns = Namespace('auditoria', description='Trilhas de Auditoria e Logs (LGPD)')
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -409,6 +462,7 @@ def create_app(config_class=Config):
     api.add_namespace(recebimentos_ns)
     api.add_namespace(dashboard_ns)
     api.add_namespace(contratos_ns)
+    api.add_namespace(audit_ns)
 
     # --- DEFINIÇÃO DOS MODELOS DA API (DTOs - Data Transfer Objects) para Flask-RESTx ---
     user_model_dto = auth_ns.model('UserRegistration', {
@@ -429,6 +483,16 @@ def create_app(config_class=Config):
         'username': fields.String(description='Nome de usuário'),
         'email': fields.String(description='Email do usuário'),
         'role': fields.String(description='Papel do usuário no sistema')
+    })
+    
+    audit_log_model_dto = audit_ns.model('AuditLogOutput', {
+        'id': fields.Integer(readonly=True),
+        'username': fields.String(),
+        'acao': fields.String(),
+        'tabela_afetada': fields.String(),
+        'registro_id': fields.Integer(),
+        'detalhes': fields.String(),
+        'data_hora': fields.String()
     })
     
     user_invite_dto = auth_ns.model('UserInvite', {
