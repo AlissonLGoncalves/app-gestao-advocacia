@@ -197,7 +197,7 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
             />
             {cnjInfo && (
               <div className="alert alert-info py-1 px-2 mt-1 mb-0 small d-flex gap-3 flex-wrap">
-                <span><strong>Segmento:</strong> {cnjInfo.segmentoNome}</span>
+                <span><strong>Tribunal:</strong> {cnjInfo.tribunalNome}</span>
                 <span><strong>Âmbito:</strong> {cnjInfo.areaSugerida}</span>
                 <span><strong>Ano:</strong> {cnjInfo.ano}</span>
                 <span><strong>Instância sugerida:</strong> {cnjInfo.instanciaSugerida}</span>
