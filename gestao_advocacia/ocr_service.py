@@ -163,49 +163,48 @@ def _extract_case_data_from_text(text):
 def _extract_case_data_with_gemini(text):
     """
     Motor Suprassumo: Envia o texto da petição para a API do Google Gemini
-    buscando um JSON padronizado com 100% de precisão contextual.
+    buscando um JSON padronizado usando o SDK Oficial google-genai.
     """
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         return None # Força o fallback pro Regex se não tiver API key
     
-    prompt = '''
+    try:
+        from google import genai
+        from google.genai import types
+        # O cliente coleta a API key automaticamente da var GEMINI_API_KEY
+        client = genai.Client()
+        
+        prompt = '''
 Você é um extator de dados jurídicos brasileiro (Legaltech).
 Analise o texto desta capa de processo/petição inicial e retorne APENAS um JSON válido. 
-Nenhuma outra palavra. Não inclua markdown (```json). Apenas o JSON cru com estas chaves:
+Nenhuma outra palavra. Apenas o JSON cru com estas chaves:
 - "numero_processo" (string, formato CNJ se achar)
 - "valor_causa" (float)
 - "titulo" (string, geralmente "AUTOR x REU" ou resumo da ação)
 
 TEXTO DA PETIÇÃO:
-''' + text[:15000] # Limite de texto pra não estourar payload fácil
-    
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    headers = {'Content-Type': 'application/json'}
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=20)
-        if response.status_code == 200:
-            res_data = response.json()
-            try:
-                raw_text = res_data['candidates'][0]['content']['parts'][0]['text'].strip()
-                # Limpando crases de markdown
-                if raw_text.startswith("```json"): raw_text = raw_text[7:]
-                if raw_text.endswith("```"): raw_text = raw_text[:-3]
-                
-                json_data = json.loads(raw_text.strip())
-                return json_data
-            except (KeyError, IndexError, json.JSONDecodeError) as e:
-                print(f"[GEMINI_PARSE_ERROR] Erro ao extrair JSON do modelo: {e}. Output bruto: {res_data}")
-                return None
-        else:
-            print(f"[GEMINI_API_ERROR] Falha na API. Status: {response.status_code}, Msg: {response.text}")
-            return None
+''' + text[:15000] # Limite de texto
+        
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            )
+        )
+        
+        raw_text = response.text.strip()
+        # Tratamento de segurança caso o modelo não retorne json puro
+        if raw_text.startswith("```json"): raw_text = raw_text[7:]
+        if raw_text.startswith("```"): raw_text = raw_text[3:]
+        if raw_text.endswith("```"): raw_text = raw_text[:-3]
+        
+        json_data = json.loads(raw_text.strip())
+        return json_data
+        
     except Exception as e:
-        print(f"[GEMINI_NETWORK_ERROR] {e}")
+        print(f"[GEMINI_SDK_ERROR] Ocorreu uma falha no motor AI: {e}")
         return None
 
 
