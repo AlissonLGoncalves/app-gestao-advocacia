@@ -72,10 +72,15 @@ function CasosPage() {
     );
   }
 
+  // Lê cliente_id da query string (ex: /casos/novo?cliente_id=3)
+  const searchParams = new URLSearchParams(location.search);
+  const clienteIdInicial = searchParams.get('cliente_id');
+
   if (mostrarFormulario) {
     return (
       <CasoForm
-        casoParaEditar={casoParaEditar} // Se for novo, será null
+        casoParaEditar={casoParaEditar}
+        clienteIdInicial={clienteIdInicial}
         onCasoChange={handleFormularioFechado}
         onCancel={() => {
           setCasoParaEditar(null);

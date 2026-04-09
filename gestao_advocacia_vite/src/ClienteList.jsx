@@ -1,10 +1,12 @@
 ﻿// src/ClienteList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_URL } from './config.js';
-import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, InformationCircleIcon, BriefcaseIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 
 function ClienteList({ onEditCliente, refreshKey }) {
+  const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -187,7 +189,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
               <th onClick={() => requestSort('tipo_pessoa')} style={{ cursor: 'pointer' }}>Tipo {getSortIcon('tipo_pessoa')}</th>
               <th>Email</th>
               <th>Telefone</th>
-              <th className="text-center" style={{width: '100px'}}>Ações</th>
+              <th className="text-center" style={{width: '120px'}}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -216,6 +218,14 @@ function ClienteList({ onEditCliente, refreshKey }) {
                   <td className="px-3 py-2">{cliente.email || '-'}</td>
                   <td className="px-3 py-2">{cliente.telefone || '-'}</td>
                   <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => navigate(`/casos/novo?cliente_id=${cliente.id}`)}
+                      className="btn btn-sm btn-outline-success me-1 p-1 lh-1"
+                      title="Adicionar Caso para este Cliente"
+                      style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}
+                    >
+                      <BriefcaseIcon style={{ width: '16px', height: '16px' }} />
+                    </button>
                     <button
                       onClick={() => onEditCliente(cliente)}
                       className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
