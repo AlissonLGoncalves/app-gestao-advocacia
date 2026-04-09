@@ -11,6 +11,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
   const [deletingId, setDeletingId] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [tipoPessoaFilter, setTipoPessoaFilter] = useState('');
 
   const [sortConfig, setSortConfig] = useState({ key: 'nome_razao_social', direction: 'asc' });
@@ -30,8 +31,8 @@ function ClienteList({ onEditCliente, refreshKey }) {
     const authHeaders = { 'Authorization': `Bearer ${token}` };
 
     let url = `${API_URL}/clientes/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`; // Adicionada barra final
-    if (searchTerm) {
-      url += `&search=${encodeURIComponent(searchTerm)}`;
+    if (appliedSearchTerm) {
+      url += `&search=${encodeURIComponent(appliedSearchTerm)}`;
     }
     if (tipoPessoaFilter) {
       url += `&tipo_pessoa=${encodeURIComponent(tipoPessoaFilter)}`;
@@ -55,7 +56,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, tipoPessoaFilter, sortConfig]);
+  }, [appliedSearchTerm, tipoPessoaFilter, sortConfig]);
 
   useEffect(() => {
     fetchClientes();
@@ -113,8 +114,13 @@ function ClienteList({ onEditCliente, refreshKey }) {
     return <ArrowDownIcon className="text-primary" style={iconStyle} />;
   };
   
+  const handleSearch = () => {
+    setAppliedSearchTerm(searchTerm);
+  };
+
   const resetFilters = () => {
     setSearchTerm('');
+    setAppliedSearchTerm('');
     setTipoPessoaFilter('');
   };
 
@@ -138,14 +144,18 @@ function ClienteList({ onEditCliente, refreshKey }) {
         <div className="row g-2 align-items-end">
           <div className="col-lg-5 col-md-6">
             <label htmlFor="searchTermClienteList" className="form-label form-label-sm visually-hidden">Buscar</label>
-            <input
-              type="text"
-              id="searchTermClienteList"
-              className="form-control form-control-sm"
-              placeholder="Buscar por Nome, CPF/CNPJ, Email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <div className="input-group input-group-sm">
+              <input
+                type="text"
+                id="searchTermClienteList"
+                className="form-control form-control-sm"
+                placeholder="Buscar por Nome, CPF/CNPJ, Email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+              />
+              <button className="btn btn-primary btn-sm" onClick={handleSearch}>Buscar</button>
+            </div>
           </div>
           <div className="col-lg-4 col-md-6">
             <label htmlFor="tipoPessoaFilterClienteList" className="form-label form-label-sm visually-hidden">Tipo</label>
