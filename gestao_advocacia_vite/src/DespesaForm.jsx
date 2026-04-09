@@ -1,4 +1,4 @@
-﻿// src/DespesaForm.jsx
+// src/DespesaForm.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js';
 import { toast } from 'react-toastify';
@@ -39,7 +39,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders });
       if (!response.ok) throw new Error('Falha ao carregar clientes');
       const data = await response.json();
-      setClientes(data.clientes || []);
+      setClientes(Array.isArray(data) ? data : (data.clientes || []));
     } catch (error) {
       console.error("DespesaForm: Erro ao buscar clientes:", error);
       toast.error(`Erro ao carregar clientes: ${error.message}`);
@@ -61,7 +61,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) throw new Error('Falha ao carregar casos');
       const data = await response.json();
-      setCasos(data.casos || []);
+      setCasos(Array.isArray(data) ? data : (data.casos || []));
     } catch (error) {
       console.error("DespesaForm: Erro ao buscar casos:", error);
       toast.error(`Erro ao carregar casos: ${error.message}`);

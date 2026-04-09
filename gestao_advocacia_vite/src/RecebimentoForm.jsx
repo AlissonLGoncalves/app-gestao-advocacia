@@ -26,7 +26,7 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
             const response = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`);
             if (!response.ok) throw new Error('Falha ao carregar clientes');
             const data = await response.json();
-            setClientes(data.clientes || []);
+            setClientes(Array.isArray(data) ? data : (data.clientes || []));
         } catch (error) { toast.error(`Erro ao carregar clientes: ${error.message}`); }
     }, []);
 
@@ -37,7 +37,7 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
             const response = await fetch(url);
             if (!response.ok) throw new Error('Falha ao carregar casos');
             const data = await response.json();
-            setCasos(data.casos || []);
+            setCasos(Array.isArray(data) ? data : (data.casos || []));
         } catch (error) { toast.error(`Erro ao carregar casos: ${error.message}`); }
     }, []);
 
