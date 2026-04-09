@@ -50,8 +50,8 @@ def get_list_query(model):
     if not tenant_id:
         return model.query
     # Se o modelo tem a coluna tenant_id, a query ganha a amarra de isolamento!
-    # if hasattr(model, 'tenant_id'):
-    #     return model.query.filter_by(tenant_id=tenant_id)
+    if hasattr(model, 'tenant_id'):
+        return model.query.filter_by(tenant_id=tenant_id)
     return model.query
 
 def get_item_or_404(model, item_id):
@@ -59,15 +59,15 @@ def get_item_or_404(model, item_id):
     item = model.query.get_or_404(item_id)
     
     # Validação Cruzada (Cross-Tenant Breach Prevention)
-    # if tenant_id and hasattr(item, 'tenant_id'):
-    #     if item.tenant_id and item.tenant_id != tenant_id:
-    #         abort(403, "Acesso Negado (LGPD): Este registro pertence a outro Escritório (Cross-Tenant Request).")
+    if tenant_id and hasattr(item, 'tenant_id'):
+        if item.tenant_id and item.tenant_id != tenant_id:
+            abort(403, "Acesso Negado (LGPD): Este registro pertence a outro Escritório (Cross-Tenant Request).")
     return item
 
 def get_existing_item(model, **kwargs):
     tenant_id = get_tenant_id()
-    # if tenant_id and hasattr(model, 'tenant_id'):
-    #     kwargs['tenant_id'] = tenant_id
+    if tenant_id and hasattr(model, 'tenant_id'):
+        kwargs['tenant_id'] = tenant_id
     return model.query.filter_by(**kwargs).first()
 # Inicialização das extensões
 db = SQLAlchemy()
@@ -1045,6 +1045,8 @@ def create_app(config_class=Config):
             novo_cliente = Cliente(cpf_cnpj=cpf_cnpj_limpo, user_id=user_id)
             _preencher_cliente_from_data(novo_cliente, data)
             db.session.add(novo_cliente)
+            db.session.flush()
+            log_audit('CREATE', 'Cliente', novo_cliente.id, f"Cliente {novo_cliente.cpf_cnpj} cadastrado.")
             db.session.commit()
             app.logger.info(f"Novo cliente '{novo_cliente.nome_razao_social}' (ID: {novo_cliente.id}) criado para usuário ID {user_id}.")
             return novo_cliente, 201
@@ -1072,6 +1074,7 @@ def create_app(config_class=Config):
             if not data.get('nome_razao_social'):
                 return {"message": "Nome/Razão Social é obrigatório."}, 400
             _preencher_cliente_from_data(cliente, data)
+            log_audit('UPDATE', 'Cliente', cliente.id, "Atualização de dados cadastrais.")
             db.session.commit()
             app.logger.info(f"Cliente ID {cliente.id} atualizado pelo usuário ID {user_id}.")
             return cliente
@@ -1085,6 +1088,7 @@ def create_app(config_class=Config):
             cliente = get_item_or_404(Cliente, cliente_id_param)
             if cliente.casos.first():
                 return {"message": "Não é possível deletar cliente com casos associados."}, 400
+            log_audit('DELETE', 'Cliente', cliente.id, f"Exclusão do cliente ({cliente.cpf_cnpj}).")
             db.session.delete(cliente)
             db.session.commit()
             app.logger.info(f"Cliente ID {cliente.id} ('{cliente.nome_razao_social}') deletado pelo usuário ID {user_id}.")
@@ -1151,6 +1155,8 @@ def create_app(config_class=Config):
             )
             _preencher_caso_from_data(novo_caso, data)
             db.session.add(novo_caso)
+            db.session.flush()
+            log_audit('CREATE', 'Caso', novo_caso.id, f"Caso criado: {novo_caso.numero_processo or novo_caso.titulo}")
             db.session.commit()
             app.logger.info(f"Novo caso '{novo_caso.titulo}' (ID: {novo_caso.id}) criado para usuário ID {user_id}.")
             return novo_caso, 201
@@ -1183,6 +1189,7 @@ def create_app(config_class=Config):
                     return {"message": f"Outro caso já utiliza o número de processo '{novo_numero_processo}'."}, 409
             caso.numero_processo = novo_numero_processo
             _preencher_caso_from_data(caso, data)
+            log_audit('UPDATE', 'Caso', caso.id, f"Alteração no caso ({caso.numero_processo or caso.titulo}).")
             db.session.commit()
             app.logger.info(f"Caso ID {caso.id} atualizado pelo usuário ID {user_id}.")
             return caso
@@ -1193,6 +1200,7 @@ def create_app(config_class=Config):
         def delete(self, caso_id_param):
             user_id = get_jwt_identity()
             caso = get_item_or_404(Caso, caso_id_param)
+            log_audit('DELETE', 'Caso', caso.id, f"Caso deletado: {caso.titulo}.")
             db.session.delete(caso)
             db.session.commit()
             app.logger.info(f"Caso ID {caso.id} ('{caso.titulo}') deletado pelo usuário ID {user_id}.")
@@ -1912,6 +1920,21 @@ def create_app(config_class=Config):
                 
             db.session.commit()
             return {"message": f"{qtd_parcelas} parcelas geradas com sucesso!"}, 201
+
+    @audit_ns.route('/')
+    class AuditLogListAPI(Resource):
+        @jwt_required()
+        @audit_ns.marshal_list_with(audit_log_model_dto)
+        @audit_ns.doc(security='jsonWebToken', description='Lista o log de auditoria LGPD do Escritório.')
+        def get(self):
+            tenant_id = get_tenant_id()
+            user_id = get_jwt_identity()
+            user = db.session.get(User, user_id)
+            if not user or user.role != 'admin':
+                return []
+            
+            logs = AuditLog.query.filter_by(tenant_id=tenant_id).order_by(AuditLog.data_hora.desc()).limit(200).all()
+            return logs
 
     return app
 
