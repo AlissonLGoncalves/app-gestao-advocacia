@@ -46,7 +46,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
         throw new Error(resData.erro || `Erro HTTP: ${response.status} ao buscar clientes`);
       }
       const data = await response.json();
-      setClientes(data.clientes || []);
+      setClientes(Array.isArray(data) ? data : (data.clientes || []));
     } catch (err) {
       console.error("ClienteList: Erro detalhado ao buscar clientes:", err);
       setError(`Erro ao carregar clientes: ${err.message}`);
