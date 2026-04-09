@@ -1187,6 +1187,77 @@ def create_app(config_class=Config):
         caso.notas_caso = data.get('notas_caso', caso.notas_caso)
         return caso
 
+    @casos_ns.route('/consulta-publica-cnj')
+    class CasoConsultaPublicaCNJAPI(Resource):
+        @jwt_required()
+        @casos_ns.doc(security='jsonWebToken', description="Consulta a API do DataJud/TJPR para um CNJ genérico e extrai auto-preenchimentos.")
+        @casos_ns.param('numero', 'O Número Único de Processo CNJ (20 dígitos recomendados)')
+        def get(self):
+            user_id = get_jwt_identity()
+            numero = request.args.get('numero', '').strip()
+            if not numero:
+                return {"message": "Informe o número do processo."}, 400
+                
+            app.logger.info(f"Consulta pública live CNJ solicitada por user {user_id} para '{numero}'.")
+            dados_resposta_cnj, status_http = consultar_processo_cnj(numero)
+            
+            if status_http >= 400:
+                app.logger.warning(f"Consulta live falhou com status {status_http}")
+                return {"message": "Falha na comunicação com o Tribunal/DataJud.", "detalhes": dados_resposta_cnj}, 400
+                
+            hits = dados_resposta_cnj.get("hits", {}).get("hits", [])
+            if not hits:
+                return {"message": "Nenhum caso encontrado no sistema do Tribunal/CNJ com este número."}, 404
+                
+            dados_processo = hits[0].get('_source', {})
+            
+            # Extração de Campos Processuais Base
+            vara_juizo = dados_processo.get('orgaoJulgador', {}).get('nomeOrgao', '')
+            classe_acao = dados_processo.get('classe', {}).get('nome', '')
+            
+            instancia_raw = dados_processo.get('grau', '')
+            instancia = "1ª Instância" if instancia_raw == "G1" else "2ª Instância" if instancia_raw == "G2" else instancia_raw
+            
+            # Formatação do Resumo e extração da Data de Distribuição
+            data_distribuicao = dados_processo.get('dataAjuizamento', '')[:10] # Formato YYYY-MM-DD
+            
+            movimentos = dados_processo.get('movimentos', [])
+            movimentos.sort(key=lambda m: m.get('dataHora', '1900-01-01T00:00:00Z'), reverse=True)
+            
+            fase_processual = ""
+            if movimentos:
+                 # Tentativa rudimentar de deduzir fase a partir da movimentação local do tribunal
+                 fase_processual = "Ativo" 
+                 
+            resumo_linhas = []
+            for mov in movimentos[:5]:  # Pega as 5 ultimas
+                data_mov = mov.get('dataHora', '')[:10]
+                if len(data_mov) == 10:
+                    data_mov = f"{data_mov[8:10]}/{data_mov[5:7]}/{data_mov[0:4]}"
+                
+                desc_parts = []
+                if mov.get('movimentoNacional', {}).get('descricao'):
+                    desc_parts.append(mov['movimentoNacional']['descricao'])
+                if mov.get('movimentoLocal', {}).get('descricao'):
+                    desc_parts.append(mov['movimentoLocal']['descricao'])
+                for comp in mov.get('complementos', []):
+                    if type(comp) == dict and comp.get('descricao'): 
+                        desc_parts.append(comp['descricao'])
+                
+                desc_final = " | ".join(desc_parts) or mov.get('descricao') or "Movimentação Não Especificada"
+                resumo_linhas.append(f"- [{data_mov}] {desc_final}")
+                
+            resumo_texto = ">> RESUMO AUTOMÁTICO (DATAJUD):\n" + "\n".join(resumo_linhas) if resumo_linhas else ""
+            
+            return {
+                "vara_juizo": vara_juizo[:100],
+                "classe_acao": classe_acao[:100],
+                "instancia": instancia[:100],
+                "data_distribuicao": data_distribuicao,
+                "fase_processual": fase_processual,
+                "resumo_andamentos": resumo_texto
+            }, 200
+
     @casos_ns.route('/')
     class CasoListAPI(Resource):
         @jwt_required()

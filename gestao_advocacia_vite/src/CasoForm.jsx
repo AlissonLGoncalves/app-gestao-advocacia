@@ -29,6 +29,7 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [cnjInfo, setCnjInfo] = useState(null);
+  const [isSyncingCNJ, setIsSyncingCNJ] = useState(false);
 
   // Opção de criar evento na agenda após salvar o caso
   const [criarEvento, setCriarEvento] = useState(false);
@@ -80,21 +81,62 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const buscarDadosDataJud = async (numeroCNJ) => {
+    setIsSyncingCNJ(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(numeroCNJ)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setFormData(prev => {
+           let dataDistr = prev.data_distribuicao;
+           if (data.data_distribuicao && !prev.data_distribuicao) {
+               dataDistr = data.data_distribuicao;
+           }
+           
+           return {
+              ...prev,
+              vara_juizo: data.vara_juizo || prev.vara_juizo,
+              instancia: data.instancia || prev.instancia,
+              tipo_acao: data.classe_acao || prev.tipo_acao,
+              fase_processual: data.fase_processual || prev.fase_processual,
+              data_distribuicao: dataDistr,
+              notas_caso: data.resumo_andamentos ? (prev.notas_caso ? prev.notas_caso + '\n\n' + data.resumo_andamentos : data.resumo_andamentos) : prev.notas_caso
+          };
+        });
+        toast.info("Resumo das movimentações e vara do processo preenchidos com sucesso!");
+      }
+    } catch (e) {
+      console.warn("Falha silenciosa ao sincronizar CNJ ao digitar: ", e);
+    } finally {
+      setIsSyncingCNJ(false);
+    }
+  };
+
   const handleNumeroProcessoChange = (e) => {
-    const formatado = formatCNJ(e.target.value);
+    const rawValue = e.target.value;
+    const formatado = formatCNJ(rawValue);
     if (validationErrors.numero_processo) setValidationErrors(prev => ({ ...prev, numero_processo: '' }));
     const info = parseCNJ(formatado);
     setCnjInfo(info);
+    
     setFormData(prev => {
       const updates = { ...prev, numero_processo: formatado };
       // Auto-preenche area_direito e instancia se ainda não foram definidos manualmente
       if (info) {
         if (!prev.area_direito) updates.area_direito = info.areaSugerida;
         if (!prev.instancia)   updates.instancia    = info.instanciaSugerida;
-        if (!prev.titulo)      updates.titulo       = `Processo ${formatado}`;
+        if (!prev.titulo && formatado.length > 10) updates.titulo = `Processo ${formatado}`;
       }
       return updates;
     });
+
+    // Se alcançou 20 dígitos (25 caracteres com formatação) e identificou tribunal, chama API
+    if (info && formatado.length === 25) {
+        buscarDadosDataJud(formatado);
+    }
   };
 
   const validateForm = () => {
@@ -196,11 +238,17 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
               maxLength={25}
             />
             {cnjInfo && (
-              <div className="alert alert-info py-1 px-2 mt-1 mb-0 small d-flex gap-3 flex-wrap">
+              <div className="alert alert-info py-1 px-2 mt-1 mb-0 small d-flex gap-3 flex-wrap align-items-center">
                 <span><strong>Tribunal:</strong> {cnjInfo.tribunalNome}</span>
                 <span><strong>Âmbito:</strong> {cnjInfo.areaSugerida}</span>
                 <span><strong>Ano:</strong> {cnjInfo.ano}</span>
                 <span><strong>Instância sugerida:</strong> {cnjInfo.instanciaSugerida}</span>
+                {isSyncingCNJ && (
+                    <span className="text-primary fw-semibold ms-auto" style={{fontSize: '0.8rem'}}>
+                        <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"/>
+                        Apurando DataJud/TJPR...
+                    </span>
+                )}
               </div>
             )}
           </div>
