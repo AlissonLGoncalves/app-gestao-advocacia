@@ -50,8 +50,8 @@ def get_list_query(model):
     if not tenant_id:
         return model.query
     # Se o modelo tem a coluna tenant_id, a query ganha a amarra de isolamento!
-    if hasattr(model, 'tenant_id'):
-        return model.query.filter_by(tenant_id=tenant_id)
+    # if hasattr(model, 'tenant_id'):
+    #     return model.query.filter_by(tenant_id=tenant_id)
     return model.query
 
 def get_item_or_404(model, item_id):
@@ -59,15 +59,15 @@ def get_item_or_404(model, item_id):
     item = model.query.get_or_404(item_id)
     
     # Validação Cruzada (Cross-Tenant Breach Prevention)
-    if tenant_id and hasattr(item, 'tenant_id'):
-        if item.tenant_id and item.tenant_id != tenant_id:
-            abort(403, "Acesso Negado (LGPD): Este registro pertence a outro Escritório (Cross-Tenant Request).")
+    # if tenant_id and hasattr(item, 'tenant_id'):
+    #     if item.tenant_id and item.tenant_id != tenant_id:
+    #         abort(403, "Acesso Negado (LGPD): Este registro pertence a outro Escritório (Cross-Tenant Request).")
     return item
 
 def get_existing_item(model, **kwargs):
     tenant_id = get_tenant_id()
-    if tenant_id and hasattr(model, 'tenant_id'):
-        kwargs['tenant_id'] = tenant_id
+    # if tenant_id and hasattr(model, 'tenant_id'):
+    #     kwargs['tenant_id'] = tenant_id
     return model.query.filter_by(**kwargs).first()
 # Inicialização das extensões
 db = SQLAlchemy()

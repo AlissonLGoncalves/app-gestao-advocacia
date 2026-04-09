@@ -31,7 +31,7 @@ def upgrade():
 
     with op.batch_alter_table('cliente', schema=None) as batch_op:
         batch_op.add_column(sa.Column('tenant_id', sa.Integer(), nullable=True))
-        batch_op.drop_constraint('cliente_email_key', type_='unique')
+        # batch_op.drop_constraint('cliente_email_key', type_='unique')
         batch_op.create_foreign_key('fk_cliente_tenant_id', 'tenant', ['tenant_id'], ['id'])
 
     with op.batch_alter_table('contrato_honorario', schema=None) as batch_op:
