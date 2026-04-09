@@ -31,6 +31,7 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
   const [cnjInfo, setCnjInfo] = useState(null);
   const [isSyncingCNJ, setIsSyncingCNJ] = useState(false);
   const [isMagicLoading, setIsMagicLoading] = useState(false);
+  const [magicUploadProgress, setMagicUploadProgress] = useState(0);
   const [magicFileRef, setMagicFileRef] = useState(React.createRef());
 
   // Opção de criar evento na agenda após salvar o caso
@@ -145,40 +146,61 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
       magicFileRef.current?.click();
   };
 
-  const handleMagicUpload = async (e) => {
+  const handleMagicUpload = (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       setIsMagicLoading(true);
+      setMagicUploadProgress(0);
+      
       const token = localStorage.getItem('token');
       const formDataUpload = new FormData();
       formDataUpload.append('documento', file);
       
-      try {
-          const res = await fetch(`${API_URL}/casos/leitura-peticao`, {
-             method: 'POST', headers: { 'Authorization': `Bearer ${token}` },
-             body: formDataUpload
-          });
-          const jsonRes = await res.json();
-          if (res.ok && jsonRes.dados) {
-              setFormData(prev => ({
-                 ...prev,
-                 numero_processo: jsonRes.dados.numero_processo || prev.numero_processo,
-                 valor_causa: jsonRes.dados.valor_causa ? String(jsonRes.dados.valor_causa) : prev.valor_causa,
-                 titulo: jsonRes.dados.titulo || prev.titulo
-              }));
-              toast.success(`Leitura Concluída via ${jsonRes.dados.fonte}!`);
-              // Trigger cnj check if auto filled process
-              if (jsonRes.dados.numero_processo && jsonRes.dados.numero_processo.length === 25) {
-                 buscarDadosDataJud(jsonRes.dados.numero_processo);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_URL}/casos/leitura-peticao`, true);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      
+      xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+              const percent = Math.round((event.loaded / event.total) * 100);
+              setMagicUploadProgress(percent);
+          }
+      };
+      
+      xhr.onload = () => {
+          setIsMagicLoading(false);
+          if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                  const jsonRes = JSON.parse(xhr.responseText);
+                  if (jsonRes.dados) {
+                      setFormData(prev => ({
+                         ...prev,
+                         numero_processo: jsonRes.dados.numero_processo || prev.numero_processo,
+                         valor_causa: jsonRes.dados.valor_causa ? String(jsonRes.dados.valor_causa) : prev.valor_causa,
+                         titulo: jsonRes.dados.titulo || prev.titulo
+                      }));
+                      toast.success(`Leitura Concluída via ${jsonRes.dados.fonte || 'IA'}!`);
+                      // Triggers cnj check if auto filled process
+                      if (jsonRes.dados.numero_processo && jsonRes.dados.numero_processo.length === 25) {
+                         buscarDadosDataJud(jsonRes.dados.numero_processo);
+                      }
+                  } else {
+                     toast.error(jsonRes.message || "Erro na Leitura da IA.");
+                  }
+              } catch (err) {
+                  toast.error("Erro ao analisar a resposta da API.");
               }
           } else {
-             toast.error(jsonRes.message || "Erro na Leitura da IA.");
+              toast.error(`Falha do Servidor: ${xhr.status} ${xhr.responseText}`);
           }
-      } catch (err) {
-          toast.error("Erro fatal ao invocar o Motor Mágico: " + err.message);
-      } finally {
+      };
+      
+      xhr.onerror = () => {
           setIsMagicLoading(false);
-      }
+          toast.error("Erro fatal de Conexão ao invocar o Motor Mágico.");
+      };
+      
+      xhr.send(formDataUpload);
   };
 
   const validateForm = () => {
@@ -268,6 +290,19 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
                👁️‍🗨️ Preenchimento Mágico (RegEx + IA)
             </h6>
             <p className="small mb-2">Poupe tempo do seu dia. Anexe a aqui a <strong>Cópia Integral do Processo (Autos completos)</strong> e nossa inteligência vai focar na capa para ler e extrair Título, Valor e Número do CNJ automaticamente.</p>
+            
+            {isMagicLoading && (
+                <div className="mb-3">
+                    <div className="d-flex justify-content-between small text-muted mb-1">
+                        <span>{magicUploadProgress === 100 ? 'Processando Automação IA (Aguarde...)' : 'Enviando...'}</span>
+                        <span>{magicUploadProgress}%</span>
+                    </div>
+                    <div className="progress" style={{height: '6px'}}>
+                        <div className={`progress-bar progress-bar-striped ${magicUploadProgress === 100 ? 'progress-bar-animated bg-success' : 'bg-primary'}`} role="progressbar" style={{width: `${magicUploadProgress}%`}}></div>
+                    </div>
+                </div>
+            )}
+
             <input type="file" style={{display: 'none'}} ref={magicFileRef} onChange={handleMagicUpload} accept="application/pdf,image/*,.docx"/>
             <button type="button" className="btn btn-outline-primary shadow-sm rounded-pill btn-sm" onClick={handleMagicAIClick} disabled={isMagicLoading}>
                 {isMagicLoading ? <span className="spinner-border spinner-border-sm me-1"></span> : 'Carregar Arquivo do Processo'}  

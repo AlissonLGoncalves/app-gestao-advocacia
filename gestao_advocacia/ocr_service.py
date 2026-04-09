@@ -68,7 +68,7 @@ def extract_client_data_from_file(file_stream, filename):
 
         if ext == 'pdf':
             reader = PdfReader(file_stream)
-            for page in reader.pages:
+            for page in reader.pages[:10]:
                 page_text = page.extract_text()
                 if page_text:
                     text += page_text + "\n"
@@ -219,7 +219,7 @@ def extract_case_data_from_file(file_stream, filename):
 
         if ext == 'pdf':
             reader = PdfReader(file_stream)
-            for page in reader.pages:
+            for page in reader.pages[:10]:
                 page_text = page.extract_text()
                 if page_text:
                     text += page_text + "\n"
