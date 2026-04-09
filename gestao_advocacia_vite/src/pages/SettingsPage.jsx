@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BuildingOfficeIcon, UserGroupIcon, CreditCardIcon, CheckBadgeIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { BuildingOfficeIcon, UserGroupIcon, CreditCardIcon, CheckBadgeIcon, ShieldCheckIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 
 function SettingsPage() {
@@ -13,6 +13,10 @@ function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('advogado');
   const [isInviting, setIsInviting] = useState(false);
+
+  // Auditoria LGPD
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   useEffect(() => {
     // Busca informações básicas do usuário local para popular o Form
@@ -31,6 +35,32 @@ function SettingsPage() {
     e.preventDefault();
     toast.success("Informações do Escritório salvas com sucesso!");
   };
+
+  const fetchAuditLogs = async () => {
+    if (userRole !== 'admin') return;
+    setLoadingLogs(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/auditoria/`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.ok) {
+        setAuditLogs(await response.json());
+      }
+    } catch(e) {
+      console.error(e);
+      toast.error("Erro ao puxar log de auditoria.");
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'auditoria') {
+      fetchAuditLogs();
+    }
+  }, [activeTab]);
+
 
   const handleInvite = async (e) => {
     e.preventDefault();
@@ -90,6 +120,14 @@ function SettingsPage() {
                 >
                   <CreditCardIcon style={{width: '20px'}} className="me-2 d-inline" /> Assinatura SaaS
                 </button>
+                {userRole === 'admin' && (
+                  <button 
+                    className={`list-group-item list-group-item-action py-3 px-4 fw-semibold border-bottom-0 ${activeTab === 'auditoria' ? 'bg-danger text-white' : 'text-secondary'}`}
+                    onClick={() => setActiveTab('auditoria')}
+                  >
+                    <ClipboardDocumentListIcon style={{width: '20px'}} className="me-2 d-inline" /> Auditoria (LGPD)
+                  </button>
+                )}
              </div>
            </div>
         </div>
@@ -276,6 +314,52 @@ function SettingsPage() {
                  <div className="d-flex justify-content-center mt-5 pt-3 border-top">
                    <button className="btn btn-link text-danger text-decoration-none fw-bold" onClick={() => toast.warn("Cancelamentos são feitos pela Central de Ajuda.")}>Cancelar Assinatura</button>
                  </div>
+               </div>
+             </div>
+           )}
+
+           {/* ABA: AUDITORIA LGPD */}
+           {activeTab === 'auditoria' && userRole === 'admin' && (
+             <div className="card shadow-sm border-0 rounded-4">
+               <div className="card-header bg-danger text-white border-bottom p-4">
+                 <h5 className="mb-0 fw-bold">Trilha de Auditoria Universal (Logs LGPD)</h5>
+                 <p className="small mb-0 mt-1" style={{opacity: 0.9}}>Rastreamento definitivo de modificação e manipulação de informações confidenciais.</p>
+               </div>
+               <div className="card-body p-0">
+                  <div className="table-responsive" style={{maxHeight: '600px', overflowY: 'auto'}}>
+                    <table className="table table-hover align-middle mb-0 text-sm">
+                      <thead className="table-light sticky-top">
+                        <tr>
+                          <th className="px-4 py-3 small fw-bold">Data/Hora</th>
+                          <th className="py-3 small fw-bold">Usuário Responsável</th>
+                          <th className="py-3 small fw-bold">Operação</th>
+                          <th className="py-3 small fw-bold">Tabela Alvo</th>
+                          <th className="py-3 small fw-bold pe-4">Resumo Pormenorizado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loadingLogs ? (
+                          <tr><td colSpan="5" className="text-center py-5 text-muted">Carregando logs de auditoria selados...</td></tr>
+                        ) : auditLogs.length === 0 ? (
+                          <tr><td colSpan="5" className="text-center py-5 text-muted">Nenhum rastro de auditoria indexado no seu Workspace ainda. Comece a operar.</td></tr>
+                        ) : auditLogs.map(log => (
+                          <tr key={log.id}>
+                            <td className="px-4 py-3 small text-muted">
+                               {new Date(log.data_hora).toLocaleString('pt-BR')}
+                            </td>
+                            <td className="fw-bold">{log.username}</td>
+                            <td>
+                              {log.acao === 'CREATE' && <span className="badge bg-success px-2 py-1"><i className="bi bi-plus-circle me-1"></i> CRIAÇÃO</span>}
+                              {log.acao === 'UPDATE' && <span className="badge bg-warning text-dark px-2 py-1"><i className="bi bi-pencil-square me-1"></i> EDIÇÃO</span>}
+                              {log.acao === 'DELETE' && <span className="badge bg-danger px-2 py-1"><i className="bi bi-trash3 me-1"></i> DELEÇÃO</span>}
+                            </td>
+                            <td><span className="badge border text-dark">{log.tabela_afetada}</span> (ID {log.registro_id})</td>
+                            <td className="pe-4 small text-secondary">{log.detalhes}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                </div>
              </div>
            )}
