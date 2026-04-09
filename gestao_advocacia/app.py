@@ -16,6 +16,12 @@ from flask_cors import CORS
 from flask_restx import Api, Namespace, Resource, fields
 from flask_apscheduler import APScheduler # IMPORT para o Scheduler
 
+# Definições base
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads_documentos')
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
 # Importe suas configurações, o serviço CNJ e a nova task
 # Assumindo que config.py, cnj_service.py, tasks.py estão no mesmo diretório (gestao_advocacia)
 from config import Config 
@@ -244,7 +250,7 @@ class MovimentacaoCNJ(db.Model):
             'id': self.id, 'caso_id': self.caso_id,
             'data_movimentacao': self.data_movimentacao.isoformat() if self.data_movimentacao else None,
             'descricao': self.descricao, 'dados_integra_cnj': self.dados_integra_cnj,
-            'data_registro_sistema': self.data_registro_sistema.isoformat() if self.data_registro_sistema else None
+            'data_registro_sistema': self.data_registro_sistema.isoformat() if self.data_registro else None
         }
 
 class AuditLog(db.Model):
@@ -436,6 +442,7 @@ class TarefaPrazo(db.Model):
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
     app.url_map.strict_slashes = False
 
     # Configuração de Logging
@@ -1079,12 +1086,14 @@ def create_app(config_class=Config):
         @clientes_ns.marshal_list_with(cliente_model_dto)
         @clientes_ns.doc(security='jsonWebToken', description="Lista todos os clientes do usuário autenticado.")
         def get(self):
-            user_id = get_jwt_identity()
             search = request.args.get('search', '').strip()
             tipo_pessoa = request.args.get('tipo_pessoa', '').strip()
             sort_by = request.args.get('sort_by', 'nome_razao_social')
             sort_order = request.args.get('sort_order', 'asc')
-            query = Cliente.query.filter_by(user_id=user_id)
+            
+            # Usando Tenant Isolation (B2B SaaS Security)
+            query = get_list_query(Cliente)
+            
             if search:
                 like = f'%{search}%'
                 query = query.filter(
@@ -1133,7 +1142,6 @@ def create_app(config_class=Config):
         @clientes_ns.marshal_with(cliente_model_dto)
         @clientes_ns.doc(security='jsonWebToken', description="Obtém os detalhes de um cliente específico.")
         def get(self, cliente_id_param):
-            user_id = get_jwt_identity()
             cliente = get_item_or_404(Cliente, cliente_id_param)
             return cliente
 
@@ -1330,13 +1338,15 @@ def create_app(config_class=Config):
         @casos_ns.marshal_list_with(caso_model_dto)
         @casos_ns.doc(security='jsonWebToken', description="Lista todos os casos jurídicos do usuário.")
         def get(self):
-            user_id = get_jwt_identity()
             search = request.args.get('search', '').strip()
             status_f = request.args.get('status', '').strip()
             cliente_id_f = request.args.get('cliente_id', '').strip()
             sort_by = request.args.get('sort_by', 'data_atualizacao')
             sort_order = request.args.get('sort_order', 'desc')
-            query = Caso.query.filter_by(user_id=user_id)
+            
+            # Usando Tenant Isolation (B2B SaaS Security)
+            query = get_list_query(Caso)
+            
             if search:
                 like = f'%{search}%'
                 query = query.filter(

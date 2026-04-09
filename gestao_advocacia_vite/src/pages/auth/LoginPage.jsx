@@ -74,10 +74,15 @@ function LoginPage() {
             />
           </div>
           <div className="mb-4">
-            <label htmlFor="password" className="form-label">
-              <LockClosedIcon className="d-inline-block me-1" style={{ width: '16px', verticalAlign: 'text-bottom' }} />
-              Senha
-            </label>
+            <div className="d-flex justify-content-between">
+              <label htmlFor="password" className="form-label">
+                <LockClosedIcon className="d-inline-block me-1" style={{ width: '16px', verticalAlign: 'text-bottom' }} />
+                Senha
+              </label>
+              <a href="#" onClick={(e) => { e.preventDefault(); toast.info("Link de recuperação enviado para o email (simulado)!"); }} className="small text-decoration-none fw-semibold">
+                Esqueceu a senha?
+              </a>
+            </div>
             <input
               type="password"
               className="form-control"

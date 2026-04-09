@@ -315,13 +315,11 @@ function RegisterPage() {
                     type="checkbox" 
                     id="termsBox" 
                     checked={aceiteTermos} 
-                    disabled={!scrolledToBottom} 
                     onChange={(e)=>setAceiteTermos(e.target.checked)} 
-                    style={{cursor: !scrolledToBottom ? 'not-allowed' : 'pointer', width: '18px', height: '18px'}}
+                    style={{cursor: 'pointer', width: '18px', height: '18px'}}
                   />
                   <label className="form-check-label text-dark ms-2" htmlFor="termsBox">
                     Eu li, compreendo e aceito os <b className="text-primary text-decoration-underline" style={{cursor: 'pointer'}} onClick={() => setShowTermsModal(true)}>Termos de Serviço</b> estruturais da Plataforma.
-                    {!scrolledToBottom && <span className="d-block text-danger mt-1" style={{fontSize: '0.75rem'}}>* Você deve abrir e ler os Termos até o final para destravar o aceite.</span>}
                   </label>
                 </div>
                 <div className="form-check">
@@ -405,12 +403,11 @@ function RegisterPage() {
             
             <div className="p-3 border-top d-flex justify-content-between align-items-center bg-white">
                <span className="text-muted small fw-semibold">
-                  {!scrolledToBottom ? '🛑 Role até o final para confirmar a leitura ↓' : '✅ Leitura confirmada!'}
+                  Obrigado por ler os termos.
                </span>
                <button 
                  type="button" 
-                 className={`btn fw-bold px-4 ${scrolledToBottom ? 'btn-primary' : 'btn-secondary'}`} 
-                 disabled={!scrolledToBottom} 
+                 className={`btn fw-bold px-4 btn-primary`} 
                  onClick={aceitarNoModal}
                >
                  Aceitar e Concordar

@@ -1,7 +1,7 @@
-// src/ClienteForm.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from './config.js'; // Ajuste o caminho se config.js não estiver em src/
 import { toast } from 'react-toastify';
+import DocumentosClienteTab from './components/DocumentosClienteTab.jsx';
 
 // Estado inicial para Pessoa Física
 const initialStatePF = {
@@ -694,6 +694,10 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
             </button>
           </div>
         </form>
+
+        {isEditing && clienteParaEditar && (
+            <DocumentosClienteTab clienteId={clienteParaEditar.id} />
+        )}
       </div>
     </div>
   );
