@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd gestao_advocacia_vite && npm install && npm run build",
+  "outputDirectory": "gestao_advocacia_vite/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

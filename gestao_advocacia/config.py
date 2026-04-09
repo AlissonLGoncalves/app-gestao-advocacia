@@ -28,12 +28,17 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev_secret_key_fallback' # Use uma chave forte em produção
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'dev_jwt_secret_key_fallback' # Use uma chave forte
     
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db') # Fallback para SQLite
+    _db_url = os.environ.get('DATABASE_URL') or \
+        'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
+    # Render fornece URLs com prefixo "postgres://" (deprecated). SQLAlchemy 2.x exige "postgresql://"
+    if _db_url.startswith('postgres://'):
+        _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False # Mude para True para logar queries SQL em desenvolvimento, se útil
 
-    UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
+    # Em produção (Render), defina UPLOAD_FOLDER como /mnt/data/uploads (Persistent Disk)
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
     CNJ_API_KEY = os.environ.get('CNJ_API_KEY')
