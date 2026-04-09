@@ -17,6 +17,9 @@ from flask_restx import Api, Namespace, Resource, fields
 from flask_apscheduler import APScheduler # IMPORT para o Scheduler
 
 # Definições base
+from dotenv import load_dotenv
+load_dotenv()
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads_documentos')
 if not os.path.exists(UPLOAD_FOLDER):
