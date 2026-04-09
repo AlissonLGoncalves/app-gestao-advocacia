@@ -267,10 +267,10 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
             <h6 className="alert-heading text-primary fw-bold">
                👁️‍🗨️ Preenchimento Mágico (RegEx + IA)
             </h6>
-            <p className="small mb-2">Poupe tempo do seu dia. Anexe a Petição Inicial aqui e nossa inteligência vai ler e extrair Título, Valor e Número do CNJ automaticamente.</p>
+            <p className="small mb-2">Poupe tempo do seu dia. Anexe a aqui a <strong>Cópia Integral do Processo (Autos completos)</strong> e nossa inteligência vai focar na capa para ler e extrair Título, Valor e Número do CNJ automaticamente.</p>
             <input type="file" style={{display: 'none'}} ref={magicFileRef} onChange={handleMagicUpload} accept="application/pdf,image/*,.docx"/>
             <button type="button" className="btn btn-outline-primary shadow-sm rounded-pill btn-sm" onClick={handleMagicAIClick} disabled={isMagicLoading}>
-                {isMagicLoading ? <span className="spinner-border spinner-border-sm me-1"></span> : 'Carregar Petição Inicial'}  
+                {isMagicLoading ? <span className="spinner-border spinner-border-sm me-1"></span> : 'Carregar Arquivo do Processo'}  
             </button>
         </div>
 
