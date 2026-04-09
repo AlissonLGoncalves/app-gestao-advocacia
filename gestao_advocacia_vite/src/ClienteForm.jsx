@@ -416,6 +416,32 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     }
   };
 
+  const handleAnonymizar = async () => {
+    if (!window.confirm("ATENÇÃO: A execução do Direito ao Esquecimento irá apagar irreversivelmente todos os documentos físicos associados aos casos deste cliente (petições, etc) e mascarar seu CPF, Nome e demais informações sensíveis.\n\nDeseja continuar com a exclusão LGPD? (Esta ação NÃO PODE SER DESFEITA)")) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/clientes/${clienteParaEditar.id}/anonimizar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        toast.success("Direito ao esquecimento executado! Dados irreversivelmente mascarados.");
+        if (typeof onClienteChange === 'function') onClienteChange();
+      } else {
+        const errorData = await response.json();
+        toast.error(`Falha ao anonimizar: ${errorData.message}`);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro interno ao solicitar anonimização LGPD.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderCamposPF = () => ( /* ... código dos campos PF existente ... */ <>
       <div className="col-md-6 mb-3">
         <label htmlFor="rg" className="form-label form-label-sm">RG</label>
@@ -655,6 +681,11 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
             {typeof onCancel === 'function' && (
               <button type="button" className="btn btn-outline-secondary me-2 btn-sm" onClick={onCancel} disabled={loading}>
                 Cancelar
+              </button>
+            )}
+            {isEditing && (
+              <button type="button" className="btn btn-outline-danger me-2 btn-sm d-flex align-items-center" onClick={handleAnonymizar} title="Direito ao Esquecimento LGPD / Mascarar Dados">
+                <i className="bi bi-shield-lock-fill me-1"></i> Anonimizar LGPD
               </button>
             )}
             <button type="submit" className="btn btn-primary btn-sm" disabled={loading || loadingCep || loadingCnpj || Object.keys(validationErrors).some(key => validationErrors[key] && validationErrors[key] !== '')}>

@@ -1087,12 +1087,58 @@ def create_app(config_class=Config):
             user_id = get_jwt_identity()
             cliente = get_item_or_404(Cliente, cliente_id_param)
             if cliente.casos.first():
-                return {"message": "Não é possível deletar cliente com casos associados."}, 400
+                return {"message": "Não é possível deletar cliente com casos associados. Utilize a funcionalidade Anonimizar."}, 400
             log_audit('DELETE', 'Cliente', cliente.id, f"Exclusão do cliente ({cliente.cpf_cnpj}).")
             db.session.delete(cliente)
             db.session.commit()
             app.logger.info(f"Cliente ID {cliente.id} ('{cliente.nome_razao_social}') deletado pelo usuário ID {user_id}.")
             return '', 204
+
+    @clientes_ns.route('/<int:cliente_id_param>/anonimizar')
+    @clientes_ns.response(404, 'Cliente não encontrado.')
+    @clientes_ns.param('cliente_id_param', 'O ID único do cliente')
+    class ClienteAnonimizarAPI(Resource):
+        @jwt_required()
+        @clientes_ns.doc(security='jsonWebToken', description="Executa o Direito ao Esquecimento (Art. 18 LGPD). Mascara os dados pessoais e exclui documentos associados.")
+        def post(self, cliente_id_param):
+            user_id = get_jwt_identity()
+            cliente = get_item_or_404(Cliente, cliente_id_param)
+            
+            # Deletar Documentos Associados a este Cliente (via Casos)
+            for caso in cliente.casos:
+                for doc in caso.documentos_caso:
+                    try:
+                        if os.path.exists(doc.path_arquivo):
+                            os.remove(doc.path_arquivo)
+                    except Exception as e:
+                        app.logger.error(f"Erro ao deletar arquivo físico {doc.path_arquivo}: {e}")
+                    db.session.delete(doc)
+            
+            # Mascarar Dados do Cliente
+            cliente_original_nome = cliente.nome_razao_social
+            cliente.nome_razao_social = "*** ANONIMIZADO ***"
+            cliente.cpf_cnpj = "000.000.000-00"
+            cliente.email = "anonimizado@local"
+            cliente.telefone = "(00) 00000-0000"
+            cliente.rg = "***"
+            cliente.orgao_emissor = "***"
+            cliente.estado_civil = "***"
+            cliente.profissao = "***"
+            cliente.nacionalidade = "***"
+            cliente.nome_fantasia = "*** ANONIMIZADO ***"
+            cliente.rua = "***"
+            cliente.numero = "***"
+            cliente.bairro = "***"
+            cliente.cidade = "***"
+            cliente.cep = "00000-000"
+            cliente.notas_gerais = "Dados originais destruídos a pedido do titular (Direito ao Esquecimento - LGPD)."
+            
+            log_audit('UPDATE', 'Cliente', cliente.id, f"Tratamento de Exclusão/Anonimização LGPD executado no cliente ({cliente_original_nome}).")
+            db.session.commit()
+            
+            app.logger.info(f"Cliente ID {cliente.id} anonimizado pelo usuário ID {user_id}. Todos os documentos associados foram purgados.")
+            return {"message": "Direito ao esquecimento executado. Dados mascarados e documentos apagados."}, 200
+
 
     def _preencher_caso_from_data(caso, data):
         """Helper para preencher campos do caso a partir dos dados recebidos."""
