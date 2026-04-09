@@ -1024,8 +1024,25 @@ def create_app(config_class=Config):
         @clientes_ns.doc(security='jsonWebToken', description="Lista todos os clientes do usuário autenticado.")
         def get(self):
             user_id = get_jwt_identity()
-            clientes = get_list_query(Cliente).order_by(Cliente.nome_razao_social.asc()).all()
-            return clientes
+            search = request.args.get('search', '').strip()
+            tipo_pessoa = request.args.get('tipo_pessoa', '').strip()
+            sort_by = request.args.get('sort_by', 'nome_razao_social')
+            sort_order = request.args.get('sort_order', 'asc')
+            query = Cliente.query.filter_by(user_id=user_id)
+            if search:
+                like = f'%{search}%'
+                query = query.filter(
+                    db.or_(
+                        Cliente.nome_razao_social.ilike(like),
+                        Cliente.cpf_cnpj.ilike(like),
+                        Cliente.email.ilike(like),
+                    )
+                )
+            if tipo_pessoa:
+                query = query.filter_by(tipo_pessoa=tipo_pessoa)
+            col = getattr(Cliente, sort_by, Cliente.nome_razao_social)
+            query = query.order_by(col.desc() if sort_order == 'desc' else col.asc())
+            return query.all()
 
         @jwt_required()
         @clientes_ns.expect(cliente_input_model_dto)
@@ -1043,7 +1060,7 @@ def create_app(config_class=Config):
             existente = get_existing_item(Cliente, cpf_cnpj=cpf_cnpj_limpo)
             if existente:
                 return {"message": f"Já existe um cliente com o CPF/CNPJ '{cpf_cnpj_limpo}'."}, 409
-            novo_cliente = Cliente(cpf_cnpj=cpf_cnpj_limpo, user_id=user_id)
+            novo_cliente = Cliente(cpf_cnpj=cpf_cnpj_limpo, user_id=user_id, tenant_id=get_tenant_id())
             _preencher_cliente_from_data(novo_cliente, data)
             db.session.add(novo_cliente)
             db.session.flush()
