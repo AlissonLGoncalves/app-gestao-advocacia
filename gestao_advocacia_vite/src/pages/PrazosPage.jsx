@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from '../config.js';
 import { toast } from 'react-toastify';
-import { PlusIcon, ClockIcon, ExclamationCircleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ClockIcon, ExclamationCircleIcon, CheckCircleIcon, BriefcaseIcon } from '@heroicons/react/24/outline';
 
 export default function PrazosPage() {
   const [tarefas, setTarefas] = useState([]);
@@ -159,11 +159,15 @@ export default function PrazosPage() {
                                       </span>
                                   </div>
                                   <h6 className="card-title fw-semibold text-dark mb-1">{t.titulo}</h6>
-                                  {t.caso_id && (
-                                     <p className="small text-muted mb-2 text-truncate" style={{fontSize: '0.75rem'}}>
-                                        Caso ID: {t.caso_id}
-                                     </p>
-                                  )}
+                                  {t.caso_id && (() => {
+                                      const casoVinculado = casos.find(c => c.id === t.caso_id);
+                                      return (
+                                         <p className="small text-muted mb-2 text-truncate" style={{fontSize: '0.75rem'}} title={casoVinculado ? `${casoVinculado.titulo} (${casoVinculado.numero_processo})` : `Caso ID: ${t.caso_id}`}>
+                                            <BriefcaseIcon style={{width: 12, marginRight: 4, display: 'inline', marginTop: '-2px'}} />
+                                            {casoVinculado ? `${casoVinculado.titulo} (${casoVinculado.numero_processo})` : `Caso ID: ${t.caso_id}`}
+                                         </p>
+                                      );
+                                  })()}
                                   {t.data_vencimento && (
                                       <div className="d-flex align-items-center mt-3 pt-2 border-top">
                                           <ClockIcon className="text-muted me-1" style={{ width: 14 }} />

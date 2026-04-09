@@ -19,6 +19,7 @@ function CasoDetalhePage() {
     
     const [caso, setCaso] = useState(null);
     const [movimentacoesCNJ, setMovimentacoesCNJ] = useState([]);
+    const [prazos, setPrazos] = useState([]);
     
     const [isLoadingCaso, setIsLoadingCaso] = useState(true);
     const [isLoadingMovimentacoes, setIsLoadingMovimentacoes] = useState(false);
@@ -75,6 +76,13 @@ function CasoDetalhePage() {
             }
             const dataMovCNJ = await resMovCNJ.json();
             setMovimentacoesCNJ(dataMovCNJ);
+            
+            // Buscar Prazos/Tarefas Vinculados
+            const resTarefas = await fetch(`${API_URL}/tarefas`, { headers: authHeaders });
+            if (resTarefas.ok) {
+                const dataTarefas = await resTarefas.json();
+                setPrazos(dataTarefas.filter(t => t.caso_id === parseInt(casoId)));
+            }
             
         } catch (err) {
             console.error("Erro ao buscar dados do caso ou movimentações:", err);
@@ -232,6 +240,44 @@ function CasoDetalhePage() {
 
             {/* SEÇÃO DE HONORÁRIOS ADVOCATÍCIOS FINANCEIROS */}
             <HonorariosCasoCard casoId={casoId} clienteId={caso.cliente_id} />
+            
+            {/* SEÇÃO DE PRAZOS E TAREFAS */}
+            <div className="card shadow-lg mb-4">
+                <div className="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+                    <h5 className="card-title mb-0 text-primary">
+                        Prazos e Tarefas Vinculados ({prazos.length})
+                    </h5>
+                    <Link to="/prazos" className="btn btn-sm btn-outline-primary">Abrir Kanban</Link>
+                </div>
+                <div className="card-body p-3">
+                    {prazos.length > 0 ? (
+                        <div className="table-responsive">
+                            <table className="table table-hover align-middle small mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Título</th>
+                                        <th>Prioridade</th>
+                                        <th>Status</th>
+                                        <th>Vencimento</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {prazos.map(t => (
+                                        <tr key={t.id}>
+                                            <td className="fw-medium text-dark">{t.titulo}</td>
+                                            <td><span className={`badge bg-${t.prioridade === 'Urgente'? 'danger' : t.prioridade === 'Alta' ? 'warning' : 'info'}-subtle text-dark`}>{t.prioridade}</span></td>
+                                            <td><span className={`badge ${t.status === 'Concluído' ? 'bg-success' : t.status === 'Fazendo' ? 'bg-warning' : 'bg-danger'}`}>{t.status}</span></td>
+                                            <td>{t.data_vencimento ? new Date(t.data_vencimento).toLocaleDateString('pt-BR') : '-'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="text-muted fst-italic text-center py-3 mb-0">Nenhum prazo vinculado a este caso.</p>
+                    )}
+                </div>
+            </div>
             
             <div className="card shadow-lg">
                 <div className="card-header bg-light py-3">
