@@ -177,7 +177,8 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
                          ...prev,
                          numero_processo: jsonRes.dados.numero_processo || prev.numero_processo,
                          valor_causa: jsonRes.dados.valor_causa ? String(jsonRes.dados.valor_causa) : prev.valor_causa,
-                         titulo: jsonRes.dados.titulo || prev.titulo
+                         titulo: jsonRes.dados.titulo || prev.titulo,
+                         notas_caso: jsonRes.dados.resumo_fatos ? (prev.notas_caso ? prev.notas_caso + "\n\n-- Resumo IA dos Fatos:\n" + jsonRes.dados.resumo_fatos : "-- Resumo IA dos Fatos:\n" + jsonRes.dados.resumo_fatos) : prev.notas_caso
                       }));
                       toast.success(`Leitura Concluída via ${jsonRes.dados.fonte || 'IA'}!`);
                       // Triggers cnj check if auto filled process

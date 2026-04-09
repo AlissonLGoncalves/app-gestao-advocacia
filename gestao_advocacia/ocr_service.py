@@ -182,6 +182,7 @@ Nenhuma outra palavra. Apenas o JSON cru com estas chaves:
 - "numero_processo" (string, formato CNJ se achar)
 - "valor_causa" (float)
 - "titulo" (string, geralmente "AUTOR x REU" ou resumo da ação)
+- "resumo_fatos" (string, um parágrafo que resume a tese/fatos do caso para um advogado ler rapidamente)
 
 TEXTO DA PETIÇÃO:
 ''' + text[:15000] # Limite de texto
