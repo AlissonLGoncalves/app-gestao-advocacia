@@ -117,7 +117,10 @@ def job_verificar_processos_cnj():
                                         if isinstance(c_job, dict) and c_job.get('descricao'):
                                             desc_parts_job.append(c_job['descricao'])
                                 
-                                descricao_db_job = " | ".join(filter(None, desc_parts_job))
+                                # Garante que a descrição seja sempre preenchida, mesmo que as partes estejam vazias
+                                descricao_db_job = " | ".join(filter(None, desc_parts_job)).strip()
+                                # Fallback para a descrição geral do movimento se as partes específicas não gerarem nada
+                                # ou para um valor padrão se nada for encontrado
                                 if not descricao_db_job: 
                                     descricao_db_job = mov_json_job.get('descricao') or str(mov_json_job.get('codigoNacional', {}).get('codigo', 'Movimento'))
 
@@ -176,4 +179,3 @@ def job_verificar_processos_cnj():
 
     except Exception as e_job_geral:
         logger.critical(f"JOB CNJ [{datetime.now(tz=current_app.config.get('SCHEDULER_TIMEZONE'))}]: Erro CRÍTICO durante a execução do job: {str(e_job_geral)}", exc_info=True)
-
