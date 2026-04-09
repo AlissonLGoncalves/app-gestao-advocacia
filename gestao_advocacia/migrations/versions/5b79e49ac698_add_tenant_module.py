@@ -7,6 +7,7 @@ Create Date: 2026-04-08 18:07:22.893350
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -17,19 +18,19 @@ depends_on = None
 
 
 def _table_exists(table_name):
-    """Verifica se uma tabela já existe no SQLite."""
+    """Verifica se uma tabela já existe de forma agnóstica (SQLite/PostgreSQL)."""
     conn = op.get_bind()
-    result = conn.execute(sa.text(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=:name"
-    ), {"name": table_name})
-    return result.fetchone() is not None
+    inspector = inspect(conn)
+    return inspector.has_table(table_name)
 
 def _column_exists(table_name, column_name):
-    """Verifica se uma coluna já existe em uma tabela no SQLite."""
+    """Verifica se uma coluna já existe de forma agnóstica."""
     conn = op.get_bind()
-    result = conn.execute(sa.text(f"PRAGMA table_info({table_name})"))
-    columns = [row[1] for row in result.fetchall()]
-    return column_name in columns
+    inspector = inspect(conn)
+    if inspector.has_table(table_name):
+        columns = [c['name'] for c in inspector.get_columns(table_name)]
+        return column_name in columns
+    return False
 
 def _add_tenant_id_if_missing(table_name, fk_name):
     """Adiciona tenant_id a uma tabela somente se a coluna não existir."""
