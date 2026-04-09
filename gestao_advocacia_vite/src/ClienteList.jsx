@@ -1,8 +1,8 @@
-﻿// src/ClienteList.jsx
+// src/ClienteList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL } from './config.js';
-import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, InformationCircleIcon, BriefcaseIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, InformationCircleIcon, BriefcaseIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 
 function ClienteList({ onEditCliente, refreshKey }) {
@@ -17,6 +17,11 @@ function ClienteList({ onEditCliente, refreshKey }) {
   const [tipoPessoaFilter, setTipoPessoaFilter] = useState('');
 
   const [sortConfig, setSortConfig] = useState({ key: 'nome_razao_social', direction: 'asc' });
+
+  // Estados para exibição dos Casos/Processos (CRM View)
+  const [expandedRowId, setExpandedRowId] = useState(null);
+  const [clienteCasos, setClienteCasos] = useState({});
+  const [loadingCasos, setLoadingCasos] = useState({});
 
   const fetchClientes = useCallback(async () => {
     setLoading(true);
@@ -63,6 +68,32 @@ function ClienteList({ onEditCliente, refreshKey }) {
   useEffect(() => {
     fetchClientes();
   }, [fetchClientes, refreshKey]);
+
+  const handleToggleExpand = async (clienteId) => {
+    if (expandedRowId === clienteId) {
+      setExpandedRowId(null);
+      return;
+    }
+    setExpandedRowId(clienteId);
+    
+    if (!clienteCasos[clienteId]) {
+      setLoadingCasos(prev => ({...prev, [clienteId]: true}));
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/casos?cliente_id=${clienteId}`, {
+          headers: {'Authorization': `Bearer ${token}`}
+        });
+        if(res.ok) {
+           const data = await res.json();
+           setClienteCasos(prev => ({...prev, [clienteId]: data}));
+        }
+      } catch (e) {
+         toast.error("Erro ao carregar casos do cliente.");
+      } finally {
+         setLoadingCasos(prev => ({...prev, [clienteId]: false}));
+      }
+    }
+  };
 
   const handleDeleteClick = async (id) => {
     const token = localStorage.getItem('token');
@@ -202,7 +233,8 @@ function ClienteList({ onEditCliente, refreshKey }) {
               </tr>
             )}
             {clientes.map((cliente) => (
-                <tr key={cliente.id}>
+                <React.Fragment key={cliente.id}>
+                <tr className={expandedRowId === cliente.id ? 'table-active' : ''}>
                   <td className="px-3 py-2">
                     {cliente.nome_razao_social}
                     {cliente.tipo_pessoa === 'PJ' && (cliente.cnpj_secundario || cliente.cnpj_terciario) && (
@@ -217,14 +249,14 @@ function ClienteList({ onEditCliente, refreshKey }) {
                   <td className="px-3 py-2">{cliente.tipo_pessoa}</td>
                   <td className="px-3 py-2">{cliente.email || '-'}</td>
                   <td className="px-3 py-2">{cliente.telefone || '-'}</td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 text-center text-nowrap">
                     <button
-                      onClick={() => navigate(`/casos/novo?cliente_id=${cliente.id}`)}
-                      className="btn btn-sm btn-outline-success me-1 p-1 lh-1"
-                      title="Adicionar Caso para este Cliente"
+                      onClick={() => handleToggleExpand(cliente.id)}
+                      className={`btn btn-sm me-1 p-1 lh-1 ${expandedRowId === cliente.id ? 'btn-primary' : 'btn-outline-secondary'}`}
+                      title="Ver Processos / Casos"
                       style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}
                     >
-                      <BriefcaseIcon style={{ width: '16px', height: '16px' }} />
+                      {expandedRowId === cliente.id ? <ChevronUpIcon style={{ width: '16px', height: '16px' }} /> : <BriefcaseIcon style={{ width: '16px', height: '16px' }} />}
                     </button>
                     <button
                       onClick={() => onEditCliente(cliente)}
@@ -250,6 +282,45 @@ function ClienteList({ onEditCliente, refreshKey }) {
                     </button>
                   </td>
                 </tr>
+                {expandedRowId === cliente.id && (
+                   <tr>
+                      <td colSpan="6" className="p-0 border-bottom-0">
+                         <div className="bg-light px-4 py-3 border-bottom shadow-inner" style={{boxShadow: 'inset 0 3px 6px rgba(0,0,0,0.04)'}}>
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                               <h6 className="mb-0 text-primary fw-bold">Processos e Casos ({clienteCasos[cliente.id]?.length || 0})</h6>
+                               <button className="btn btn-sm btn-primary d-flex align-items-center gap-1" onClick={() => navigate(`/casos/novo?cliente_id=${cliente.id}`)}>
+                                  <BriefcaseIcon style={{width: '14px', height: '14px'}}/> Novo Processo
+                               </button>
+                            </div>
+                            
+                            {loadingCasos[cliente.id] ? (
+                                <div className="text-center py-3"><span className="spinner-border spinner-border-sm text-primary"></span></div>
+                            ) : clienteCasos[cliente.id] && clienteCasos[cliente.id].length > 0 ? (
+                                <div className="card shadow-sm border-0">
+                                  <ul className="list-group list-group-flush small">
+                                     {clienteCasos[cliente.id].map(caso => (
+                                         <li key={caso.id} className="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-3 py-2 cursor-pointer" onClick={() => navigate(`/casos/detalhe/${caso.id}`)}>
+                                            <div>
+                                               <span className="fw-semibold text-dark text-decoration-none">{caso.titulo}</span>
+                                               {caso.numero_processo && <div className="text-muted" style={{fontSize: '0.75rem'}}>{caso.numero_processo}</div>}
+                                            </div>
+                                            <div>
+                                                <span className={`badge ${caso.status === 'Encerrado' || caso.status === 'Arquivado' ? 'bg-secondary' : 'bg-success'}`}>{caso.status}</span>
+                                            </div>
+                                         </li>
+                                     ))}
+                                  </ul>
+                                </div>
+                            ) : (
+                                <p className="text-muted small fst-italic mb-0 bg-white border border-dashed rounded p-3 text-center">
+                                   Nenhum caso documentado no CRM para este cliente. Pode cadastrar o primeiro!
+                                </p>
+                            )}
+                         </div>
+                      </td>
+                   </tr>
+                )}
+                </React.Fragment>
               ))}
           </tbody>
         </table>

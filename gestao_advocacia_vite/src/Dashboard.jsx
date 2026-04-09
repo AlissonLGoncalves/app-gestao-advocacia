@@ -15,19 +15,19 @@ import { formatCNJ } from './utils/cnj.js';
 
 const StatCard = ({ title, value, icon: IconComponent, colorClass = "text-primary", bgColorClass = "bg-primary-subtle", onClick }) => (
   <div
-    className={`card shadow-sm hover-shadow transition-shadow duration-200 ease-in-out d-flex flex-row align-items-center p-3 ${onClick ? 'cursor-pointer' : ''}`}
+    className={`card border-0 shadow-sm transition-shadow duration-200 ease-in-out d-flex flex-row align-items-center p-4 ${onClick ? 'cursor-pointer hover-shadow-lg' : ''}`}
     onClick={onClick}
-    style={onClick ? { cursor: 'pointer' } : {}}
+    style={onClick ? { cursor: 'pointer', borderRadius: 'var(--radius-lg)' } : { borderRadius: 'var(--radius-lg)' }}
     role={onClick ? 'button' : 'figure'}
     tabIndex={onClick ? 0 : -1}
     onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
   >
-    <div className={`p-2 rounded-circle me-3 ${bgColorClass} ${colorClass}`}>
-      <IconComponent style={{ width: '24px', height: '24px' }} />
+    <div className={`p-3 rounded-circle me-4 ${bgColorClass} ${colorClass}`} style={{ background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)' }}>
+      <IconComponent style={{ width: '28px', height: '28px', color: 'var(--primary)' }} />
     </div>
     <div className="flex-grow-1">
-      <p className="text-muted small text-uppercase mb-1" style={{fontSize: '0.7rem'}}>{title}</p>
-      <p className="h5 mb-0 fw-semibold text-dark">{value === undefined || value === null ? '...' : value}</p>
+      <p className="text-muted small text-uppercase mb-1" style={{fontSize: '0.75rem', letterSpacing: '0.05em', fontWeight: '600'}}>{title}</p>
+      <p className="h3 mb-0 fw-bold text-dark" style={{fontFamily: 'var(--font-heading)'}}>{value === undefined || value === null ? '...' : value}</p>
     </div>
   </div>
 );

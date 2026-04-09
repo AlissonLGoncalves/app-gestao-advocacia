@@ -121,13 +121,13 @@ const MainLayout = () => {
 
       {/* Sidebar */}
       <aside className={`app-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">
-            <ScaleIcon style={{ width: '22px', height: '22px' }} />
+        <div className="sidebar-brand" style={{ padding: '1.75rem 1.25rem', marginBottom: '0.5rem' }}>
+          <div className="sidebar-brand-icon shadow-sm" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)', borderRadius: '10px' }}>
+            <ScaleIcon style={{ width: '24px', height: '24px' }} strokeWidth={1.8} />
           </div>
           <div>
-            <div className="sidebar-brand-text">Patronus</div>
-            <div className="sidebar-brand-sub">Gestão Jurídica</div>
+            <div className="sidebar-brand-text" style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', letterSpacing: '-0.03em' }}>Patronus</div>
+            <div className="sidebar-brand-sub" style={{ fontSize: '0.62rem', letterSpacing: '0.12em', color: '#64748b' }}>SISTEMA JURÍDICO</div>
           </div>
         </div>
 

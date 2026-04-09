@@ -136,19 +136,19 @@ export default function PrazosPage() {
              onDragOver={handleDragOver}
              onDrop={(e) => handleDrop(e, statusNome)}
           >
-              <div className={`card shadow-sm h-100 border-top-0 border-start-0 border-end-0 border-bottom border-3 border-${cor} bg-light`}>
-                  <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                      <h6 className="mb-0 fw-bold">{titulo}</h6>
-                      <span className="badge bg-secondary rounded-pill">{tarefasColuna.length}</span>
+              <div className={`card shadow-sm h-100 border-0 bg-white`} style={{ borderRadius: 'var(--radius-lg)' }}>
+                  <div className="card-header bg-white py-4 d-flex justify-content-between align-items-center border-bottom-0" style={{ borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
+                      <h6 className="mb-0 fw-bold" style={{fontFamily: 'var(--font-heading)'}}>{titulo}</h6>
+                      <span className={`badge bg-${cor}-subtle text-${cor} rounded-pill px-3 py-2`}>{tarefasColuna.length}</span>
                   </div>
-                  <div className="card-body overflow-auto" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+                  <div className="card-body overflow-auto p-3" style={{ maxHeight: 'calc(100vh - 250px)', background: 'var(--bg-main)', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)' }}>
                       {tarefasColuna.map(t => (
                           <div 
                              key={t.id} 
                              draggable 
                              onDragStart={(e) => handleDragStart(e, t.id)}
-                             className={`card mb-3 shadow-none border hover-shadow cursor-grab ${arrastandoId === t.id ? 'opacity-50' : ''}`}
-                             style={{ cursor: 'grab' }}
+                             className={`card mb-3 border-0 shadow-sm transition-all cursor-grab ${arrastandoId === t.id ? 'opacity-50 scale-95' : 'hover-shadow-md'}`}
+                             style={{ cursor: 'grab', borderRadius: 'var(--radius-md)', transform: arrastandoId === t.id ? 'scale(0.98)' : 'scale(1)' }}
                           >
                               <div className="card-body p-3">
                                   <div className="d-flex justify-content-between mb-2">
@@ -158,7 +158,7 @@ export default function PrazosPage() {
                                           <span> {t.tipo_tarefa}</span>
                                       </span>
                                   </div>
-                                  <h6 className="card-title fw-semibold text-dark mb-1">{t.titulo}</h6>
+                                  <h6 className="card-title fw-bold text-dark mb-1" style={{fontFamily: 'var(--font-heading)'}}>{t.titulo}</h6>
                                   {t.caso_id && (() => {
                                       const casoVinculado = casos.find(c => c.id === t.caso_id);
                                       return (
@@ -191,15 +191,15 @@ export default function PrazosPage() {
   };
 
   return (
-    <div className="container-fluid py-4" style={{ backgroundColor: '#f4f7f6', minHeight: '100%' }}>
+    <div className="container-fluid py-4" style={{ backgroundColor: 'var(--bg-main)', minHeight: '100%' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h4 className="mb-0 fw-bold">Kanban de Prazos e Tarefas</h4>
-                <p className="text-muted small mb-0">Gerencie o trabalho do escritório visualmente.</p>
+                <h4 className="mb-0 fw-bold mx-2" style={{fontFamily: 'var(--font-heading)'}}>Kanban de Prazos</h4>
+                <p className="text-muted small mb-0 mx-2">Gerencie o trabalho do escritório visualmente.</p>
             </div>
-            <button className="btn btn-primary shadow-sm" onClick={() => setShowModal(true)}>
+            <button className="btn btn-primary shadow-sm rounded-pill px-4" onClick={() => setShowModal(true)}>
                 <PlusIcon style={{width: 20, marginRight: 5}} className="mb-1"/>
-                Novo Prazo/Tarefa
+                Novo Prazo
             </button>
         </div>
 
