@@ -41,7 +41,7 @@ class Config:
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
-    CNJ_API_KEY = os.environ.get('CNJ_API_KEY')
+    CNJ_API_KEY = os.environ.get('CNJ_API_KEY') or 'cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw=='
     APP_VERSION = os.environ.get('APP_VERSION') or '1.0.0'
 
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
