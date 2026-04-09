@@ -1194,8 +1194,28 @@ def create_app(config_class=Config):
         @casos_ns.doc(security='jsonWebToken', description="Lista todos os casos jurídicos do usuário.")
         def get(self):
             user_id = get_jwt_identity()
-            casos = get_list_query(Caso).order_by(Caso.data_atualizacao.desc()).all()
-            return casos
+            search = request.args.get('search', '').strip()
+            status_f = request.args.get('status', '').strip()
+            cliente_id_f = request.args.get('cliente_id', '').strip()
+            sort_by = request.args.get('sort_by', 'data_atualizacao')
+            sort_order = request.args.get('sort_order', 'desc')
+            query = Caso.query.filter_by(user_id=user_id)
+            if search:
+                like = f'%{search}%'
+                query = query.filter(
+                    db.or_(
+                        Caso.titulo.ilike(like),
+                        Caso.numero_processo.ilike(like),
+                        Caso.parte_contraria.ilike(like),
+                    )
+                )
+            if status_f:
+                query = query.filter_by(status=status_f)
+            if cliente_id_f:
+                query = query.filter_by(cliente_id=int(cliente_id_f))
+            col = getattr(Caso, sort_by, Caso.data_atualizacao)
+            query = query.order_by(col.desc() if sort_order == 'desc' else col.asc())
+            return query.all()
 
         @jwt_required()
         @casos_ns.expect(caso_input_model_dto)

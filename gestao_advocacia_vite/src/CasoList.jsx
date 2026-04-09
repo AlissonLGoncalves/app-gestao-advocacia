@@ -38,7 +38,7 @@ function CasoList({ onEditCaso, refreshKey }) {
         throw new Error(errorData.erro || 'Falha ao carregar clientes para filtro');
       }
       const data = await response.json();
-      setClientes(data.clientes || []);
+      setClientes(Array.isArray(data) ? data : (data.clientes || []));
     } catch (err) {
       console.error("CasoList: Erro ao buscar clientes para filtro:", err);
       toast.error(`Erro ao carregar clientes para filtro: ${err.message}`);
@@ -75,7 +75,7 @@ function CasoList({ onEditCaso, refreshKey }) {
         throw new Error(resData.erro || `Erro HTTP: ${response.status} ao buscar casos`);
       }
       const data = await response.json();
-      setCasos(data.casos || []);
+      setCasos(Array.isArray(data) ? data : (data.casos || []));
     } catch (err) {
       console.error("CasoList: Erro detalhado ao buscar casos:", err);
       setError(`Erro ao carregar casos: ${err.message}`);
