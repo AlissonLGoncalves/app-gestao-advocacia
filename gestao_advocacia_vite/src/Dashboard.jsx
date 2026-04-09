@@ -10,7 +10,8 @@ import {
   ClockIcon as PrazoIconSolid,
   CalendarDaysIcon as EventoIconSolid
 } from '@heroicons/react/24/solid';
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { formatCNJ } from './utils/cnj.js';
 
 const StatCard = ({ title, value, icon: IconComponent, colorClass = "text-primary", bgColorClass = "bg-primary-subtle", onClick }) => (
   <div
@@ -87,6 +88,11 @@ function Dashboard({ mudarSecao }) {
   const [proximosEventos, setProximosEventos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState('');
+
+  // Estados do Widget de Consulta Rápida
+  const [consultaCnjInput, setConsultaCnjInput] = useState('');
+  const [buscandoConsulta, setBuscandoConsulta] = useState(false);
+  const [resultadoConsulta, setResultadoConsulta] = useState(null);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -167,6 +173,34 @@ function Dashboard({ mudarSecao }) {
     }
   };
 
+  const handleConsultaRapida = async () => {
+    const limpo = consultaCnjInput.replace(/\D/g, '');
+    if (limpo.length !== 20) {
+      setResultadoConsulta({ erro: "Por favor, insira um número CNJ válido de 20 dígitos." });
+      return;
+    }
+    
+    setBuscandoConsulta(true);
+    setResultadoConsulta(null);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(limpo)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+         setResultadoConsulta({ erro: data.message || "Falha ao buscar processo." });
+      } else {
+         setResultadoConsulta(data);
+      }
+    } catch (e) {
+      setResultadoConsulta({ erro: "Erro de conexão ao acessar o Tribunal." });
+    } finally {
+      setBuscandoConsulta(false);
+    }
+  };
+
   return (
     <div className="container-fluid p-0">
       <div className="row g-3">
@@ -183,15 +217,70 @@ function Dashboard({ mudarSecao }) {
           <StatCard title="Despesas a Pagar" value={`${stats.despesasAPagarQtd} (R$ ${stats.despesasAPagarValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`} icon={TrendingDownIconSolid} colorClass="text-danger" bgColorClass="bg-danger-subtle" onClick={() => handleCardClick('DESPESAS')} />
         </div>
       </div>
-      <div className="card mt-4 shadow-sm">
-        <div className="card-header bg-light"><h2 className="h6 mb-0 text-dark">Próximos Prazos e Eventos</h2></div>
-        {proximosEventos && proximosEventos.length > 0 ? (
-          <ul className="list-group list-group-flush">
-            {proximosEventos.map(evento => ( <EventListItem key={evento.id} evento={evento} onClick={() => handleCardClick('AGENDA')} /> ))}
-          </ul>
-        ) : (
-          <div className="card-body text-center"><p className="text-muted small">Nenhum prazo ou evento pendente nos próximos dias.</p></div>
-        )}
+      <div className="row mt-4 g-3">
+        {/* Coluna Eventos */}
+        <div className="col-lg-6">
+          <div className="card shadow-sm h-100">
+            <div className="card-header bg-light"><h2 className="h6 mb-0 text-dark">Próximos Prazos e Eventos</h2></div>
+            {proximosEventos && proximosEventos.length > 0 ? (
+              <ul className="list-group list-group-flush">
+                {proximosEventos.map(evento => ( <EventListItem key={evento.id} evento={evento} onClick={() => handleCardClick('AGENDA')} /> ))}
+              </ul>
+            ) : (
+              <div className="card-body text-center d-flex align-items-center justify-content-center" style={{minHeight: "150px"}}>
+                <p className="text-muted small mb-0">Nenhum prazo ou evento pendente nos próximos dias.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Coluna Widget Consulta Rápida */}
+        <div className="col-lg-6">
+          <div className="card shadow-sm h-100 border-primary">
+            <div className="card-header bg-primary text-white d-flex align-items-center">
+               <MagnifyingGlassIcon style={{ width: '20px', height: '20px' }} className="me-2"/>
+               <h2 className="h6 mb-0 text-white">Consulta Rápida Processual (DataJud)</h2>
+            </div>
+            <div className="card-body">
+               <p className="small text-muted mb-3">Pesquise informações gratuitas ao vivo no tribunal sem salvar na sua base local.</p>
+               <div className="input-group mb-3">
+                  <input 
+                    type="text" 
+                    className="form-control form-control-sm" 
+                    placeholder="Cole aqui o número do processo..." 
+                    value={consultaCnjInput}
+                    onChange={(e) => setConsultaCnjInput(formatCNJ(e.target.value))}
+                    maxLength={25}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleConsultaRapida(); }}
+                  />
+                  <button className="btn btn-primary btn-sm" onClick={handleConsultaRapida} disabled={buscandoConsulta}>
+                     {buscandoConsulta ? 'Buscando...' : 'Consultar'}
+                  </button>
+               </div>
+
+               {/* Resultados da Consulta Rápida */}
+               {resultadoConsulta && !resultadoConsulta.erro && (
+                 <div className="border rounded p-3 bg-light" style={{ maxHeight: "300px", overflowY: "auto" }}>
+                    <div className="d-flex justify-content-between mb-2">
+                       <span className="badge bg-secondary">{resultadoConsulta.instancia}</span>
+                       <span className="small text-muted fw-bold">{resultadoConsulta.data_distribuicao?.split('-').reverse().join('/')}</span>
+                    </div>
+                    <p className="small fw-bold text-dark mb-1">{resultadoConsulta.vara_juizo}</p>
+                    <p className="small text-muted mb-2 border-bottom pb-2">Ação: {resultadoConsulta.classe_acao}</p>
+                    <pre className="small text-dark mb-0" style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
+                        {resultadoConsulta.resumo_andamentos || "Sem andamentos disponíveis recente."}
+                    </pre>
+                 </div>
+               )}
+
+               {resultadoConsulta && resultadoConsulta.erro && (
+                 <div className="alert alert-danger small py-2 mb-0">
+                    <strong>Erro na busca:</strong> {resultadoConsulta.erro}
+                 </div>
+               )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
