@@ -103,8 +103,18 @@ def job_verificar_processos_cnj():
                                     continue
                                 
                                 desc_parts_job = []
+                                
+                                # Model Transfer Data (MTD) 1.2 do CNJ API Publica
+                                if mov_json_job.get('nome'):
+                                    desc_parts_job.append(str(mov_json_job['nome']))
+                                    
+                                for comp in mov_json_job.get('complementosTabelados', []):
+                                    if type(comp) == dict and comp.get('nome'): 
+                                        desc_parts_job.append(str(comp['nome']))
+                                
+                                # Fallbacks antigos/emergenciais
                                 mov_nacional = mov_json_job.get('movimentoNacional')
-                                if mov_nacional and isinstance(mov_nacional, dict) and mov_nacional.get('descricao'):
+                                if not desc_parts_job and mov_nacional and isinstance(mov_nacional, dict) and mov_nacional.get('descricao'):
                                     desc_parts_job.append(mov_nacional['descricao'])
                                 
                                 mov_local = mov_json_job.get('movimentoLocal')
@@ -112,7 +122,7 @@ def job_verificar_processos_cnj():
                                      desc_parts_job.append(mov_local['descricao'])
 
                                 complementos_job = mov_json_job.get('complementos', [])
-                                if isinstance(complementos_job, list):
+                                if not desc_parts_job and isinstance(complementos_job, list):
                                     for c_job in complementos_job:
                                         if isinstance(c_job, dict) and c_job.get('descricao'):
                                             desc_parts_job.append(c_job['descricao'])
@@ -122,7 +132,7 @@ def job_verificar_processos_cnj():
                                 # Fallback para a descrição geral do movimento se as partes específicas não gerarem nada
                                 # ou para um valor padrão se nada for encontrado
                                 if not descricao_db_job: 
-                                    descricao_db_job = mov_json_job.get('descricao') or str(mov_json_job.get('codigoNacional', {}).get('codigo', 'Movimento'))
+                                    descricao_db_job = mov_json_job.get('descricao') or mov_json_job.get('nome') or str(mov_json_job.get('codigoNacional', {}).get('codigo', 'Movimento'))
 
                                 mov_existente_job = MovimentacaoCNJ.query.filter_by(
                                     caso_id=caso_item.id,

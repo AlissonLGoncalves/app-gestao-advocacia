@@ -1236,15 +1236,25 @@ def create_app(config_class=Config):
                     data_mov = f"{data_mov[8:10]}/{data_mov[5:7]}/{data_mov[0:4]}"
                 
                 desc_parts = []
-                if mov.get('movimentoNacional', {}).get('descricao'):
+                
+                # Model Transfer Data (MTD) 1.2 do CNJ API Publica
+                if mov.get('nome'):
+                    desc_parts.append(str(mov['nome']))
+                    
+                for comp in mov.get('complementosTabelados', []):
+                    if type(comp) == dict and comp.get('nome'): 
+                        desc_parts.append(str(comp['nome']))
+                
+                # Fallbacks antigos/emergenciais
+                if not desc_parts and mov.get('movimentoNacional', {}).get('descricao'):
                     desc_parts.append(mov['movimentoNacional']['descricao'])
-                if mov.get('movimentoLocal', {}).get('descricao'):
+                if not desc_parts and mov.get('movimentoLocal', {}).get('descricao'):
                     desc_parts.append(mov['movimentoLocal']['descricao'])
                 for comp in mov.get('complementos', []):
                     if type(comp) == dict and comp.get('descricao'): 
                         desc_parts.append(comp['descricao'])
                 
-                desc_final = " | ".join(desc_parts) or mov.get('descricao') or "Movimentação Não Especificada"
+                desc_final = " | ".join(desc_parts) or mov.get('descricao') or mov.get('nome') or "Movimentação Não Especificada"
                 resumo_linhas.append(f"- [{data_mov}] {desc_final}")
                 
             resumo_texto = ">> RESUMO AUTOMÁTICO (DATAJUD):\n" + "\n".join(resumo_linhas) if resumo_linhas else ""
@@ -1427,8 +1437,18 @@ def create_app(config_class=Config):
                         continue
                     
                     desc_parts = []
+                    
+                    # Model Transfer Data (MTD) 1.2 do CNJ API Publica
+                    if movimento_json.get('nome'):
+                        desc_parts.append(str(movimento_json['nome']))
+                        
+                    for comp in movimento_json.get('complementosTabelados', []):
+                        if type(comp) == dict and comp.get('nome'): 
+                            desc_parts.append(str(comp['nome']))
+                    
+                    # Fallbacks antigos/emergenciais
                     mov_nacional = movimento_json.get('movimentoNacional')
-                    if mov_nacional and isinstance(mov_nacional, dict) and mov_nacional.get('descricao'):
+                    if not desc_parts and mov_nacional and isinstance(mov_nacional, dict) and mov_nacional.get('descricao'):
                         desc_parts.append(mov_nacional['descricao'])
                     
                     mov_local = movimento_json.get('movimentoLocal')
@@ -1436,14 +1456,14 @@ def create_app(config_class=Config):
                          desc_parts.append(mov_local['descricao'])
 
                     complementos_api = movimento_json.get('complementos', [])
-                    if isinstance(complementos_api, list):
+                    if not desc_parts and isinstance(complementos_api, list):
                         for comp_item in complementos_api:
                             if isinstance(comp_item, dict) and comp_item.get('descricao'):
                                 desc_parts.append(comp_item['descricao'])
                     
                     descricao_db = " | ".join(filter(None, desc_parts))
                     if not descricao_db: 
-                        descricao_db = movimento_json.get('descricao') or f"Movimento Cód: {movimento_json.get('codigoNacional', {}).get('codigo', 'N/A')}"
+                        descricao_db = movimento_json.get('descricao') or movimento_json.get('nome') or f"Movimento Cód: {movimento_json.get('codigoNacional', {}).get('codigo', 'N/A')}"
 
                     mov_existente = MovimentacaoCNJ.query.filter_by(
                         caso_id=caso_para_atualizar.id,
