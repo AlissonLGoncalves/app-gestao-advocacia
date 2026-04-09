@@ -69,21 +69,25 @@ const DocumentosCasoTab = ({ casoId }) => {
         fetchDocumentos();
     };
 
-    const handleDownload = async (docId, fileName) => {
+    const handleDownload = async (docId, fileName, viewOnly = false) => {
         const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${API_URL}/documentos/${docId}/download`, {
+            const res = await fetch(`${API_URL}/documentos/download/${docId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+                if (viewOnly) {
+                    window.open(url, '_blank');
+                } else {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                }
             } else {
                 toast.error('Arquivo corrompido ou inacessível.');
             }
@@ -127,13 +131,18 @@ const DocumentosCasoTab = ({ casoId }) => {
                                         <DocumentTextIcon style={{width: 18}} />
                                     </div>
                                     <div>
-                                        <h6 className="mb-0 fw-semibold text-dark" style={{fontSize: '0.85rem'}}>{doc.titulo}</h6>
-                                        <small className="text-muted" style={{fontSize: '0.7rem'}}>Enviado em: {new Date(doc.data).toLocaleDateString()}</small>
+                                        <h6 className="mb-0 fw-semibold text-dark" style={{fontSize: '0.85rem'}}>{doc.nome_arquivo}</h6>
+                                        <small className="text-muted" style={{fontSize: '0.7rem'}}>Enviado em: {new Date(doc.data_upload).toLocaleDateString()}</small>
                                     </div>
                                 </div>
-                                <button type="button" className="btn btn-sm btn-light border hover-shadow" title="Baixar" onClick={() => handleDownload(doc.id, doc.titulo)}>
-                                    <ArrowDownTrayIcon style={{width: 16}} className="text-dark" />
-                                </button>
+                                <div className="d-flex gap-2">
+                                    <button type="button" className="btn btn-sm btn-outline-primary border hover-shadow" title="Visualizar" onClick={() => handleDownload(doc.id, doc.nome_arquivo, true)}>
+                                        Visualizar
+                                    </button>
+                                    <button type="button" className="btn btn-sm btn-light border hover-shadow" title="Baixar" onClick={() => handleDownload(doc.id, doc.nome_arquivo, false)}>
+                                        <ArrowDownTrayIcon style={{width: 16}} className="text-dark" />
+                                    </button>
+                                </div>
                             </li>
                         ))}
                     </ul>
