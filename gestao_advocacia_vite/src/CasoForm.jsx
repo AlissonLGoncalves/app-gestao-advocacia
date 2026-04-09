@@ -30,6 +30,8 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
   const [validationErrors, setValidationErrors] = useState({});
   const [cnjInfo, setCnjInfo] = useState(null);
   const [isSyncingCNJ, setIsSyncingCNJ] = useState(false);
+  const [isMagicLoading, setIsMagicLoading] = useState(false);
+  const [magicFileRef, setMagicFileRef] = useState(React.createRef());
 
   // Opção de criar evento na agenda após salvar o caso
   const [criarEvento, setCriarEvento] = useState(false);
@@ -139,6 +141,46 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
     }
   };
 
+  const handleMagicAIClick = () => {
+      magicFileRef.current?.click();
+  };
+
+  const handleMagicUpload = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setIsMagicLoading(true);
+      const token = localStorage.getItem('token');
+      const formDataUpload = new FormData();
+      formDataUpload.append('documento', file);
+      
+      try {
+          const res = await fetch(`${API_URL}/casos/leitura-peticao`, {
+             method: 'POST', headers: { 'Authorization': `Bearer ${token}` },
+             body: formDataUpload
+          });
+          const jsonRes = await res.json();
+          if (res.ok && jsonRes.dados) {
+              setFormData(prev => ({
+                 ...prev,
+                 numero_processo: jsonRes.dados.numero_processo || prev.numero_processo,
+                 valor_causa: jsonRes.dados.valor_causa ? String(jsonRes.dados.valor_causa) : prev.valor_causa,
+                 titulo: jsonRes.dados.titulo || prev.titulo
+              }));
+              toast.success(`Leitura Concluída via ${jsonRes.dados.fonte}!`);
+              // Trigger cnj check if auto filled process
+              if (jsonRes.dados.numero_processo && jsonRes.dados.numero_processo.length === 25) {
+                 buscarDadosDataJud(jsonRes.dados.numero_processo);
+              }
+          } else {
+             toast.error(jsonRes.message || "Erro na Leitura da IA.");
+          }
+      } catch (err) {
+          toast.error("Erro fatal ao invocar o Motor Mágico: " + err.message);
+      } finally {
+          setIsMagicLoading(false);
+      }
+  };
+
   const validateForm = () => {
     const errors = {};
     if (!formData.titulo?.trim()) errors.titulo = 'Título do caso é obrigatório.';
@@ -220,6 +262,18 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
         <h5 className="mb-0">{isEditing ? 'Editar Caso' : 'Adicionar Novo Caso'}</h5>
       </div>
       <div className="card-body p-4">
+        {/* LEITURA MAGICA IA */}
+        <div className="alert alert-secondary border-dashed mb-4" style={{border: '2px dashed #6c757d', backgroundColor: '#f8f9fa'}} role="alert">
+            <h6 className="alert-heading text-primary fw-bold">
+               👁️‍🗨️ Preenchimento Mágico (RegEx + IA)
+            </h6>
+            <p className="small mb-2">Poupe tempo do seu dia. Anexe a Petição Inicial aqui e nossa inteligência vai ler e extrair Título, Valor e Número do CNJ automaticamente.</p>
+            <input type="file" style={{display: 'none'}} ref={magicFileRef} onChange={handleMagicUpload} accept="application/pdf,image/*,.docx"/>
+            <button type="button" className="btn btn-outline-primary shadow-sm rounded-pill btn-sm" onClick={handleMagicAIClick} disabled={isMagicLoading}>
+                {isMagicLoading ? <span className="spinner-border spinner-border-sm me-1"></span> : 'Carregar Petição Inicial'}  
+            </button>
+        </div>
+
         <form onSubmit={handleSubmit}>
 
           {/* Número do Processo CNJ */}

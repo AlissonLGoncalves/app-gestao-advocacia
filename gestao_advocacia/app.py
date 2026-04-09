@@ -1332,6 +1332,31 @@ def create_app(config_class=Config):
                 "resumo_andamentos": resumo_texto
             }, 200
 
+    upload_peticao_parser = casos_ns.parser()
+    upload_peticao_parser.add_argument('documento', location='files', type=FileStorage, required=True, help='Petição Inicial ou Documento do Processo (PDF, Imagem, DOCX)')
+
+    @casos_ns.route('/leitura-peticao')
+    class CasoLeituraPeticaoAPI(Resource):
+        @jwt_required()
+        @casos_ns.expect(upload_peticao_parser)
+        @casos_ns.doc(security='jsonWebToken', description="Processa leitura mágica usando IA Gemini + Regex.")
+        def post(self):
+            user_id = get_jwt_identity()
+            if 'documento' not in request.files:
+                return {"message": "Nenhum arquivo 'documento' foi enviado."}, 400
+                
+            file = request.files['documento']
+            if file.filename == '':
+                return {"message": "Nenhum arquivo selecionado."}, 400
+                
+            try:
+                from ocr_service import extract_case_data_from_file
+                ai_data = extract_case_data_from_file(file.stream, file.filename)
+                return {"dados": ai_data}, 200
+            except Exception as e:
+                app.logger.error(f"[LEITURA PETICAO] {e}")
+                return {"message": "Falha geral no Parser.", "error": str(e)}, 500
+
     @casos_ns.route('/')
     class CasoListAPI(Resource):
         @jwt_required()

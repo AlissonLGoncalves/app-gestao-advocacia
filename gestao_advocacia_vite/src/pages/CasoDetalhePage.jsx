@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { API_URL } from '../config.js'; // Importa API_URL
 import { toast } from 'react-toastify'; // Para notificações
 import HonorariosCasoCard from '../components/HonorariosCasoCard';
+import DocumentosCasoTab from '../components/DocumentosCasoTab';
 
 // Componente auxiliar para exibir mensagens de status (loading, error, success)
 const StatusDisplay = ({ isLoading, error, successMessage, className = '' }) => {
@@ -240,6 +241,13 @@ function CasoDetalhePage() {
 
             {/* SEÇÃO DE HONORÁRIOS ADVOCATÍCIOS FINANCEIROS */}
             <HonorariosCasoCard casoId={casoId} clienteId={caso.cliente_id} />
+
+            {/* SEÇÃO DO DRIVE DO PROCESSO */}
+            <div className="card shadow-lg mb-4">
+                <div className="card-body p-4 pt-2">
+                    <DocumentosCasoTab casoId={casoId} />
+                </div>
+            </div>
             
             {/* SEÇÃO DE PRAZOS E TAREFAS */}
             <div className="card shadow-lg mb-4">

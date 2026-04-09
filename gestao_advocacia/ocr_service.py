@@ -5,6 +5,9 @@ from docx import Document
 import openpyxl
 from PIL import Image
 import pytesseract
+import os
+import requests
+import json
 
 def _extract_biometria_from_text(text):
     """
@@ -112,3 +115,141 @@ def extract_client_data_from_file(file_stream, filename):
     except Exception as e:
         print(f"[OCR_ERROR_CRITICAL] {filename}: {e}")
         return {"error": f"Falha Oculta na leitura do arquivo: {str(e)}"}
+
+
+def _extract_case_data_from_text(text):
+    """
+    Fallback OFFLINE puro usando Expressões Regulares (Regex) Python
+    para buscar número de processo, varas e partes em uma petição inicial.
+    """
+    extracted = {
+        "numero_processo": "",
+        "valor_causa": 0.0,
+        "titulo": ""
+    }
+    
+    # Busca Padrão CNJ: xxxxxxx-xx.xxxx.x.xx.xxxx
+    cnj_match = re.search(r'\b(\d{7}-\d{2}\.\d{4}\.\d{1}\.\d{2}\.\d{4})\b', text)
+    if cnj_match:
+        extracted['numero_processo'] = cnj_match.group(1)
+        
+    # Busca Valor da Causa
+    valor_match = re.search(r'valor da causa.*?R\$\s*([\d\.,]+)', text, re.IGNORECASE)
+    if not valor_match:
+        valor_match = re.search(r'Dá-se à causa o valor de R\$\s*([\d\.,]+)', text, re.IGNORECASE)
+    
+    if valor_match:
+        valor_str = valor_match.group(1).replace('.', '').replace(',', '.')
+        try:
+            extracted['valor_causa'] = float(valor_str)
+        except ValueError:
+            pass
+
+    # Titulo Genérico pela primeira linha útil ou Autor X Réu
+    autor_match = re.search(r'^\s*([A-Z\s]+),\s*já qualificado', text, re.MULTILINE)
+    reu_match = re.search(r'em face de\s*([A-Z\s]+)', text, re.IGNORECASE)
+    
+    if autor_match and reu_match:
+        autor = autor_match.group(1).strip().title()
+        reu = reu_match.group(1).strip().title()
+        extracted['titulo'] = f"AÇÃO: {autor} X {reu}"
+    else:
+        # Pega a primeira grande linha centralizada como título possivel
+        extracted['titulo'] = "Processo Lançado via Petição Autográfica"
+        
+    return extracted
+
+
+def _extract_case_data_with_gemini(text):
+    """
+    Motor Suprassumo: Envia o texto da petição para a API do Google Gemini
+    buscando um JSON padronizado com 100% de precisão contextual.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return None # Força o fallback pro Regex se não tiver API key
+    
+    prompt = '''
+Você é um extator de dados jurídicos brasileiro (Legaltech).
+Analise o texto desta capa de processo/petição inicial e retorne APENAS um JSON válido. 
+Nenhuma outra palavra. Não inclua markdown (```json). Apenas o JSON cru com estas chaves:
+- "numero_processo" (string, formato CNJ se achar)
+- "valor_causa" (float)
+- "titulo" (string, geralmente "AUTOR x REU" ou resumo da ação)
+
+TEXTO DA PETIÇÃO:
+''' + text[:15000] # Limite de texto pra não estourar payload fácil
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}]
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        if response.status_code == 200:
+            res_data = response.json()
+            try:
+                raw_text = res_data['candidates'][0]['content']['parts'][0]['text'].strip()
+                # Limpando crases de markdown
+                if raw_text.startswith("```json"): raw_text = raw_text[7:]
+                if raw_text.endswith("```"): raw_text = raw_text[:-3]
+                
+                json_data = json.loads(raw_text.strip())
+                return json_data
+            except (KeyError, IndexError, json.JSONDecodeError) as e:
+                print(f"[GEMINI_PARSE_ERROR] Erro ao extrair JSON do modelo: {e}. Output bruto: {res_data}")
+                return None
+        else:
+            print(f"[GEMINI_API_ERROR] Falha na API. Status: {response.status_code}, Msg: {response.text}")
+            return None
+    except Exception as e:
+        print(f"[GEMINI_NETWORK_ERROR] {e}")
+        return None
+
+
+def extract_case_data_from_file(file_stream, filename):
+    """
+    O Orquestrador do Processo: Pega o PDF, tira a máscara de texto e envia
+    pro Gemini. Se falhar, usa Regex bruto. Returna os metadados jurídicos.
+    """
+    try:
+        ext = filename.lower().split('.')[-1]
+        text = ""
+
+        if ext == 'pdf':
+            reader = PdfReader(file_stream)
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+        elif ext == 'txt':
+            text = file_stream.read().decode('utf-8', errors='ignore')
+        elif ext == 'docx':
+            doc = Document(file_stream)
+            for p in doc.paragraphs: text += p.text + "\n"
+        elif ext in ['png', 'jpg', 'jpeg']:
+            try:
+                img = Image.open(file_stream)
+                text = pytesseract.image_to_string(img, lang='por')
+            except:
+                pass
+
+        if not text.strip():
+            return {"error": "Nenhum texto legível encontrado no arquivo. Verifique se ele não é um escaneamento rasurado."}
+
+        # Tentativa Ouro: Google Gemini
+        ai_data = _extract_case_data_with_gemini(text)
+        if ai_data and (ai_data.get('numero_processo') or ai_data.get('titulo')):
+            ai_data['fonte'] = "AI Gemini"
+            return ai_data
+            
+        # Fallback Bronze: Regex Nativo
+        regex_data = _extract_case_data_from_text(text)
+        regex_data['fonte'] = "Regex Offline"
+        return regex_data
+
+    except Exception as e:
+        print(f"[CASE_OCR_ERROR] {filename}: {e}")
+        return {"error": f"Falha na automação judiciária: {str(e)}"}
