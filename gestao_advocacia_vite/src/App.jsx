@@ -14,6 +14,7 @@ import CasoDetalhePage from './pages/CasoDetalhePage.jsx';
 import RecebimentosPage from './pages/RecebimentosPage.jsx';
 import DespesasPage from './pages/DespesasPage.jsx';
 import AgendaPage from './pages/AgendaPage.jsx';
+import PrazosPage from './pages/PrazosPage.jsx';
 import DocumentosPage from './pages/DocumentosPage.jsx';
 import RelatoriosPage from './pages/RelatoriosPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
@@ -26,7 +27,7 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import {
   HomeIcon, UsersIcon, BriefcaseIcon, DocumentTextIcon,
   CurrencyDollarIcon, CalendarDaysIcon, ChartBarIcon, CreditCardIcon, ArrowLeftOnRectangleIcon,
-  Bars3Icon, XMarkIcon, ScaleIcon, Cog6ToothIcon
+  Bars3Icon, XMarkIcon, ScaleIcon, Cog6ToothIcon, ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline';
 
 const ProtectedRoute = ({ children }) => {
@@ -80,6 +81,7 @@ const MainLayout = () => {
       case 'casos': baseTitle = 'Caso'; break;
       case 'recebimentos': baseTitle = 'Recebimento'; break;
       case 'despesas': baseTitle = 'Despesa'; break;
+      case 'prazos': baseTitle = 'Prazos/Tarefas'; break;
       case 'agenda': baseTitle = 'Evento'; break;
       case 'documentos': baseTitle = 'Documento'; break;
       case 'relatorios': return 'Relatórios';
@@ -133,6 +135,7 @@ const MainLayout = () => {
           <SidebarLink to="/dashboard" icon={HomeIcon}>Dashboard</SidebarLink>
           <SidebarLink to="/clientes" icon={UsersIcon}>Clientes</SidebarLink>
           <SidebarLink to="/casos" icon={BriefcaseIcon}>Casos</SidebarLink>
+          <SidebarLink to="/prazos" icon={ClipboardDocumentListIcon}>Prazos (Kanban)</SidebarLink>
           {userRole !== 'assistente' && (
             <>
               <SidebarLink to="/recebimentos" icon={CurrencyDollarIcon}>Recebimentos</SidebarLink>
@@ -204,6 +207,7 @@ function App() {
           <Route path="casos/editar/:casoId" element={<CasosPage />} />
           <Route path="casos/detalhe/:casoId" element={<CasoDetalhePage />} />
 
+          <Route path="prazos" element={<PrazosPage />} />
 
           <Route path="recebimentos" element={<RecebimentosPage />} />
           <Route path="recebimentos/novo" element={<RecebimentosPage />} />

@@ -100,6 +100,7 @@ class User(db.Model):
     despesas = db.relationship('Despesa', backref='registrador_despesa', lazy='dynamic', foreign_keys='Despesa.user_id')
     recebimentos = db.relationship('Recebimento', backref='registrador_recebimento', lazy='dynamic', foreign_keys='Recebimento.user_id')
     contratos = db.relationship('ContratoHonorario', backref='responsavel_contrato', lazy='dynamic', foreign_keys='ContratoHonorario.user_id')
+    tarefas_prazo = db.relationship('TarefaPrazo', backref='responsavel_tarefa', lazy='dynamic', foreign_keys='TarefaPrazo.user_id')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -205,6 +206,7 @@ class Caso(db.Model):
     despesas_caso = db.relationship('Despesa', backref='caso_despesa_associado', lazy='dynamic', cascade="all, delete-orphan")
     recebimentos_caso = db.relationship('Recebimento', backref='caso_recebimento_associado', lazy='dynamic', cascade="all, delete-orphan")
     contratos_caso = db.relationship('ContratoHonorario', backref='caso_contrato_associado', lazy='dynamic', cascade="all, delete-orphan")
+    tarefas_caso = db.relationship('TarefaPrazo', backref='caso_tarefa_associado', lazy='dynamic', cascade="all, delete-orphan")
 
     def __repr__(self): return f'<Caso {self.id} - {self.titulo}>'
     def to_dict(self):
@@ -400,6 +402,33 @@ class Recebimento(db.Model):
         return {'id': self.id, 'descricao': self.descricao, 'valor': str(self.valor),
                 'data_recebimento': self.data_recebimento.isoformat(), 'recebido': self.recebido,
                 'caso_id': self.caso_id, 'user_id': self.user_id, 'contrato_id': self.contrato_id}
+
+class TarefaPrazo(db.Model):
+    __tablename__ = 'tarefa_prazo'
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_tarefaprazo_tenant_id'), nullable=True)
+    titulo = db.Column(db.String(250), nullable=False)
+    descricao = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(50), nullable=True, default='A Fazer') # A Fazer, Fazendo, Concluído
+    prioridade = db.Column(db.String(50), nullable=True, default='Normal') # Baixa, Normal, Alta, Urgente
+    data_vencimento = db.Column(db.DateTime, nullable=True)
+    tipo_tarefa = db.Column(db.String(50), nullable=True, default='Prazo') # Prazo, Peticionamento, Reunião, Ligação, Outros
+    origem_id = db.Column(db.String(100), nullable=True) # Ex: ID do MNI
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_tarefaprazo_user_id'), nullable=False)
+    caso_id = db.Column(db.Integer, db.ForeignKey('caso.id', name='fk_tarefaprazo_caso_id'), nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id, 'titulo': self.titulo, 'descricao': self.descricao,
+            'status': self.status, 'prioridade': self.prioridade,
+            'data_vencimento': self.data_vencimento.isoformat() if self.data_vencimento else None,
+            'tipo_tarefa': self.tipo_tarefa, 'origem_id': self.origem_id,
+            'user_id': self.user_id, 'caso_id': self.caso_id,
+            'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None
+        }
+
 # --- FIM DOS MODELOS SQLAlchemy ---
 
 
@@ -453,6 +482,7 @@ def create_app(config_class=Config):
     dashboard_ns = Namespace('dashboard', description='Dados agregados para o Dashboard')
     contratos_ns = Namespace('contratos', description='Operações relacionadas aos Contratos de Honorários')
     audit_ns = Namespace('auditoria', description='Trilhas de Auditoria e Logs (LGPD)')
+    tarefas_ns = Namespace('tarefas', description='Operações de Prazos e Tarefas')
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -464,6 +494,7 @@ def create_app(config_class=Config):
     api.add_namespace(dashboard_ns)
     api.add_namespace(contratos_ns)
     api.add_namespace(audit_ns)
+    api.add_namespace(tarefas_ns)
 
     # --- DEFINIÇÃO DOS MODELOS DA API (DTOs - Data Transfer Objects) para Flask-RESTx ---
     user_model_dto = auth_ns.model('UserRegistration', {
@@ -694,6 +725,31 @@ def create_app(config_class=Config):
         'caso_id': fields.Integer,
         'cliente_id': fields.Integer,
         'user_id': fields.Integer
+    })
+
+    tarefa_input_model_dto = tarefas_ns.model('TarefaInput', {
+        'titulo': fields.String(required=True, description='Título abreviado da tarefa'),
+        'descricao': fields.String(description='Detalhes'),
+        'status': fields.String(description='Status da tarefa', default='A Fazer', enum=['A Fazer', 'Fazendo', 'Concluído']),
+        'prioridade': fields.String(description='Prioridade', default='Normal', enum=['Baixa', 'Normal', 'Alta', 'Urgente']),
+        'data_vencimento': fields.DateTime(description='Data fatal/vencimento (ISO 8601)'),
+        'tipo_tarefa': fields.String(description='Tipo (Prazo, Reunião, etc)'),
+        'origem_id': fields.String(description='ID na integração (MNI, etc)'),
+        'caso_id': fields.Integer(description='ID do Caso associado (opcional mas recomendado)')
+    })
+
+    tarefa_model_dto = tarefas_ns.model('TarefaOutput', {
+        'id': fields.Integer(readonly=True),
+        'titulo': fields.String,
+        'descricao': fields.String,
+        'status': fields.String,
+        'prioridade': fields.String,
+        'data_vencimento': fields.DateTime(dt_format='iso8601'),
+        'tipo_tarefa': fields.String,
+        'origem_id': fields.String,
+        'data_criacao': fields.DateTime(dt_format='iso8601'),
+        'user_id': fields.Integer,
+        'caso_id': fields.Integer
     })
 
     # --- ENDPOINT DO DASHBOARD ---
@@ -2110,6 +2166,98 @@ def create_app(config_class=Config):
             
             logs = AuditLog.query.filter_by(tenant_id=tenant_id).order_by(AuditLog.data_hora.desc()).limit(200).all()
             return logs
+
+    # --- ENDPOINTS DE TAREFAS/PRAZOS ---
+    @tarefas_ns.route('/')
+    class TarefaListAPI(Resource):
+        @jwt_required()
+        @tarefas_ns.marshal_list_with(tarefa_model_dto)
+        @tarefas_ns.doc(security='jsonWebToken')
+        def get(self):
+            tarefas = get_list_query(TarefaPrazo).all()
+            return tarefas
+
+        @jwt_required()
+        @tarefas_ns.expect(tarefa_input_model_dto)
+        @tarefas_ns.marshal_with(tarefa_model_dto, code=201)
+        @tarefas_ns.doc(security='jsonWebToken')
+        def post(self):
+            user_id = get_jwt_identity()
+            data = request.get_json()
+            
+            dv = data.get('data_vencimento')
+            from datetime import datetime
+            data_vencimento_obj = None
+            if dv:
+                try:
+                    data_vencimento_obj = datetime.fromisoformat(dv.replace('Z', '+00:00'))
+                except ValueError:
+                    pass
+
+            nova_tarefa = TarefaPrazo(
+                titulo=data['titulo'],
+                descricao=data.get('descricao'),
+                status=data.get('status', 'A Fazer'),
+                prioridade=data.get('prioridade', 'Normal'),
+                tipo_tarefa=data.get('tipo_tarefa', 'Prazo'),
+                data_vencimento=data_vencimento_obj,
+                origem_id=data.get('origem_id'),
+                caso_id=data.get('caso_id'),
+                user_id=user_id,
+                tenant_id=get_tenant_id()
+            )
+            
+            db.session.add(nova_tarefa)
+            db.session.commit()
+            return nova_tarefa, 201
+
+    @tarefas_ns.route('/<int:id>')
+    class TarefaDetailAPI(Resource):
+        @jwt_required()
+        @tarefas_ns.marshal_with(tarefa_model_dto)
+        @tarefas_ns.doc(security='jsonWebToken')
+        def get(self, id):
+            tarefa = get_item_or_404(TarefaPrazo, id)
+            return tarefa
+
+        @jwt_required()
+        @tarefas_ns.expect(tarefa_input_model_dto)
+        @tarefas_ns.marshal_with(tarefa_model_dto)
+        @tarefas_ns.doc(security='jsonWebToken')
+        def put(self, id):
+            tarefa = get_item_or_404(TarefaPrazo, id)
+            data = request.get_json()
+            
+            tarefa.titulo = data.get('titulo', tarefa.titulo)
+            tarefa.descricao = data.get('descricao', tarefa.descricao)
+            tarefa.status = data.get('status', tarefa.status)
+            tarefa.prioridade = data.get('prioridade', tarefa.prioridade)
+            tarefa.tipo_tarefa = data.get('tipo_tarefa', tarefa.tipo_tarefa)
+            if 'caso_id' in data:
+                tarefa.caso_id = data.get('caso_id')
+
+            dv = data.get('data_vencimento')
+            if dv is not None:
+                if dv == "":
+                    tarefa.data_vencimento = None
+                else:
+                    from datetime import datetime
+                    try:
+                        tarefa.data_vencimento = datetime.fromisoformat(dv.replace('Z', '+00:00'))
+                    except ValueError:
+                        pass
+                        
+            db.session.commit()
+            return tarefa
+
+        @jwt_required()
+        @tarefas_ns.response(204, 'Deletado com sucesso')
+        @tarefas_ns.doc(security='jsonWebToken')
+        def delete(self, id):
+            tarefa = get_item_or_404(TarefaPrazo, id)
+            db.session.delete(tarefa)
+            db.session.commit()
+            return '', 204
 
     return app
 
