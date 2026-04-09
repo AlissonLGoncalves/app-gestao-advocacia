@@ -184,7 +184,7 @@ function Dashboard({ mudarSecao }) {
     setResultadoConsulta(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(limpo)}`, {
+      const response = await fetch(`${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(consultaCnjInput)}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
