@@ -10,35 +10,47 @@ from datetime import datetime
 # Este mapeamento é CRUCIAL e deve ser o mais completo e preciso possível.
 # Consulte a documentação oficial do DataJud para a lista correta de aliases.
 TRIBUNAL_ALIASES_CNJ = {
-    "01": "api_publica_tjac",  # TJAC - Acre
-    "02": "api_publica_tjal",  # TJAL - Alagoas
-    "03": "api_publica_tjap",  # TJAP - Amapá
-    "04": "api_publica_tjam",  # TJAM - Amazonas
-    "05": "api_publica_tjba",  # TJBA - Bahia
-    "06": "api_publica_tjce",  # TJCE - Ceará
-    "07": "api_publica_tjdft", # TJDFT - Distrito Federal e Territórios
-    "08": "api_publica_tjes",  # TJES - Espírito Santo
-    "09": "api_publica_tjgo",  # TJGO - Goiás
-    "10": "api_publica_tjma",  # TJMA - Maranhão
-    "11": "api_publica_tjmt",  # TJMT - Mato Grosso
-    "12": "api_publica_tjms",  # TJMS - Mato Grosso do Sul
-    "13": "api_publica_tjmg",  # TJMG - Minas Gerais
-    "14": "api_publica_tjpa",  # TJPA - Pará
-    "15": "api_publica_tjpb",  # TJPB - Paraíba
-    "16": "api_publica_tjpr",  # TJPR - Paraná
-    "17": "api_publica_tjpe",  # TJPE - Pernambuco
-    "18": "api_publica_tjpi",  # TJPI - Piauí
-    "19": "api_publica_tjrj",  # TJRJ - Rio de Janeiro
-    "20": "api_publica_tjrn",  # TJRN - Rio Grande do Norte
-    "21": "api_publica_tjrs",  # TJRS - Rio Grande do Sul
-    "22": "api_publica_tjro",  # TJRO - Rondônia
-    "23": "api_publica_tjrr",  # TJRR - Roraima
-    "24": "api_publica_tjsc",  # TJSC - Santa Catarina
-    "25": "api_publica_tjsp",  # TJSP - São Paulo
-    "26": "api_publica_tjse",  # TJSE - Sergipe
-    "27": "api_publica_tjto",  # TJTO - Tocantins
-    # Adicione outros tribunais (TRFs, TRTs, etc.) conforme necessário,
-    # verificando o código TR e o alias correspondente na documentação do DataJud.
+    # Tribunais Superiores
+    "5.00": "api_publica_tst",
+    "6.00": "api_publica_tse",
+    "3.00": "api_publica_stj",
+    "7.00": "api_publica_stm",
+    
+    # Justiça Federal (J=4)
+    "4.01": "api_publica_trf1", "4.02": "api_publica_trf2", "4.03": "api_publica_trf3", 
+    "4.04": "api_publica_trf4", "4.05": "api_publica_trf5", "4.06": "api_publica_trf6",
+
+    # Justiça do Trabalho (J=5)
+    "5.01": "api_publica_trt1", "5.02": "api_publica_trt2", "5.03": "api_publica_trt3",
+    "5.04": "api_publica_trt4", "5.05": "api_publica_trt5", "5.06": "api_publica_trt6",
+    "5.07": "api_publica_trt7", "5.08": "api_publica_trt8", "5.09": "api_publica_trt9",
+    "5.10": "api_publica_trt10", "5.11": "api_publica_trt11", "5.12": "api_publica_trt12",
+    "5.13": "api_publica_trt13", "5.14": "api_publica_trt14", "5.15": "api_publica_trt15",
+    "5.16": "api_publica_trt16", "5.17": "api_publica_trt17", "5.18": "api_publica_trt18",
+    "5.19": "api_publica_trt19", "5.20": "api_publica_trt20", "5.21": "api_publica_trt21",
+    "5.22": "api_publica_trt22", "5.23": "api_publica_trt23", "5.24": "api_publica_trt24",
+
+    # Justiça Eleitoral (J=6)
+    "6.01": "api_publica_tre-ac", "6.02": "api_publica_tre-al", "6.03": "api_publica_tre-ap",
+    "6.04": "api_publica_tre-am", "6.05": "api_publica_tre-ba", "6.06": "api_publica_tre-ce",
+    "6.07": "api_publica_tre-dft", "6.08": "api_publica_tre-es", "6.09": "api_publica_tre-go",
+    "6.10": "api_publica_tre-ma", "6.11": "api_publica_tre-mt", "6.12": "api_publica_tre-ms",
+    "6.13": "api_publica_tre-mg", "6.14": "api_publica_tre-pa", "6.15": "api_publica_tre-pb",
+    "6.16": "api_publica_tre-pr", "6.17": "api_publica_tre-pe", "6.18": "api_publica_tre-pi",
+    "6.19": "api_publica_tre-rj", "6.20": "api_publica_tre-rn", "6.21": "api_publica_tre-rs",
+    "6.22": "api_publica_tre-ro", "6.23": "api_publica_tre-rr", "6.24": "api_publica_tre-sc",
+    "6.25": "api_publica_tre-sp", "6.26": "api_publica_tre-se", "6.27": "api_publica_tre-to",
+
+    # Justiça Estadual (J=8)
+    "8.01": "api_publica_tjac", "8.02": "api_publica_tjal", "8.03": "api_publica_tjap",
+    "8.04": "api_publica_tjam", "8.05": "api_publica_tjba", "8.06": "api_publica_tjce",
+    "8.07": "api_publica_tjdft","8.08": "api_publica_tjes", "8.09": "api_publica_tjgo",
+    "8.10": "api_publica_tjma", "8.11": "api_publica_tjmt", "8.12": "api_publica_tjms",
+    "8.13": "api_publica_tjmg", "8.14": "api_publica_tjpa", "8.15": "api_publica_tjpb",
+    "8.16": "api_publica_tjpr", "8.17": "api_publica_tjpe", "8.18": "api_publica_tjpi",
+    "8.19": "api_publica_tjrj", "8.20": "api_publica_tjrn", "8.21": "api_publica_tjrs",
+    "8.22": "api_publica_tjro", "8.23": "api_publica_tjrr", "8.24": "api_publica_tjsc",
+    "8.25": "api_publica_tjsp", "8.26": "api_publica_tjse", "8.27": "api_publica_tjto"
 }
 
 def extrair_segmento_tr_processo(numero_processo_completo):
@@ -50,7 +62,7 @@ def extrair_segmento_tr_processo(numero_processo_completo):
     try:
         partes = numero_processo_completo.split('.')
         if len(partes) == 5: # Formato NNNNNNN-DD.AAAA.J.TR.OOOO tem 5 partes
-            return partes[3] # O quarto segmento é o TR
+            return f"{partes[2]}.{partes[3]}" # J e TR (ex: 8.16)
         else:
             # Verifica se current_app está disponível (pode não estar se este módulo for importado fora de um contexto de app)
             if current_app:
