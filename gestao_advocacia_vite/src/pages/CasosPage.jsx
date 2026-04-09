@@ -1,4 +1,4 @@
-﻿// src/pages/CasosPage.jsx
+// src/pages/CasosPage.jsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import CasoList from '../CasoList.jsx'; // Ajuste o caminho se CasoList.jsx não estiver em src/
@@ -22,7 +22,10 @@ function CasosPage() {
   useEffect(() => {
     if (modoFormulario === 'editar' && params.casoId) {
       setLoadingItem(true);
-      fetch(`${API_URL}/casos/${params.casoId}`)
+      const token = localStorage.getItem('token');
+      fetch(`${API_URL}/casos/${params.casoId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
         .then(response => {
           if (!response.ok) {
             console.error(`CasosPage: Falha ao buscar caso ${params.casoId}. Status: ${response.status}`);
