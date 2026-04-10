@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL } from './config.js';
-import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, InformationCircleIcon, BriefcaseIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, InformationCircleIcon, BriefcaseIcon, ChevronUpIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
+import GerarDocumentoModal from './components/GerarDocumentoModal.jsx';
 
 function ClienteList({ onEditCliente, refreshKey }) {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [clienteDocumento, setClienteDocumento] = useState(null); // cliente selecionado para gerar doc
 
   const [searchTerm, setSearchTerm] = useState('');
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
@@ -220,7 +222,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
               <th onClick={() => requestSort('tipo_pessoa')} style={{ cursor: 'pointer' }}>Tipo {getSortIcon('tipo_pessoa')}</th>
               <th>Email</th>
               <th>Telefone</th>
-              <th className="text-center" style={{width: '120px'}}>Ações</th>
+              <th className="text-center" style={{width: '150px'}}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -266,6 +268,15 @@ function ClienteList({ onEditCliente, refreshKey }) {
                       style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}
                     >
                       <PencilSquareIcon style={{ width: '16px', height: '16px' }} />
+                    </button>
+                    <button
+                      onClick={() => setClienteDocumento(cliente)}
+                      className="btn btn-sm btn-outline-success me-1 p-1 lh-1"
+                      title="Gerar Documento Jurídico"
+                      disabled={deletingId === cliente.id}
+                      style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}
+                    >
+                      <DocumentTextIcon style={{ width: '16px', height: '16px' }} />
                     </button>
                     <button
                       onClick={() => handleDeleteClick(cliente.id)}
@@ -329,6 +340,13 @@ function ClienteList({ onEditCliente, refreshKey }) {
         <div className="card-footer bg-light text-muted p-2 text-end small">
           {clientes.length} cliente(s) encontrado(s)
         </div>
+      )}
+
+      {clienteDocumento && (
+        <GerarDocumentoModal
+          cliente={clienteDocumento}
+          onClose={() => setClienteDocumento(null)}
+        />
       )}
     </div>
   );
