@@ -56,9 +56,9 @@ def get_list_query(model):
     tenant_id = get_tenant_id()
     # Se o modelo tem a coluna tenant_id, SEMPRE filtrar por tenant (proteção contra vazamento de dados)
     if hasattr(model, 'tenant_id'):
-        if not tenant_id:
-            # Se não há tenant por algum motivo, retorna vazio (não retorna tudo!)
-            return model.query.filter_by(tenant_id=None)
+        # Se o usuário não tem tenant atribuído, negar acesso — não retornar registros órfãos
+        if tenant_id is None:
+            abort(403, "Acesso Negado (LGPD): Usuário sem tenant atribuído.")
         return model.query.filter_by(tenant_id=tenant_id)
     # Se o modelo NÃO tem tenant_id, retorna query normal
     return model.query
@@ -81,7 +81,9 @@ def get_existing_item(model, **kwargs):
     tenant_id = get_tenant_id()
     # Se o modelo tem tenant_id, SEMPRE filtra por tenant (proteção obrigatória)
     if hasattr(model, 'tenant_id'):
-        kwargs['tenant_id'] = tenant_id if tenant_id else None
+        if tenant_id is None:
+            abort(403, "Acesso Negado (LGPD): Usuário sem tenant atribuído.")
+        kwargs['tenant_id'] = tenant_id
     return model.query.filter_by(**kwargs).first()
 # Inicialização das extensões
 db = SQLAlchemy()
