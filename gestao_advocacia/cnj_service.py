@@ -2,6 +2,7 @@
 # ARQUIVO: gestao_advocacia/cnj_service.py
 # Módulo para encapsular a lógica de comunicação com a API do CNJ (DataJud).
 # ==============================================================================
+import logging
 import requests
 from flask import current_app # Para acessar app.config (configurações e logger)
 from datetime import datetime
