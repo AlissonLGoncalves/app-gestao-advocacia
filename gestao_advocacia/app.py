@@ -54,13 +54,13 @@ def get_tenant_id():
 
 def get_list_query(model):
     tenant_id = get_tenant_id()
-    # Se ainda estivermos na transição onde o Tenant do usuario Master é nulo, retorna tudo pra n quebrar
-    # Num SaaS 100% maturado, tenant nulo = error.
-    if not tenant_id:
-        return model.query
-    # Se o modelo tem a coluna tenant_id, a query ganha a amarra de isolamento!
+    # Se o modelo tem a coluna tenant_id, SEMPRE filtrar por tenant (proteção contra vazamento de dados)
     if hasattr(model, 'tenant_id'):
+        if not tenant_id:
+            # Se não há tenant por algum motivo, retorna vazio (não retorna tudo!)
+            return model.query.filter_by(tenant_id=None)
         return model.query.filter_by(tenant_id=tenant_id)
+    # Se o modelo NÃO tem tenant_id, retorna query normal
     return model.query
 
 def get_item_or_404(model, item_id):
@@ -68,15 +68,20 @@ def get_item_or_404(model, item_id):
     item = model.query.get_or_404(item_id)
     
     # Validação Cruzada (Cross-Tenant Breach Prevention)
-    if tenant_id and hasattr(item, 'tenant_id'):
-        if item.tenant_id and item.tenant_id != tenant_id:
+    if hasattr(item, 'tenant_id'):
+        # Se o item NÃO tem tenant_id (NULL), rejeita (dados órfãos/legados)
+        if not item.tenant_id:
+            abort(404, "Registro não encontrado ou não pertence ao seu escritório.")
+        # Se o item tem tenant_id diferente do usuario, rejeita
+        if item.tenant_id != tenant_id:
             abort(403, "Acesso Negado (LGPD): Este registro pertence a outro Escritório (Cross-Tenant Request).")
     return item
 
 def get_existing_item(model, **kwargs):
     tenant_id = get_tenant_id()
-    if tenant_id and hasattr(model, 'tenant_id'):
-        kwargs['tenant_id'] = tenant_id
+    # Se o modelo tem tenant_id, SEMPRE filtra por tenant (proteção obrigatória)
+    if hasattr(model, 'tenant_id'):
+        kwargs['tenant_id'] = tenant_id if tenant_id else None
     return model.query.filter_by(**kwargs).first()
 # Inicialização das extensões
 db = SQLAlchemy()
