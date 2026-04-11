@@ -46,6 +46,52 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     setValidationErrors({});
   }, []);
 
+  // Formata data de YYYY-MM-DD para DD/MM/YYYY para exibição
+  const formatDataParaExibicao = (data) => {
+    if (!data) return '';
+    if (data.includes('/')) return data; // Já está em DD/MM/YYYY
+    const partes = data.split('-');
+    if (partes.length === 3) {
+      return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+    return data;
+  };
+
+  // Converte de DD/MM/YYYY para YYYY-MM-DD para armazenamento
+  const formatDataParaArmazenamento = (data) => {
+    if (!data) return '';
+    const limpo = data.replace(/\D/g, '');
+    if (limpo.length === 8) {
+      return `${limpo.substring(4, 8)}-${limpo.substring(2, 4)}-${limpo.substring(0, 2)}`;
+    }
+    return '';
+  };
+
+  // Handler para data de nascimento com máscara DD/MM/YYYY
+  const handleDataNascimentoChange = (e) => {
+    let valor = e.target.value;
+    
+    // Remove caracteres não numéricos
+    valor = valor.replace(/\D/g, '');
+    
+    // Adiciona a máscara
+    if (valor.length >= 2) {
+      valor = valor.substring(0, 2) + '/' + valor.substring(2);
+    }
+    if (valor.length >= 5) {
+      valor = valor.substring(0, 5) + '/' + valor.substring(5, 9);
+    }
+    
+    // Armazena no formato YYYY-MM-DD
+    const dataArmazenada = formatDataParaArmazenamento(valor);
+    setFormData(prev => ({ ...prev, data_nascimento: dataArmazenada }));
+    
+    // Limpa erro de validação se houver
+    if (validationErrors.data_nascimento) {
+      setValidationErrors(prev => ({ ...prev, data_nascimento: '' }));
+    }
+  };
+
   useEffect(() => {
     clearValidationErrors();
     if (clienteParaEditar && clienteParaEditar.id) {
@@ -452,8 +498,17 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
         <input type="text" name="orgao_emissor" id="orgao_emissor" className="form-control form-control-sm" value={formData.orgao_emissor || ''} onChange={handleChange} />
       </div>
       <div className="col-md-6 mb-3">
-        <label htmlFor="data_nascimento" className="form-label form-label-sm">Data de Nascimento</label>
-        <input type="date" name="data_nascimento" id="data_nascimento" className="form-control form-control-sm" value={formData.data_nascimento} onChange={handleChange} />
+        <label htmlFor="data_nascimento" className="form-label form-label-sm">Data de Nascimento (DD/MM/YYYY)</label>
+        <input 
+          type="text" 
+          name="data_nascimento" 
+          id="data_nascimento" 
+          className="form-control form-control-sm" 
+          value={formData.data_nascimento ? formatDataParaExibicao(formData.data_nascimento) : ''} 
+          onChange={handleDataNascimentoChange}
+          placeholder="DD/MM/YYYY"
+          maxLength="10"
+        />
       </div>
       <div className="col-md-6 mb-3">
         <label htmlFor="estado_civil" className="form-label form-label-sm">Estado Civil</label>

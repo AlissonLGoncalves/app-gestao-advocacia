@@ -1410,7 +1410,8 @@ def create_app(config_class=Config):
             novo_caso = Caso(
                 titulo=data['titulo'], numero_processo=num_proc_strip,
                 status=data.get('status', 'Ativo'),
-                cliente_id=data['cliente_id'], user_id=user_id
+                cliente_id=data['cliente_id'], user_id=user_id,
+                tenant_id=get_tenant_id()
             )
             _preencher_caso_from_data(novo_caso, data)
             db.session.add(novo_caso)
@@ -1647,7 +1648,8 @@ def create_app(config_class=Config):
                 tipo_evento=data.get('tipo_evento', 'Outros'),
                 prioridade=data.get('prioridade', 'Normal'),
                 status_evento=data.get('status_evento', 'Pendente'),
-                user_id=user_id
+                user_id=user_id,
+                tenant_id=get_tenant_id()
             )
             db.session.add(novo_evento)
             db.session.commit()
@@ -1762,7 +1764,7 @@ def create_app(config_class=Config):
                         return {'message': 'O valor fornecido para "caso_id" é inválido.'}, 400
                 novo_documento_db = Documento(
                     nome_arquivo=final_filename_to_save, path_arquivo=full_file_path_to_save, 
-                    user_id=user_id, caso_id=db_caso_id
+                    user_id=user_id, caso_id=db_caso_id, tenant_id=get_tenant_id()
                 )
                 db.session.add(novo_documento_db)
                 db.session.commit()
@@ -1841,7 +1843,7 @@ def create_app(config_class=Config):
             if caso_id_val:
                 if not Caso.query.filter_by(id=caso_id_val, user_id=user_id).first():
                     return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
-            nova_despesa = Despesa(descricao=data['descricao'], valor=valor_decimal, data_despesa=data_despesa_obj, pago=data.get('pago', False), caso_id=caso_id_val, user_id=user_id)
+            nova_despesa = Despesa(descricao=data['descricao'], valor=valor_decimal, data_despesa=data_despesa_obj, pago=data.get('pago', False), caso_id=caso_id_val, user_id=user_id, tenant_id=get_tenant_id())
             db.session.add(nova_despesa)
             db.session.commit()
             app.logger.info(f"Nova despesa ID {nova_despesa.id} criada para usuário ID {user_id}.")
@@ -1926,7 +1928,7 @@ def create_app(config_class=Config):
                 if not Caso.query.filter_by(id=caso_id_val, user_id=user_id).first():
                     return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
             novo_recebimento = Recebimento(descricao=data['descricao'], valor=valor_decimal, data_recebimento=data_recebimento_obj, 
-                                           recebido=data.get('recebido', False), caso_id=caso_id_val, user_id=user_id)
+                                           recebido=data.get('recebido', False), caso_id=caso_id_val, user_id=user_id, tenant_id=get_tenant_id())
             db.session.add(novo_recebimento)
             db.session.commit()
             app.logger.info(f"Novo recebimento ID {novo_recebimento.id} criado para usuário ID {user_id}.")
@@ -2086,7 +2088,8 @@ def create_app(config_class=Config):
                 notas_condicoes=data.get('notas_condicoes'),
                 caso_id=data['caso_id'],
                 cliente_id=data['cliente_id'],
-                user_id=user_id
+                user_id=user_id,
+                tenant_id=get_tenant_id()
             )
             
             if da:
