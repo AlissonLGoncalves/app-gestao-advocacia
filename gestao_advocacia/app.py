@@ -1123,13 +1123,12 @@ def create_app(config_class=Config):
         @clientes_ns.marshal_list_with(cliente_model_dto)
         @clientes_ns.doc(security='jsonWebToken', description="Lista todos os clientes do usuário autenticado.")
         def get(self):
+            user_id = get_jwt_identity()
             search = request.args.get('search', '').strip()
             tipo_pessoa = request.args.get('tipo_pessoa', '').strip()
             sort_by = request.args.get('sort_by', 'nome_razao_social')
             sort_order = request.args.get('sort_order', 'asc')
-            
-            # Usando Tenant Isolation (B2B SaaS Security)
-            query = get_list_query(Cliente)
+            query = Cliente.query.filter_by(user_id=user_id)
             
             if search:
                 like = f'%{search}%'
@@ -1400,14 +1399,13 @@ def create_app(config_class=Config):
         @casos_ns.marshal_list_with(caso_model_dto)
         @casos_ns.doc(security='jsonWebToken', description="Lista todos os casos jurídicos do usuário.")
         def get(self):
+            user_id = get_jwt_identity()
             search = request.args.get('search', '').strip()
             status_f = request.args.get('status', '').strip()
             cliente_id_f = request.args.get('cliente_id', '').strip()
             sort_by = request.args.get('sort_by', 'data_atualizacao')
             sort_order = request.args.get('sort_order', 'desc')
-            
-            # Usando Tenant Isolation (B2B SaaS Security)
-            query = get_list_query(Caso)
+            query = Caso.query.filter_by(user_id=user_id)
             
             if search:
                 like = f'%{search}%'
