@@ -1,0 +1,13 @@
+id,numero_processo,status,data_criacao,data_atualizacao,cliente_id,user_id,data_ultima_verificacao_cnj,titulo,tipo_acao,area_direito,fase_processual,vara_juizo,comarca,instancia,parte_contraria,adv_parte_contraria,valor_causa,data_distribuicao,notas_caso,tenant_id
+2,0014181-73.2025.8.16.0045,Ativo,2026-04-09 18:20:28.378238,2026-04-09 18:20:28.378243,3,2,,Processo 0014181-73.2025.8.16.0045,Cumprimento de sentença,Cível,Execução,Juizado Especial Cível,Aapongas,JE,,,27.52,,">> RESUMO AUTOMÁTICO (DATAJUD):
+- [31/03/2026] Confirmada
+- [30/03/2026] Documento | Informações
+- [30/03/2026] Recebimento
+- [20/03/2026] Remessa | em diligência
+- [20/03/2026] Expedição de documento | Outros documentos",
+1,0003659-69.2025.8.16.0050,Ativo,2026-04-09 15:41:24.758326,2026-04-09 20:58:47.742781,2,2,,Processo Lançado via Petição Autográfica,Monitória,Cível,Ativo,1ª vara cível,Bandeirantes,1ª Instância,SICREDI PARANAPANEMA,ANTONIO VALDEMIR ZAGO,63635.53,2025-10-02,">> RESUMO AUTOMÁTICO (DATAJUD):
+- [31/03/2026] Petição | Embargos À  ação monitária
+- [16/03/2026] Ato cumprido pela parte ou interessado (sem atributo)
+- [27/02/2026] Expedição de documento | Carta
+- [25/02/2026] Petição | Petição (outras)
+- [25/02/2026] Confirmada",

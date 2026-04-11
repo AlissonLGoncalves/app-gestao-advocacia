@@ -1,0 +1,4 @@
+id,email,telefone,user_id,nome_razao_social,cpf_cnpj,tipo_pessoa,rg,orgao_emissor,data_nascimento,estado_civil,profissao,nacionalidade,nome_fantasia,nire,inscricao_estadual,inscricao_municipal,cnpj_secundario,descricao_cnpj_secundario,cnpj_terciario,descricao_cnpj_terciario,cep,rua,numero,bairro,cidade,estado,pais,notas_gerais,tenant_id
+1,alisson.16lg@gmail.com,43984770411,2,Alisson Luiz Gonçalves,06560181944,PF,10.987.965-7,SSP/PR,1989-06-12,Casado(a),Advogado,Brasileiro(a),,,,,,,,,86300-000,R. Primo Bozeli,387,Jardim bandeirantes,Cornélio Procópio,PR,Brasil,,
+2,,43 984851391,2,LUIZA MEDEIROS IZAIAS FACCIOLI,36917429805,PF,45.018.840-1,SSPPR,1989-03-31,Casado(a),AUTONOMA,Brasileiro(a),,,,,,,,,86300-000,Rua Paula Gomes,616,Centro,Cornélio Procópio,PR,Brasil,,
+3,,43 99924-6545,2,ADRIANO BASSO MARSON,05199800930,PF,99031859,SSP/PR,,Casado(a),EMPRESÀRIO,Brasileiro(a),,,,,,,,,86300000,Rua dos Bandeirantes,933,Vila Seugling,Cornélio Procópio,Pr,Brasil,,

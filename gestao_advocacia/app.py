@@ -53,20 +53,33 @@ def get_tenant_id():
     return user.tenant_id
 
 def get_list_query(model):
+    # Aplica isolamento por tenant E, quando aplicável, por usuário.
+    from flask_jwt_extended import get_jwt_identity
     tenant_id = get_tenant_id()
+    user_id = get_jwt_identity()
+
     # Se o modelo tem a coluna tenant_id, SEMPRE filtrar por tenant (proteção contra vazamento de dados)
     if hasattr(model, 'tenant_id'):
         # Se o usuário não tem tenant atribuído, negar acesso — não retornar registros órfãos
         if tenant_id is None:
             abort(403, "Acesso Negado (LGPD): Usuário sem tenant atribuído.")
-        return model.query.filter_by(tenant_id=tenant_id)
-    # Se o modelo NÃO tem tenant_id, retorna query normal
-    return model.query
+        query = model.query.filter_by(tenant_id=tenant_id)
+    else:
+        query = model.query
+
+    # Se o modelo tem coluna user_id, aplicar filtro por usuário (isolamento estrito por usuário)
+    if hasattr(model, 'user_id'):
+        query = query.filter_by(user_id=user_id)
+
+    return query
 
 def get_item_or_404(model, item_id):
+    from flask_jwt_extended import get_jwt_identity
     tenant_id = get_tenant_id()
+    user_id = get_jwt_identity()
+
     item = model.query.get_or_404(item_id)
-    
+
     # Validação Cruzada (Cross-Tenant Breach Prevention)
     if hasattr(item, 'tenant_id'):
         # Se o item NÃO tem tenant_id (NULL), rejeita (dados órfãos/legados)
@@ -75,15 +88,29 @@ def get_item_or_404(model, item_id):
         # Se o item tem tenant_id diferente do usuario, rejeita
         if item.tenant_id != tenant_id:
             abort(403, "Acesso Negado (LGPD): Este registro pertence a outro Escritório (Cross-Tenant Request).")
+
+    # Se o modelo tem owner por usuário, garantir que o usuário logado seja o owner
+    if hasattr(item, 'user_id'):
+        if item.user_id != user_id:
+            abort(403, "Acesso Negado: Este registro pertence a outro usuário no mesmo escritório.")
+
     return item
 
 def get_existing_item(model, **kwargs):
+    from flask_jwt_extended import get_jwt_identity
     tenant_id = get_tenant_id()
+    user_id = get_jwt_identity()
+
     # Se o modelo tem tenant_id, SEMPRE filtra por tenant (proteção obrigatória)
     if hasattr(model, 'tenant_id'):
         if tenant_id is None:
             abort(403, "Acesso Negado (LGPD): Usuário sem tenant atribuído.")
         kwargs['tenant_id'] = tenant_id
+
+    # Se o modelo tem owner por usuário, filtrar também por user_id
+    if hasattr(model, 'user_id'):
+        kwargs['user_id'] = user_id
+
     return model.query.filter_by(**kwargs).first()
 # Inicialização das extensões
 db = SQLAlchemy()
