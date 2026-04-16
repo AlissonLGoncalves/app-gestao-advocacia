@@ -25,8 +25,31 @@ else:
 
 class Config:
     """Configurações base da aplicação."""
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev_secret_key_fallback' # Use uma chave forte em produção
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'dev_jwt_secret_key_fallback' # Use uma chave forte
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+
+    # In production both keys MUST be set via environment variables.
+    # A missing key will cause a clear startup error instead of silently
+    # falling back to an insecure default.
+    if not SECRET_KEY:
+        import warnings
+        if os.environ.get('FLASK_ENV') == 'production':
+            raise RuntimeError(
+                "CRITICAL: SECRET_KEY environment variable is not set. "
+                "Refusing to start in production without a strong secret key."
+            )
+        SECRET_KEY = 'dev-only-secret-key-do-not-use-in-production'
+        warnings.warn("Using insecure default SECRET_KEY — set SECRET_KEY env var for production.", stacklevel=2)
+
+    if not JWT_SECRET_KEY:
+        import warnings
+        if os.environ.get('FLASK_ENV') == 'production':
+            raise RuntimeError(
+                "CRITICAL: JWT_SECRET_KEY environment variable is not set. "
+                "Refusing to start in production without a strong JWT secret key."
+            )
+        JWT_SECRET_KEY = 'dev-only-jwt-key-do-not-use-in-production'
+        warnings.warn("Using insecure default JWT_SECRET_KEY — set JWT_SECRET_KEY env var for production.", stacklevel=2)
     
     _db_url = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
@@ -41,7 +64,7 @@ class Config:
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
-    CNJ_API_KEY = os.environ.get('CNJ_API_KEY') or 'cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw=='
+    CNJ_API_KEY = os.environ.get('CNJ_API_KEY', '')
     APP_VERSION = os.environ.get('APP_VERSION') or '1.0.0'
 
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
@@ -54,7 +77,7 @@ class Config:
     CNJ_JOB_MAX_CASES_PER_RUN = int(os.environ.get('CNJ_JOB_MAX_CASES_PER_RUN', 10))
 
     # Configurações do APScheduler
-    SCHEDULER_API_ENABLED = True # Permite gerenciar jobs via API REST (opcional, provido pelo Flask-APScheduler)
+    SCHEDULER_API_ENABLED = False  # Disabled — exposes unauthenticated job management endpoints
     SCHEDULER_TIMEZONE = os.environ.get('SCHEDULER_TIMEZONE', "America/Sao_Paulo") # Fuso horário para o scheduler
 
 

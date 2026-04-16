@@ -500,12 +500,25 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
-    CORS(app) 
+    # Restrict CORS to known frontend origins instead of allowing all domains
+    allowed_origins = [
+        os.environ.get('FRONTEND_URL', 'http://localhost:5173'),
+        'http://127.0.0.1:5173',
+        'http://localhost:5173',
+        'https://app-gestao-advocacia-frontend.vercel.app',
+    ]
+    # Allow additional origins via comma-separated env var
+    extra_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+    if extra_origins:
+        allowed_origins.extend([o.strip() for o in extra_origins.split(',') if o.strip()])
+    CORS(app, origins=allowed_origins)
 
     api_bp = Blueprint('api', __name__, url_prefix='/api')
+    # Disable Swagger UI in production to avoid exposing the full API surface
+    swagger_doc_path = '/api/docs' if os.environ.get('FLASK_ENV') != 'production' else False
     api = Api(api_bp, version='1.0', title='API Gestão Advocacia',
               description='API para gerenciar informações de um escritório de advocacia.',
-              doc='/api/docs', 
+              doc=swagger_doc_path, 
               authorizations={
                   'jsonWebToken': {
                       'type': 'apiKey', 'in': 'header', 'name': 'Authorization',
@@ -994,7 +1007,8 @@ def create_app(config_class=Config):
             except DecodeError:
                  return {"message": "Token de convite inválido ou corrompido."}, 400
             except Exception as e:
-                return {"message": f"Falha na validação do link mágico. {str(e)}"}, 400
+                app.logger.error(f"Falha na validação do link mágico: {str(e)}")
+                return {"message": "Falha na validação do link de convite."}, 400
 
     @auth_ns.route('/login')
     class UserLogin(Resource):
@@ -1111,11 +1125,11 @@ def create_app(config_class=Config):
                 if not combined_data:
                     return {"message": "Motor finalizado sem identificar Biometrias visíveis nesta bateria de arquivos."}, 422
                     
-                app.logger.info(f"Dados OCR LOTE extraídos com sucesso para usuário {user_id}. CPF Pescado: {combined_data.get('cpf', 'N/A')}")
+                app.logger.info(f"Dados OCR LOTE extraídos com sucesso para usuário {user_id}.")
                 return combined_data, 200
             except Exception as e:
                 app.logger.error(f"Erro Crítico de OCR: {str(e)}")
-                return {"message": f"Erro interno de processamento dos arquivos: {str(e)}"}, 500
+                return {"message": "Erro interno de processamento dos arquivos."}, 500
 
     @clientes_ns.route('/')
     class ClienteListAPI(Resource):
@@ -1141,6 +1155,9 @@ def create_app(config_class=Config):
                 )
             if tipo_pessoa:
                 query = query.filter_by(tipo_pessoa=tipo_pessoa)
+            ALLOWED_CLIENTE_SORT_FIELDS = {'nome_razao_social', 'cpf_cnpj', 'email', 'tipo_pessoa', 'id'}
+            if sort_by not in ALLOWED_CLIENTE_SORT_FIELDS:
+                sort_by = 'nome_razao_social'
             col = getattr(Cliente, sort_by, Cliente.nome_razao_social)
             query = query.order_by(col.desc() if sort_order == 'desc' else col.asc())
             return query.all()
@@ -1391,7 +1408,7 @@ def create_app(config_class=Config):
                 return {"dados": ai_data}, 200
             except Exception as e:
                 app.logger.error(f"[LEITURA PETICAO] {e}")
-                return {"message": "Falha geral no Parser.", "error": str(e)}, 500
+                return {"message": "Falha geral no Parser."}, 500
 
     @casos_ns.route('/')
     class CasoListAPI(Resource):
@@ -1420,6 +1437,9 @@ def create_app(config_class=Config):
                 query = query.filter_by(status=status_f)
             if cliente_id_f:
                 query = query.filter_by(cliente_id=int(cliente_id_f))
+            ALLOWED_CASO_SORT_FIELDS = {'titulo', 'numero_processo', 'status', 'data_atualizacao', 'data_criacao', 'id'}
+            if sort_by not in ALLOWED_CASO_SORT_FIELDS:
+                sort_by = 'data_atualizacao'
             col = getattr(Caso, sort_by, Caso.data_atualizacao)
             query = query.order_by(col.desc() if sort_order == 'desc' else col.asc())
             return query.all()
@@ -1628,11 +1648,11 @@ def create_app(config_class=Config):
             except (KeyError, IndexError, TypeError, AttributeError) as e_proc:
                 db.session.rollback()
                 app.logger.error(f"API CNJ: Erro crítico ao processar dados da resposta CNJ para caso {caso_id}: {str(e_proc)}. Resposta CNJ (parcial): {str(dados_resposta_cnj)[:500]}", exc_info=True)
-                return {"message": "Erro interno ao processar os dados recebidos do CNJ.", "error_details": str(e_proc)}, 500
+                return {"message": "Erro interno ao processar os dados recebidos do CNJ."}, 500
             except Exception as e_geral:
                 db.session.rollback()
                 app.logger.critical(f"API CNJ: Erro geral INESPERADO no endpoint de atualização CNJ para caso {caso_id}: {str(e_geral)}", exc_info=True)
-                return {"message": f"Ocorreu um erro geral e inesperado no sistema: {str(e_geral)}"}, 500
+                return {"message": "Ocorreu um erro interno inesperado no sistema."}, 500
 
     @casos_ns.route('/<int:caso_id>/movimentacoes-cnj')
     @casos_ns.param('caso_id', 'O ID do caso para o qual listar as movimentações CNJ registradas no sistema')
