@@ -22,12 +22,13 @@ import LoginPage from './pages/auth/LoginPage.jsx';
 import RegisterPage from './pages/auth/RegisterPage.jsx';
 import TermsPage from './pages/auth/TermsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import DjenPage from './pages/DjenPage.jsx';
 
 // Importação dos ícones
 import {
   HomeIcon, UsersIcon, BriefcaseIcon, DocumentTextIcon,
   CurrencyDollarIcon, CalendarDaysIcon, ChartBarIcon, CreditCardIcon, ArrowLeftOnRectangleIcon,
-  Bars3Icon, XMarkIcon, ScaleIcon, Cog6ToothIcon, ClipboardDocumentListIcon
+  Bars3Icon, XMarkIcon, ScaleIcon, Cog6ToothIcon, ClipboardDocumentListIcon, NewspaperIcon
 } from '@heroicons/react/24/outline';
 
 const ProtectedRoute = ({ children }) => {
@@ -85,6 +86,7 @@ const MainLayout = () => {
       case 'agenda': baseTitle = 'Evento'; break;
       case 'documentos': baseTitle = 'Documento'; break;
       case 'relatorios': return 'Relatórios';
+      case 'djen': return 'DJEN — Diário de Justiça';
       case 'configuracoes': return 'Configurações do Sistema';
       default: baseTitle = baseSegment.replace('-', ' ');
     }
@@ -144,6 +146,7 @@ const MainLayout = () => {
           )}
           <SidebarLink to="/agenda" icon={CalendarDaysIcon}>Agenda</SidebarLink>
           <SidebarLink to="/documentos" icon={DocumentTextIcon}>Documentos</SidebarLink>
+          <SidebarLink to="/djen" icon={NewspaperIcon}>DJEN — Publicações</SidebarLink>
           <SidebarLink to="/relatorios" icon={ChartBarIcon}>Relatórios</SidebarLink>
           <SidebarLink to="/configuracoes" icon={Cog6ToothIcon}>Configurações SaaS</SidebarLink>
         </nav>
@@ -224,7 +227,9 @@ function App() {
           <Route path="documentos" element={<DocumentosPage />} />
           <Route path="documentos/novo" element={<DocumentosPage />} />
           <Route path="documentos/editar/:documentoId" element={<DocumentosPage />} />
-          
+
+          <Route path="djen" element={<DjenPage />} />
+
           <Route path="relatorios" element={<RelatoriosPage />} />
           
           <Route path="configuracoes" element={<SettingsPage />} />

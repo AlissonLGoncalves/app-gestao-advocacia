@@ -78,6 +78,15 @@ class Config:
 
     # Configurações do APScheduler
     SCHEDULER_API_ENABLED = False  # Disabled — exposes unauthenticated job management endpoints
-    SCHEDULER_TIMEZONE = os.environ.get('SCHEDULER_TIMEZONE', "America/Sao_Paulo") # Fuso horário para o scheduler
+    SCHEDULER_TIMEZONE = os.environ.get('SCHEDULER_TIMEZONE', "America/Sao_Paulo")
+
+    # --- Configurações do DJEN (ComunicaAPI/CNJ) ---
+    DJEN_API_BASE_URL = os.environ.get('DJEN_API_BASE_URL', 'https://comunicaapi.pje.jus.br')
+    DJEN_JOB_ENABLED = os.environ.get('DJEN_JOB_ENABLED', 'False').lower() == 'true'
+    DJEN_JOB_HOUR = int(os.environ.get('DJEN_JOB_HOUR', 4))
+    DJEN_JOB_MINUTE = int(os.environ.get('DJEN_JOB_MINUTE', 0))
+    DJEN_LOOKBACK_DAYS = int(os.environ.get('DJEN_LOOKBACK_DAYS', 1))
+    DJEN_ITENS_POR_PAGINA = int(os.environ.get('DJEN_ITENS_POR_PAGINA', 100))
+    DJEN_REQUEST_DELAY_SECONDS = float(os.environ.get('DJEN_REQUEST_DELAY_SECONDS', 1.5))
 
 

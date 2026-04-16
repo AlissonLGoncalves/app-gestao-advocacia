@@ -135,7 +135,10 @@ class User(db.Model):
     password_hash = db.Column(db.String(256), nullable=False) 
     email = db.Column(db.String(120), unique=True, nullable=False)
     role = db.Column(db.String(20), nullable=False, default='admin') # admin, advogado, assistente
-    
+    numero_oab = db.Column(db.String(30), nullable=True)
+    sigla_oab_tribunal = db.Column(db.String(10), nullable=True)
+    djen_monitoramento_ativo = db.Column(db.Boolean, nullable=True, default=True)
+
     casos = db.relationship('Caso', backref='responsavel_user', lazy='dynamic', foreign_keys='Caso.user_id')
     clientes = db.relationship('Cliente', backref='advogado_responsavel', lazy='dynamic', foreign_keys='Cliente.user_id')
     eventos_agenda = db.relationship('EventoAgenda', backref='criador_evento', lazy='dynamic', foreign_keys='EventoAgenda.user_id')
@@ -243,6 +246,7 @@ class Caso(db.Model):
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id', name='fk_caso_cliente_id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_caso_user_id'), nullable=False)
     data_ultima_verificacao_cnj = db.Column(db.DateTime, nullable=True)
+    data_ultima_verificacao_djen = db.Column(db.DateTime, nullable=True)
 
     movimentacoes_cnj = db.relationship('MovimentacaoCNJ', backref='caso_cnj_associado', lazy='dynamic', cascade="all, delete-orphan")
     documentos_caso = db.relationship('Documento', backref='caso_documento_associado', lazy='dynamic', cascade="all, delete-orphan")
@@ -472,6 +476,77 @@ class TarefaPrazo(db.Model):
             'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None
         }
 
+class DjenOabMonitoramento(db.Model):
+    """OABs configuradas para monitoramento automático de publicações DJEN."""
+    __tablename__ = 'djen_oab_monitoramento'
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_djen_oab_tenant_id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_djen_oab_user_id'), nullable=False)
+    numero_oab = db.Column(db.String(30), nullable=False)
+    uf_oab = db.Column(db.String(2), nullable=True)
+    nome_advogado = db.Column(db.String(200), nullable=True)
+    ativo = db.Column(db.Boolean, default=True)
+    ultima_sincronizacao = db.Column(db.DateTime, nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        db.UniqueConstraint('tenant_id', 'numero_oab', 'uf_oab', name='uq_djen_oab_tenant'),
+    )
+    def to_dict(self):
+        return {
+            'id': self.id, 'user_id': self.user_id, 'tenant_id': self.tenant_id,
+            'numero_oab': self.numero_oab, 'uf_oab': self.uf_oab,
+            'nome_advogado': self.nome_advogado, 'ativo': self.ativo,
+            'ultima_sincronizacao': self.ultima_sincronizacao.isoformat() if self.ultima_sincronizacao else None,
+            'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None,
+        }
+
+class PublicacaoDJEN(db.Model):
+    """Publicações do Diário de Justiça Eletrônico capturadas via ComunicaAPI."""
+    __tablename__ = 'publicacao_djen'
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_pub_djen_tenant_id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_pub_djen_user_id'), nullable=False)
+    caso_id = db.Column(db.Integer, db.ForeignKey('caso.id', name='fk_pub_djen_caso_id'), nullable=True)
+    djen_id = db.Column(db.BigInteger, nullable=True, index=True)
+    hash_comunicacao = db.Column(db.String(100), nullable=True, index=True)
+    numero_comunicacao = db.Column(db.Integer, nullable=True)
+    numero_processo = db.Column(db.String(50), nullable=True, index=True)
+    numero_processo_mascara = db.Column(db.String(50), nullable=True)
+    sigla_tribunal = db.Column(db.String(20), nullable=True, index=True)
+    nome_orgao = db.Column(db.String(200), nullable=True)
+    tipo_comunicacao = db.Column(db.String(100), nullable=True)
+    tipo_documento = db.Column(db.String(100), nullable=True)
+    nome_classe = db.Column(db.String(200), nullable=True)
+    data_disponibilizacao = db.Column(db.Date, nullable=True, index=True)
+    texto = db.Column(db.Text, nullable=True)
+    link = db.Column(db.Text, nullable=True)
+    meio = db.Column(db.String(1), nullable=True)
+    ativo = db.Column(db.Boolean, default=True)
+    origem_busca = db.Column(db.String(20), nullable=True)  # 'oab' ou 'processo'
+    lida = db.Column(db.Boolean, default=False, index=True)
+    notas = db.Column(db.Text, nullable=True)
+    raw_json = db.Column(db.JSON, nullable=True)
+    data_captura = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        db.UniqueConstraint('tenant_id', 'djen_id', name='uq_pub_djen_tenant_djenid'),
+    )
+    def to_dict(self):
+        return {
+            'id': self.id, 'user_id': self.user_id, 'tenant_id': self.tenant_id,
+            'caso_id': self.caso_id, 'djen_id': self.djen_id,
+            'hash_comunicacao': self.hash_comunicacao,
+            'numero_processo': self.numero_processo,
+            'numero_processo_mascara': self.numero_processo_mascara,
+            'sigla_tribunal': self.sigla_tribunal, 'nome_orgao': self.nome_orgao,
+            'tipo_comunicacao': self.tipo_comunicacao, 'tipo_documento': self.tipo_documento,
+            'nome_classe': self.nome_classe,
+            'data_disponibilizacao': self.data_disponibilizacao.isoformat() if self.data_disponibilizacao else None,
+            'texto': self.texto, 'link': self.link, 'meio': self.meio,
+            'ativo': self.ativo, 'origem_busca': self.origem_busca,
+            'lida': self.lida, 'notas': self.notas,
+            'data_captura': self.data_captura.isoformat() if self.data_captura else None,
+        }
+
 # --- FIM DOS MODELOS SQLAlchemy ---
 
 
@@ -540,6 +615,7 @@ def create_app(config_class=Config):
     contratos_ns = Namespace('contratos', description='Operações relacionadas aos Contratos de Honorários')
     audit_ns = Namespace('auditoria', description='Trilhas de Auditoria e Logs (LGPD)')
     tarefas_ns = Namespace('tarefas', description='Operações de Prazos e Tarefas')
+    djen_ns = Namespace('djen', description='Publicações DJEN — Diário de Justiça Eletrônico Nacional')
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -552,6 +628,7 @@ def create_app(config_class=Config):
     api.add_namespace(contratos_ns)
     api.add_namespace(audit_ns)
     api.add_namespace(tarefas_ns)
+    api.add_namespace(djen_ns)
 
     # --- DEFINIÇÃO DOS MODELOS DA API (DTOs - Data Transfer Objects) para Flask-RESTx ---
     user_model_dto = auth_ns.model('UserRegistration', {
@@ -2037,6 +2114,18 @@ def create_app(config_class=Config):
             app.logger.info(f"Recebimento ID {recebimento.id} deletado pelo usuário ID {user_id}.")
             return '', 204
 
+    # --- REGISTRO DAS ROTAS DJEN ---
+    try:
+        from djen_routes import registrar_rotas_djen
+        registrar_rotas_djen(
+            djen_ns, db,
+            DjenOabMonitoramento, PublicacaoDJEN, Caso,
+            jwt_required, get_jwt_identity,
+            app.logger
+        )
+    except Exception as e_djen:
+        app.logger.warning(f"Rotas DJEN não carregadas: {e_djen}")
+
     app.register_blueprint(api_bp)
 
     # --- INICIALIZAÇÃO DO APSCHEDULER ---
@@ -2055,7 +2144,7 @@ def create_app(config_class=Config):
                         )
                         app.logger.info(f"Job '{job_id}' agendado: {interval_hours}h{interval_minutes}m.")
                         
-                        # --- NOVO JOB DE E-MAILS DE ALERTA ---
+                        # --- JOB DE ALERTAS DE PRAZOS ---
                         job_alertas_id = 'VerificarAlertasPrazosJob'
                         if not scheduler.get_job(job_alertas_id):
                             from alertas_tasks import job_verificar_prazos
@@ -2064,6 +2153,20 @@ def create_app(config_class=Config):
                                 hour=6, minute=0, replace_existing=True
                             )
                             app.logger.info(f"Job '{job_alertas_id}' agendado para rodar diariamente às 06:00.")
+
+                        # --- JOB DE MONITORAMENTO DJEN ---
+                        if app.config.get('DJEN_JOB_ENABLED', False):
+                            djen_job_id = 'SincronizarDJENJob'
+                            if not scheduler.get_job(djen_job_id):
+                                from djen_tasks import job_monitorar_djen
+                                djen_hour = app.config.get('DJEN_JOB_HOUR', 4)
+                                djen_minute = app.config.get('DJEN_JOB_MINUTE', 0)
+                                scheduler.add_job(
+                                    id=djen_job_id, func=job_monitorar_djen, args=[app],
+                                    trigger='cron', hour=djen_hour, minute=djen_minute,
+                                    replace_existing=True
+                                )
+                                app.logger.info(f"Job '{djen_job_id}' agendado às {djen_hour:02d}:{djen_minute:02d}.")
                     except Exception as e_add_job:
                         app.logger.error(f"Falha ao adicionar job '{job_id}': {str(e_add_job)}")
                 if not scheduler.running:
