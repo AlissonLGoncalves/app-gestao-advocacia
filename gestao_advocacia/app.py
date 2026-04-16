@@ -91,7 +91,7 @@ def get_item_or_404(model, item_id):
 
     # Se o modelo tem owner por usuário, garantir que o usuário logado seja o owner
     if hasattr(item, 'user_id'):
-        if item.user_id != user_id:
+        if item.user_id != int(user_id):
             abort(403, "Acesso Negado: Este registro pertence a outro usuário no mesmo escritório.")
 
     return item
