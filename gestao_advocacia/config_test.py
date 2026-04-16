@@ -15,4 +15,6 @@ class ConfigTest:
         
         # Desabilitar o job CNJ nos testes
         CNJ_JOB_ENABLED = False
+        # Desabilitar o job DJEN nos testes
+        DJEN_JOB_ENABLED = False
         

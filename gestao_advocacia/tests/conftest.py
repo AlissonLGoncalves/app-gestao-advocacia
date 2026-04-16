@@ -10,9 +10,9 @@ import pytest
 # para que o módulo 'app' possa ser encontrado pelos testes.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app import app as flask_app, db as _db # Importa a aplicação Flask e o objeto db
-from app import Cliente # Importa modelos que podem ser usados para criar dados de teste
-from config_test import ConfigTest # Importa a configuração de teste (DEVE ESTAR NA RAIZ DO PROJETO BACKEND)
+from app import create_app, db as _db  # Importa a factory e o objeto db
+from app import Cliente  # Importa modelos que podem ser usados para criar dados de teste
+from config_test import ConfigTest  # Importa a configuração de teste
 
 
 @pytest.fixture(scope='session')
@@ -21,7 +21,7 @@ def app(request):
     Fixture de sessão para criar uma instância da aplicação Flask configurada para testes.
     O banco de dados de teste é criado uma vez por sessão de teste e limpo no final.
     """
-    flask_app.config.from_object(ConfigTest)
+    flask_app = create_app(ConfigTest)
 
     # Cria a pasta de uploads de teste se não existir
     upload_folder = flask_app.config['UPLOAD_FOLDER']
@@ -106,4 +106,61 @@ def db(app):
             _db.session.execute(table.delete())
         _db.session.commit()
         yield _db
+
+
+@pytest.fixture()
+def auth_client(client, db):
+    """
+    Retorna um cliente de teste já autenticado (com token JWT).
+    Registra um usuário de teste e faz login, expondo:
+      - auth_client.http  : flask test client com cabeçalho Authorization setado
+      - auth_client.token : o access_token JWT
+      - auth_client.user  : dict com dados do usuário criado
+    """
+    import json
+
+    # Registra um usuário de teste
+    reg_resp = client.post('/api/auth/register', json={
+        'username': 'testuser',
+        'email': 'testuser@teste.com',
+        'password': 'Senha1234!',
+        'role': 'admin',
+    })
+    assert reg_resp.status_code == 201, f"Registro falhou: {reg_resp.data}"
+
+    # Faz login para obter o token
+    login_resp = client.post('/api/auth/login', json={
+        'username_or_email': 'testuser',
+        'password': 'Senha1234!',
+    })
+    assert login_resp.status_code == 200, f"Login falhou: {login_resp.data}"
+    data = json.loads(login_resp.data)
+    token = data['access_token']
+
+    class _AuthClient:
+        def __init__(self, http_client, access_token, user_data):
+            self.token = access_token
+            self.user = user_data
+            self._client = http_client
+
+        def _headers(self):
+            return {'Authorization': f'Bearer {self.token}'}
+
+        def get(self, url, **kwargs):
+            kwargs.setdefault('headers', {}).update(self._headers())
+            return self._client.get(url, **kwargs)
+
+        def post(self, url, **kwargs):
+            kwargs.setdefault('headers', {}).update(self._headers())
+            return self._client.post(url, **kwargs)
+
+        def patch(self, url, **kwargs):
+            kwargs.setdefault('headers', {}).update(self._headers())
+            return self._client.patch(url, **kwargs)
+
+        def delete(self, url, **kwargs):
+            kwargs.setdefault('headers', {}).update(self._headers())
+            return self._client.delete(url, **kwargs)
+
+    yield _AuthClient(client, token, data.get('user', {}))
 

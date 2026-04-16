@@ -268,7 +268,7 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
         def post(self):
             """Dispara busca imediata no DJEN para as OABs e processos do tenant."""
             user_id = get_jwt_identity()
-            from app import User, app as flask_app
+            from app import User
             from djen_tasks import job_monitorar_djen
             user = User.query.get(int(user_id))
             if not user:
