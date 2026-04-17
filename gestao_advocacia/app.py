@@ -528,6 +528,9 @@ class PublicacaoDJEN(db.Model):
     lida = db.Column(db.Boolean, default=False, index=True)
     triagem_ignorada = db.Column(db.Boolean, default=False, index=True)
     notas = db.Column(db.Text, nullable=True)
+    polo_ativo = db.Column(db.Text, nullable=True)
+    polo_passivo = db.Column(db.Text, nullable=True)
+    nome_juiz = db.Column(db.String(200), nullable=True)
     raw_json = db.Column(db.JSON, nullable=True)
     data_captura = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (
@@ -549,6 +552,9 @@ class PublicacaoDJEN(db.Model):
             'status_origem': self.status_origem,
             'triagem_ignorada': self.triagem_ignorada,
             'lida': self.lida, 'notas': self.notas,
+            'polo_ativo': self.polo_ativo,
+            'polo_passivo': self.polo_passivo,
+            'nome_juiz': self.nome_juiz,
             'data_captura': self.data_captura.isoformat() if self.data_captura else None,
         }
 

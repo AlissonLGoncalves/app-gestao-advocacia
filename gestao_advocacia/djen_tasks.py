@@ -89,6 +89,23 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
     link = _item_get(item, "link", "url") or ""
     numero_proc_masc = _item_get(item, "numeroProcessoMascara", "numeroprocessomascara") or ""
 
+    # Extrai partes (polo ativo/passivo)
+    partes_raw = _item_get(item, "partes", "polo") or []
+    polo_ativo_list, polo_passivo_list = [], []
+    if isinstance(partes_raw, list):
+        for parte in partes_raw:
+            if isinstance(parte, dict):
+                nome_parte = _item_get(parte, "nome", "nomeAdvogado", "nomeParte") or ""
+                tipo_parte = str(_item_get(parte, "tipoParte", "tipo") or "").upper()
+                if nome_parte:
+                    if "PASSIVO" in tipo_parte:
+                        polo_passivo_list.append(nome_parte)
+                    else:
+                        polo_ativo_list.append(nome_parte)
+    polo_ativo_str = " | ".join(polo_ativo_list) or None
+    polo_passivo_str = " | ".join(polo_passivo_list) or None
+    nome_juiz = str(_item_get(item, "nomeJuiz", "juiz", "magistrado") or "")[:200] or None
+
     pub = PublicacaoDJEN(
         user_id=user_id,
         tenant_id=tenant_id,
@@ -107,6 +124,9 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
         texto=texto,
         link=link,
         meio=str(meio_val)[:1],
+        polo_ativo=polo_ativo_str,
+        polo_passivo=polo_passivo_str,
+        nome_juiz=nome_juiz,
         raw_json=item,
         origem_busca=origem,
         status_origem='pendente',

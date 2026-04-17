@@ -630,6 +630,18 @@ export default function DjenPage() {
                         <td className="small">{fmtData(pubSelecionada.data_disponibilizacao)}</td></tr>
                       <tr><td className="text-muted small fw-semibold">Meio</td>
                         <td className="small">{pubSelecionada.meio === 'D' ? 'Diário Eletrônico' : pubSelecionada.meio === 'E' ? 'Edital' : '—'}</td></tr>
+                      {pubSelecionada.nome_juiz && (
+                        <tr><td className="text-muted small fw-semibold">Magistrado</td>
+                          <td className="small">{pubSelecionada.nome_juiz}</td></tr>
+                      )}
+                      {pubSelecionada.polo_ativo && (
+                        <tr><td className="text-muted small fw-semibold">Polo Ativo</td>
+                          <td className="small">{pubSelecionada.polo_ativo}</td></tr>
+                      )}
+                      {pubSelecionada.polo_passivo && (
+                        <tr><td className="text-muted small fw-semibold">Polo Passivo</td>
+                          <td className="small">{pubSelecionada.polo_passivo}</td></tr>
+                      )}
                     </tbody>
                   </table>
 

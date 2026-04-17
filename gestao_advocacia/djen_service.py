@@ -176,7 +176,8 @@ def obter_certidao(hash_comunicacao):
     """Consulta GET /api/v1/comunicacao/{hash}/certidao."""
     path = ENDPOINT_CERTIDAO.format(hash=hash_comunicacao)
     response = _request("GET", path)
-    return response.content  # PDF em bytes
+    content_type = response.headers.get('content-type', 'application/pdf')
+    return response.content, content_type
 
 
 def listar_tribunais():
