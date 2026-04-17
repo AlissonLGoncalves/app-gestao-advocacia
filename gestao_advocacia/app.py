@@ -581,7 +581,7 @@ def create_app(config_class=Config):
         os.environ.get('FRONTEND_URL', 'http://localhost:5173'),
         'http://127.0.0.1:5173',
         'http://localhost:5173',
-        'https://app-gestao-advocacia-frontend.vercel.app',
+        'https://app-gestao-advocacia.vercel.app',
         re.compile(r"https://.*\.vercel\.app$"),
     ]
     # Allow additional origins via comma-separated env var
@@ -1029,7 +1029,7 @@ def create_app(config_class=Config):
             if 'localhost' in base_url or '127.0.0.1' in base_url:
                 base_url = "http://localhost:5173/" 
             else:
-                base_url = os.environ.get('FRONTEND_URL', 'https://app-gestao-advocacia-frontend.vercel.app/')
+                base_url = os.environ.get('FRONTEND_URL', 'https://app-gestao-advocacia.vercel.app/')
                 
             link = f"{base_url.rstrip('/')}/register?invite_token={invite_token}"
             
