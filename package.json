@@ -4,10 +4,10 @@
   "version": "1.1.3",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev": "npm --prefix gestao_advocacia_vite run dev",
+    "build": "npm --prefix gestao_advocacia_vite ci && npm --prefix gestao_advocacia_vite run build",
+    "lint": "npm --prefix gestao_advocacia_vite run lint",
+    "preview": "npm --prefix gestao_advocacia_vite run preview"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
