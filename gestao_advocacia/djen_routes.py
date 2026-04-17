@@ -62,7 +62,7 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
 
     sync_input_dto = djen_ns.model('DjenSyncInput', {
         'oab_id': fields.Integer(description='ID da OAB a sincronizar (omitir = todas as ativas)'),
-        'dias': fields.Integer(description='Janela de busca em dias (padrão = 1)', default=1),
+        'dias': fields.Integer(description='Janela de busca em dias (padrão = 30, máximo = 30)', default=30),
     })
 
     # ── OABs monitoradas ──────────────────────────────────────────────────────
@@ -274,12 +274,23 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             if not user:
                 djen_ns.abort(401)
             data = request.json or {}
-            dias = min(int(data.get('dias', 1)), 30)
+            try:
+                dias = int(data.get('dias', 30))
+            except (TypeError, ValueError):
+                dias = 30
+            dias = max(1, min(dias, 30))
 
             from flask import current_app
             try:
-                job_monitorar_djen(current_app._get_current_object())
-                return {'message': f'Sincronização iniciada (janela: {dias} dia(s)).'}, 202
+                resumo = job_monitorar_djen(
+                    current_app._get_current_object(),
+                    lookback_days=dias,
+                    tenant_id=user.tenant_id,
+                )
+                return {
+                    'message': f"Sincronização concluída (janela: {dias} dia(s)).",
+                    'resumo': resumo,
+                }, 200
             except Exception as e:
                 logger.error(f"Erro no sync DJEN manual: {e}", exc_info=True)
                 djen_ns.abort(500, "Erro ao iniciar sincronização.")

@@ -25,23 +25,26 @@ def _get_logger(app):
         return logging.getLogger(__name__)
 
 
-def _salvar_publicacao(db, DjenPublicacao, user_id, tenant_id, caso_id, item, origem):
+def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, origem):
     """Persiste uma publicação se ainda não existir no banco."""
     hash_com = item.get("hash") or item.get("id") or item.get("codigo")
 
     # Tenta deduplicar por hash; se não tiver hash, usa processo + data
     if hash_com:
-        exists = DjenPublicacao.query.filter_by(hash_comunicacao=str(hash_com)).first()
+        exists = PublicacaoDJEN.query.filter_by(
+            tenant_id=tenant_id,
+            hash_comunicacao=str(hash_com),
+        ).first()
         if exists:
             return False
     else:
         numero_proc = item.get("numeroProcesso") or item.get("processo", {}).get("numero")
         data_disp = item.get("dataDisponibilizacao")
         if numero_proc and data_disp:
-            exists = DjenPublicacao.query.filter_by(
-                user_id=user_id,
+            exists = PublicacaoDJEN.query.filter_by(
+                tenant_id=tenant_id,
                 numero_processo=numero_proc,
-                data_disponibilizacao_str=str(data_disp),
+                data_disponibilizacao=_parse_data_disponibilizacao(data_disp),
             ).first()
             if exists:
                 return False
@@ -57,41 +60,58 @@ def _salvar_publicacao(db, DjenPublicacao, user_id, tenant_id, caso_id, item, or
         or ""
     )
     tipo_com = item.get("tipoComunicacao") or item.get("tipo") or ""
+    tipo_doc = item.get("tipoDocumento") or ""
+    nome_classe = item.get("nomeClasse") or ""
+    nome_orgao = item.get("nomeOrgao") or ""
     data_disp_str = item.get("dataDisponibilizacao") or item.get("data") or ""
     texto = item.get("texto") or item.get("conteudo") or ""
-    nome_parte = item.get("nomeParte") or ""
     meio_val = item.get("meio") or "D"
+    numero_com = item.get("numeroComunicacao")
+    djen_id = item.get("id")
+    link = item.get("link") or item.get("url") or ""
+    numero_proc_masc = item.get("numeroProcessoMascara") or ""
 
-    data_disp_dt = None
-    if data_disp_str:
-        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-            try:
-                data_disp_dt = datetime.strptime(str(data_disp_str)[:19], fmt)
-                break
-            except ValueError:
-                continue
+    data_disp_dt = _parse_data_disponibilizacao(data_disp_str)
 
-    pub = DjenPublicacao(
+    pub = PublicacaoDJEN(
         user_id=user_id,
         tenant_id=tenant_id,
         caso_id=caso_id,
+        djen_id=djen_id,
         hash_comunicacao=str(hash_com) if hash_com else None,
+        numero_comunicacao=numero_com,
         numero_processo=numero_proc,
+        numero_processo_mascara=str(numero_proc_masc)[:50] if numero_proc_masc else None,
         sigla_tribunal=sigla_trib,
+        nome_orgao=str(nome_orgao)[:200] if nome_orgao else None,
         tipo_comunicacao=str(tipo_com)[:200],
+        tipo_documento=str(tipo_doc)[:100] if tipo_doc else None,
+        nome_classe=str(nome_classe)[:200] if nome_classe else None,
         data_disponibilizacao=data_disp_dt,
-        data_disponibilizacao_str=str(data_disp_str)[:50],
         texto=texto,
-        nome_parte=str(nome_parte)[:300],
+        link=link,
         meio=str(meio_val)[:1],
-        dados_raw=item,
+        raw_json=item,
         origem_busca=origem,
     )
     db.session.add(pub)
     return True
 
 
-def job_monitorar_djen(app):
+def _parse_data_disponibilizacao(valor):
+    if not valor:
+        return None
+    valor_str = str(valor)
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(valor_str[:19], fmt)
+            return dt.date()
+        except ValueError:
+            continue
+    return None
+
+
+def job_monitorar_djen(app, lookback_days=None, tenant_id=None):
     """Job APScheduler: monitora publicações DJEN por OAB e por processo."""
     with app.app_context():
         logger = _get_logger(app)
@@ -101,56 +121,84 @@ def job_monitorar_djen(app):
             return
 
         try:
-            from app import db, DjenPublicacao, User, Caso
+            from app import db, PublicacaoDJEN, User, Caso, DjenOabMonitoramento
         except ImportError as e:
             logger.critical(f"JOB DJEN: falha ao importar modelos: {e}")
-            return
+            return {
+                "ok": False,
+                "message": "Falha ao importar modelos DJEN.",
+                "erro": str(e),
+            }
 
-        logger.info("JOB DJEN: iniciando monitoramento de publicações...")
+        janela_dias = lookback_days if lookback_days is not None else app.config.get("DJEN_LOOKBACK_DAYS", 30)
+        try:
+            janela_dias = int(janela_dias)
+        except (TypeError, ValueError):
+            janela_dias = 30
+        janela_dias = max(1, min(janela_dias, 30))
+        data_fim = datetime.utcnow().date()
+        data_inicio = data_fim - timedelta(days=janela_dias)
+
+        logger.info(
+            "JOB DJEN: iniciando monitoramento de publicações "
+            f"(janela: {janela_dias} dia(s), de {data_inicio} até {data_fim})."
+        )
         total_novas = 0
+        total_itens_encontrados = 0
+        total_oabs_processadas = 0
+        total_casos_processados = 0
+        erros = 0
 
-        # ── Vetor 1: busca por OAB de cada usuário ──────────────────────────
-        usuarios = User.query.filter(
-            User.numero_oab.isnot(None),
-            User.numero_oab != "",
-            User.djen_monitoramento_ativo == True,
-        ).all()
+        # ── Vetor 1: busca pelas OABs monitoradas no tenant ─────────────────
+        q_oabs = DjenOabMonitoramento.query.filter_by(ativo=True)
+        if tenant_id is not None:
+            q_oabs = q_oabs.filter_by(tenant_id=tenant_id)
+        oabs_monitoradas = q_oabs.all()
 
-        logger.info(f"JOB DJEN: {len(usuarios)} usuário(s) com OAB configurada.")
+        logger.info(f"JOB DJEN: {len(oabs_monitoradas)} OAB(s) monitorada(s).")
 
-        for user in usuarios:
+        for oab_mon in oabs_monitoradas:
             logger.info(
-                f"JOB DJEN: buscando por OAB {user.numero_oab} "
-                f"(tribunal: {user.sigla_oab_tribunal or 'todos'})"
+                f"JOB DJEN: buscando por OAB {oab_mon.numero_oab}/{oab_mon.uf_oab or '--'} "
+                f"(tenant: {oab_mon.tenant_id})"
             )
             try:
                 data = consultar_comunicacoes(
-                    numero_oab=user.numero_oab,
-                    sigla_tribunal=user.sigla_oab_tribunal or None,
+                    numero_oab=oab_mon.numero_oab,
+                    sigla_tribunal=(oab_mon.uf_oab or '').strip().upper() or None,
                     meio="D",
+                    data_inicio=data_inicio,
+                    data_fim=data_fim,
                 )
                 items = _extrair_items(data)
+                total_itens_encontrados += len(items)
                 for item in items:
                     saved = _salvar_publicacao(
-                        db, DjenPublicacao, user.id, user.tenant_id, None, item, "oab"
+                        db, PublicacaoDJEN, oab_mon.user_id, oab_mon.tenant_id, None, item, "oab"
                     )
                     if saved:
                         total_novas += 1
+
+                oab_mon.ultima_sincronizacao = datetime.utcnow()
                 db.session.commit()
+                total_oabs_processadas += 1
                 logger.info(
-                    f"JOB DJEN: OAB {user.numero_oab} — {len(items)} publicações encontradas."
+                    f"JOB DJEN: OAB {oab_mon.numero_oab}/{oab_mon.uf_oab or '--'} — {len(items)} publicações encontradas."
                 )
             except DjenRateLimitError:
                 logger.warning(f"JOB DJEN: rate limit atingido. Aguardando {RATE_LIMIT_SLEEP}s.")
                 db.session.rollback()
+                erros += 1
                 time.sleep(RATE_LIMIT_SLEEP)
                 continue
             except DjenAPIError as e:
-                logger.error(f"JOB DJEN: erro na busca por OAB {user.numero_oab}: {e}")
+                logger.error(f"JOB DJEN: erro na busca por OAB {oab_mon.numero_oab}: {e}")
                 db.session.rollback()
+                erros += 1
             except Exception as e:
-                logger.error(f"JOB DJEN: exceção inesperada (OAB {user.numero_oab}): {e}", exc_info=True)
+                logger.error(f"JOB DJEN: exceção inesperada (OAB {oab_mon.numero_oab}): {e}", exc_info=True)
                 db.session.rollback()
+                erros += 1
 
             time.sleep(DELAY_ENTRE_REQUISICOES)
 
@@ -159,14 +207,18 @@ def job_monitorar_djen(app):
         limite_tempo = datetime.utcnow() - timedelta(days=intervalo_dias)
         max_casos = app.config.get("DJEN_JOB_MAX_CASOS_POR_RUN", 20)
 
-        casos = Caso.query.filter(
+        casos_query = Caso.query.filter(
             Caso.numero_processo.isnot(None),
             Caso.numero_processo != "",
             db.or_(
                 Caso.data_ultima_verificacao_djen.is_(None),
                 Caso.data_ultima_verificacao_djen < limite_tempo,
             ),
-        ).order_by(Caso.data_ultima_verificacao_djen.asc().nulls_first()).limit(max_casos).all()
+        )
+        if tenant_id is not None:
+            casos_query = casos_query.filter_by(tenant_id=tenant_id)
+
+        casos = casos_query.order_by(Caso.data_ultima_verificacao_djen.asc().nulls_first()).limit(max_casos).all()
 
         logger.info(f"JOB DJEN: {len(casos)} caso(s) para verificar por processo.")
 
@@ -176,26 +228,31 @@ def job_monitorar_djen(app):
                 data = consultar_comunicacoes(
                     numero_processo=caso.numero_processo,
                     meio="D",
+                    data_inicio=data_inicio,
+                    data_fim=data_fim,
                 )
                 items = _extrair_items(data)
+                total_itens_encontrados += len(items)
                 user = User.query.get(caso.user_id)
-                tenant_id = user.tenant_id if user else None
+                tenant_id_caso = user.tenant_id if user else None
 
                 for item in items:
                     saved = _salvar_publicacao(
-                        db, DjenPublicacao, caso.user_id, tenant_id, caso.id, item, "processo"
+                        db, PublicacaoDJEN, caso.user_id, tenant_id_caso, caso.id, item, "processo"
                     )
                     if saved:
                         total_novas += 1
 
                 caso.data_ultima_verificacao_djen = datetime.utcnow()
                 db.session.commit()
+                total_casos_processados += 1
                 logger.info(
                     f"JOB DJEN: processo {caso.numero_processo} — {len(items)} publicações."
                 )
             except DjenRateLimitError:
                 logger.warning(f"JOB DJEN: rate limit atingido. Aguardando {RATE_LIMIT_SLEEP}s.")
                 db.session.rollback()
+                erros += 1
                 time.sleep(RATE_LIMIT_SLEEP)
                 continue
             except DjenAPIError as e:
@@ -206,16 +263,27 @@ def job_monitorar_djen(app):
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
+                erros += 1
             except Exception as e:
                 logger.error(
                     f"JOB DJEN: exceção inesperada (processo {caso.numero_processo}): {e}",
                     exc_info=True,
                 )
                 db.session.rollback()
+                erros += 1
 
             time.sleep(DELAY_ENTRE_REQUISICOES)
 
         logger.info(f"JOB DJEN: concluído. {total_novas} nova(s) publicação(ões) salva(s).")
+        return {
+            "ok": True,
+            "lookback_days": janela_dias,
+            "oabs_processadas": total_oabs_processadas,
+            "casos_processados": total_casos_processados,
+            "itens_encontrados": total_itens_encontrados,
+            "publicacoes_salvas": total_novas,
+            "erros": erros,
+        }
 
 
 def _extrair_items(data):

@@ -326,12 +326,21 @@ class TestDjenSync:
     def test_sync_manual_sucesso(self, auth_client, db):
         """POST /api/djen/sync inicia a sincronização manual (mockando o job)."""
         with patch('djen_tasks.job_monitorar_djen') as mock_job:
-            mock_job.return_value = None
+            mock_job.return_value = {
+                'ok': True,
+                'lookback_days': 30,
+                'oabs_processadas': 1,
+                'casos_processados': 0,
+                'itens_encontrados': 2,
+                'publicacoes_salvas': 1,
+                'erros': 0,
+            }
             resp = auth_client.post('/api/djen/sync', json={'dias': 1})
-        assert resp.status_code == 202
+        assert resp.status_code == 200
         data = json.loads(resp.data)
         assert 'message' in data
         assert 'Sincronização' in data['message']
+        assert 'resumo' in data
 
     def test_sync_sem_autenticacao(self, client, db):
         """POST /api/djen/sync sem token retorna 401."""

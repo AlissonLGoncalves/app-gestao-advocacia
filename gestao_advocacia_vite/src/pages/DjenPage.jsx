@@ -97,13 +97,23 @@ export default function DjenPage() {
       const res = await fetch(`${API_URL}/djen/sync`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dias: 1 }),
+        body: JSON.stringify({ dias: 30 }),
       });
+      const payload = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success('Sincronização iniciada! Aguarde alguns instantes e recarregue.');
+        const resumo = payload?.resumo || {};
+        const salvas = resumo.publicacoes_salvas ?? 0;
+        const encontrados = resumo.itens_encontrados ?? 0;
+        const oabsProc = resumo.oabs_processadas ?? 0;
+        const casosProc = resumo.casos_processados ?? 0;
+        toast.success(
+          `Sync DJEN concluído: ${salvas} nova(s), ${encontrados} encontrada(s), OABs ${oabsProc}, casos ${casosProc}.`
+        );
+        setOffset(0);
+        await carregarPublicacoes(0);
+        await carregarOabs();
       } else {
-        const err = await res.json();
-        toast.error(err.message || 'Erro ao sincronizar.');
+        toast.error(payload.message || 'Erro ao sincronizar.');
       }
     } catch {
       toast.error('Erro de conexão.');
@@ -520,7 +530,7 @@ export default function DjenPage() {
                 <div className="alert alert-info mt-3 small mb-0">
                   <i className="bi bi-info-circle me-1" />
                   Após cadastrar, clique em <strong>"Sincronizar agora"</strong> para buscar publicações imediatamente.
-                  O job automático roda diariamente às 04:00.
+                  O job automático roda diariamente às 04:00 e considera os últimos 30 dias.
                 </div>
               </div>
             </div>

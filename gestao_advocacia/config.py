@@ -85,7 +85,7 @@ class Config:
     DJEN_JOB_ENABLED = os.environ.get('DJEN_JOB_ENABLED', 'False').lower() == 'true'
     DJEN_JOB_HOUR = int(os.environ.get('DJEN_JOB_HOUR', 4))
     DJEN_JOB_MINUTE = int(os.environ.get('DJEN_JOB_MINUTE', 0))
-    DJEN_LOOKBACK_DAYS = int(os.environ.get('DJEN_LOOKBACK_DAYS', 1))
+    DJEN_LOOKBACK_DAYS = int(os.environ.get('DJEN_LOOKBACK_DAYS', 30))
     DJEN_ITENS_POR_PAGINA = int(os.environ.get('DJEN_ITENS_POR_PAGINA', 100))
     DJEN_REQUEST_DELAY_SECONDS = float(os.environ.get('DJEN_REQUEST_DELAY_SECONDS', 1.5))
 
