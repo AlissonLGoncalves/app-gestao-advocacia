@@ -217,14 +217,18 @@ def _consultar_oab_com_fallback(*, numero_oab, sigla_tribunal, data_inicio, data
     return ultimo_payload, ultimo_items
 
 
-def job_monitorar_djen(app, lookback_days=None, tenant_id=None):
+def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
     """Job APScheduler: monitora publicações DJEN por OAB e por processo."""
     with app.app_context():
         logger = _get_logger(app)
 
-        if not app.config.get("DJEN_JOB_ENABLED", True):
+        if not force and not app.config.get("DJEN_JOB_ENABLED", True):
             logger.info("JOB DJEN: desabilitado nas configurações. Pulando.")
-            return
+            return {
+                "ok": False,
+                "skipped": True,
+                "reason": "DJEN_JOB_ENABLED=false",
+            }
 
         try:
             from app import db, PublicacaoDJEN, User, Caso, DjenOabMonitoramento

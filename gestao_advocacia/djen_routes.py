@@ -696,6 +696,7 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
                     current_app._get_current_object(),
                     lookback_days=dias,
                     tenant_id=user.tenant_id,
+                    force=True,
                 )
                 return {
                     'message': f"Sincronização concluída (janela: {dias} dia(s)).",
