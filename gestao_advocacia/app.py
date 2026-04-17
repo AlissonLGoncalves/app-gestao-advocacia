@@ -6,16 +6,13 @@
 import os
 import logging # Para configurar o logging
 from flask import Flask, request, jsonify, send_from_directory, Blueprint
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from flask_cors import CORS
 import re
 from flask_restx import Api, Namespace, Resource, fields
-from flask_apscheduler import APScheduler # IMPORT para o Scheduler
 
 # Definições base
 from dotenv import load_dotenv
@@ -31,6 +28,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 from config import Config 
 from cnj_service import consultar_processo_cnj 
 from tasks import job_verificar_processos_cnj 
+from extensions import db, jwt, migrate, scheduler, mail
 from functools import wraps
 from flask_restx import abort
 from flask_jwt_extended import get_jwt
@@ -139,11 +137,6 @@ def get_item_or_404(model, item_id):
 
 def get_existing_item(model, **kwargs):
     return query_for_tenant(model).filter_by(**kwargs).first()
-# Inicialização das extensões
-db = SQLAlchemy()
-migrate = Migrate()
-jwt = JWTManager()
-scheduler = APScheduler()
 
 # --- MODELOS SQLAlchemy ---
 class Tenant(db.Model):
