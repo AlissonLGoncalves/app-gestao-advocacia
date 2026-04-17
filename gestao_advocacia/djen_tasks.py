@@ -160,6 +160,63 @@ def _normalizar_sigla_tribunal(uf_ou_sigla):
     return valor
 
 
+def _normalizar_numero_oab(numero_oab):
+    """Mantém apenas dígitos da OAB para reduzir erro de filtro no CNJ."""
+    if numero_oab is None:
+        return ""
+    bruto = str(numero_oab).strip()
+    if not bruto:
+        return ""
+    somente_digitos = "".join(ch for ch in bruto if ch.isdigit())
+    return somente_digitos or bruto
+
+
+def _consultar_oab_com_fallback(*, numero_oab, sigla_tribunal, data_inicio, data_fim, logger):
+    """Consulta DJEN para OAB com fallback de paginação e tribunal.
+
+    Estratégia:
+    1) Com tribunal e página 1
+    2) Com tribunal e página 0
+    3) Sem tribunal e página 1
+    4) Sem tribunal e página 0
+    """
+    tentativas = []
+    if sigla_tribunal:
+        tentativas.extend([
+            {"sigla_tribunal": sigla_tribunal, "pagina": 1},
+            {"sigla_tribunal": sigla_tribunal, "pagina": 0},
+        ])
+    tentativas.extend([
+        {"sigla_tribunal": None, "pagina": 1},
+        {"sigla_tribunal": None, "pagina": 0},
+    ])
+
+    ultimo_payload = {}
+    ultimo_items = []
+    for t in tentativas:
+        payload = consultar_comunicacoes(
+            numero_oab=numero_oab,
+            sigla_tribunal=t["sigla_tribunal"],
+            meio="D",
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            pagina=t["pagina"],
+        )
+        items = _extrair_items(payload)
+        logger.info(
+            "JOB DJEN: tentativa OAB %s (sigla=%s, pagina=%s) retornou %s item(ns).",
+            numero_oab,
+            t["sigla_tribunal"] or "sem_filtro",
+            t["pagina"],
+            len(items),
+        )
+        ultimo_payload = payload
+        ultimo_items = items
+        if items:
+            return payload, items
+    return ultimo_payload, ultimo_items
+
+
 def job_monitorar_djen(app, lookback_days=None, tenant_id=None):
     """Job APScheduler: monitora publicações DJEN por OAB e por processo."""
     with app.app_context():
@@ -199,7 +256,12 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None):
         erros = 0
 
         # ── Vetor 1: busca pelas OABs monitoradas no tenant ─────────────────
-        q_oabs = DjenOabMonitoramento.query.filter_by(ativo=True)
+        q_oabs = DjenOabMonitoramento.query.filter(
+            db.or_(
+                DjenOabMonitoramento.ativo.is_(True),
+                DjenOabMonitoramento.ativo.is_(None),
+            )
+        )
         if tenant_id is not None:
             q_oabs = q_oabs.filter_by(tenant_id=tenant_id)
         oabs_monitoradas = q_oabs.all()
@@ -213,29 +275,14 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None):
             )
             try:
                 sigla_tribunal = _normalizar_sigla_tribunal(oab_mon.uf_oab)
-                data = consultar_comunicacoes(
-                    numero_oab=oab_mon.numero_oab,
+                numero_oab = _normalizar_numero_oab(oab_mon.numero_oab)
+                data, items = _consultar_oab_com_fallback(
+                    numero_oab=numero_oab,
                     sigla_tribunal=sigla_tribunal,
-                    meio="D",
                     data_inicio=data_inicio,
                     data_fim=data_fim,
+                    logger=logger,
                 )
-                items = _extrair_items(data)
-
-                # Fallback: quando o filtro por tribunal vier restritivo/inesperado,
-                # tenta novamente sem tribunal para não perder publicações válidas da OAB.
-                if not items and sigla_tribunal:
-                    logger.info(
-                        f"JOB DJEN: nenhuma publicação para OAB {oab_mon.numero_oab} "
-                        f"com sigla {sigla_tribunal}. Tentando sem filtro de tribunal."
-                    )
-                    data = consultar_comunicacoes(
-                        numero_oab=oab_mon.numero_oab,
-                        meio="D",
-                        data_inicio=data_inicio,
-                        data_fim=data_fim,
-                    )
-                    items = _extrair_items(data)
 
                 total_itens_encontrados += len(items)
                 for item in items:

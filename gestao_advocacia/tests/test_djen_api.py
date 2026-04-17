@@ -378,6 +378,41 @@ class TestDjenPayloadCompat:
         assert _normalizar_sigla_tribunal('') is None
         assert _normalizar_sigla_tribunal(None) is None
 
+    def test_normalizar_numero_oab_remove_mascara(self):
+        """_normalizar_numero_oab deve manter somente dígitos quando possível."""
+        from djen_tasks import _normalizar_numero_oab
+
+        assert _normalizar_numero_oab('94.297/PR') == '94297'
+        assert _normalizar_numero_oab(' 94297 ') == '94297'
+        assert _normalizar_numero_oab('') == ''
+        assert _normalizar_numero_oab(None) == ''
+
+    def test_consultar_oab_com_fallback_tenta_paginas_e_sem_tribunal(self):
+        """Quando não encontra com tribunal/página inicial, tenta fallback até achar."""
+        from djen_tasks import _consultar_oab_com_fallback
+
+        class DummyLogger:
+            def info(self, *args, **kwargs):
+                return None
+
+        side_effect = [
+            {'items': []},  # com sigla, pagina 1
+            {'items': []},  # com sigla, pagina 0
+            {'items': [{'id': 7}]},  # sem sigla, pagina 1
+        ]
+        with patch('djen_tasks.consultar_comunicacoes', side_effect=side_effect) as mocked:
+            payload, items = _consultar_oab_com_fallback(
+                numero_oab='94297',
+                sigla_tribunal='TJPR',
+                data_inicio='2026-04-01',
+                data_fim='2026-04-17',
+                logger=DummyLogger(),
+            )
+
+            assert len(items) == 1
+            assert payload.get('items')[0]['id'] == 7
+            assert mocked.call_count == 3
+
 
 # ---------------------------------------------------------------------------
 # Triagem inteligente (parser + matching)
