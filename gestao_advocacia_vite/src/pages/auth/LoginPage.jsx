@@ -30,7 +30,13 @@ function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username_or_email: usernameOrEmail, password: password })
       });
-      const data = await response.json();
+      const rawResponse = await response.text();
+      let data = {};
+      try {
+        data = rawResponse ? JSON.parse(rawResponse) : {};
+      } catch {
+        data = {};
+      }
 
       if (response.ok) {
         localStorage.setItem('token', data.access_token);
@@ -38,11 +44,11 @@ function LoginPage() {
         toast.success("Login bem-sucedido! Redirecionando...");
         navigate('/dashboard'); 
       } else {
-        toast.error(data.message || "Falha no login. Verifique suas credenciais.");
+        toast.error(data.message || `Falha no login (HTTP ${response.status}). Verifique suas credenciais.`);
       }
     } catch (error) {
       console.error("Erro ao tentar fazer login:", error);
-      toast.error("Erro de rede ou servidor indisponível. Tente novamente.");
+      toast.error(`Erro de rede ao conectar em ${API_URL}. Verifique se backend está online.`);
     } finally {
       setLoading(false);
     }

@@ -13,6 +13,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from flask_cors import CORS
+import re
 from flask_restx import Api, Namespace, Resource, fields
 from flask_apscheduler import APScheduler # IMPORT para o Scheduler
 
@@ -581,6 +582,7 @@ def create_app(config_class=Config):
         'http://127.0.0.1:5173',
         'http://localhost:5173',
         'https://app-gestao-advocacia-frontend.vercel.app',
+        re.compile(r"https://.*\.vercel\.app$"),
     ]
     # Allow additional origins via comma-separated env var
     extra_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')

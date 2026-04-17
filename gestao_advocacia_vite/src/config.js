@@ -1,8 +1,25 @@
 ﻿// src/config.js
-// Define a URL base da sua API Flask.
-// !!! IMPORTANTE: Ajuste esta URL para o endereço correto do seu backend Flask !!!
-// Se o seu backend Flask estiver a correr localmente na porta 5000, esta URL está correta.
-export const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api';
 
-// Log para verificar se o config.js foi carregado e qual a API_URL
-// Este log aparecerá no console do navegador quando este módulo for importado pela primeira vez.
+function normalizeBaseUrl(url) {
+	return String(url || '').replace(/\/+$/, '');
+}
+
+function resolveApiUrl() {
+	const envUrl = import.meta.env.VITE_API_URL;
+	if (envUrl) {
+		return normalizeBaseUrl(envUrl);
+	}
+
+	const host = typeof window !== 'undefined' ? window.location.hostname : '';
+	const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+
+	// Fallback de desenvolvimento local.
+	if (isLocalHost || !host) {
+		return 'http://127.0.0.1:5000/api';
+	}
+
+	// Fallback de produção quando VITE_API_URL não foi definida no deploy do frontend.
+	return 'https://gestao-advocacia-api.onrender.com/api';
+}
+
+export const API_URL = resolveApiUrl();
