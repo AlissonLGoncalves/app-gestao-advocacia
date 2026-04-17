@@ -971,15 +971,22 @@ def create_app(config_class=Config):
                 })
 
             # Alertas DJEN relevantes para o dashboard operacional.
-            djen_nao_lidas = PublicacaoDJEN.query.filter_by(
-                tenant_id=user.tenant_id,
-                lida=False,
-                triagem_ignorada=False,
-            ).count()
-            djen_sem_vinculo = PublicacaoDJEN.query.filter_by(
-                tenant_id=user.tenant_id,
-                triagem_ignorada=False,
-            ).filter(PublicacaoDJEN.caso_id.is_(None)).count()
+            # Usa try/except para não quebrar o dashboard caso a migração
+            # ainda não tenha sido aplicada no ambiente de produção.
+            try:
+                djen_nao_lidas = PublicacaoDJEN.query.filter_by(
+                    tenant_id=user.tenant_id,
+                    lida=False,
+                    triagem_ignorada=False,
+                ).count()
+                djen_sem_vinculo = PublicacaoDJEN.query.filter_by(
+                    tenant_id=user.tenant_id,
+                    triagem_ignorada=False,
+                ).filter(PublicacaoDJEN.caso_id.is_(None)).count()
+            except Exception:
+                db.session.rollback()
+                djen_nao_lidas = 0
+                djen_sem_vinculo = 0
 
             return {
                 'total_clientes': total_clientes,
