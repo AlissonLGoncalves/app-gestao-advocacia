@@ -38,8 +38,16 @@ from helpers import (
     tenant_scoped,
 )
 from routes import register_auth_routes
+from routes import register_auditoria_routes
 from routes import register_casos_routes
 from routes import register_clientes_routes
+from routes import register_contratos_routes
+from routes import register_dashboard_routes
+from routes import register_despesas_routes
+from routes import register_documentos_routes
+from routes import register_eventos_routes
+from routes import register_recebimentos_routes
+from routes import register_tarefas_routes
 from functools import wraps
 from flask_restx import abort
 from flask_jwt_extended import get_jwt
@@ -435,473 +443,36 @@ def create_app(config_class=Config):
         'user_id': fields.Integer,
         'caso_id': fields.Integer
     })
+    register_dashboard_routes(app, dashboard_ns)
 
-    # --- ENDPOINT DO DASHBOARD ---
-    @dashboard_ns.route('/stats')
-    class DashboardStatsAPI(Resource):
-        @jwt_required()
-        @dashboard_ns.doc(security='jsonWebToken', description="Retorna estatísticas consolidadas para o Dashboard.")
-        def get(self):
-            user_id = get_jwt_identity()
+    register_eventos_routes(
+        app,
+        eventos_ns,
+        evento_input_model_dto,
+        evento_model_dto,
+    )
 
-            # Total de clientes
-            total_clientes = Cliente.query.filter_by(user_id=user_id).count()
+    register_documentos_routes(
+        app,
+        documentos_ns,
+        documento_model_dto,
+    )
 
-            # Casos ativos (status diferente de 'Concluído', 'Arquivado', 'Encerrado')
-            status_inativos = ['Concluído', 'Arquivado', 'Encerrado']
-            casos_ativos = Caso.query.filter(
-                Caso.user_id == user_id,
-                ~Caso.status.in_(status_inativos)
-            ).count()
+    register_despesas_routes(
+        app,
+        despesas_ns,
+        despesa_input_model_dto,
+        despesa_model_dto,
+        finance_access_required,
+    )
 
-            # Recebimentos pendentes (não recebidos)
-            recebimentos_pendentes = Recebimento.query.filter_by(user_id=user_id, recebido=False).all()
-            recebimentos_pendentes_qtd = len(recebimentos_pendentes)
-            recebimentos_pendentes_valor = sum(float(r.valor) for r in recebimentos_pendentes)
-
-            # Despesas a pagar (não pagas)
-            despesas_a_pagar = Despesa.query.filter_by(user_id=user_id, pago=False).all()
-            despesas_a_pagar_qtd = len(despesas_a_pagar)
-            despesas_a_pagar_valor = sum(float(d.valor) for d in despesas_a_pagar)
-
-            # Próximos eventos (futuros, ordenados por data, limite de 5)
-            agora = datetime.utcnow()
-            proximos_eventos = EventoAgenda.query.filter(
-                EventoAgenda.user_id == user_id,
-                EventoAgenda.data_inicio >= agora
-            ).order_by(EventoAgenda.data_inicio.asc()).limit(5).all()
-
-            eventos_lista = []
-            for ev in proximos_eventos:
-                eventos_lista.append({
-                    'id': ev.id,
-                    'titulo': ev.titulo,
-                    'data_inicio': ev.data_inicio.isoformat() if ev.data_inicio else None,
-                    'data_fim': ev.data_fim.isoformat() if ev.data_fim else None,
-                    'descricao': ev.descricao
-                })
-
-            # Alertas DJEN relevantes para o dashboard operacional.
-            # Usa try/except para não quebrar o dashboard caso a migração
-            # ainda não tenha sido aplicada no ambiente de produção.
-            try:
-                djen_nao_lidas = PublicacaoDJEN.query.filter_by(
-                    tenant_id=user.tenant_id,
-                    lida=False,
-                    triagem_ignorada=False,
-                ).count()
-                djen_sem_vinculo = PublicacaoDJEN.query.filter_by(
-                    tenant_id=user.tenant_id,
-                    triagem_ignorada=False,
-                ).filter(PublicacaoDJEN.caso_id.is_(None)).count()
-            except Exception:
-                db.session.rollback()
-                djen_nao_lidas = 0
-                djen_sem_vinculo = 0
-
-            return {
-                'total_clientes': total_clientes,
-                'casos_ativos': casos_ativos,
-                'recebimentos_pendentes': {
-                    'quantidade': recebimentos_pendentes_qtd,
-                    'valor_total': round(recebimentos_pendentes_valor, 2)
-                },
-                'despesas_a_pagar': {
-                    'quantidade': despesas_a_pagar_qtd,
-                    'valor_total': round(despesas_a_pagar_valor, 2)
-                },
-                'proximos_eventos': eventos_lista,
-                'alertas_djen': {
-                    'nao_lidas': djen_nao_lidas,
-                    'pendentes_triagem': djen_sem_vinculo,
-                },
-            }, 200
-
-    @eventos_ns.route('/')
-    class EventoListAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @eventos_ns.marshal_list_with(evento_model_dto)
-        @eventos_ns.doc(security='jsonWebToken')
-        def get(self):
-            user_id = get_jwt_identity()
-            eventos = get_list_query(EventoAgenda).order_by(EventoAgenda.data_inicio.asc()).all()
-            return eventos
-
-        @jwt_required()
-        @tenant_scoped
-        @eventos_ns.expect(evento_input_model_dto)
-        @eventos_ns.marshal_with(evento_model_dto, code=201)
-        @eventos_ns.doc(security='jsonWebToken')
-        def post(self):
-            user_id = get_jwt_identity()
-            data = request.get_json()
-            if not data.get('titulo') or not data.get('data_inicio'):
-                return {"message": "Título e data de início são obrigatórios para o evento."}, 400
-            try:
-                data_inicio_obj = datetime.fromisoformat(data['data_inicio'])
-                data_fim_obj = datetime.fromisoformat(data['data_fim']) if data.get('data_fim') else None
-            except ValueError:
-                return {"message": "Formato de data inválido. Utilize o formato ISO 8601 (ex: YYYY-MM-DDTHH:MM:SS)."}, 400
-            novo_evento = EventoAgenda(
-                titulo=data['titulo'], data_inicio=data_inicio_obj, data_fim=data_fim_obj, 
-                descricao=data.get('descricao'), 
-                tipo_evento=data.get('tipo_evento', 'Outros'),
-                prioridade=data.get('prioridade', 'Normal'),
-                status_evento=data.get('status_evento', 'Pendente'),
-                user_id=user_id,
-                tenant_id=get_tenant_id()
-            )
-            db.session.add(novo_evento)
-            db.session.commit()
-            app.logger.info(f"Novo evento '{novo_evento.titulo}' (ID: {novo_evento.id}) criado para usuário ID {user_id}.")
-            return novo_evento, 201
-
-    @eventos_ns.route('/<int:evento_id_param>')
-    @eventos_ns.response(404, 'Evento não encontrado ou não pertence ao usuário.')
-    @eventos_ns.param('evento_id_param', 'O ID único do evento da agenda')
-    class EventoDetailAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @eventos_ns.marshal_with(evento_model_dto)
-        @eventos_ns.doc(security='jsonWebToken')
-        def get(self, evento_id_param):
-            user_id = get_jwt_identity()
-            evento = get_item_or_404(EventoAgenda, evento_id_param)
-            return evento
-
-        @jwt_required()
-        @tenant_scoped
-        @eventos_ns.expect(evento_input_model_dto)
-        @eventos_ns.marshal_with(evento_model_dto)
-        @eventos_ns.doc(security='jsonWebToken')
-        def put(self, evento_id_param):
-            user_id = get_jwt_identity()
-            evento = get_item_or_404(EventoAgenda, evento_id_param)
-            data = request.get_json()
-            if not data.get('titulo') or not data.get('data_inicio'):
-                 return {"message": "Título e data de início são obrigatórios para atualização do evento."}, 400
-            try:
-                data_inicio_obj = datetime.fromisoformat(data['data_inicio'])
-                data_fim_obj = datetime.fromisoformat(data['data_fim']) if data.get('data_fim') else None
-            except ValueError:
-                return {"message": "Formato de data inválido. Utilize ISO 8601."}, 400
-            evento.titulo = data['titulo']
-            evento.data_inicio = data_inicio_obj
-            evento.data_fim = data_fim_obj
-            evento.descricao = data.get('descricao', evento.descricao)
-            evento.tipo_evento = data.get('tipo_evento', evento.tipo_evento)
-            evento.prioridade = data.get('prioridade', evento.prioridade)
-            evento.status_evento = data.get('status_evento', evento.status_evento)
-            db.session.commit()
-            app.logger.info(f"Evento ID {evento.id} atualizado pelo usuário ID {user_id}.")
-            return evento
-
-        @jwt_required()
-        @tenant_scoped
-        @eventos_ns.response(204, 'Evento deletado com sucesso.')
-        @eventos_ns.doc(security='jsonWebToken')
-        def delete(self, evento_id_param):
-            user_id = get_jwt_identity()
-            evento = get_item_or_404(EventoAgenda, evento_id_param)
-            db.session.delete(evento)
-            db.session.commit()
-            app.logger.info(f"Evento ID {evento.id} ('{evento.titulo}') deletado pelo usuário ID {user_id}.")
-            return '', 204
-    
-    ALLOWED_EXTENSIONS_UPLOAD = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp'}
-    def is_allowed_file_upload(filename):
-        return '.' in filename and \
-            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS_UPLOAD
-            
-    @documentos_ns.route('/')
-    class DocumentoListAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @documentos_ns.marshal_list_with(documento_model_dto)
-        @documentos_ns.doc(security='jsonWebToken', description="Lista documentos do usuário, com filtro opcional por 'caso_id'.")
-        @documentos_ns.param('caso_id', 'ID do caso para filtrar os documentos (opcional)', type=int)
-        def get(self):
-            user_id = get_jwt_identity()
-            caso_id_query_param = request.args.get('caso_id', type=int)
-            query = query_for_tenant(Documento)
-            if caso_id_query_param is not None:
-                query = query.filter_by(caso_id=caso_id_query_param)
-            documentos = query.order_by(Documento.data_upload.desc()).all()
-            return documentos
-
-    @documentos_ns.route('/upload')
-    class DocumentoUploadAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @documentos_ns.doc(security='jsonWebToken', description="Faz upload de um novo documento. Use 'multipart/form-data'. Campo 'file' para o arquivo e opcionalmente 'caso_id' no formulário.")
-        @documentos_ns.response(201, "Documento enviado com sucesso.", model=documento_model_dto)
-        @documentos_ns.response(400, "Erro nos dados de entrada ou tipo de arquivo não permitido.")
-        def post(self):
-            user_id = get_jwt_identity()
-            if 'file' not in request.files:
-                return {'message': 'Nenhum arquivo foi incluído na requisição (campo "file" ausente).'}, 400
-            file_storage = request.files['file']
-            if file_storage.filename == '':
-                return {'message': 'Nenhum arquivo foi selecionado para upload.'}, 400
-            if file_storage and is_allowed_file_upload(file_storage.filename):
-                original_filename = secure_filename(file_storage.filename)
-                user_upload_folder_path = os.path.join(app.config['UPLOAD_FOLDER'], str(user_id))
-                os.makedirs(user_upload_folder_path, exist_ok=True)
-                file_base, file_ext = os.path.splitext(original_filename)
-                counter = 1
-                final_filename_to_save = original_filename
-                full_file_path_to_save = os.path.join(user_upload_folder_path, final_filename_to_save)
-                while os.path.exists(full_file_path_to_save):
-                    final_filename_to_save = f"{file_base}_{counter}{file_ext}"
-                    full_file_path_to_save = os.path.join(user_upload_folder_path, final_filename_to_save)
-                    counter += 1
-                file_storage.save(full_file_path_to_save)
-                caso_id_from_form = request.form.get('caso_id')
-                db_caso_id = None
-                if caso_id_from_form:
-                    try:
-                        db_caso_id = int(caso_id_from_form)
-                        if not query_for_tenant(Caso).filter_by(id=db_caso_id).first():
-                            os.remove(full_file_path_to_save)
-                            return {'message': f'Caso com ID {db_caso_id} não encontrado ou não pertence ao usuário.'}, 400
-                    except ValueError:
-                        os.remove(full_file_path_to_save)
-                        return {'message': 'O valor fornecido para "caso_id" é inválido.'}, 400
-                novo_documento_db = Documento(
-                    nome_arquivo=final_filename_to_save, path_arquivo=full_file_path_to_save, 
-                    user_id=user_id, caso_id=db_caso_id, tenant_id=get_tenant_id()
-                )
-                db.session.add(novo_documento_db)
-                db.session.commit()
-                app.logger.info(f"Documento '{novo_documento_db.nome_arquivo}' (ID: {novo_documento_db.id}) salvo para usuário ID {user_id}.")
-                doc_dict = novo_documento_db.to_dict()
-                return doc_dict, 201
-            return {'message': 'Tipo de arquivo não permitido. Extensões permitidas: ' + ", ".join(ALLOWED_EXTENSIONS_UPLOAD)}, 400
-
-    @documentos_ns.route('/download/<int:doc_id_param>')
-    @documentos_ns.param('doc_id_param', 'O ID do documento para realizar o download')
-    class DocumentoDownloadAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @documentos_ns.doc(security='jsonWebToken', description="Permite o download de um documento específico.")
-        @documentos_ns.response(404, "Documento não encontrado ou acesso negado.")
-        @documentos_ns.response(500, "Erro no servidor ao tentar enviar o arquivo.")
-        def get(self, doc_id_param):
-            user_id = get_jwt_identity()
-            documento_db = get_item_or_404(Documento, doc_id_param)
-            if not os.path.exists(documento_db.path_arquivo):
-                app.logger.error(f"Arquivo para Doc ID {doc_id_param} não encontrado em '{documento_db.path_arquivo}'.")
-                return {"message": "Arquivo não encontrado no servidor."}, 500
-            try:
-                file_directory = os.path.dirname(documento_db.path_arquivo)
-                file_name_on_disk = os.path.basename(documento_db.path_arquivo)
-                return send_from_directory(file_directory, file_name_on_disk, as_attachment=True, download_name=documento_db.nome_arquivo)
-            except Exception as e_download:
-                app.logger.error(f"Erro ao enviar arquivo '{documento_db.path_arquivo}' (Doc ID: {doc_id_param}): {str(e_download)}")
-                return {"message": "Erro ao processar download."}, 500
-
-    @documentos_ns.route('/<int:doc_id_param>')
-    @documentos_ns.response(404, 'Documento não encontrado.')
-    @documentos_ns.param('doc_id_param', 'O ID do documento a ser deletado')
-    class DocumentoDetailAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @documentos_ns.response(204, 'Documento deletado com sucesso.')
-        @documentos_ns.doc(security='jsonWebToken', description="Deleta um documento específico.")
-        def delete(self, doc_id_param):
-            user_id = get_jwt_identity()
-            documento_db = get_item_or_404(Documento, doc_id_param)
-            file_path_on_disk = documento_db.path_arquivo
-            document_name_log = documento_db.nome_arquivo
-            try:
-                if os.path.exists(file_path_on_disk): os.remove(file_path_on_disk)
-                else: app.logger.warning(f"Arquivo físico '{file_path_on_disk}' para Doc ID {doc_id_param} não encontrado durante exclusão.")
-            except Exception as e_delete_file:
-                app.logger.error(f"Erro ao deletar arquivo físico '{file_path_on_disk}' para Doc ID {doc_id_param}: {str(e_delete_file)}")
-            db.session.delete(documento_db)
-            db.session.commit()
-            app.logger.info(f"Documento ID {doc_id_param} ('{document_name_log}') deletado pelo usuário ID {user_id}.")
-            return '', 204
-
-    @despesas_ns.route('/')
-    class DespesaListAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @despesas_ns.marshal_list_with(despesa_model_dto)
-        @despesas_ns.doc(security='jsonWebToken')
-        def get(self):
-            user_id = get_jwt_identity()
-            despesas = get_list_query(Despesa).order_by(Despesa.data_despesa.desc()).all()
-            return despesas
-        @jwt_required()
-        @tenant_scoped
-        @despesas_ns.expect(despesa_input_model_dto)
-        @despesas_ns.marshal_with(despesa_model_dto, code=201)
-        @despesas_ns.doc(security='jsonWebToken')
-        def post(self):
-            user_id = get_jwt_identity()
-            data = request.get_json()
-            if not all(k in data for k in ('descricao', 'valor', 'data_despesa')): return {"message": "Descrição, valor e data são obrigatórios."}, 400
-            try:
-                valor_decimal = float(data['valor'])
-                if valor_decimal <= 0: return {"message": "Valor da despesa deve ser positivo."}, 400
-                data_despesa_obj = datetime.strptime(data['data_despesa'], '%Y-%m-%d').date()
-            except ValueError: return {"message": "Formato de valor ou data inválido."}, 400
-            caso_id_val = data.get('caso_id')
-            if caso_id_val:
-                if not query_for_tenant(Caso).filter_by(id=caso_id_val).first():
-                    return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
-            nova_despesa = Despesa(descricao=data['descricao'], valor=valor_decimal, data_despesa=data_despesa_obj, pago=data.get('pago', False), caso_id=caso_id_val, user_id=user_id, tenant_id=get_tenant_id())
-            db.session.add(nova_despesa)
-            db.session.commit()
-            app.logger.info(f"Nova despesa ID {nova_despesa.id} criada para usuário ID {user_id}.")
-            return nova_despesa, 201
-
-    @despesas_ns.route('/<int:despesa_id_param>')
-    @despesas_ns.response(404, 'Despesa não encontrada.')
-    @despesas_ns.param('despesa_id_param', 'O ID da despesa')
-    class DespesaDetailAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @despesas_ns.marshal_with(despesa_model_dto)
-        @despesas_ns.doc(security='jsonWebToken')
-        def get(self, despesa_id_param):
-            user_id = get_jwt_identity()
-            despesa = get_item_or_404(Despesa, despesa_id_param)
-            return despesa
-        @jwt_required()
-        @tenant_scoped
-        @despesas_ns.expect(despesa_input_model_dto)
-        @despesas_ns.marshal_with(despesa_model_dto)
-        @despesas_ns.doc(security='jsonWebToken')
-        def put(self, despesa_id_param):
-            user_id = get_jwt_identity()
-            despesa = get_item_or_404(Despesa, despesa_id_param)
-            data = request.get_json()
-            if not all(k in data for k in ('descricao', 'valor', 'data_despesa')): return {"message": "Descrição, valor e data são obrigatórios."}, 400
-            try:
-                valor_decimal = float(data['valor'])
-                if valor_decimal <= 0: return {"message": "Valor da despesa deve ser positivo."}, 400
-                data_despesa_obj = datetime.strptime(data['data_despesa'], '%Y-%m-%d').date()
-            except ValueError: return {"message": "Formato de valor ou data inválido."}, 400
-            caso_id_val = data.get('caso_id')
-            if 'caso_id' in data:
-                if caso_id_val is not None:
-                    if not query_for_tenant(Caso).filter_by(id=caso_id_val).first():
-                        return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
-                    despesa.caso_id = caso_id_val
-                else: despesa.caso_id = None
-            despesa.descricao = data['descricao']
-            despesa.valor = valor_decimal
-            despesa.data_despesa = data_despesa_obj
-            despesa.pago = data.get('pago', despesa.pago)
-            db.session.commit()
-            app.logger.info(f"Despesa ID {despesa.id} atualizada pelo usuário ID {user_id}.")
-            return despesa
-        @jwt_required()
-        @tenant_scoped
-        @despesas_ns.response(204, 'Despesa deletada.')
-        @despesas_ns.doc(security='jsonWebToken')
-        def delete(self, despesa_id_param):
-            user_id = get_jwt_identity()
-            despesa = get_item_or_404(Despesa, despesa_id_param)
-            db.session.delete(despesa)
-            db.session.commit()
-            app.logger.info(f"Despesa ID {despesa.id} deletada pelo usuário ID {user_id}.")
-            return '', 204
-
-    @recebimentos_ns.route('/')
-    class RecebimentoListAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @recebimentos_ns.marshal_list_with(recebimento_model_dto)
-        @recebimentos_ns.doc(security='jsonWebToken')
-        def get(self):
-            user_id = get_jwt_identity()
-            recebimentos = get_list_query(Recebimento).order_by(Recebimento.data_recebimento.desc()).all()
-            return recebimentos
-        @jwt_required()
-        @tenant_scoped
-        @recebimentos_ns.expect(recebimento_input_model_dto)
-        @recebimentos_ns.marshal_with(recebimento_model_dto, code=201)
-        @recebimentos_ns.doc(security='jsonWebToken')
-        def post(self):
-            user_id = get_jwt_identity()
-            data = request.get_json()
-            if not all(k in data for k in ('descricao', 'valor', 'data_recebimento')): return {"message": "Descrição, valor e data são obrigatórios."}, 400
-            try:
-                valor_decimal = float(data['valor'])
-                if valor_decimal <= 0: return {"message": "Valor do recebimento deve ser positivo."}, 400
-                data_recebimento_obj = datetime.strptime(data['data_recebimento'], '%Y-%m-%d').date()
-            except ValueError: return {"message": "Formato de valor ou data inválido."}, 400
-            caso_id_val = data.get('caso_id')
-            if caso_id_val:
-                if not query_for_tenant(Caso).filter_by(id=caso_id_val).first():
-                    return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
-            novo_recebimento = Recebimento(descricao=data['descricao'], valor=valor_decimal, data_recebimento=data_recebimento_obj, 
-                                           recebido=data.get('recebido', False), caso_id=caso_id_val, user_id=user_id, tenant_id=get_tenant_id())
-            db.session.add(novo_recebimento)
-            db.session.commit()
-            app.logger.info(f"Novo recebimento ID {novo_recebimento.id} criado para usuário ID {user_id}.")
-            return novo_recebimento, 201
-
-    @recebimentos_ns.route('/<int:recebimento_id_param>')
-    @recebimentos_ns.response(404, 'Recebimento não encontrado.')
-    @recebimentos_ns.param('recebimento_id_param', 'O ID do recebimento')
-    class RecebimentoDetailAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @recebimentos_ns.marshal_with(recebimento_model_dto)
-        @recebimentos_ns.doc(security='jsonWebToken')
-        def get(self, recebimento_id_param):
-            user_id = get_jwt_identity()
-            recebimento = get_item_or_404(Recebimento, recebimento_id_param)
-            return recebimento
-        @jwt_required()
-        @tenant_scoped
-        @recebimentos_ns.expect(recebimento_input_model_dto)
-        @recebimentos_ns.marshal_with(recebimento_model_dto)
-        @recebimentos_ns.doc(security='jsonWebToken')
-        def put(self, recebimento_id_param):
-            user_id = get_jwt_identity()
-            recebimento = get_item_or_404(Recebimento, recebimento_id_param)
-            data = request.get_json()
-            if not all(k in data for k in ('descricao', 'valor', 'data_recebimento')): return {"message": "Descrição, valor e data são obrigatórios."}, 400
-            try:
-                valor_decimal = float(data['valor'])
-                if valor_decimal <= 0: return {"message": "Valor do recebimento deve ser positivo."}, 400
-                data_recebimento_obj = datetime.strptime(data['data_recebimento'], '%Y-%m-%d').date()
-            except ValueError: return {"message": "Formato de valor ou data inválido."}, 400
-            caso_id_val = data.get('caso_id')
-            if 'caso_id' in data:
-                if caso_id_val is not None:
-                    if not query_for_tenant(Caso).filter_by(id=caso_id_val).first():
-                        return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
-                    recebimento.caso_id = caso_id_val
-                else: recebimento.caso_id = None
-            recebimento.descricao = data['descricao']
-            recebimento.valor = valor_decimal
-            recebimento.data_recebimento = data_recebimento_obj
-            recebimento.recebido = data.get('recebido', recebimento.recebido)
-            db.session.commit()
-            app.logger.info(f"Recebimento ID {recebimento.id} atualizado pelo usuário ID {user_id}.")
-            return recebimento
-        @jwt_required()
-        @tenant_scoped
-        @recebimentos_ns.response(204, 'Recebimento deletado.')
-        @recebimentos_ns.doc(security='jsonWebToken')
-        def delete(self, recebimento_id_param):
-            user_id = get_jwt_identity()
-            recebimento = get_item_or_404(Recebimento, recebimento_id_param)
-            db.session.delete(recebimento)
-            db.session.commit()
-            app.logger.info(f"Recebimento ID {recebimento.id} deletado pelo usuário ID {user_id}.")
-            return '', 204
+    register_recebimentos_routes(
+        app,
+        recebimentos_ns,
+        recebimento_input_model_dto,
+        recebimento_model_dto,
+        finance_access_required,
+    )
 
     # --- REGISTRO DAS ROTAS DJEN ---
     try:
@@ -989,271 +560,24 @@ def create_app(config_class=Config):
             "status": "online",
             "message": "API Patronus (Servidor Backend) operando com sucesso. Utilize o Front-end Vercel para acessar a Interface."
         }), 200
-                
+    register_contratos_routes(
+        app,
+        contratos_ns,
+        contrato_input_model_dto,
+        contrato_model_dto,
+        finance_access_required,
+    )
 
-    # --- ENDPOINTS DOS CONTRATOS ---
-    @contratos_ns.route('/')
-    class ContratoListAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @contratos_ns.marshal_list_with(contrato_model_dto)
-        @contratos_ns.doc(security='jsonWebToken')
-        def get(self):
-            contratos = get_list_query(ContratoHonorario).all()
-            return contratos
+    register_auditoria_routes(
+        audit_ns,
+        audit_log_model_dto,
+    )
 
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @contratos_ns.expect(contrato_input_model_dto)
-        @contratos_ns.marshal_with(contrato_model_dto, code=201)
-        @contratos_ns.doc(security='jsonWebToken')
-        def post(self):
-            user_id = get_jwt_identity()
-            data = request.get_json()
-            
-            caso = query_for_tenant(Caso).filter_by(id=data['caso_id']).first()
-            if not caso:
-                return {"message": "Caso não encontrado."}, 404
-
-            # Validar permissão de Acesso se for advogado
-            from flask_jwt_extended import get_jwt
-            if get_jwt().get('role') == 'advogado' and caso.user_id != user_id:
-                return {"message": "Acesso negado ao caso informado."}, 403
-
-            vt = data.get('valor_total')
-            pe = data.get('percentual_exito')
-            da = data.get('data_assinatura')
-            
-            novo_contrato = ContratoHonorario(
-                tipo_honorario=data['tipo_honorario'],
-                valor_total=float(vt) if vt is not None else None,
-                percentual_exito=float(pe) if pe is not None else None,
-                status=data.get('status', 'Ativo'),
-                notas_condicoes=data.get('notas_condicoes'),
-                caso_id=data['caso_id'],
-                cliente_id=data['cliente_id'],
-                user_id=user_id,
-                tenant_id=get_tenant_id()
-            )
-            
-            if da:
-                from datetime import datetime
-                novo_contrato.data_assinatura = datetime.strptime(da, '%Y-%m-%d').date()
-
-            db.session.add(novo_contrato)
-            db.session.commit()
-            return novo_contrato, 201
-
-    @contratos_ns.route('/<int:id>')
-    class ContratoDetailAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @contratos_ns.marshal_with(contrato_model_dto)
-        @contratos_ns.doc(security='jsonWebToken')
-        def get(self, id):
-            contrato = get_item_or_404(ContratoHonorario, id)
-            return contrato
-
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @contratos_ns.expect(contrato_input_model_dto)
-        @contratos_ns.marshal_with(contrato_model_dto)
-        @contratos_ns.doc(security='jsonWebToken')
-        def put(self, id):
-            contrato = get_item_or_404(ContratoHonorario, id)
-            data = request.get_json()
-            contrato.tipo_honorario = data.get('tipo_honorario', contrato.tipo_honorario)
-            vt = data.get('valor_total')
-            contrato.valor_total = float(vt) if vt is not None else None
-            pe = data.get('percentual_exito')
-            contrato.percentual_exito = float(pe) if pe is not None else None
-            da = data.get('data_assinatura')
-            if da:
-                from datetime import datetime
-                contrato.data_assinatura = datetime.strptime(da, '%Y-%m-%d').date()
-            contrato.status = data.get('status', contrato.status)
-            contrato.notas_condicoes = data.get('notas_condicoes', contrato.notas_condicoes)
-            db.session.commit()
-            return contrato
-
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @contratos_ns.response(204, 'Deletado com sucesso')
-        @contratos_ns.doc(security='jsonWebToken')
-        def delete(self, id):
-            contrato = get_item_or_404(ContratoHonorario, id)
-            db.session.delete(contrato)
-            db.session.commit()
-            return '', 204
-
-    @contratos_ns.route('/<int:id>/gerar-parcelas')
-    class ContratoGerarParcelasAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @finance_access_required
-        @contratos_ns.doc(security='jsonWebToken')
-        def post(self, id):
-            from datetime import timedelta
-            from dateutil.relativedelta import relativedelta
-            
-            user_id = get_jwt_identity()
-            contrato = get_item_or_404(ContratoHonorario, id)
-            data = request.get_json() or {}
-            qtd_parcelas = int(data.get('quantidade_parcelas', 1))
-            primeiro_vencimento = data.get('primeiro_vencimento')
-            
-            if qtd_parcelas <= 0:
-                return {"message": "Quantidade deve ser maior que zero."}, 400
-            
-            if not contrato.valor_total:
-                return {"message": "O contrato deve ter um valor total para parcelar."}, 400
-                
-            valor_parcela = round(float(contrato.valor_total) / qtd_parcelas, 2)
-            
-            from datetime import datetime
-            
-            if primeiro_vencimento:
-                data_base = datetime.strptime(primeiro_vencimento, '%Y-%m-%d').date()
-            else:
-                from datetime import date
-                data_base = date.today()
-
-            novos_recebimentos = []
-            for i in range(qtd_parcelas):
-                desc = f'Parcela {i+1}/{qtd_parcelas} - Cód. contrato {id}'
-                venc = data_base + relativedelta(months=i)
-                
-                novo_rec = Recebimento(
-                    descricao=desc,
-                    valor=valor_parcela,
-                    data_recebimento=venc,
-                    recebido=False,
-                    caso_id=contrato.caso_id,
-                    user_id=user_id,
-                    contrato_id=id
-                )
-                db.session.add(novo_rec)
-                novos_recebimentos.append(novo_rec)
-                
-            db.session.commit()
-            return {"message": f"{qtd_parcelas} parcelas geradas com sucesso!"}, 201
-
-    @audit_ns.route('/')
-    class AuditLogListAPI(Resource):
-        @jwt_required()
-        @audit_ns.marshal_list_with(audit_log_model_dto)
-        @audit_ns.doc(security='jsonWebToken', description='Lista o log de auditoria LGPD do Escritório.')
-        def get(self):
-            tenant_id = get_tenant_id()
-            user_id = get_jwt_identity()
-            user = db.session.get(User, user_id)
-            if not user or user.role != 'admin':
-                return []
-            
-            logs = AuditLog.query.filter_by(tenant_id=tenant_id).order_by(AuditLog.data_hora.desc()).limit(200).all()
-            return logs
-
-    # --- ENDPOINTS DE TAREFAS/PRAZOS ---
-    @tarefas_ns.route('/')
-    class TarefaListAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @tarefas_ns.marshal_list_with(tarefa_model_dto)
-        @tarefas_ns.doc(security='jsonWebToken')
-        def get(self):
-            tarefas = get_list_query(TarefaPrazo).all()
-            return tarefas
-
-        @jwt_required()
-        @tenant_scoped
-        @tarefas_ns.expect(tarefa_input_model_dto)
-        @tarefas_ns.marshal_with(tarefa_model_dto, code=201)
-        @tarefas_ns.doc(security='jsonWebToken')
-        def post(self):
-            user_id = get_jwt_identity()
-            data = request.get_json()
-            
-            dv = data.get('data_vencimento')
-            from datetime import datetime
-            data_vencimento_obj = None
-            if dv:
-                try:
-                    data_vencimento_obj = datetime.fromisoformat(dv.replace('Z', '+00:00'))
-                except ValueError:
-                    pass
-
-            nova_tarefa = TarefaPrazo(
-                titulo=data['titulo'],
-                descricao=data.get('descricao'),
-                status=data.get('status', 'A Fazer'),
-                prioridade=data.get('prioridade', 'Normal'),
-                tipo_tarefa=data.get('tipo_tarefa', 'Prazo'),
-                data_vencimento=data_vencimento_obj,
-                origem_id=data.get('origem_id'),
-                caso_id=data.get('caso_id'),
-                user_id=user_id,
-                tenant_id=get_tenant_id()
-            )
-            
-            db.session.add(nova_tarefa)
-            db.session.commit()
-            return nova_tarefa, 201
-
-    @tarefas_ns.route('/<int:id>')
-    class TarefaDetailAPI(Resource):
-        @jwt_required()
-        @tenant_scoped
-        @tarefas_ns.marshal_with(tarefa_model_dto)
-        @tarefas_ns.doc(security='jsonWebToken')
-        def get(self, id):
-            tarefa = get_item_or_404(TarefaPrazo, id)
-            return tarefa
-
-        @jwt_required()
-        @tenant_scoped
-        @tarefas_ns.expect(tarefa_input_model_dto)
-        @tarefas_ns.marshal_with(tarefa_model_dto)
-        @tarefas_ns.doc(security='jsonWebToken')
-        def put(self, id):
-            tarefa = get_item_or_404(TarefaPrazo, id)
-            data = request.get_json()
-            
-            tarefa.titulo = data.get('titulo', tarefa.titulo)
-            tarefa.descricao = data.get('descricao', tarefa.descricao)
-            tarefa.status = data.get('status', tarefa.status)
-            tarefa.prioridade = data.get('prioridade', tarefa.prioridade)
-            tarefa.tipo_tarefa = data.get('tipo_tarefa', tarefa.tipo_tarefa)
-            if 'caso_id' in data:
-                tarefa.caso_id = data.get('caso_id')
-
-            dv = data.get('data_vencimento')
-            if dv is not None:
-                if dv == "":
-                    tarefa.data_vencimento = None
-                else:
-                    from datetime import datetime
-                    try:
-                        tarefa.data_vencimento = datetime.fromisoformat(dv.replace('Z', '+00:00'))
-                    except ValueError:
-                        pass
-                        
-            db.session.commit()
-            return tarefa
-
-        @jwt_required()
-        @tenant_scoped
-        @tarefas_ns.response(204, 'Deletado com sucesso')
-        @tarefas_ns.doc(security='jsonWebToken')
-        def delete(self, id):
-            tarefa = get_item_or_404(TarefaPrazo, id)
-            db.session.delete(tarefa)
-            db.session.commit()
-            return '', 204
+    register_tarefas_routes(
+        tarefas_ns,
+        tarefa_input_model_dto,
+        tarefa_model_dto,
+    )
 
     return app
 
@@ -1264,5 +588,6 @@ if __name__ == '__main__':
            # Remova ou altere a linha abaixo se existir e estiver como port=5001
            # port=5000, # Garanta que seja 5000 ou remova para usar o padrão
            use_reloader=(os.environ.get('FLASK_ENV') == 'development' and os.environ.get('WERKZEUG_RUN_MAIN') != 'true'))
+
 
 
