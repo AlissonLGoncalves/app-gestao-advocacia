@@ -19,7 +19,7 @@ function resolveApiUrl() {
 	}
 
 	// Fallback de produção quando VITE_API_URL não foi definida no deploy do frontend.
-	return 'https://app-gestao-advocacia.onrender.com/api';
+	return 'https://app-gestao-advocacia.fly.dev/api';
 }
 
 export const API_URL = resolveApiUrl();
