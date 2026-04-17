@@ -46,8 +46,15 @@ def _item_get(item, *keys):
 def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, origem):
     """Persiste uma publicação se ainda não existir no banco."""
     hash_com = _item_get(item, "hash", "id", "codigo")
+    numero_proc = (
+        _item_get(item, "numeroProcesso", "numeroprocesso")
+        or (item.get("processo") or {}).get("numero")
+        or ""
+    )
+    data_disp = _item_get(item, "dataDisponibilizacao", "datadisponibilizacao", "data")
+    data_disp_dt = _parse_data_disponibilizacao(data_disp)
 
-    # Tenta deduplicar por hash; se não tiver hash, usa processo + data
+    # Dedup principal por hash + tenant.
     if hash_com:
         exists = PublicacaoDJEN.query.filter_by(
             tenant_id=tenant_id,
@@ -55,26 +62,17 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
         ).first()
         if exists:
             return False
-    else:
-        numero_proc = (
-            _item_get(item, "numeroProcesso", "numeroprocesso")
-            or (item.get("processo") or {}).get("numero")
-        )
-        data_disp = _item_get(item, "dataDisponibilizacao", "datadisponibilizacao", "data")
-        if numero_proc and data_disp:
-            exists = PublicacaoDJEN.query.filter_by(
-                tenant_id=tenant_id,
-                numero_processo=numero_proc,
-                data_disponibilizacao=_parse_data_disponibilizacao(data_disp),
-            ).first()
-            if exists:
-                return False
 
-    numero_proc = (
-        _item_get(item, "numeroProcesso", "numeroprocesso")
-        or (item.get("processo") or {}).get("numero")
-        or ""
-    )
+    # Dedup secundário por processo + data (mesmo que exista hash distinto da fonte).
+    if numero_proc and data_disp_dt:
+        exists = PublicacaoDJEN.query.filter_by(
+            tenant_id=tenant_id,
+            numero_processo=numero_proc,
+            data_disponibilizacao=data_disp_dt,
+        ).first()
+        if exists:
+            return False
+
     sigla_trib = (
         _item_get(item, "siglaTribunal", "siglatribunal")
         or (item.get("tribunal") or {}).get("sigla")
@@ -84,15 +82,12 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
     tipo_doc = _item_get(item, "tipoDocumento", "tipodocumento") or ""
     nome_classe = _item_get(item, "nomeClasse", "nomeclasse") or ""
     nome_orgao = _item_get(item, "nomeOrgao", "nomeorgao") or ""
-    data_disp_str = _item_get(item, "dataDisponibilizacao", "datadisponibilizacao", "data") or ""
     texto = _item_get(item, "texto", "conteudo") or ""
     meio_val = _item_get(item, "meio", "meiocompleto") or "D"
     numero_com = _item_get(item, "numeroComunicacao", "numerocomunicacao")
     djen_id = _item_get(item, "id")
     link = _item_get(item, "link", "url") or ""
     numero_proc_masc = _item_get(item, "numeroProcessoMascara", "numeroprocessomascara") or ""
-
-    data_disp_dt = _parse_data_disponibilizacao(data_disp_str)
 
     pub = PublicacaoDJEN(
         user_id=user_id,
@@ -114,6 +109,8 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
         meio=str(meio_val)[:1],
         raw_json=item,
         origem_busca=origem,
+        status_origem='pendente',
+        triagem_ignorada=False,
     )
     db.session.add(pub)
     return True

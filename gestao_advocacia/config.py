@@ -88,5 +88,7 @@ class Config:
     DJEN_LOOKBACK_DAYS = int(os.environ.get('DJEN_LOOKBACK_DAYS', 30))
     DJEN_ITENS_POR_PAGINA = int(os.environ.get('DJEN_ITENS_POR_PAGINA', 100))
     DJEN_REQUEST_DELAY_SECONDS = float(os.environ.get('DJEN_REQUEST_DELAY_SECONDS', 1.5))
+    DJEN_ENABLED_TENANTS = os.environ.get('DJEN_ENABLED_TENANTS', '')  # CSV: 1,2,3
+    DJEN_ROLLOUT_PERCENT = int(os.environ.get('DJEN_ROLLOUT_PERCENT', 100))  # 10, 50, 100
 
 

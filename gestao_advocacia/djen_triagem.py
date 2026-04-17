@@ -4,6 +4,7 @@ import unicodedata
 
 CNJ_REGEX = re.compile(r"\b\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}\b")
 OAB_REGEX = re.compile(r"\b(?:OAB\/?[A-Z]{2}\s*)?\d{4,10}\b", re.IGNORECASE)
+CPF_CNPJ_REGEX = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b|\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b|\b\d{11}\b|\b\d{14}\b")
 
 
 def _normalize_text(value):
@@ -81,24 +82,34 @@ def analisar_publicacao(publicacao):
     oabs = OAB_REGEX.findall(texto_total)
     oabs = _dedupe_preserving_order(oabs)
 
+    doc_ids = _dedupe_preserving_order(CPF_CNPJ_REGEX.findall(texto_total))
+    tribunal = getattr(publicacao, 'sigla_tribunal', None) or (raw.get('siglaTribunal') if isinstance(raw, dict) else None)
+
     confidence = 0.0
     if numero_processo:
-        confidence += 0.4
+        confidence += 0.35
     if autores or reus:
-        confidence += 0.3
+        confidence += 0.25
     if representantes:
-        confidence += 0.2
+        confidence += 0.15
     if oabs:
+        confidence += 0.1
+    if tribunal:
+        confidence += 0.05
+    if doc_ids:
         confidence += 0.1
     confidence = round(min(confidence, 1.0), 2)
 
     return {
         'numero_processo': numero_processo,
+        'tribunal': tribunal,
         'partes_autoras': autores,
         'partes_reus': reus,
         'representantes': representantes,
         'oabs_encontradas': oabs,
+        'documentos_extraidos': doc_ids,
         'confianca': confidence,
+        'revisao_manual_recomendada': confidence < 0.6,
     }
 
 
@@ -107,6 +118,7 @@ def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise):
     nomes = _dedupe_preserving_order(
         (analise.get('partes_autoras') or []) + (analise.get('partes_reus') or [])
     )
+    documentos = [re.sub(r"\D", "", d) for d in (analise.get('documentos_extraidos') or []) if d]
 
     sugestoes_casos = []
     sugestoes_clientes = []
@@ -159,6 +171,23 @@ def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise):
                 'score': score,
                 'motivo': f"Nome semelhante a '{nome}'",
             })
+
+    if documentos:
+        clientes_doc = Cliente.query.filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.cpf_cnpj.isnot(None),
+            Cliente.cpf_cnpj != '',
+        ).limit(300).all()
+        for cliente in clientes_doc:
+            cpf_cnpj = re.sub(r"\D", "", cliente.cpf_cnpj or '')
+            if cpf_cnpj and cpf_cnpj in documentos:
+                sugestoes_clientes.append({
+                    'id': cliente.id,
+                    'nome_razao_social': cliente.nome_razao_social,
+                    'cpf_cnpj': cliente.cpf_cnpj,
+                    'score': 0.98,
+                    'motivo': 'CPF/CNPJ exato encontrado no texto da publicação',
+                })
 
     # remove duplicados mantendo maior score
     casos_by_id = {}

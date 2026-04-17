@@ -524,7 +524,9 @@ class PublicacaoDJEN(db.Model):
     meio = db.Column(db.String(1), nullable=True)
     ativo = db.Column(db.Boolean, default=True)
     origem_busca = db.Column(db.String(20), nullable=True)  # 'oab' ou 'processo'
+    status_origem = db.Column(db.String(40), nullable=True, index=True)  # pendente, criado_automaticamente, revisado_manual, ignorado
     lida = db.Column(db.Boolean, default=False, index=True)
+    triagem_ignorada = db.Column(db.Boolean, default=False, index=True)
     notas = db.Column(db.Text, nullable=True)
     raw_json = db.Column(db.JSON, nullable=True)
     data_captura = db.Column(db.DateTime, default=datetime.utcnow)
@@ -544,8 +546,43 @@ class PublicacaoDJEN(db.Model):
             'data_disponibilizacao': self.data_disponibilizacao.isoformat() if self.data_disponibilizacao else None,
             'texto': self.texto, 'link': self.link, 'meio': self.meio,
             'ativo': self.ativo, 'origem_busca': self.origem_busca,
+            'status_origem': self.status_origem,
+            'triagem_ignorada': self.triagem_ignorada,
             'lida': self.lida, 'notas': self.notas,
             'data_captura': self.data_captura.isoformat() if self.data_captura else None,
+        }
+
+
+class DjenVinculoDecisao(db.Model):
+    """Trilha auditável de decisões humanas/automáticas da triagem DJEN."""
+    __tablename__ = 'djen_vinculo_decisao'
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', name='fk_djen_decisao_tenant_id'), nullable=True, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_djen_decisao_user_id'), nullable=False, index=True)
+    publicacao_id = db.Column(db.Integer, db.ForeignKey('publicacao_djen.id', name='fk_djen_decisao_publicacao_id'), nullable=False, index=True)
+    acao = db.Column(db.String(30), nullable=False, index=True)  # criar, mesclar, ignorar
+    origem_acao = db.Column(db.String(20), nullable=False, default='manual')  # manual ou automatica
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id', name='fk_djen_decisao_cliente_id'), nullable=True)
+    caso_id = db.Column(db.Integer, db.ForeignKey('caso.id', name='fk_djen_decisao_caso_id'), nullable=True)
+    confianca = db.Column(db.Float, nullable=True)
+    motivo = db.Column(db.String(255), nullable=True)
+    payload = db.Column(db.JSON, nullable=True)
+    data_decisao = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tenant_id': self.tenant_id,
+            'user_id': self.user_id,
+            'publicacao_id': self.publicacao_id,
+            'acao': self.acao,
+            'origem_acao': self.origem_acao,
+            'cliente_id': self.cliente_id,
+            'caso_id': self.caso_id,
+            'confianca': self.confianca,
+            'motivo': self.motivo,
+            'payload': self.payload,
+            'data_decisao': self.data_decisao.isoformat() if self.data_decisao else None,
         }
 
 # --- FIM DOS MODELOS SQLAlchemy ---
@@ -933,6 +970,17 @@ def create_app(config_class=Config):
                     'descricao': ev.descricao
                 })
 
+            # Alertas DJEN relevantes para o dashboard operacional.
+            djen_nao_lidas = PublicacaoDJEN.query.filter_by(
+                tenant_id=user.tenant_id,
+                lida=False,
+                triagem_ignorada=False,
+            ).count()
+            djen_sem_vinculo = PublicacaoDJEN.query.filter_by(
+                tenant_id=user.tenant_id,
+                triagem_ignorada=False,
+            ).filter(PublicacaoDJEN.caso_id.is_(None)).count()
+
             return {
                 'total_clientes': total_clientes,
                 'casos_ativos': casos_ativos,
@@ -944,7 +992,11 @@ def create_app(config_class=Config):
                     'quantidade': despesas_a_pagar_qtd,
                     'valor_total': round(despesas_a_pagar_valor, 2)
                 },
-                'proximos_eventos': eventos_lista
+                'proximos_eventos': eventos_lista,
+                'alertas_djen': {
+                    'nao_lidas': djen_nao_lidas,
+                    'pendentes_triagem': djen_sem_vinculo,
+                },
             }, 200
 
     # --- ROTAS DA API (Endpoints) ---

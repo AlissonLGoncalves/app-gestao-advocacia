@@ -219,6 +219,52 @@ export default function DjenPage() {
     }
   };
 
+  const mesclarTriagemCaso = async (pub, casoId) => {
+    try {
+      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/mesclar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caso_id: casoId }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(payload.message || 'Erro ao mesclar publicação.');
+        return;
+      }
+
+      setTriagemItems(prev => prev.filter(i => i.publicacao.id !== pub.id));
+      setTriagemTotal(prev => Math.max(0, prev - 1));
+      await carregarPublicacoes(0);
+      await carregarUltimasPublicacoesDjen();
+      toast.success('Publicação mesclada ao caso com sucesso.');
+    } catch {
+      toast.error('Erro de conexão ao mesclar publicação.');
+    }
+  };
+
+  const ignorarTriagem = async (pub) => {
+    try {
+      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/ignorar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: 'Sem ação necessária' }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(payload.message || 'Erro ao ignorar publicação.');
+        return;
+      }
+
+      setTriagemItems(prev => prev.filter(i => i.publicacao.id !== pub.id));
+      setTriagemTotal(prev => Math.max(0, prev - 1));
+      await carregarPublicacoes(0);
+      await carregarUltimasPublicacoesDjen();
+      toast.success('Publicação ignorada na triagem.');
+    } catch {
+      toast.error('Erro de conexão ao ignorar publicação.');
+    }
+  };
+
   // ── Criar cliente + caso via triagem ──────────────────────────────────────
   const criarClienteECasoTriagem = async (pub) => {
     try {
@@ -840,8 +886,13 @@ export default function DjenPage() {
                             {pub.numero_processo_mascara || pub.numero_processo || 'Sem número de processo'}
                           </div>
                           <div className="small text-muted">
-                            {pub.sigla_tribunal || '—'} · confiança da análise: {Math.round((analise.confianca || 0) * 100)}%
+                            {(analise.tribunal || pub.sigla_tribunal || '—')} · confiança da análise: {Math.round((analise.confianca || 0) * 100)}%
                           </div>
+                          {analise.revisao_manual_recomendada && (
+                            <div className="small text-warning-emphasis mt-1">
+                              Revisão manual recomendada para esta publicação.
+                            </div>
+                          )}
                         </div>
                         <div className="d-flex gap-2">
                           <button
@@ -859,11 +910,17 @@ export default function DjenPage() {
                           {sugestoes?.casos?.[0] && (
                             <button
                               className="btn btn-primary btn-sm"
-                              onClick={() => vincularCaso(pub, sugestoes.casos[0].id)}
+                              onClick={() => mesclarTriagemCaso(pub, sugestoes.casos[0].id)}
                             >
-                              Vincular ao caso sugerido
+                              Mesclar com caso sugerido
                             </button>
                           )}
+                          <button
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={() => ignorarTriagem(pub)}
+                          >
+                            Ignorar
+                          </button>
                         </div>
                       </div>
 
@@ -892,13 +949,19 @@ export default function DjenPage() {
 
                       <div className="row g-3 small mt-1">
                         <div className="col-md-6">
+                          <div className="text-muted fw-semibold mb-1">Documentos (CPF/CNPJ)</div>
+                          {(analise.documentos_extraidos || []).length > 0 ? (
+                            analise.documentos_extraidos.map((d, idx) => <div key={`doc-${idx}`}>{d}</div>)
+                          ) : <div className="text-muted">Nenhum documento explícito encontrado.</div>}
+                        </div>
+                        <div className="col-md-6">
                           <div className="text-muted fw-semibold mb-1">Sugestões de casos</div>
                           {(sugestoes.casos || []).length > 0 ? (
                             sugestoes.casos.map((s) => (
                               <div key={`caso-${s.id}`} className="mb-1">
                                 <button
                                   className="btn btn-link btn-sm p-0 text-start"
-                                  onClick={() => vincularCaso(pub, s.id)}
+                                  onClick={() => mesclarTriagemCaso(pub, s.id)}
                                 >
                                   #{s.id} {s.numero_processo || s.titulo} ({Math.round((s.score || 0) * 100)}%)
                                 </button>

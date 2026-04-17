@@ -5,14 +5,47 @@
 # para evitar importação circular.
 # ==============================================================================
 from datetime import datetime, timedelta
+import hashlib
 
-from flask import request, send_file
+from flask import request, send_file, current_app
 from flask_restx import Resource, fields
 import io
 
 
 def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso,
                           jwt_required, get_jwt_identity, logger):
+
+    def _tenant_djen_habilitado(tenant_id):
+        enabled_csv = (current_app.config.get('DJEN_ENABLED_TENANTS') or '').strip()
+        rollout = max(0, min(int(current_app.config.get('DJEN_ROLLOUT_PERCENT', 100)), 100))
+
+        if enabled_csv:
+            enabled = {p.strip() for p in enabled_csv.split(',') if p.strip()}
+            if str(tenant_id) not in enabled:
+                return False
+
+        if rollout >= 100:
+            return True
+        digest = hashlib.sha256(str(tenant_id).encode('utf-8')).hexdigest()
+        bucket = int(digest[:8], 16) % 100
+        return bucket < rollout
+
+    def _registrar_decisao(pub, user_id, acao, origem_acao='manual', cliente_id=None, caso_id=None, confianca=None, motivo=None, payload=None):
+        from app import DjenVinculoDecisao
+
+        decisao = DjenVinculoDecisao(
+            tenant_id=pub.tenant_id,
+            user_id=user_id,
+            publicacao_id=pub.id,
+            acao=acao,
+            origem_acao=origem_acao,
+            cliente_id=cliente_id,
+            caso_id=caso_id,
+            confianca=confianca,
+            motivo=motivo,
+            payload=payload or {},
+        )
+        db.session.add(decisao)
 
     def _processar_triagem_criar_cliente_caso(user, pub):
         from app import Cliente
@@ -101,9 +134,23 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
 
         pub.caso_id = caso.id
         pub.lida = True
+        pub.triagem_ignorada = False
+        pub.status_origem = 'criado_automaticamente'
 
         notas_auto = f"[TRIAGEM DJEN] Vinculado ao caso #{caso.id}."
         pub.notas = f"{pub.notas}\n{notas_auto}".strip() if pub.notas else notas_auto
+
+        _registrar_decisao(
+            pub=pub,
+            user_id=user.id,
+            acao='criar',
+            origem_acao='manual',
+            cliente_id=cliente.id,
+            caso_id=caso.id,
+            confianca=analise.get('confianca'),
+            motivo='Criação cliente/caso na triagem',
+            payload={'cliente_criado': cliente_criado, 'caso_criado': caso_criado},
+        )
 
         return {
             'message': 'Cliente/Caso processados com sucesso pela triagem.',
@@ -156,6 +203,8 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
         'meio': fields.String(),
         'ativo': fields.Boolean(),
         'origem_busca': fields.String(),
+        'status_origem': fields.String(),
+        'triagem_ignorada': fields.Boolean(),
         'lida': fields.Boolean(),
         'notas': fields.String(),
         'caso_id': fields.Integer(),
@@ -259,6 +308,8 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             user = User.query.get(int(user_id))
             if not user:
                 djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
 
             q = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id)
 
@@ -318,8 +369,10 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             user = User.query.get(int(user_id))
             if not user:
                 djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
 
-            q = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id)
+            q = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id, triagem_ignorada=False)
 
             somente_pendentes = request.args.get('somente_pendentes', 'true').lower() != 'false'
             if somente_pendentes:
@@ -360,6 +413,8 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             user = User.query.get(int(user_id))
             if not user:
                 djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
 
             pub = PublicacaoDJEN.query.filter_by(id=pub_id, tenant_id=user.tenant_id).first()
             if not pub:
@@ -381,6 +436,8 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             user = User.query.get(int(user_id))
             if not user:
                 djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
 
             payload = request.json or {}
             pub_ids = payload.get('pub_ids') or []
@@ -440,6 +497,98 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
                 'resultados': resultados,
             }, 200
 
+    @djen_ns.route('/triagem/<int:pub_id>/mesclar')
+    class PublicacaoTriagemMesclarAPI(Resource):
+        @djen_ns.doc(security='jsonWebToken', description='Vincula uma publicação a um caso existente (ação manual).')
+        @jwt_required()
+        def post(self, pub_id):
+            user_id = get_jwt_identity()
+            from app import User
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
+
+            payload = request.json or {}
+            caso_id = payload.get('caso_id')
+            if not caso_id:
+                djen_ns.abort(400, 'caso_id é obrigatório.')
+
+            pub = PublicacaoDJEN.query.filter_by(id=pub_id, tenant_id=user.tenant_id).first()
+            if not pub:
+                djen_ns.abort(404, 'Publicação não encontrada.')
+
+            caso = Caso.query.filter_by(id=int(caso_id), tenant_id=user.tenant_id, user_id=user.id).first()
+            if not caso:
+                djen_ns.abort(404, 'Caso não encontrado para este usuário/tenant.')
+
+            pub.caso_id = caso.id
+            pub.lida = True
+            pub.triagem_ignorada = False
+            pub.status_origem = 'revisado_manual'
+            _registrar_decisao(
+                pub=pub,
+                user_id=user.id,
+                acao='mesclar',
+                origem_acao='manual',
+                caso_id=caso.id,
+                motivo='Mesclagem manual na triagem',
+            )
+            db.session.commit()
+
+            return {
+                'message': 'Publicação vinculada manualmente ao caso.',
+                'publicacao': pub.to_dict(),
+                'caso': {
+                    'id': caso.id,
+                    'titulo': caso.titulo,
+                    'numero_processo': caso.numero_processo,
+                },
+            }, 200
+
+    @djen_ns.route('/triagem/<int:pub_id>/ignorar')
+    class PublicacaoTriagemIgnorarAPI(Resource):
+        @djen_ns.doc(security='jsonWebToken', description='Marca uma publicação da triagem como ignorada.')
+        @jwt_required()
+        def post(self, pub_id):
+            user_id = get_jwt_identity()
+            from app import User
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
+
+            pub = PublicacaoDJEN.query.filter_by(id=pub_id, tenant_id=user.tenant_id).first()
+            if not pub:
+                djen_ns.abort(404, 'Publicação não encontrada.')
+
+            payload = request.json or {}
+            motivo = (payload.get('motivo') or 'Sem ação necessária').strip()
+
+            pub.triagem_ignorada = True
+            pub.status_origem = 'ignorado'
+            pub.lida = True
+            anotacao = f"[TRIAGEM DJEN] Ignorado: {motivo}"
+            pub.notas = f"{pub.notas}\n{anotacao}".strip() if pub.notas else anotacao
+            _registrar_decisao(
+                pub=pub,
+                user_id=user.id,
+                acao='ignorar',
+                origem_acao='manual',
+                motivo=motivo,
+                payload={'motivo': motivo},
+            )
+            db.session.commit()
+
+            return {
+                'message': 'Publicação ignorada com sucesso.',
+                'publicacao': pub.to_dict(),
+            }, 200
+
     @djen_ns.route('/publicacoes/<int:pub_id>')
     class PublicacaoDetailAPI(Resource):
         @djen_ns.doc(security='jsonWebToken')
@@ -462,6 +611,8 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             user_id = get_jwt_identity()
             from app import User
             user = User.query.get(int(user_id))
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
             pub = PublicacaoDJEN.query.filter_by(id=pub_id, tenant_id=user.tenant_id).first()
             if not pub:
                 djen_ns.abort(404, "Publicação não encontrada.")
@@ -474,6 +625,16 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
                     caso = Caso.query.filter_by(id=int(caso_id), user_id=int(user_id)).first()
                     if not caso:
                         djen_ns.abort(404, "Caso não encontrado ou sem permissão.")
+                    pub.status_origem = 'revisado_manual'
+                    pub.triagem_ignorada = False
+                    _registrar_decisao(
+                        pub=pub,
+                        user_id=int(user_id),
+                        acao='mesclar',
+                        origem_acao='manual',
+                        caso_id=caso.id,
+                        motivo='Vínculo manual por PATCH',
+                    )
                 pub.caso_id = caso_id
             if 'notas' in data:
                 pub.notas = data['notas']
@@ -520,6 +681,8 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             user = User.query.get(int(user_id))
             if not user:
                 djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
             data = request.json or {}
             try:
                 dias = int(data.get('dias', 30))
@@ -567,7 +730,50 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             user = User.query.get(int(user_id))
             if not user:
                 return {'count': 0}
+            if not _tenant_djen_habilitado(user.tenant_id):
+                return {'count': 0}
             count = PublicacaoDJEN.query.filter_by(
-                tenant_id=user.tenant_id, lida=False
+                tenant_id=user.tenant_id, lida=False, triagem_ignorada=False
             ).count()
             return {'count': count}
+
+    @djen_ns.route('/qualidade')
+    class DjenQualidadeAPI(Resource):
+        @djen_ns.doc(security='jsonWebToken')
+        @jwt_required()
+        def get(self):
+            """Métricas de qualidade para rollout gradual por tenant."""
+            user_id = get_jwt_identity()
+            from app import User, DjenVinculoDecisao
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
+
+            base = DjenVinculoDecisao.query.filter_by(tenant_id=user.tenant_id)
+            total = base.count()
+            ignoradas = base.filter_by(acao='ignorar').count()
+            mescladas = base.filter_by(acao='mesclar').count()
+            criadas = base.filter_by(acao='criar').count()
+
+            publicacoes_total = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id).count()
+            vinculadas = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id).filter(PublicacaoDJEN.caso_id.isnot(None)).count()
+
+            taxa_vinculo = round((vinculadas / publicacoes_total) * 100, 2) if publicacoes_total else 0.0
+            taxa_decisao = round((total / publicacoes_total) * 100, 2) if publicacoes_total else 0.0
+
+            return {
+                'rollout_percent': current_app.config.get('DJEN_ROLLOUT_PERCENT', 100),
+                'total_publicacoes': publicacoes_total,
+                'publicacoes_vinculadas': vinculadas,
+                'taxa_vinculo_percent': taxa_vinculo,
+                'total_decisoes': total,
+                'taxa_decisao_percent': taxa_decisao,
+                'decisoes_por_acao': {
+                    'criar': criadas,
+                    'mesclar': mescladas,
+                    'ignorar': ignoradas,
+                },
+            }
