@@ -25,9 +25,27 @@ def _get_logger(app):
         return logging.getLogger(__name__)
 
 
+def _item_get(item, *keys):
+    """Busca valor em dicionário aceitando variações de chave (case/camel/snake)."""
+    if not isinstance(item, dict):
+        return None
+
+    for key in keys:
+        if key in item and item.get(key) not in (None, ""):
+            return item.get(key)
+
+    lower_map = {str(k).lower(): v for k, v in item.items()}
+    for key in keys:
+        value = lower_map.get(str(key).lower())
+        if value not in (None, ""):
+            return value
+
+    return None
+
+
 def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, origem):
     """Persiste uma publicação se ainda não existir no banco."""
-    hash_com = item.get("hash") or item.get("id") or item.get("codigo")
+    hash_com = _item_get(item, "hash", "id", "codigo")
 
     # Tenta deduplicar por hash; se não tiver hash, usa processo + data
     if hash_com:
@@ -38,8 +56,11 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
         if exists:
             return False
     else:
-        numero_proc = item.get("numeroProcesso") or item.get("processo", {}).get("numero")
-        data_disp = item.get("dataDisponibilizacao")
+        numero_proc = (
+            _item_get(item, "numeroProcesso", "numeroprocesso")
+            or (item.get("processo") or {}).get("numero")
+        )
+        data_disp = _item_get(item, "dataDisponibilizacao", "datadisponibilizacao", "data")
         if numero_proc and data_disp:
             exists = PublicacaoDJEN.query.filter_by(
                 tenant_id=tenant_id,
@@ -50,26 +71,26 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
                 return False
 
     numero_proc = (
-        item.get("numeroProcesso")
+        _item_get(item, "numeroProcesso", "numeroprocesso")
         or (item.get("processo") or {}).get("numero")
         or ""
     )
     sigla_trib = (
-        item.get("siglaTribunal")
+        _item_get(item, "siglaTribunal", "siglatribunal")
         or (item.get("tribunal") or {}).get("sigla")
         or ""
     )
-    tipo_com = item.get("tipoComunicacao") or item.get("tipo") or ""
-    tipo_doc = item.get("tipoDocumento") or ""
-    nome_classe = item.get("nomeClasse") or ""
-    nome_orgao = item.get("nomeOrgao") or ""
-    data_disp_str = item.get("dataDisponibilizacao") or item.get("data") or ""
-    texto = item.get("texto") or item.get("conteudo") or ""
-    meio_val = item.get("meio") or "D"
-    numero_com = item.get("numeroComunicacao")
-    djen_id = item.get("id")
-    link = item.get("link") or item.get("url") or ""
-    numero_proc_masc = item.get("numeroProcessoMascara") or ""
+    tipo_com = _item_get(item, "tipoComunicacao", "tipocomunicacao", "tipo") or ""
+    tipo_doc = _item_get(item, "tipoDocumento", "tipodocumento") or ""
+    nome_classe = _item_get(item, "nomeClasse", "nomeclasse") or ""
+    nome_orgao = _item_get(item, "nomeOrgao", "nomeorgao") or ""
+    data_disp_str = _item_get(item, "dataDisponibilizacao", "datadisponibilizacao", "data") or ""
+    texto = _item_get(item, "texto", "conteudo") or ""
+    meio_val = _item_get(item, "meio", "meiocompleto") or "D"
+    numero_com = _item_get(item, "numeroComunicacao", "numerocomunicacao")
+    djen_id = _item_get(item, "id")
+    link = _item_get(item, "link", "url") or ""
+    numero_proc_masc = _item_get(item, "numeroProcessoMascara", "numeroprocessomascara") or ""
 
     data_disp_dt = _parse_data_disponibilizacao(data_disp_str)
 
@@ -101,10 +122,29 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
 def _parse_data_disponibilizacao(valor):
     if not valor:
         return None
-    valor_str = str(valor)
-    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+    valor_str = str(valor).strip()
+
+    # Remove sufixo UTC para normalizar parsing
+    normalizado = valor_str.replace("Z", "").replace("z", "")
+
+    # Datas no padrão brasileiro (ex.: 17/04/2026)
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
         try:
-            dt = datetime.strptime(valor_str[:19], fmt)
+            dt = datetime.strptime(normalizado[:10], fmt)
+            return dt.date()
+        except ValueError:
+            continue
+
+    # ISO e variações com horário/milisegundos
+    for fmt in (
+        "%Y-%m-%d",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S.%f",
+    ):
+        try:
+            recorte = normalizado[:26] if "%f" in fmt else normalizado[:19]
+            dt = datetime.strptime(recorte, fmt)
             return dt.date()
         except ValueError:
             continue
