@@ -148,6 +148,18 @@ def _parse_data_disponibilizacao(valor):
     return None
 
 
+def _normalizar_sigla_tribunal(uf_ou_sigla):
+    """Normaliza UF/sigla para formato aceito pelo CNJ (ex.: PR -> TJPR)."""
+    if not uf_ou_sigla:
+        return None
+    valor = str(uf_ou_sigla).strip().upper()
+    if not valor:
+        return None
+    if len(valor) == 2:
+        return f"TJ{valor}"
+    return valor
+
+
 def job_monitorar_djen(app, lookback_days=None, tenant_id=None):
     """Job APScheduler: monitora publicações DJEN por OAB e por processo."""
     with app.app_context():
@@ -200,14 +212,31 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None):
                 f"(tenant: {oab_mon.tenant_id})"
             )
             try:
+                sigla_tribunal = _normalizar_sigla_tribunal(oab_mon.uf_oab)
                 data = consultar_comunicacoes(
                     numero_oab=oab_mon.numero_oab,
-                    sigla_tribunal=(oab_mon.uf_oab or '').strip().upper() or None,
+                    sigla_tribunal=sigla_tribunal,
                     meio="D",
                     data_inicio=data_inicio,
                     data_fim=data_fim,
                 )
                 items = _extrair_items(data)
+
+                # Fallback: quando o filtro por tribunal vier restritivo/inesperado,
+                # tenta novamente sem tribunal para não perder publicações válidas da OAB.
+                if not items and sigla_tribunal:
+                    logger.info(
+                        f"JOB DJEN: nenhuma publicação para OAB {oab_mon.numero_oab} "
+                        f"com sigla {sigla_tribunal}. Tentando sem filtro de tribunal."
+                    )
+                    data = consultar_comunicacoes(
+                        numero_oab=oab_mon.numero_oab,
+                        meio="D",
+                        data_inicio=data_inicio,
+                        data_fim=data_fim,
+                    )
+                    items = _extrair_items(data)
+
                 total_itens_encontrados += len(items)
                 for item in items:
                     saved = _salvar_publicacao(
@@ -327,12 +356,17 @@ def _extrair_items(data):
     """Normaliza a resposta da ComunicaAPI para uma lista de itens."""
     if not data:
         return []
-    # A API retorna { "content": [...], "totalElements": N, ... }
+    # A API já retornou em diferentes formatos entre versões/documentações:
+    # - {"content": [...]} (paginado)
+    # - {"comunicacoes": [...]} (legado)
+    # - {"items": [...], "count": N} (atual)
     if isinstance(data, dict):
         if "content" in data:
             return data["content"] or []
         if "comunicacoes" in data:
             return data["comunicacoes"] or []
+        if "items" in data:
+            return data["items"] or []
     if isinstance(data, list):
         return data
     return []

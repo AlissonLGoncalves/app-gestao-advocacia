@@ -349,6 +349,37 @@ class TestDjenSync:
 
 
 # ---------------------------------------------------------------------------
+# Compatibilidade da integração DJEN (payload CNJ)
+# ---------------------------------------------------------------------------
+
+class TestDjenPayloadCompat:
+    def test_extrair_items_suporta_formato_atual_items(self):
+        """_extrair_items deve aceitar payload com chave 'items' da ComunicaAPI atual."""
+        from djen_tasks import _extrair_items
+
+        payload = {
+            'status': 'success',
+            'message': 'Sucesso',
+            'count': 1,
+            'items': [{'id': 123, 'hash': 'abc'}],
+        }
+
+        items = _extrair_items(payload)
+        assert isinstance(items, list)
+        assert len(items) == 1
+        assert items[0]['id'] == 123
+
+    def test_normalizar_sigla_tribunal_converte_uf_para_tj(self):
+        """_normalizar_sigla_tribunal converte UF (PR) para sigla esperada (TJPR)."""
+        from djen_tasks import _normalizar_sigla_tribunal
+
+        assert _normalizar_sigla_tribunal('pr') == 'TJPR'
+        assert _normalizar_sigla_tribunal('TJSP') == 'TJSP'
+        assert _normalizar_sigla_tribunal('') is None
+        assert _normalizar_sigla_tribunal(None) is None
+
+
+# ---------------------------------------------------------------------------
 # Triagem inteligente (parser + matching)
 # ---------------------------------------------------------------------------
 
