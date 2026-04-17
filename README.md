@@ -1,5 +1,7 @@
 # Sistema de Gestão para Advocacia
 
+![CI](https://github.com/AlissonLGoncalves/app-gestao-advocacia/actions/workflows/ci.yml/badge.svg)
+
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python)
 ![Flask](https://img.shields.io/badge/Flask-2.0-000000?style=for-the-badge&logo=flask)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
