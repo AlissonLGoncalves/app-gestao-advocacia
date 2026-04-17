@@ -43,6 +43,11 @@ const MainLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const dataAtual = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short'
+  }).format(new Date());
 
   const userString = localStorage.getItem('user');
   let userRole = 'admin'; 
@@ -114,7 +119,7 @@ const MainLayout = () => {
   );
 
   return (
-    <div className="d-flex vh-100">
+    <div className="app-shell">
       {/* Overlay para mobile */}
       <div
         className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
@@ -123,13 +128,13 @@ const MainLayout = () => {
 
       {/* Sidebar */}
       <aside className={`app-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-brand" style={{ padding: '1.75rem 1.25rem', marginBottom: '0.5rem' }}>
-          <div className="sidebar-brand-icon shadow-sm" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)', borderRadius: '10px' }}>
-            <ScaleIcon style={{ width: '24px', height: '24px' }} strokeWidth={1.8} />
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-icon">
+            <ScaleIcon className="sidebar-brand-scale" strokeWidth={1.8} />
           </div>
           <div>
-            <div className="sidebar-brand-text" style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', letterSpacing: '-0.03em' }}>Patronus</div>
-            <div className="sidebar-brand-sub" style={{ fontSize: '0.62rem', letterSpacing: '0.12em', color: '#64748b' }}>SISTEMA JURÍDICO</div>
+            <div className="sidebar-brand-text">Patronus</div>
+            <div className="sidebar-brand-sub">Sistema Juridico</div>
           </div>
         </div>
 
@@ -161,7 +166,7 @@ const MainLayout = () => {
       </aside>
 
       {/* Conteúdo Principal */}
-      <div className="flex-grow-1 d-flex flex-column overflow-hidden">
+      <div className="app-content">
         <header className="app-header">
           <div className="d-flex align-items-center gap-3">
             <button
@@ -171,8 +176,12 @@ const MainLayout = () => {
             >
               {sidebarOpen ? <XMarkIcon /> : <Bars3Icon />}
             </button>
-            <h1>{getPageTitle()}</h1>
+            <div>
+              <h1>{getPageTitle()}</h1>
+              <small className="app-header-meta text-muted">Organizado e fluido, como seu escritorio precisa</small>
+            </div>
           </div>
+          <div className="app-header-date text-capitalize">{dataAtual}</div>
         </header>
         <main className="app-main">
           <Outlet />
