@@ -9,6 +9,7 @@ export default function DjenPage() {
   const [naoLidas, setNaoLidas] = useState(0);
   const [loadingPubs, setLoadingPubs] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [diasSync, setDiasSync] = useState(30);
 
   // Filtros
   const [filtros, setFiltros] = useState({
@@ -153,7 +154,7 @@ export default function DjenPage() {
       const res = await fetch(`${API_URL}/djen/sync`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dias: 30 }),
+        body: JSON.stringify({ dias: diasSync }),
       });
       const payload = await res.json().catch(() => ({}));
       if (res.ok) {
@@ -446,11 +447,21 @@ export default function DjenPage() {
               {naoLidas} não lida{naoLidas !== 1 ? 's' : ''}
             </span>
           )}
-          <button className="btn btn-primary" onClick={sincronizar} disabled={syncing}>
-            {syncing
-              ? <><span className="spinner-border spinner-border-sm me-2" />Sincronizando…</>
-              : <><i className="bi bi-arrow-clockwise me-2" />Sincronizar agora</>}
-          </button>
+          <div className="d-flex align-items-center gap-2">
+            <div className="input-group input-group-sm" style={{ width: 130 }}>
+              <input
+                type="number" className="form-control" min={1} max={365}
+                value={diasSync}
+                onChange={e => setDiasSync(Math.max(1, Math.min(365, parseInt(e.target.value) || 30)))}
+                disabled={syncing} />
+              <span className="input-group-text">dias</span>
+            </div>
+            <button className="btn btn-primary" onClick={sincronizar} disabled={syncing}>
+              {syncing
+                ? <><span className="spinner-border spinner-border-sm me-2" />Sincronizando…</>
+                : <><i className="bi bi-arrow-clockwise me-2" />Sincronizar</>}
+            </button>
+          </div>
         </div>
       </div>
 

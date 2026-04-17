@@ -265,7 +265,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             janela_dias = int(janela_dias)
         except (TypeError, ValueError):
             janela_dias = 30
-        janela_dias = max(1, min(janela_dias, 30))
+        janela_dias = max(1, min(janela_dias, 365))
         data_fim = datetime.utcnow().date()
         data_inicio = data_fim - timedelta(days=janela_dias)
 

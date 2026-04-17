@@ -219,7 +219,7 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
 
     sync_input_dto = djen_ns.model('DjenSyncInput', {
         'oab_id': fields.Integer(description='ID da OAB a sincronizar (omitir = todas as ativas)'),
-        'dias': fields.Integer(description='Janela de busca em dias (padrão = 30, máximo = 30)', default=30),
+        'dias': fields.Integer(description='Janela de busca em dias (padrão = 30, máximo = 365)', default=30),
     })
 
     # ── OABs monitoradas ──────────────────────────────────────────────────────
@@ -688,7 +688,7 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
                 dias = int(data.get('dias', 30))
             except (TypeError, ValueError):
                 dias = 30
-            dias = max(1, min(dias, 30))
+            dias = max(1, min(dias, 365))
 
             from flask import current_app
             try:
