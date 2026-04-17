@@ -133,6 +133,10 @@ export default function DjenPage() {
   const [loadingTriagem, setLoadingTriagem] = useState(false);
   const [triagemSelecionadas, setTriagemSelecionadas] = useState([]);
   const [processandoLoteTriagem, setProcessandoLoteTriagem] = useState(false);
+  const [triagemOffset, setTriagemOffset] = useState(0);
+  const TRIAGEM_LIMIT = 20;
+  const [triagemBusca, setTriagemBusca] = useState('');
+  const [triagemExpandido, setTriagemExpandido] = useState({});
 
   // Detalhe
   const [pubSelecionada, setPubSelecionada] = useState(null);
@@ -221,10 +225,10 @@ export default function DjenPage() {
   }, []);
 
   // ── Carregar fila de triagem ───────────────────────────────────────────────
-  const carregarTriagem = useCallback(async () => {
+  const carregarTriagem = useCallback(async (offsetParam = 0) => {
     setLoadingTriagem(true);
     try {
-      const res = await fetch(`${API_URL}/djen/triagem?limit=30&somente_pendentes=true`, {
+      const res = await fetch(`${API_URL}/djen/triagem?limit=${TRIAGEM_LIMIT}&offset=${offsetParam}&somente_pendentes=true`, {
         headers: { Authorization: `Bearer ${token()}` },
       });
       if (res.ok) {
@@ -1019,172 +1023,310 @@ export default function DjenPage() {
       )}
 
       {/* ── Aba Triagem ───────────────────────────────────────────────────── */}
-      {aba === 'triagem' && (
-        <div className="row g-3">
-          <div className="col-12">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="small text-muted">
-                {triagemTotal} publicação(ões) pendente(s) de triagem inteligente
-              </div>
-              <div className="d-flex gap-2">
-                <button className="btn btn-outline-secondary btn-sm" onClick={selecionarTodasTriagem}>
-                  Selecionar todas
-                </button>
-                <button className="btn btn-outline-secondary btn-sm" onClick={limparSelecaoTriagem}>
-                  Limpar seleção
-                </button>
-                <button className="btn btn-outline-primary btn-sm" onClick={carregarTriagem}>
-                  <i className="bi bi-arrow-repeat me-1" />Atualizar triagem
-                </button>
-                <button
-                  className="btn btn-success btn-sm"
-                  onClick={processarLoteTriagem}
-                  disabled={processandoLoteTriagem || triagemSelecionadas.length === 0}
-                >
-                  {processandoLoteTriagem ? 'Processando lote...' : `Processar selecionadas (${triagemSelecionadas.length})`}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {loadingTriagem ? (
-            <div className="col-12 text-center py-5"><div className="spinner-border text-primary" /></div>
-          ) : triagemItems.length === 0 ? (
-            <div className="col-12">
-              <div className="alert alert-success mb-0">
-                Nenhuma pendência na fila de triagem. As publicações novas aparecerão aqui após a sincronização.
-              </div>
-            </div>
-          ) : (
-            triagemItems.map(item => {
+      {aba === 'triagem' && (() => {
+        // filtro local por busca de texto
+        const triagemFiltrados = triagemBusca.trim()
+          ? triagemItems.filter(item => {
               const pub = item.publicacao;
               const analise = item.analise || {};
-              const sugestoes = item.sugestoes || {};
-              return (
-                <div className="col-12" key={pub.id}>
-                  <div className="card border-0 shadow-sm">
-                    <div className="card-body">
-                      <div className="form-check mb-2">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id={`triagem-check-${pub.id}`}
-                          checked={triagemSelecionadas.includes(pub.id)}
-                          onChange={() => toggleSelecaoTriagem(pub.id)}
-                        />
-                        <label className="form-check-label small" htmlFor={`triagem-check-${pub.id}`}>
-                          Selecionar para processamento em lote
-                        </label>
-                      </div>
+              const haystack = [
+                pub.numero_processo,
+                pub.numero_processo_mascara,
+                pub.nome_orgao,
+                pub.sigla_tribunal,
+                analise.tribunal,
+                pub.texto,
+                ...(analise.partes_autoras || []),
+                ...(analise.partes_reus || []),
+                ...(analise.representantes || []),
+              ].join(' ').toLowerCase();
+              return haystack.includes(triagemBusca.toLowerCase());
+            })
+          : triagemItems;
 
-                      <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-                        <div>
-                          <div className="fw-semibold">
-                            {pub.numero_processo_mascara || pub.numero_processo || 'Sem número de processo'}
+        const badgeConfianca = (v) => {
+          const pct = Math.round((v || 0) * 100);
+          const cls = pct >= 70 ? 'bg-success' : pct >= 40 ? 'bg-warning text-dark' : 'bg-danger';
+          return <span className={`badge ${cls} ms-2`} style={{ fontSize: '0.7rem' }}>{pct}% confiança</span>;
+        };
+
+        const toggleExpandido = (id) =>
+          setTriagemExpandido(prev => ({ ...prev, [id]: !prev[id] }));
+
+        return (
+          <div className="row g-3">
+            {/* Barra de controles */}
+            <div className="col-12">
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  <span className="badge bg-secondary fs-6 px-3 py-2">{triagemTotal} pendente(s)</span>
+                  <input
+                    type="search"
+                    className="form-control form-control-sm"
+                    style={{ width: 260 }}
+                    placeholder="Buscar por processo, parte, órgão..."
+                    value={triagemBusca}
+                    onChange={e => setTriagemBusca(e.target.value)}
+                  />
+                </div>
+                <div className="d-flex gap-2 flex-wrap">
+                  <button className="btn btn-outline-secondary btn-sm" onClick={selecionarTodasTriagem}>
+                    <i className="bi bi-check2-all me-1" />Selecionar todas
+                  </button>
+                  <button className="btn btn-outline-secondary btn-sm" onClick={limparSelecaoTriagem}>
+                    Limpar seleção
+                  </button>
+                  <button className="btn btn-outline-primary btn-sm" onClick={() => { setTriagemOffset(0); carregarTriagem(0); }}>
+                    <i className="bi bi-arrow-repeat me-1" />Atualizar
+                  </button>
+                  <button
+                    className="btn btn-success btn-sm"
+                    onClick={processarLoteTriagem}
+                    disabled={processandoLoteTriagem || triagemSelecionadas.length === 0}
+                  >
+                    <i className="bi bi-robot me-1" />
+                    {processandoLoteTriagem ? 'Processando...' : `Processar selecionadas (${triagemSelecionadas.length})`}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {loadingTriagem ? (
+              <div className="col-12 text-center py-5"><div className="spinner-border text-primary" /></div>
+            ) : triagemFiltrados.length === 0 ? (
+              <div className="col-12">
+                <div className="alert alert-success mb-0">
+                  {triagemBusca ? 'Nenhuma publicação encontrada para esse filtro.' : 'Nenhuma pendência na fila de triagem. As publicações novas aparecerão aqui após a sincronização.'}
+                </div>
+              </div>
+            ) : (
+              <>
+                {triagemFiltrados.map(item => {
+                  const pub = item.publicacao;
+                  const analise = item.analise || {};
+                  const sugestoes = item.sugestoes || {};
+                  const tribunal = analise.tribunal || pub.sigla_tribunal || '';
+                  const dataFormatada = pub.data_disponibilizacao
+                    ? new Date(pub.data_disponibilizacao).toLocaleDateString('pt-BR')
+                    : null;
+                  const textoPreview = (pub.texto || '').trim();
+                  const expandido = !!triagemExpandido[pub.id];
+                  const temPartes = (analise.partes_autoras || []).length > 0 || (analise.partes_reus || []).length > 0;
+                  const temRepresentantes = (analise.representantes || []).length > 0;
+                  const temDocumentos = (analise.documentos_extraidos || []).length > 0;
+                  const temSugestoesCasos = (sugestoes.casos || []).length > 0;
+                  const temSugestoesClientes = (sugestoes.clientes || []).length > 0;
+                  const confianca = analise.confianca || 0;
+                  const borderColor = confianca >= 0.7 ? '#198754' : confianca >= 0.4 ? '#ffc107' : '#dc3545';
+
+                  return (
+                    <div className="col-12" key={pub.id}>
+                      <div className="card shadow-sm" style={{ borderLeft: `4px solid ${borderColor}` }}>
+                        {/* Cabeçalho do card */}
+                        <div className="card-header bg-white py-2 px-3 d-flex align-items-center gap-2 flex-wrap">
+                          <input
+                            className="form-check-input mt-0 flex-shrink-0"
+                            type="checkbox"
+                            title="Selecionar para lote"
+                            id={`triagem-check-${pub.id}`}
+                            checked={triagemSelecionadas.includes(pub.id)}
+                            onChange={() => toggleSelecaoTriagem(pub.id)}
+                          />
+                          <div className="fw-semibold me-1" style={{ fontSize: '0.95rem' }}>
+                            {pub.numero_processo_mascara || pub.numero_processo || <span className="text-muted fst-italic">Sem número de processo</span>}
                           </div>
-                          <div className="small text-muted">
-                            {(analise.tribunal || pub.sigla_tribunal || '—')} · confiança da análise: {Math.round((analise.confianca || 0) * 100)}%
-                          </div>
+                          {tribunal && (
+                            <span className="badge bg-primary bg-opacity-10 text-primary border border-primary" style={{ fontSize: '0.72rem' }}>
+                              {tribunal}
+                            </span>
+                          )}
+                          {pub.tipo_comunicacao && (
+                            <span className="badge bg-light text-secondary border" style={{ fontSize: '0.72rem' }}>
+                              {pub.tipo_comunicacao}
+                            </span>
+                          )}
+                          {dataFormatada && (
+                            <span className="text-muted ms-auto small"><i className="bi bi-calendar3 me-1" />{dataFormatada}</span>
+                          )}
+                          {badgeConfianca(confianca)}
                           {analise.revisao_manual_recomendada && (
-                            <div className="small text-warning-emphasis mt-1">
-                              Revisão manual recomendada para esta publicação.
+                            <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.7rem' }}>
+                              <i className="bi bi-exclamation-triangle me-1" />Revisão manual
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="card-body py-2 px-3">
+                          {/* Órgão */}
+                          {pub.nome_orgao && (
+                            <div className="small text-muted mb-2">
+                              <i className="bi bi-building me-1" />{pub.nome_orgao}
                             </div>
                           )}
-                        </div>
-                        <div className="d-flex gap-2">
-                          <button
-                            className="btn btn-outline-secondary btn-sm"
-                            onClick={() => marcarLida(pub, true)}
-                          >
-                            Marcar lida
-                          </button>
-                          <button
-                            className="btn btn-success btn-sm"
-                            onClick={() => criarClienteECasoTriagem(pub)}
-                          >
-                            Criar cliente e caso
-                          </button>
-                          {sugestoes?.casos?.[0] && (
-                            <button
-                              className="btn btn-primary btn-sm"
-                              onClick={() => mesclarTriagemCaso(pub, sugestoes.casos[0].id)}
-                            >
-                              Mesclar com caso sugerido
-                            </button>
-                          )}
-                          <button
-                            className="btn btn-outline-danger btn-sm"
-                            onClick={() => ignorarTriagem(pub)}
-                          >
-                            Ignorar
-                          </button>
-                        </div>
-                      </div>
 
-                      <hr />
-
-                      <div className="row g-3 small">
-                        <div className="col-md-4">
-                          <div className="text-muted fw-semibold mb-1">Partes autoras</div>
-                          {(analise.partes_autoras || []).length > 0
-                            ? analise.partes_autoras.map((p, idx) => <div key={`a-${idx}`}>{p}</div>)
-                            : <div className="text-muted">—</div>}
-                        </div>
-                        <div className="col-md-4">
-                          <div className="text-muted fw-semibold mb-1">Partes rés</div>
-                          {(analise.partes_reus || []).length > 0
-                            ? analise.partes_reus.map((p, idx) => <div key={`r-${idx}`}>{p}</div>)
-                            : <div className="text-muted">—</div>}
-                        </div>
-                        <div className="col-md-4">
-                          <div className="text-muted fw-semibold mb-1">Representantes</div>
-                          {(analise.representantes || []).length > 0
-                            ? analise.representantes.map((p, idx) => <div key={`rep-${idx}`}>{p}</div>)
-                            : <div className="text-muted">—</div>}
-                        </div>
-                      </div>
-
-                      <div className="row g-3 small mt-1">
-                        <div className="col-md-6">
-                          <div className="text-muted fw-semibold mb-1">Documentos (CPF/CNPJ)</div>
-                          {(analise.documentos_extraidos || []).length > 0 ? (
-                            analise.documentos_extraidos.map((d, idx) => <div key={`doc-${idx}`}>{d}</div>)
-                          ) : <div className="text-muted">Nenhum documento explícito encontrado.</div>}
-                        </div>
-                        <div className="col-md-6">
-                          <div className="text-muted fw-semibold mb-1">Sugestões de casos</div>
-                          {(sugestoes.casos || []).length > 0 ? (
-                            sugestoes.casos.map((s) => (
-                              <div key={`caso-${s.id}`} className="mb-1">
+                          {/* Preview do texto */}
+                          {textoPreview && (
+                            <div className="mb-3">
+                              <div
+                                className="small text-secondary p-2 rounded"
+                                style={{ background: '#f8f9fa', borderLeft: '3px solid #dee2e6', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                              >
+                                {expandido ? textoPreview : textoPreview.slice(0, 320) + (textoPreview.length > 320 ? '…' : '')}
+                              </div>
+                              {textoPreview.length > 320 && (
                                 <button
-                                  className="btn btn-link btn-sm p-0 text-start"
-                                  onClick={() => mesclarTriagemCaso(pub, s.id)}
+                                  className="btn btn-link btn-sm p-0 mt-1"
+                                  style={{ fontSize: '0.75rem' }}
+                                  onClick={() => toggleExpandido(pub.id)}
                                 >
-                                  #{s.id} {s.numero_processo || s.titulo} ({Math.round((s.score || 0) * 100)}%)
+                                  {expandido ? 'Ver menos ▲' : 'Ver texto completo ▼'}
                                 </button>
-                              </div>
-                            ))
-                          ) : <div className="text-muted">Nenhuma sugestão de caso.</div>}
-                        </div>
-                        <div className="col-md-6">
-                          <div className="text-muted fw-semibold mb-1">Sugestões de clientes</div>
-                          {(sugestoes.clientes || []).length > 0 ? (
-                            sugestoes.clientes.map((s) => (
-                              <div key={`cli-${s.id}`} className="mb-1">
-                                {s.nome_razao_social} ({Math.round((s.score || 0) * 100)}%)
-                              </div>
-                            ))
-                          ) : <div className="text-muted">Nenhuma sugestão de cliente.</div>}
+                              )}
+                            </div>
+                          )}
+
+                          {/* Partes + Representantes */}
+                          {(temPartes || temRepresentantes) && (
+                            <div className="row g-2 small mb-2">
+                              {(analise.partes_autoras || []).length > 0 && (
+                                <div className="col-md-4">
+                                  <div className="text-muted fw-semibold mb-1"><i className="bi bi-person me-1" />Polo ativo</div>
+                                  {analise.partes_autoras.map((p, idx) => (
+                                    <div key={`a-${idx}`} className="text-truncate" title={p}>{p}</div>
+                                  ))}
+                                </div>
+                              )}
+                              {(analise.partes_reus || []).length > 0 && (
+                                <div className="col-md-4">
+                                  <div className="text-muted fw-semibold mb-1"><i className="bi bi-person-x me-1" />Polo passivo</div>
+                                  {analise.partes_reus.map((p, idx) => (
+                                    <div key={`r-${idx}`} className="text-truncate" title={p}>{p}</div>
+                                  ))}
+                                </div>
+                              )}
+                              {temRepresentantes && (
+                                <div className="col-md-4">
+                                  <div className="text-muted fw-semibold mb-1"><i className="bi bi-briefcase me-1" />Advogado(s)</div>
+                                  {analise.representantes.map((p, idx) => (
+                                    <div key={`rep-${idx}`} className="text-truncate" title={p}>{p}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Documentos + Sugestões */}
+                          {(temDocumentos || temSugestoesCasos || temSugestoesClientes) && (
+                            <div className="row g-2 small mb-2">
+                              {temDocumentos && (
+                                <div className="col-md-4">
+                                  <div className="text-muted fw-semibold mb-1"><i className="bi bi-file-earmark-text me-1" />CPF/CNPJ</div>
+                                  {analise.documentos_extraidos.map((d, idx) => (
+                                    <div key={`doc-${idx}`}>{d}</div>
+                                  ))}
+                                </div>
+                              )}
+                              {temSugestoesCasos && (
+                                <div className="col-md-4">
+                                  <div className="text-muted fw-semibold mb-1"><i className="bi bi-folder2-open me-1" />Casos sugeridos</div>
+                                  <div className="d-flex flex-wrap gap-1">
+                                    {sugestoes.casos.slice(0, 3).map((s) => (
+                                      <button
+                                        key={`caso-${s.id}`}
+                                        className="btn btn-outline-primary btn-sm py-0 px-2"
+                                        style={{ fontSize: '0.72rem' }}
+                                        onClick={() => mesclarTriagemCaso(pub, s.id)}
+                                        title={`Mesclar com caso #${s.id}`}
+                                      >
+                                        #{s.id} {s.numero_processo || s.titulo} · {Math.round((s.score || 0) * 100)}%
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {temSugestoesClientes && (
+                                <div className="col-md-4">
+                                  <div className="text-muted fw-semibold mb-1"><i className="bi bi-people me-1" />Clientes sugeridos</div>
+                                  <div className="d-flex flex-wrap gap-1">
+                                    {sugestoes.clientes.slice(0, 3).map((s) => (
+                                      <span
+                                        key={`cli-${s.id}`}
+                                        className="badge bg-light text-dark border"
+                                        style={{ fontSize: '0.72rem' }}
+                                      >
+                                        {s.nome_razao_social} · {Math.round((s.score || 0) * 100)}%
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Ações */}
+                          <div className="d-flex gap-2 flex-wrap mt-2 pt-2 border-top">
+                            <button
+                              className="btn btn-success btn-sm"
+                              onClick={() => criarClienteECasoTriagem(pub)}
+                            >
+                              <i className="bi bi-plus-circle me-1" />Criar cliente e caso
+                            </button>
+                            {temSugestoesCasos && (
+                              <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => mesclarTriagemCaso(pub, sugestoes.casos[0].id)}
+                              >
+                                <i className="bi bi-arrow-left-right me-1" />Mesclar com #{sugestoes.casos[0].id}
+                              </button>
+                            )}
+                            <button
+                              className="btn btn-outline-secondary btn-sm"
+                              onClick={() => marcarLida(pub, true)}
+                            >
+                              <i className="bi bi-check2 me-1" />Marcar lida
+                            </button>
+                            <button
+                              className="btn btn-outline-danger btn-sm ms-auto"
+                              onClick={() => ignorarTriagem(pub)}
+                            >
+                              <i className="bi bi-x-circle me-1" />Ignorar
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
+                  );
+                })}
+
+                {/* Paginação */}
+                {triagemTotal > TRIAGEM_LIMIT && !triagemBusca && (
+                  <div className="col-12 d-flex justify-content-between align-items-center mt-1">
+                    <small className="text-muted">
+                      Exibindo {triagemOffset + 1}–{Math.min(triagemOffset + TRIAGEM_LIMIT, triagemTotal)} de {triagemTotal}
+                    </small>
+                    <div className="d-flex gap-2">
+                      <button
+                        className="btn btn-outline-secondary btn-sm"
+                        disabled={triagemOffset === 0}
+                        onClick={() => { const o = Math.max(0, triagemOffset - TRIAGEM_LIMIT); setTriagemOffset(o); carregarTriagem(o); }}
+                      >
+                        <i className="bi bi-chevron-left" /> Anterior
+                      </button>
+                      <button
+                        className="btn btn-outline-secondary btn-sm"
+                        disabled={triagemOffset + TRIAGEM_LIMIT >= triagemTotal}
+                        onClick={() => { const o = triagemOffset + TRIAGEM_LIMIT; setTriagemOffset(o); carregarTriagem(o); }}
+                      >
+                        Próxima <i className="bi bi-chevron-right" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
+                )}
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
