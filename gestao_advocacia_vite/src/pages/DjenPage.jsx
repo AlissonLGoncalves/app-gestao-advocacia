@@ -2,6 +2,108 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from '../config.js';
 import { toast } from 'react-toastify';
 
+// ── Lista completa de tribunais brasileiros ────────────────────────────────
+const TRIBUNAIS = [
+  // Superiores
+  { sigla: 'STF',   nome: 'Supremo Tribunal Federal' },
+  { sigla: 'STJ',   nome: 'Superior Tribunal de Justiça' },
+  { sigla: 'TST',   nome: 'Tribunal Superior do Trabalho' },
+  { sigla: 'TSE',   nome: 'Tribunal Superior Eleitoral' },
+  { sigla: 'STM',   nome: 'Superior Tribunal Militar' },
+  // TRFs
+  { sigla: 'TRF1',  nome: 'TRF 1ª Região (DF, MG, GO, BA…)' },
+  { sigla: 'TRF2',  nome: 'TRF 2ª Região (RJ, ES)' },
+  { sigla: 'TRF3',  nome: 'TRF 3ª Região (SP, MS)' },
+  { sigla: 'TRF4',  nome: 'TRF 4ª Região (RS, SC, PR)' },
+  { sigla: 'TRF5',  nome: 'TRF 5ª Região (CE, RN, PB, PE, AL, SE)' },
+  { sigla: 'TRF6',  nome: 'TRF 6ª Região (MG)' },
+  // TJs
+  { sigla: 'TJAC',  nome: 'TJAC – Acre' },
+  { sigla: 'TJAL',  nome: 'TJAL – Alagoas' },
+  { sigla: 'TJAM',  nome: 'TJAM – Amazonas' },
+  { sigla: 'TJAP',  nome: 'TJAP – Amapá' },
+  { sigla: 'TJBA',  nome: 'TJBA – Bahia' },
+  { sigla: 'TJCE',  nome: 'TJCE – Ceará' },
+  { sigla: 'TJDFT', nome: 'TJDFT – Distrito Federal' },
+  { sigla: 'TJES',  nome: 'TJES – Espírito Santo' },
+  { sigla: 'TJGO',  nome: 'TJGO – Goiás' },
+  { sigla: 'TJMA',  nome: 'TJMA – Maranhão' },
+  { sigla: 'TJMG',  nome: 'TJMG – Minas Gerais' },
+  { sigla: 'TJMS',  nome: 'TJMS – Mato Grosso do Sul' },
+  { sigla: 'TJMT',  nome: 'TJMT – Mato Grosso' },
+  { sigla: 'TJPA',  nome: 'TJPA – Pará' },
+  { sigla: 'TJPB',  nome: 'TJPB – Paraíba' },
+  { sigla: 'TJPE',  nome: 'TJPE – Pernambuco' },
+  { sigla: 'TJPI',  nome: 'TJPI – Piauí' },
+  { sigla: 'TJPR',  nome: 'TJPR – Paraná' },
+  { sigla: 'TJRJ',  nome: 'TJRJ – Rio de Janeiro' },
+  { sigla: 'TJRN',  nome: 'TJRN – Rio Grande do Norte' },
+  { sigla: 'TJRO',  nome: 'TJRO – Rondônia' },
+  { sigla: 'TJRR',  nome: 'TJRR – Roraima' },
+  { sigla: 'TJRS',  nome: 'TJRS – Rio Grande do Sul' },
+  { sigla: 'TJSC',  nome: 'TJSC – Santa Catarina' },
+  { sigla: 'TJSE',  nome: 'TJSE – Sergipe' },
+  { sigla: 'TJSP',  nome: 'TJSP – São Paulo' },
+  { sigla: 'TJTO',  nome: 'TJTO – Tocantins' },
+  // TRTs
+  { sigla: 'TRT1',  nome: 'TRT 1ª Região (RJ)' },
+  { sigla: 'TRT2',  nome: 'TRT 2ª Região (SP Capital)' },
+  { sigla: 'TRT3',  nome: 'TRT 3ª Região (MG)' },
+  { sigla: 'TRT4',  nome: 'TRT 4ª Região (RS)' },
+  { sigla: 'TRT5',  nome: 'TRT 5ª Região (BA)' },
+  { sigla: 'TRT6',  nome: 'TRT 6ª Região (PE)' },
+  { sigla: 'TRT7',  nome: 'TRT 7ª Região (CE)' },
+  { sigla: 'TRT8',  nome: 'TRT 8ª Região (PA e AP)' },
+  { sigla: 'TRT9',  nome: 'TRT 9ª Região (PR)' },
+  { sigla: 'TRT10', nome: 'TRT 10ª Região (DF e TO)' },
+  { sigla: 'TRT11', nome: 'TRT 11ª Região (AM e RR)' },
+  { sigla: 'TRT12', nome: 'TRT 12ª Região (SC)' },
+  { sigla: 'TRT13', nome: 'TRT 13ª Região (PB)' },
+  { sigla: 'TRT14', nome: 'TRT 14ª Região (RO e AC)' },
+  { sigla: 'TRT15', nome: 'TRT 15ª Região (SP Interior)' },
+  { sigla: 'TRT16', nome: 'TRT 16ª Região (MA)' },
+  { sigla: 'TRT17', nome: 'TRT 17ª Região (ES)' },
+  { sigla: 'TRT18', nome: 'TRT 18ª Região (GO)' },
+  { sigla: 'TRT19', nome: 'TRT 19ª Região (AL)' },
+  { sigla: 'TRT20', nome: 'TRT 20ª Região (SE)' },
+  { sigla: 'TRT21', nome: 'TRT 21ª Região (RN)' },
+  { sigla: 'TRT22', nome: 'TRT 22ª Região (PI)' },
+  { sigla: 'TRT23', nome: 'TRT 23ª Região (MT)' },
+  { sigla: 'TRT24', nome: 'TRT 24ª Região (MS)' },
+  // TREs
+  { sigla: 'TREAC', nome: 'TRE – Acre' },
+  { sigla: 'TREAL', nome: 'TRE – Alagoas' },
+  { sigla: 'TREAM', nome: 'TRE – Amazonas' },
+  { sigla: 'TREAP', nome: 'TRE – Amapá' },
+  { sigla: 'TREBA', nome: 'TRE – Bahia' },
+  { sigla: 'TRECE', nome: 'TRE – Ceará' },
+  { sigla: 'TREDF', nome: 'TRE – Distrito Federal' },
+  { sigla: 'TREES', nome: 'TRE – Espírito Santo' },
+  { sigla: 'TREGO', nome: 'TRE – Goiás' },
+  { sigla: 'TREMA', nome: 'TRE – Maranhão' },
+  { sigla: 'TREMG', nome: 'TRE – Minas Gerais' },
+  { sigla: 'TREMS', nome: 'TRE – Mato Grosso do Sul' },
+  { sigla: 'TREMT', nome: 'TRE – Mato Grosso' },
+  { sigla: 'TREPA', nome: 'TRE – Pará' },
+  { sigla: 'TREPB', nome: 'TRE – Paraíba' },
+  { sigla: 'TREPE', nome: 'TRE – Pernambuco' },
+  { sigla: 'TREPI', nome: 'TRE – Piauí' },
+  { sigla: 'TREPR', nome: 'TRE – Paraná' },
+  { sigla: 'TRERJ', nome: 'TRE – Rio de Janeiro' },
+  { sigla: 'TRERN', nome: 'TRE – Rio Grande do Norte' },
+  { sigla: 'TRERO', nome: 'TRE – Rondônia' },
+  { sigla: 'TRERR', nome: 'TRE – Roraima' },
+  { sigla: 'TRERS', nome: 'TRE – Rio Grande do Sul' },
+  { sigla: 'TRESC', nome: 'TRE – Santa Catarina' },
+  { sigla: 'TRESE', nome: 'TRE – Sergipe' },
+  { sigla: 'TRESP', nome: 'TRE – São Paulo' },
+  { sigla: 'TRETO', nome: 'TRE – Tocantins' },
+  // TJMs
+  { sigla: 'TJMMG', nome: 'TJM – Minas Gerais' },
+  { sigla: 'TJMRS', nome: 'TJM – Rio Grande do Sul' },
+  { sigla: 'TJMSP', nome: 'TJM – São Paulo' },
+];
+
 export default function DjenPage() {
   const [aba, setAba] = useState('publicacoes');
   const [publicacoes, setPublicacoes] = useState([]);
@@ -14,7 +116,7 @@ export default function DjenPage() {
   // Filtros
   const [filtros, setFiltros] = useState({
     lida: '', sigla_tribunal: '', numero_processo: '',
-    data_inicio: '', data_fim: '', origem: '',
+    data_inicio: '', data_fim: '', origem: '', ordenar: 'data_desc',
   });
   const [offset, setOffset] = useState(0);
   const [itensPorPagina, setItensPorPagina] = useState(20);
@@ -51,6 +153,7 @@ export default function DjenPage() {
       if (filtros.data_inicio) params.set('data_inicio', filtros.data_inicio);
       if (filtros.data_fim) params.set('data_fim', filtros.data_fim);
       if (filtros.origem) params.set('origem', filtros.origem);
+      params.set('ordenar', filtros.ordenar || 'data_desc');
 
       const res = await fetch(`${API_URL}/djen/publicacoes?${params}`, {
         headers: { Authorization: `Bearer ${token()}` },
@@ -419,7 +522,7 @@ export default function DjenPage() {
   };
 
   const limparFiltros = () => {
-    setFiltros({ lida: '', sigla_tribunal: '', numero_processo: '', data_inicio: '', data_fim: '', origem: '' });
+    setFiltros({ lida: '', sigla_tribunal: '', numero_processo: '', data_inicio: '', data_fim: '', origem: '', ordenar: 'data_desc' });
     setOffset(0);
     setTimeout(() => carregarPublicacoes(0), 50);
   };
@@ -506,6 +609,7 @@ export default function DjenPage() {
             <div className="card shadow-sm border-0">
               <div className="card-body">
                 <form onSubmit={aplicarFiltros} className="row g-2 align-items-end">
+                  {/* Linha 1: Leitura, Tribunal, Nº processo, Ordenação */}
                   <div className="col-md-2">
                     <label className="form-label small mb-1">Leitura</label>
                     <select className="form-select form-select-sm" value={filtros.lida}
@@ -515,11 +619,42 @@ export default function DjenPage() {
                       <option value="true">Lidas</option>
                     </select>
                   </div>
-                  <div className="col-md-2">
+                  <div className="col-md-3">
                     <label className="form-label small mb-1">Tribunal</label>
-                    <input className="form-control form-control-sm" placeholder="ex: TJPR"
-                      value={filtros.sigla_tribunal}
-                      onChange={e => setFiltros(f => ({ ...f, sigla_tribunal: e.target.value }))} />
+                    <select className="form-select form-select-sm" value={filtros.sigla_tribunal}
+                      onChange={e => setFiltros(f => ({ ...f, sigla_tribunal: e.target.value }))}>
+                      <option value="">Todos os tribunais</option>
+                      <optgroup label="Superiores">
+                        {TRIBUNAIS.filter(t => ['STF','STJ','TST','TSE','STM'].includes(t.sigla)).map(t => (
+                          <option key={t.sigla} value={t.sigla}>{t.sigla} — {t.nome.replace(/^[A-Z]+ – /, '')}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="TRFs – Justiça Federal">
+                        {TRIBUNAIS.filter(t => t.sigla.startsWith('TRF')).map(t => (
+                          <option key={t.sigla} value={t.sigla}>{t.sigla} — {t.nome.replace(/TRF \d+ª Região /, '')}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="TJs – Justiça Estadual">
+                        {TRIBUNAIS.filter(t => t.sigla.startsWith('TJ') && !t.sigla.startsWith('TJM')).map(t => (
+                          <option key={t.sigla} value={t.sigla}>{t.sigla} — {t.nome.replace(/TJ\w+ – /, '')}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="TRTs – Justiça do Trabalho">
+                        {TRIBUNAIS.filter(t => t.sigla.startsWith('TRT')).map(t => (
+                          <option key={t.sigla} value={t.sigla}>{t.sigla} — {t.nome.replace(/TRT \d+ª Região /, '')}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="TREs – Justiça Eleitoral">
+                        {TRIBUNAIS.filter(t => t.sigla.startsWith('TRE')).map(t => (
+                          <option key={t.sigla} value={t.sigla}>{t.sigla}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="TJMs – Justiça Militar Estadual">
+                        {TRIBUNAIS.filter(t => t.sigla.startsWith('TJM')).map(t => (
+                          <option key={t.sigla} value={t.sigla}>{t.sigla} — {t.nome.replace(/TJM – /, '')}</option>
+                        ))}
+                      </optgroup>
+                    </select>
                   </div>
                   <div className="col-md-3">
                     <label className="form-label small mb-1">Nº processo</label>
@@ -527,6 +662,18 @@ export default function DjenPage() {
                       value={filtros.numero_processo}
                       onChange={e => setFiltros(f => ({ ...f, numero_processo: e.target.value }))} />
                   </div>
+                  <div className="col-md-2">
+                    <label className="form-label small mb-1">Ordenar por</label>
+                    <select className="form-select form-select-sm" value={filtros.ordenar}
+                      onChange={e => setFiltros(f => ({ ...f, ordenar: e.target.value }))}>
+                      <option value="data_desc">Mais nova primeiro</option>
+                      <option value="data_asc">Mais antiga primeiro</option>
+                      <option value="tribunal_asc">Tribunal (A–Z)</option>
+                      <option value="orgao_asc">Órgão (A–Z)</option>
+                      <option value="tipo_asc">Tipo (A–Z)</option>
+                    </select>
+                  </div>
+                  {/* Linha 2: datas + botões */}
                   <div className="col-md-2">
                     <label className="form-label small mb-1">Data início</label>
                     <input type="date" className="form-control form-control-sm"

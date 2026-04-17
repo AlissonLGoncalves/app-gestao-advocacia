@@ -302,6 +302,7 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             'data_fim': 'Data fim disponibilização (yyyy-mm-dd)',
             'limit': 'Itens por página (padrão 50, máx 200)',
             'offset': 'Paginação',
+            'ordenar': 'Ordenação: data_desc (padrão), data_asc, tribunal_asc, orgao_asc, tipo_asc',
         })
         @jwt_required()
         def get(self):
@@ -343,7 +344,15 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
             limit = min(int(request.args.get('limit', 50)), 200)
             offset = int(request.args.get('offset', 0))
             total = q.count()
-            items = q.order_by(PublicacaoDJEN.data_disponibilizacao.desc()).offset(offset).limit(limit).all()
+
+            ordenar = request.args.get('ordenar', 'data_desc')
+            _ordem = {
+                'data_asc':     PublicacaoDJEN.data_disponibilizacao.asc(),
+                'tribunal_asc': PublicacaoDJEN.sigla_tribunal.asc(),
+                'orgao_asc':    PublicacaoDJEN.nome_orgao.asc(),
+                'tipo_asc':     PublicacaoDJEN.tipo_comunicacao.asc(),
+            }
+            items = q.order_by(_ordem.get(ordenar, PublicacaoDJEN.data_disponibilizacao.desc())).offset(offset).limit(limit).all()
 
             nao_lidas = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id, lida=False).count()
 
