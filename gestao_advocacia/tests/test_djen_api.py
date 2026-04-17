@@ -349,6 +349,82 @@ class TestDjenSync:
 
 
 # ---------------------------------------------------------------------------
+# Triagem inteligente (parser + matching)
+# ---------------------------------------------------------------------------
+
+class TestDjenTriagem:
+    def test_triagem_retorna_analise_e_sugestoes(self, auth_client, db, app):
+        """GET /api/djen/triagem retorna análise de partes/representantes e sugestões."""
+        caso_id = None
+        pub_id = None
+        with app.app_context():
+            from app import User
+            user = User.query.filter_by(username='testuser').first()
+
+            cliente = Cliente(
+                tenant_id=user.tenant_id,
+                user_id=user.id,
+                nome_razao_social='Joao da Silva',
+                cpf_cnpj='111.222.333-44',
+                tipo_pessoa='PF',
+                email='joao@teste.com',
+            )
+            db.session.add(cliente)
+            db.session.flush()
+
+            caso = Caso(
+                tenant_id=user.tenant_id,
+                user_id=user.id,
+                cliente_id=cliente.id,
+                titulo='Acao de Cobranca',
+                numero_processo='0001234-12.2024.8.16.0001',
+                status='Ativo',
+            )
+            db.session.add(caso)
+            db.session.flush()
+            caso_id = caso.id
+
+            pub = PublicacaoDJEN(
+                tenant_id=user.tenant_id,
+                user_id=user.id,
+                djen_id=8801,
+                hash_comunicacao='hash-triagem-8801',
+                numero_processo='0001234-12.2024.8.16.0001',
+                sigla_tribunal='TJPR',
+                tipo_comunicacao='Intimacao',
+                data_disponibilizacao=date.today(),
+                texto=(
+                    'AUTOR: Joao da Silva; REU: Empresa XPTO LTDA; '
+                    'ADVOGADO: Maria Rocha OAB/PR 12345'
+                ),
+                origem_busca='oab',
+            )
+            db.session.add(pub)
+            db.session.commit()
+            pub_id = pub.id
+
+        resp = auth_client.get('/api/djen/triagem')
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data['total'] >= 1
+        item = next((i for i in data['items'] if i['publicacao']['id'] == pub_id), None)
+        assert item is not None
+
+        assert 'analise' in item
+        assert item['analise']['numero_processo'] == '0001234-12.2024.8.16.0001'
+        assert any('Joao da Silva' in p for p in item['analise']['partes_autoras'])
+        assert len(item['analise']['representantes']) >= 1
+
+        assert 'sugestoes' in item
+        assert any(c['id'] == caso_id for c in item['sugestoes']['casos'])
+
+    def test_triagem_sem_autenticacao(self, client, db):
+        """GET /api/djen/triagem sem token retorna 401."""
+        resp = client.get('/api/djen/triagem')
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
 # Isolamento de tenant
 # ---------------------------------------------------------------------------
 

@@ -193,6 +193,53 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
                 'items': [p.to_dict() for p in items],
             }
 
+    @djen_ns.route('/triagem')
+    class PublicacaoTriagemAPI(Resource):
+        @djen_ns.doc(security='jsonWebToken', params={
+            'limit': 'Itens por página (padrão 20, máx 100)',
+            'offset': 'Paginação',
+            'somente_pendentes': 'Quando true, retorna apenas publicações sem caso vinculado (padrão true)',
+        })
+        @jwt_required()
+        def get(self):
+            """Fila de triagem com análise de partes/representantes e sugestões de vínculo."""
+            user_id = get_jwt_identity()
+            from app import User, Cliente
+            from djen_triagem import analisar_publicacao, sugerir_vinculos
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+
+            q = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id)
+
+            somente_pendentes = request.args.get('somente_pendentes', 'true').lower() != 'false'
+            if somente_pendentes:
+                q = q.filter(PublicacaoDJEN.caso_id.is_(None))
+
+            limit = min(int(request.args.get('limit', 20)), 100)
+            offset = int(request.args.get('offset', 0))
+
+            total = q.count()
+            pubs = q.order_by(PublicacaoDJEN.data_disponibilizacao.desc()).offset(offset).limit(limit).all()
+
+            itens = []
+            for pub in pubs:
+                analise = analisar_publicacao(pub)
+                sugestoes = sugerir_vinculos(db, Cliente, Caso, user.tenant_id, analise)
+                itens.append({
+                    'publicacao': pub.to_dict(),
+                    'analise': analise,
+                    'sugestoes': sugestoes,
+                })
+
+            return {
+                'total': total,
+                'limit': limit,
+                'offset': offset,
+                'items': itens,
+            }, 200
+
     @djen_ns.route('/publicacoes/<int:pub_id>')
     class PublicacaoDetailAPI(Resource):
         @djen_ns.doc(security='jsonWebToken')

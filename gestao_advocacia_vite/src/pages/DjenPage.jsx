@@ -23,6 +23,11 @@ export default function DjenPage() {
   const [loadingOabs, setLoadingOabs] = useState(false);
   const [novaOab, setNovaOab] = useState({ numero_oab: '', uf_oab: '', nome_advogado: '' });
   const [salvandoOab, setSalvandoOab] = useState(false);
+  const [ultimasPublicacoesDjen, setUltimasPublicacoesDjen] = useState([]);
+  const [loadingUltimasPublicacoesDjen, setLoadingUltimasPublicacoesDjen] = useState(false);
+  const [triagemItems, setTriagemItems] = useState([]);
+  const [triagemTotal, setTriagemTotal] = useState(0);
+  const [loadingTriagem, setLoadingTriagem] = useState(false);
 
   // Detalhe
   const [pubSelecionada, setPubSelecionada] = useState(null);
@@ -84,11 +89,59 @@ export default function DjenPage() {
     } catch { /* silencioso */ }
   }, []);
 
+  // ── Últimas publicações DJEN para aba OABs ────────────────────────────────
+  const carregarUltimasPublicacoesDjen = useCallback(async () => {
+    setLoadingUltimasPublicacoesDjen(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', '8');
+      params.set('offset', '0');
+
+      const res = await fetch(`${API_URL}/djen/publicacoes?${params}`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setUltimasPublicacoesDjen(data.items || []);
+      } else {
+        setUltimasPublicacoesDjen([]);
+      }
+    } catch {
+      setUltimasPublicacoesDjen([]);
+    } finally {
+      setLoadingUltimasPublicacoesDjen(false);
+    }
+  }, []);
+
+  // ── Carregar fila de triagem ───────────────────────────────────────────────
+  const carregarTriagem = useCallback(async () => {
+    setLoadingTriagem(true);
+    try {
+      const res = await fetch(`${API_URL}/djen/triagem?limit=30&somente_pendentes=true`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTriagemItems(data.items || []);
+        setTriagemTotal(data.total || 0);
+      } else {
+        toast.error('Erro ao carregar fila de triagem DJEN.');
+      }
+    } catch {
+      toast.error('Erro de conexão na triagem DJEN.');
+    } finally {
+      setLoadingTriagem(false);
+    }
+  }, []);
+
   useEffect(() => {
     carregarPublicacoes(0);
     carregarOabs();
     carregarCasos();
-  }, [carregarPublicacoes, carregarOabs, carregarCasos]);
+    carregarTriagem();
+    carregarUltimasPublicacoesDjen();
+  }, [carregarPublicacoes, carregarOabs, carregarCasos, carregarTriagem, carregarUltimasPublicacoesDjen]);
 
   // ── Sincronizar ─────────────────────────────────────────────────────────────
   const sincronizar = async () => {
@@ -112,6 +165,8 @@ export default function DjenPage() {
         setOffset(0);
         await carregarPublicacoes(0);
         await carregarOabs();
+        await carregarTriagem();
+        await carregarUltimasPublicacoesDjen();
       } else {
         toast.error(payload.message || 'Erro ao sincronizar.');
       }
@@ -151,6 +206,8 @@ export default function DjenPage() {
       if (res.ok) {
         const updated = await res.json();
         setPublicacoes(prev => prev.map(p => p.id === pub.id ? updated : p));
+        setTriagemItems(prev => prev.filter(i => i.publicacao.id !== pub.id));
+        setTriagemTotal(prev => Math.max(0, prev - 1));
         if (pubSelecionada?.id === pub.id) setPubSelecionada(updated);
         toast.success('Vínculo atualizado.');
       }
@@ -285,10 +342,20 @@ export default function DjenPage() {
         <li className="nav-item">
           <button
             className={`nav-link ${aba === 'oabs' ? 'active fw-semibold' : ''}`}
-            onClick={() => { setAba('oabs'); carregarOabs(); }}
+            onClick={() => { setAba('oabs'); carregarOabs(); carregarUltimasPublicacoesDjen(); }}
           >
             <i className="bi bi-person-badge me-1" />
             Monitorar OABs
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${aba === 'triagem' ? 'active fw-semibold' : ''}`}
+            onClick={() => { setAba('triagem'); carregarTriagem(); }}
+          >
+            <i className="bi bi-magic me-1" />
+            Triagem IA
+            {triagemTotal > 0 && <span className="badge bg-warning text-dark ms-2">{triagemTotal}</span>}
           </button>
         </li>
       </ul>
@@ -580,7 +647,167 @@ export default function DjenPage() {
                 )}
               </div>
             </div>
+
+            <div className="card shadow-sm border-0 mt-3">
+              <div className="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span><i className="bi bi-journal-text me-2" />Últimas publicações capturadas</span>
+                <button className="btn btn-outline-primary btn-sm" onClick={carregarUltimasPublicacoesDjen}>
+                  <i className="bi bi-arrow-repeat me-1" />Atualizar
+                </button>
+              </div>
+              <div className="card-body p-0">
+                {loadingUltimasPublicacoesDjen ? (
+                  <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
+                ) : ultimasPublicacoesDjen.length === 0 ? (
+                  <div className="p-3 text-muted small">
+                    Nenhuma publicação foi capturada ainda. Clique em <strong>Sincronizar agora</strong> para buscar no DJEN.
+                  </div>
+                ) : (
+                  <div className="list-group list-group-flush">
+                    {ultimasPublicacoesDjen.map((pub) => (
+                      <button
+                        key={pub.id}
+                        type="button"
+                        className="list-group-item list-group-item-action"
+                        onClick={() => { setAba('publicacoes'); setPubSelecionada(pub); }}
+                      >
+                        <div className="d-flex justify-content-between align-items-start gap-2">
+                          <div className="small" style={{ minWidth: 0 }}>
+                            <div className="fw-semibold text-truncate">
+                              {pub.numero_processo_mascara || pub.numero_processo || 'Sem número de processo'}
+                            </div>
+                            <div className="text-muted text-truncate">
+                              {pub.sigla_tribunal || '—'} · {pub.tipo_comunicacao || 'Comunicação'}
+                            </div>
+                          </div>
+                          <span className={`badge ${pub.lida ? 'bg-secondary' : 'bg-primary'}`}>
+                            {pub.lida ? 'Lida' : 'Nova'}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Aba Triagem ───────────────────────────────────────────────────── */}
+      {aba === 'triagem' && (
+        <div className="row g-3">
+          <div className="col-12">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <div className="small text-muted">
+                {triagemTotal} publicação(ões) pendente(s) de triagem inteligente
+              </div>
+              <button className="btn btn-outline-primary btn-sm" onClick={carregarTriagem}>
+                <i className="bi bi-arrow-repeat me-1" />Atualizar triagem
+              </button>
+            </div>
+          </div>
+
+          {loadingTriagem ? (
+            <div className="col-12 text-center py-5"><div className="spinner-border text-primary" /></div>
+          ) : triagemItems.length === 0 ? (
+            <div className="col-12">
+              <div className="alert alert-success mb-0">
+                Nenhuma pendência na fila de triagem. As publicações novas aparecerão aqui após a sincronização.
+              </div>
+            </div>
+          ) : (
+            triagemItems.map(item => {
+              const pub = item.publicacao;
+              const analise = item.analise || {};
+              const sugestoes = item.sugestoes || {};
+              return (
+                <div className="col-12" key={pub.id}>
+                  <div className="card border-0 shadow-sm">
+                    <div className="card-body">
+                      <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                        <div>
+                          <div className="fw-semibold">
+                            {pub.numero_processo_mascara || pub.numero_processo || 'Sem número de processo'}
+                          </div>
+                          <div className="small text-muted">
+                            {pub.sigla_tribunal || '—'} · confiança da análise: {Math.round((analise.confianca || 0) * 100)}%
+                          </div>
+                        </div>
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-outline-secondary btn-sm"
+                            onClick={() => marcarLida(pub, true)}
+                          >
+                            Marcar lida
+                          </button>
+                          {sugestoes?.casos?.[0] && (
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => vincularCaso(pub, sugestoes.casos[0].id)}
+                            >
+                              Vincular ao caso sugerido
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <hr />
+
+                      <div className="row g-3 small">
+                        <div className="col-md-4">
+                          <div className="text-muted fw-semibold mb-1">Partes autoras</div>
+                          {(analise.partes_autoras || []).length > 0
+                            ? analise.partes_autoras.map((p, idx) => <div key={`a-${idx}`}>{p}</div>)
+                            : <div className="text-muted">—</div>}
+                        </div>
+                        <div className="col-md-4">
+                          <div className="text-muted fw-semibold mb-1">Partes rés</div>
+                          {(analise.partes_reus || []).length > 0
+                            ? analise.partes_reus.map((p, idx) => <div key={`r-${idx}`}>{p}</div>)
+                            : <div className="text-muted">—</div>}
+                        </div>
+                        <div className="col-md-4">
+                          <div className="text-muted fw-semibold mb-1">Representantes</div>
+                          {(analise.representantes || []).length > 0
+                            ? analise.representantes.map((p, idx) => <div key={`rep-${idx}`}>{p}</div>)
+                            : <div className="text-muted">—</div>}
+                        </div>
+                      </div>
+
+                      <div className="row g-3 small mt-1">
+                        <div className="col-md-6">
+                          <div className="text-muted fw-semibold mb-1">Sugestões de casos</div>
+                          {(sugestoes.casos || []).length > 0 ? (
+                            sugestoes.casos.map((s) => (
+                              <div key={`caso-${s.id}`} className="mb-1">
+                                <button
+                                  className="btn btn-link btn-sm p-0 text-start"
+                                  onClick={() => vincularCaso(pub, s.id)}
+                                >
+                                  #{s.id} {s.numero_processo || s.titulo} ({Math.round((s.score || 0) * 100)}%)
+                                </button>
+                              </div>
+                            ))
+                          ) : <div className="text-muted">Nenhuma sugestão de caso.</div>}
+                        </div>
+                        <div className="col-md-6">
+                          <div className="text-muted fw-semibold mb-1">Sugestões de clientes</div>
+                          {(sugestoes.clientes || []).length > 0 ? (
+                            sugestoes.clientes.map((s) => (
+                              <div key={`cli-${s.id}`} className="mb-1">
+                                {s.nome_razao_social} ({Math.round((s.score || 0) * 100)}%)
+                              </div>
+                            ))
+                          ) : <div className="text-muted">Nenhuma sugestão de cliente.</div>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       )}
     </div>
