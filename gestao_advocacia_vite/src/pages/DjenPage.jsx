@@ -28,6 +28,8 @@ export default function DjenPage() {
   const [triagemItems, setTriagemItems] = useState([]);
   const [triagemTotal, setTriagemTotal] = useState(0);
   const [loadingTriagem, setLoadingTriagem] = useState(false);
+  const [triagemSelecionadas, setTriagemSelecionadas] = useState([]);
+  const [processandoLoteTriagem, setProcessandoLoteTriagem] = useState(false);
 
   // Detalhe
   const [pubSelecionada, setPubSelecionada] = useState(null);
@@ -125,6 +127,7 @@ export default function DjenPage() {
         const data = await res.json();
         setTriagemItems(data.items || []);
         setTriagemTotal(data.total || 0);
+        setTriagemSelecionadas([]);
       } else {
         toast.error('Erro ao carregar fila de triagem DJEN.');
       }
@@ -241,6 +244,56 @@ export default function DjenPage() {
       toast.success(`Cliente/Caso processados: ${clienteNome} · ${casoNumero}`);
     } catch {
       toast.error('Erro de conexão ao criar cliente/caso.');
+    }
+  };
+
+  const toggleSelecaoTriagem = (pubId) => {
+    setTriagemSelecionadas(prev => (
+      prev.includes(pubId) ? prev.filter(id => id !== pubId) : [...prev, pubId]
+    ));
+  };
+
+  const selecionarTodasTriagem = () => {
+    const ids = triagemItems.map(i => i.publicacao.id);
+    setTriagemSelecionadas(ids);
+  };
+
+  const limparSelecaoTriagem = () => {
+    setTriagemSelecionadas([]);
+  };
+
+  const processarLoteTriagem = async () => {
+    if (triagemSelecionadas.length === 0) {
+      toast.info('Selecione ao menos uma publicação na triagem.');
+      return;
+    }
+
+    setProcessandoLoteTriagem(true);
+    try {
+      const res = await fetch(`${API_URL}/djen/triagem/processar-lote`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pub_ids: triagemSelecionadas }),
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(payload.message || 'Erro ao processar lote da triagem.');
+        return;
+      }
+
+      const processadas = payload.processadas ?? 0;
+      const erros = payload.erros ?? 0;
+      toast.success(`Lote concluído: ${processadas} processada(s), ${erros} erro(s).`);
+
+      await carregarTriagem();
+      await carregarPublicacoes(0);
+      await carregarCasos();
+      await carregarUltimasPublicacoesDjen();
+    } catch {
+      toast.error('Erro de conexão no processamento em lote.');
+    } finally {
+      setProcessandoLoteTriagem(false);
     }
   };
 
@@ -730,9 +783,24 @@ export default function DjenPage() {
               <div className="small text-muted">
                 {triagemTotal} publicação(ões) pendente(s) de triagem inteligente
               </div>
-              <button className="btn btn-outline-primary btn-sm" onClick={carregarTriagem}>
-                <i className="bi bi-arrow-repeat me-1" />Atualizar triagem
-              </button>
+              <div className="d-flex gap-2">
+                <button className="btn btn-outline-secondary btn-sm" onClick={selecionarTodasTriagem}>
+                  Selecionar todas
+                </button>
+                <button className="btn btn-outline-secondary btn-sm" onClick={limparSelecaoTriagem}>
+                  Limpar seleção
+                </button>
+                <button className="btn btn-outline-primary btn-sm" onClick={carregarTriagem}>
+                  <i className="bi bi-arrow-repeat me-1" />Atualizar triagem
+                </button>
+                <button
+                  className="btn btn-success btn-sm"
+                  onClick={processarLoteTriagem}
+                  disabled={processandoLoteTriagem || triagemSelecionadas.length === 0}
+                >
+                  {processandoLoteTriagem ? 'Processando lote...' : `Processar selecionadas (${triagemSelecionadas.length})`}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -753,6 +821,19 @@ export default function DjenPage() {
                 <div className="col-12" key={pub.id}>
                   <div className="card border-0 shadow-sm">
                     <div className="card-body">
+                      <div className="form-check mb-2">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id={`triagem-check-${pub.id}`}
+                          checked={triagemSelecionadas.includes(pub.id)}
+                          onChange={() => toggleSelecaoTriagem(pub.id)}
+                        />
+                        <label className="form-check-label small" htmlFor={`triagem-check-${pub.id}`}>
+                          Selecionar para processamento em lote
+                        </label>
+                      </div>
+
                       <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                         <div>
                           <div className="fw-semibold">

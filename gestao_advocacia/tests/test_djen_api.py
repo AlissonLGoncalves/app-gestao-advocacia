@@ -466,6 +466,49 @@ class TestDjenTriagem:
         resp = client.post('/api/djen/triagem/1/criar-cliente-caso')
         assert resp.status_code == 401
 
+    def test_triagem_processar_lote(self, auth_client, db, app):
+        """POST /api/djen/triagem/processar-lote processa múltiplas publicações."""
+        pub_ids = []
+        with app.app_context():
+            from app import User
+            user = User.query.filter_by(username='testuser').first()
+
+            for idx in range(2):
+                pub = PublicacaoDJEN(
+                    tenant_id=user.tenant_id,
+                    user_id=user.id,
+                    djen_id=9950 + idx,
+                    hash_comunicacao=f'hash-triagem-lote-{idx}',
+                    numero_processo=f'00088{idx}7-12.2025.8.16.0001',
+                    sigla_tribunal='TJPR',
+                    tipo_comunicacao='Intimacao',
+                    data_disponibilizacao=date.today(),
+                    texto=f'AUTOR: Pessoa {idx}; REU: Empresa {idx}; ADVOGADO: Dr. Triagem {idx}',
+                    origem_busca='oab',
+                    lida=False,
+                )
+                db.session.add(pub)
+                db.session.flush()
+                pub_ids.append(pub.id)
+            db.session.commit()
+
+        resp = auth_client.post('/api/djen/triagem/processar-lote', json={'pub_ids': pub_ids})
+        assert resp.status_code == 200
+        payload = json.loads(resp.data)
+        assert payload['total_recebidas'] == 2
+        assert payload['processadas'] == 2
+        assert payload['erros'] == 0
+
+        with app.app_context():
+            pubs = PublicacaoDJEN.query.filter(PublicacaoDJEN.id.in_(pub_ids)).all()
+            assert all(p.caso_id is not None for p in pubs)
+            assert all(p.lida is True for p in pubs)
+
+    def test_triagem_processar_lote_sem_autenticacao(self, client, db):
+        """POST /api/djen/triagem/processar-lote sem token retorna 401."""
+        resp = client.post('/api/djen/triagem/processar-lote', json={'pub_ids': [1, 2]})
+        assert resp.status_code == 401
+
 
 # ---------------------------------------------------------------------------
 # Isolamento de tenant
