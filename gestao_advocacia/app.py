@@ -485,6 +485,7 @@ class DjenOabMonitoramento(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_djen_oab_user_id'), nullable=False)
     numero_oab = db.Column(db.String(30), nullable=False)
     uf_oab = db.Column(db.String(2), nullable=True)
+    sigla_tribunal = db.Column(db.String(20), nullable=True)  # ex: TRT9, TJPR, TST
     nome_advogado = db.Column(db.String(200), nullable=True)
     ativo = db.Column(db.Boolean, default=True)
     ultima_sincronizacao = db.Column(db.DateTime, nullable=True)
@@ -496,6 +497,7 @@ class DjenOabMonitoramento(db.Model):
         return {
             'id': self.id, 'user_id': self.user_id, 'tenant_id': self.tenant_id,
             'numero_oab': self.numero_oab, 'uf_oab': self.uf_oab,
+            'sigla_tribunal': self.sigla_tribunal,
             'nome_advogado': self.nome_advogado, 'ativo': self.ativo,
             'ultima_sincronizacao': self.ultima_sincronizacao.isoformat() if self.ultima_sincronizacao else None,
             'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None,

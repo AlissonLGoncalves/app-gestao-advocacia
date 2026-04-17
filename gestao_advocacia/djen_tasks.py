@@ -169,15 +169,21 @@ def _parse_data_disponibilizacao(valor):
 
 
 def _normalizar_sigla_tribunal(uf_ou_sigla):
-    """Normaliza UF/sigla para formato aceito pelo CNJ (ex.: PR -> TJPR)."""
+    """Normaliza UF/sigla para formato aceito pelo CNJ.
+    
+    - UF de 2 letras (ex.: PR) → TJPR
+    - Siglas explícitas como TRT9, TST, STJ → retorna como está
+    """
     if not uf_ou_sigla:
         return None
     valor = str(uf_ou_sigla).strip().upper()
     if not valor:
         return None
-    if len(valor) == 2:
-        return f"TJ{valor}"
-    return valor
+    # Siglas com mais de 2 chars são usadas diretamente (TRT9, TJPR, TST, etc.)
+    if len(valor) > 2:
+        return valor
+    # UF de 2 chars → prefixo TJ
+    return f"TJ{valor}"
 
 
 def _normalizar_numero_oab(numero_oab):
@@ -298,7 +304,11 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
                 f"(tenant: {oab_mon.tenant_id})"
             )
             try:
-                sigla_tribunal = _normalizar_sigla_tribunal(oab_mon.uf_oab)
+                sigla_tribunal = (
+                    oab_mon.sigla_tribunal
+                    if getattr(oab_mon, 'sigla_tribunal', None)
+                    else _normalizar_sigla_tribunal(oab_mon.uf_oab)
+                )
                 numero_oab = _normalizar_numero_oab(oab_mon.numero_oab)
                 data, items = _consultar_oab_com_fallback(
                     numero_oab=numero_oab,

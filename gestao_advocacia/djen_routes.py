@@ -267,6 +267,9 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
                 uf_oab=uf,
                 nome_advogado=(data.get('nome_advogado') or '').strip() or None,
             )
+            sigla_raw = (data.get('sigla_tribunal') or '').strip().upper()
+            if sigla_raw:
+                oab.sigla_tribunal = sigla_raw
             db.session.add(oab)
             db.session.commit()
             return oab, 201

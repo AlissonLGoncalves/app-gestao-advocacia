@@ -22,7 +22,7 @@ export default function DjenPage() {
   // OABs monitoradas
   const [oabs, setOabs] = useState([]);
   const [loadingOabs, setLoadingOabs] = useState(false);
-  const [novaOab, setNovaOab] = useState({ numero_oab: '', uf_oab: '', nome_advogado: '' });
+  const [novaOab, setNovaOab] = useState({ numero_oab: '', uf_oab: '', nome_advogado: '', sigla_tribunal: '' });
   const [salvandoOab, setSalvandoOab] = useState(false);
   const [ultimasPublicacoesDjen, setUltimasPublicacoesDjen] = useState([]);
   const [loadingUltimasPublicacoesDjen, setLoadingUltimasPublicacoesDjen] = useState(false);
@@ -356,7 +356,7 @@ export default function DjenPage() {
       });
       if (res.ok) {
         toast.success('OAB cadastrada para monitoramento!');
-        setNovaOab({ numero_oab: '', uf_oab: '', nome_advogado: '' });
+        setNovaOab({ numero_oab: '', uf_oab: '', nome_advogado: '', sigla_tribunal: '' });
         carregarOabs();
       } else {
         const err = await res.json();
@@ -733,6 +733,13 @@ export default function DjenPage() {
                     </select>
                   </div>
                   <div className="mb-3">
+                    <label className="form-label small">Tribunal (sigla) <span className="text-muted fw-normal">— opcional, ex: TRT9, TJPR, TST</span></label>
+                    <input className="form-control" placeholder="Deixe em branco para usar a UF (ex: TJPR)"
+                      value={novaOab.sigla_tribunal}
+                      onChange={e => setNovaOab(o => ({ ...o, sigla_tribunal: e.target.value.toUpperCase() }))} />
+                    <div className="form-text">Use quando a OAB atua em TRTs, TST, STJ, etc.</div>
+                  </div>
+                  <div className="mb-3">
                     <label className="form-label small">Nome do advogado (opcional)</label>
                     <input className="form-control" placeholder="Para identificação interna"
                       value={novaOab.nome_advogado}
@@ -771,7 +778,7 @@ export default function DjenPage() {
                     <thead className="table-light">
                       <tr>
                         <th className="small">OAB</th>
-                        <th className="small">UF</th>
+                        <th className="small">Tribunal</th>
                         <th className="small">Advogado</th>
                         <th className="small">Última sync</th>
                         <th className="small"></th>
@@ -781,7 +788,7 @@ export default function DjenPage() {
                       {oabs.map(o => (
                         <tr key={o.id}>
                           <td className="fw-semibold small">{o.numero_oab}</td>
-                          <td className="small"><span className="badge bg-secondary">{o.uf_oab}</span></td>
+                          <td className="small"><span className="badge bg-secondary">{o.sigla_tribunal || o.uf_oab}</span></td>
                           <td className="small text-muted">{o.nome_advogado || '—'}</td>
                           <td className="small text-muted">{o.ultima_sincronizacao ? fmtData(o.ultima_sincronizacao) : 'Nunca'}</td>
                           <td>
