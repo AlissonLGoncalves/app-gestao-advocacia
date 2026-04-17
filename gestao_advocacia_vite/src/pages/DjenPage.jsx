@@ -216,6 +216,34 @@ export default function DjenPage() {
     }
   };
 
+  // ── Criar cliente + caso via triagem ──────────────────────────────────────
+  const criarClienteECasoTriagem = async (pub) => {
+    try {
+      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/criar-cliente-caso`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(payload.message || 'Erro ao criar cliente/caso pela triagem.');
+        return;
+      }
+
+      setTriagemItems(prev => prev.filter(i => i.publicacao.id !== pub.id));
+      setTriagemTotal(prev => Math.max(0, prev - 1));
+      await carregarPublicacoes(0);
+      await carregarCasos();
+      await carregarUltimasPublicacoesDjen();
+
+      const clienteNome = payload?.cliente?.nome_razao_social || 'Cliente';
+      const casoNumero = payload?.caso?.numero_processo || payload?.caso?.titulo || `#${payload?.caso?.id}`;
+      toast.success(`Cliente/Caso processados: ${clienteNome} · ${casoNumero}`);
+    } catch {
+      toast.error('Erro de conexão ao criar cliente/caso.');
+    }
+  };
+
   // ── Salvar OAB ──────────────────────────────────────────────────────────────
   const salvarOab = async (e) => {
     e.preventDefault();
@@ -740,6 +768,12 @@ export default function DjenPage() {
                             onClick={() => marcarLida(pub, true)}
                           >
                             Marcar lida
+                          </button>
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={() => criarClienteECasoTriagem(pub)}
+                          >
+                            Criar cliente e caso
                           </button>
                           {sugestoes?.casos?.[0] && (
                             <button

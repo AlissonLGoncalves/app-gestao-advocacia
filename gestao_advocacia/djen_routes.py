@@ -240,6 +240,127 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
                 'items': itens,
             }, 200
 
+    @djen_ns.route('/triagem/<int:pub_id>/criar-cliente-caso')
+    class PublicacaoTriagemCriarCasoAPI(Resource):
+        @djen_ns.doc(security='jsonWebToken', description="Cria cliente/caso a partir da publicação e vincula automaticamente.")
+        @jwt_required()
+        def post(self, pub_id):
+            """Ação manual segura da triagem: cria cliente + caso e vincula a publicação."""
+            user_id = get_jwt_identity()
+            from app import User, Cliente
+            from djen_triagem import analisar_publicacao
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+
+            pub = PublicacaoDJEN.query.filter_by(id=pub_id, tenant_id=user.tenant_id).first()
+            if not pub:
+                djen_ns.abort(404, "Publicação não encontrada.")
+
+            if pub.caso_id:
+                return {
+                    'message': 'Publicação já está vinculada a um caso.',
+                    'publicacao': pub.to_dict(),
+                }, 200
+
+            analise = analisar_publicacao(pub)
+            numero_processo = (analise.get('numero_processo') or pub.numero_processo or '').strip()
+
+            nome_cliente = None
+            if (analise.get('partes_autoras') or []):
+                nome_cliente = analise['partes_autoras'][0]
+            elif (analise.get('partes_reus') or []):
+                nome_cliente = analise['partes_reus'][0]
+            else:
+                nome_cliente = f"Cliente DJEN {pub.id}"
+
+            cliente = Cliente.query.filter(
+                Cliente.tenant_id == user.tenant_id,
+                Cliente.user_id == int(user_id),
+                Cliente.nome_razao_social.ilike(nome_cliente),
+            ).first()
+
+            cliente_criado = False
+            if not cliente:
+                documento_base = f"DJEN-{pub.id}"
+                documento = documento_base
+                contador = 1
+                while Cliente.query.filter_by(
+                    tenant_id=user.tenant_id,
+                    user_id=int(user_id),
+                    cpf_cnpj=documento,
+                ).first():
+                    contador += 1
+                    documento = f"{documento_base}-{contador}"[:20]
+
+                cliente = Cliente(
+                    tenant_id=user.tenant_id,
+                    user_id=int(user_id),
+                    nome_razao_social=nome_cliente[:200],
+                    cpf_cnpj=documento,
+                    tipo_pessoa='PF',
+                    notas_gerais='Criado automaticamente pela triagem DJEN (revisão manual recomendada).',
+                )
+                db.session.add(cliente)
+                db.session.flush()
+                cliente_criado = True
+
+            caso = None
+            if numero_processo:
+                caso = Caso.query.filter_by(
+                    tenant_id=user.tenant_id,
+                    user_id=int(user_id),
+                    numero_processo=numero_processo,
+                ).first()
+
+            caso_criado = False
+            if not caso:
+                titulo = f"Processo {numero_processo}" if numero_processo else f"Caso DJEN #{pub.id}"
+                parte_contraria = (analise.get('partes_reus') or [None])[0]
+                adv_parte_contraria = (analise.get('representantes') or [None])[0]
+
+                caso = Caso(
+                    tenant_id=user.tenant_id,
+                    user_id=int(user_id),
+                    cliente_id=cliente.id,
+                    titulo=titulo[:200],
+                    numero_processo=numero_processo or None,
+                    status='Ativo',
+                    tipo_acao=(pub.nome_classe or 'A definir')[:100],
+                    parte_contraria=(parte_contraria or '')[:200] or None,
+                    adv_parte_contraria=(adv_parte_contraria or '')[:200] or None,
+                    notas_caso='Caso criado automaticamente pela triagem DJEN (validar dados extraídos).',
+                )
+                db.session.add(caso)
+                db.session.flush()
+                caso_criado = True
+
+            pub.caso_id = caso.id
+            pub.lida = True
+
+            notas_auto = f"[TRIAGEM DJEN] Vinculado ao caso #{caso.id}."
+            pub.notas = f"{pub.notas}\n{notas_auto}".strip() if pub.notas else notas_auto
+
+            db.session.commit()
+
+            return {
+                'message': 'Cliente/Caso processados com sucesso pela triagem.',
+                'cliente_criado': cliente_criado,
+                'caso_criado': caso_criado,
+                'cliente': {
+                    'id': cliente.id,
+                    'nome_razao_social': cliente.nome_razao_social,
+                    'cpf_cnpj': cliente.cpf_cnpj,
+                },
+                'caso': {
+                    'id': caso.id,
+                    'titulo': caso.titulo,
+                    'numero_processo': caso.numero_processo,
+                },
+                'publicacao': pub.to_dict(),
+            }, 200
+
     @djen_ns.route('/publicacoes/<int:pub_id>')
     class PublicacaoDetailAPI(Resource):
         @djen_ns.doc(security='jsonWebToken')

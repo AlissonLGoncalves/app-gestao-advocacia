@@ -423,6 +423,49 @@ class TestDjenTriagem:
         resp = client.get('/api/djen/triagem')
         assert resp.status_code == 401
 
+    def test_triagem_criar_cliente_caso(self, auth_client, db, app):
+        """POST /api/djen/triagem/<id>/criar-cliente-caso cria e vincula entidades."""
+        pub_id = None
+        with app.app_context():
+            from app import User
+            user = User.query.filter_by(username='testuser').first()
+
+            pub = PublicacaoDJEN(
+                tenant_id=user.tenant_id,
+                user_id=user.id,
+                djen_id=9901,
+                hash_comunicacao='hash-triagem-9901',
+                numero_processo='0007777-12.2025.8.16.0001',
+                sigla_tribunal='TJPR',
+                tipo_comunicacao='Intimacao',
+                data_disponibilizacao=date.today(),
+                texto='AUTOR: Carla Souza; REU: Empresa Alfa LTDA; ADVOGADO: Dr. Pedro Lopes',
+                origem_busca='oab',
+                lida=False,
+            )
+            db.session.add(pub)
+            db.session.commit()
+            pub_id = pub.id
+
+        resp = auth_client.post(f'/api/djen/triagem/{pub_id}/criar-cliente-caso')
+        assert resp.status_code == 200
+        payload = json.loads(resp.data)
+
+        assert payload['cliente']['id'] is not None
+        assert payload['caso']['id'] is not None
+        assert payload['publicacao']['caso_id'] == payload['caso']['id']
+        assert payload['publicacao']['lida'] is True
+
+        with app.app_context():
+            pub_db = PublicacaoDJEN.query.get(pub_id)
+            assert pub_db is not None
+            assert pub_db.caso_id == payload['caso']['id']
+
+    def test_triagem_criar_cliente_caso_sem_autenticacao(self, client, db):
+        """POST /api/djen/triagem/<id>/criar-cliente-caso sem token retorna 401."""
+        resp = client.post('/api/djen/triagem/1/criar-cliente-caso')
+        assert resp.status_code == 401
+
 
 # ---------------------------------------------------------------------------
 # Isolamento de tenant
