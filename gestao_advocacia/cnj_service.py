@@ -61,6 +61,12 @@ def extrair_segmento_tr_processo(numero_processo_completo):
     Retorna a string do TR (ex: '02') ou None se o formato for inesperado.
     """
     try:
+        numero_digitos = ''.join(filter(str.isdigit, str(numero_processo_completo or '')))
+        if len(numero_digitos) == 20:
+            # Formato canonico CNJ em digitos: NNNNNNNDDAAAAJTTOOOO
+            # J na posicao 13 e TR nas posicoes 14-15
+            return f"{numero_digitos[13]}.{numero_digitos[14:16]}"
+
         partes = numero_processo_completo.split('.')
         if len(partes) == 5: # Formato NNNNNNN-DD.AAAA.J.TR.OOOO tem 5 partes
             return f"{partes[2]}.{partes[3]}" # J e TR (ex: 8.16)

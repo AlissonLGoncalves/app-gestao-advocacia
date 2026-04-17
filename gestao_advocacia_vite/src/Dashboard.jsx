@@ -184,18 +184,34 @@ function Dashboard({ mudarSecao }) {
     setResultadoConsulta(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(consultaCnjInput)}`, {
+      const response = await fetch(`${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(limpo)}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await response.json();
+
+      let data = {};
+      const isJson = (response.headers.get('content-type') || '').includes('application/json');
+      if (isJson) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { message: text || `Erro HTTP ${response.status}` };
+      }
       
       if (!response.ok) {
-         setResultadoConsulta({ erro: data.message || "Falha ao buscar processo." });
+         const detalhe = data?.detalhes?.erro || data?.detalhes?.detalhes_servico_cnj || data?.detalhes || '';
+         let mensagem = data.message || "Falha ao buscar processo.";
+         if (response.status === 503) {
+           mensagem = "Servico CNJ/DataJud indisponivel no momento.";
+         }
+         if (detalhe && typeof detalhe === 'string') {
+           mensagem = `${mensagem} ${detalhe}`.trim();
+         }
+         setResultadoConsulta({ erro: mensagem });
       } else {
          setResultadoConsulta(data);
       }
     } catch (e) {
-      setResultadoConsulta({ erro: "Erro de conexão ao acessar o Tribunal." });
+      setResultadoConsulta({ erro: "Erro de conexão ao acessar o Tribunal/DataJud." });
     } finally {
       setBuscandoConsulta(false);
     }

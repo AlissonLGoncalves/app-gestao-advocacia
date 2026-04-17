@@ -5,6 +5,7 @@ import { API_URL } from '../../config';
 import { toast } from 'react-toastify';
 import { LockClosedIcon, UserIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom'; // Adicionado para o link de registro, se desejar
+import { APP_VERSION } from '../../version.js';
 
 function LoginPage() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
@@ -117,6 +118,7 @@ function LoginPage() {
           <p className="text-muted small mb-0">
             Não tem uma conta? <Link to="/register" className="fw-semibold">Registre-se aqui</Link>
           </p>
+          <p className="auth-version mt-2 mb-0">Versao v{APP_VERSION}</p>
         </div>
       </div>
     </div>

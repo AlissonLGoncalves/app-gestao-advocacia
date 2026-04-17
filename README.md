@@ -9,6 +9,14 @@ Um sistema web completo para gestão de escritórios de advocacia, permitindo o 
 
 ---
 
+## Versionamento
+
+Para padronizar atualizações de versão (incluindo quando usar `1.0`, `1.1`, `1.2` ou `2.0`), use o guia oficial do projeto:
+
+**[GUIA_VERSIONAMENTO.md](GUIA_VERSIONAMENTO.md)**
+
+---
+
 ## Funcionalidades Principais
 
 * **Dashboard Intuitivo:** Visão geral com os próximos eventos e status financeiro.

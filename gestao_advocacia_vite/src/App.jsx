@@ -23,6 +23,7 @@ import RegisterPage from './pages/auth/RegisterPage.jsx';
 import TermsPage from './pages/auth/TermsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import DjenPage from './pages/DjenPage.jsx';
+import { APP_VERSION } from './version.js';
 
 // Importação dos ícones
 import {
@@ -161,7 +162,9 @@ const MainLayout = () => {
             <ArrowLeftOnRectangleIcon className="sidebar-link-icon" />
             <span>Sair</span>
           </button>
-          <div className="sidebar-copyright mt-3">&copy; {new Date().getFullYear()} Patronus</div>
+          <div className="sidebar-copyright mt-3">
+            &copy; {new Date().getFullYear()} Patronus <span className="app-version">v{APP_VERSION}</span>
+          </div>
         </div>
       </aside>
 

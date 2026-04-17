@@ -1393,13 +1393,28 @@ def create_app(config_class=Config):
             numero = request.args.get('numero', '').strip()
             if not numero:
                 return {"message": "Informe o número do processo."}, 400
+
+            numero_limpo = ''.join(filter(str.isdigit, numero))
+            if len(numero_limpo) != 20:
+                return {"message": "Informe um número CNJ válido com 20 dígitos."}, 400
+
+            if not app.config.get('CNJ_API_KEY'):
+                app.logger.error("Consulta publica CNJ indisponivel: CNJ_API_KEY nao configurada.")
+                return {
+                    "message": "Servico de consulta CNJ indisponivel no momento. Configuracao de API pendente.",
+                    "detalhes": "Defina CNJ_API_KEY no backend para habilitar consultas DataJud."
+                }, 503
                 
             app.logger.info(f"Consulta pública live CNJ solicitada por user {user_id} para '{numero}'.")
             dados_resposta_cnj, status_http = consultar_processo_cnj(numero)
             
             if status_http >= 400:
                 app.logger.warning(f"Consulta live falhou com status {status_http}")
-                return {"message": "Falha na comunicação com o Tribunal/DataJud.", "detalhes": dados_resposta_cnj}, 400
+                msg = "Falha na comunicacao com o Tribunal/DataJud."
+                if isinstance(dados_resposta_cnj, dict):
+                    msg = dados_resposta_cnj.get("erro") or dados_resposta_cnj.get("message") or msg
+                status_retorno = status_http if status_http in [400, 401, 403, 404, 429, 500, 502, 503, 504] else 500
+                return {"message": msg, "detalhes": dados_resposta_cnj}, status_retorno
                 
             hits = dados_resposta_cnj.get("hits", {}).get("hits", [])
             if not hits:
