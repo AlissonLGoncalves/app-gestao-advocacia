@@ -17,7 +17,7 @@ export default function DjenPage() {
     data_inicio: '', data_fim: '', origem: '',
   });
   const [offset, setOffset] = useState(0);
-  const LIMIT = 50;
+  const [itensPorPagina, setItensPorPagina] = useState(20);
 
   // OABs monitoradas
   const [oabs, setOabs] = useState([]);
@@ -39,11 +39,11 @@ export default function DjenPage() {
   const token = () => localStorage.getItem('token');
 
   // ── Carregar publicações ────────────────────────────────────────────────────
-  const carregarPublicacoes = useCallback(async (offsetParam = 0) => {
+  const carregarPublicacoes = useCallback(async (offsetParam = 0, limitParam = itensPorPagina) => {
     setLoadingPubs(true);
     try {
       const params = new URLSearchParams();
-      params.set('limit', LIMIT);
+      params.set('limit', limitParam);
       params.set('offset', offsetParam);
       if (filtros.lida !== '') params.set('lida', filtros.lida);
       if (filtros.sigla_tribunal) params.set('sigla_tribunal', filtros.sigla_tribunal);
@@ -68,7 +68,7 @@ export default function DjenPage() {
     } finally {
       setLoadingPubs(false);
     }
-  }, [filtros]);
+  }, [filtros, itensPorPagina]);
 
   // ── Carregar OABs ───────────────────────────────────────────────────────────
   const carregarOabs = useCallback(async () => {
@@ -565,8 +565,28 @@ export default function DjenPage() {
               </div>
             ) : (
               <>
-                <div className="text-muted small mb-2">
-                  {total} publicação(ões) · página {Math.floor(offset / LIMIT) + 1}
+                <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 text-muted small mb-2">
+                  <span>
+                    {total} publicação(ões) · página {Math.floor(offset / itensPorPagina) + 1}
+                  </span>
+                  <div className="d-flex align-items-center gap-2">
+                    <label className="small mb-0">Por página</label>
+                    <select
+                      className="form-select form-select-sm"
+                      style={{ width: 90 }}
+                      value={itensPorPagina}
+                      onChange={(e) => {
+                        const novoLimite = Number(e.target.value);
+                        setItensPorPagina(novoLimite);
+                        setOffset(0);
+                        carregarPublicacoes(0, novoLimite);
+                      }}
+                    >
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
                 </div>
                 {publicacoes.map(pub => (
                   <div
@@ -606,11 +626,11 @@ export default function DjenPage() {
                 {/* Paginação */}
                 <div className="d-flex gap-2 mt-3">
                   <button className="btn btn-outline-secondary btn-sm" disabled={offset === 0}
-                    onClick={() => { const o = Math.max(0, offset - LIMIT); setOffset(o); carregarPublicacoes(o); }}>
+                    onClick={() => { const o = Math.max(0, offset - itensPorPagina); setOffset(o); carregarPublicacoes(o); }}>
                     ← Anterior
                   </button>
-                  <button className="btn btn-outline-secondary btn-sm" disabled={offset + LIMIT >= total}
-                    onClick={() => { const o = offset + LIMIT; setOffset(o); carregarPublicacoes(o); }}>
+                  <button className="btn btn-outline-secondary btn-sm" disabled={offset + itensPorPagina >= total}
+                    onClick={() => { const o = offset + itensPorPagina; setOffset(o); carregarPublicacoes(o); }}>
                     Próxima →
                   </button>
                 </div>
