@@ -44,6 +44,15 @@ def finance_access_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
+
+def tenant_scoped(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        # Garante defesa em profundidade: toda rota protegida precisa de tenant válido.
+        get_tenant_id()
+        return fn(*args, **kwargs)
+    return wrapper
+
 def get_tenant_id():
     # Helper central para extrair o Tenant logado. Resolve import circular
     from flask_jwt_extended import get_jwt_identity
@@ -51,68 +60,85 @@ def get_tenant_id():
     user = db.session.get(User, user_id)
     if not user:
         abort(401, "Acesso Inválido. Usuário não encontrado no banco.")
+    if user.tenant_id is None:
+        abort(403, "Acesso Negado (LGPD): Usuário sem tenant atribuído.")
     return user.tenant_id
 
-def get_list_query(model):
-    # Aplica isolamento por tenant E, quando aplicável, por usuário.
-    from flask_jwt_extended import get_jwt_identity
+
+def query_for_tenant(model):
+    # Helper único para queries com escopo de tenant e, quando existir, usuário.
     tenant_id = get_tenant_id()
     user_id = get_jwt_identity()
 
-    # Se o modelo tem a coluna tenant_id, SEMPRE filtrar por tenant (proteção contra vazamento de dados)
+    query = model.query
     if hasattr(model, 'tenant_id'):
-        # Se o usuário não tem tenant atribuído, negar acesso — não retornar registros órfãos
-        if tenant_id is None:
-            abort(403, "Acesso Negado (LGPD): Usuário sem tenant atribuído.")
-        query = model.query.filter_by(tenant_id=tenant_id)
-    else:
-        query = model.query
-
-    # Se o modelo tem coluna user_id, aplicar filtro por usuário (isolamento estrito por usuário)
+        query = query.filter_by(tenant_id=tenant_id)
     if hasattr(model, 'user_id'):
         query = query.filter_by(user_id=user_id)
-
     return query
 
+def get_list_query(model):
+    return query_for_tenant(model)
+
 def get_item_or_404(model, item_id):
-    from flask_jwt_extended import get_jwt_identity
     tenant_id = get_tenant_id()
     user_id = get_jwt_identity()
 
-    item = model.query.get_or_404(item_id)
+    item = query_for_tenant(model).filter_by(id=item_id).first()
+    if item:
+        return item
 
-    # Validação Cruzada (Cross-Tenant Breach Prevention)
-    if hasattr(item, 'tenant_id'):
-        # Se o item NÃO tem tenant_id (NULL), rejeita (dados órfãos/legados)
-        if not item.tenant_id:
-            abort(404, "Registro não encontrado ou não pertence ao seu escritório.")
-        # Se o item tem tenant_id diferente do usuario, rejeita
-        if item.tenant_id != tenant_id:
-            abort(403, "Acesso Negado (LGPD): Este registro pertence a outro Escritório (Cross-Tenant Request).")
+    # Log de tentativa de acesso indevido sem vazar para o cliente.
+    try:
+        alvo = db.session.get(model, item_id)
+        tenant_alvo = getattr(alvo, 'tenant_id', None) if alvo is not None else None
+        if hasattr(model, 'tenant_id'):
+            msg = "Cross-tenant access blocked | user_id=%s tenant_id_atual=%s tenant_id_alvo=%s endpoint=%s item_id=%s model=%s"
+            current_app.logger.warning(
+                msg,
+                user_id,
+                tenant_id,
+                tenant_alvo,
+                request.path,
+                item_id,
+                model.__name__,
+            )
+            logging.getLogger(__name__).warning(
+                msg,
+                user_id,
+                tenant_id,
+                tenant_alvo,
+                request.path,
+                item_id,
+                model.__name__,
+            )
+        elif alvo is not None and hasattr(alvo, 'user_id') and int(getattr(alvo, 'user_id', -1)) != int(user_id):
+            msg = "Cross-user access blocked | user_id=%s tenant_id_atual=%s tenant_id_alvo=%s endpoint=%s item_id=%s model=%s"
+            current_app.logger.warning(
+                msg,
+                user_id,
+                tenant_id,
+                tenant_alvo,
+                request.path,
+                item_id,
+                model.__name__,
+            )
+            logging.getLogger(__name__).warning(
+                msg,
+                user_id,
+                tenant_id,
+                tenant_alvo,
+                request.path,
+                item_id,
+                model.__name__,
+            )
+    except Exception:
+        pass
 
-    # Se o modelo tem owner por usuário, garantir que o usuário logado seja o owner
-    if hasattr(item, 'user_id'):
-        if item.user_id != int(user_id):
-            abort(403, "Acesso Negado: Este registro pertence a outro usuário no mesmo escritório.")
-
-    return item
+    abort(404, "Registro não encontrado.")
 
 def get_existing_item(model, **kwargs):
-    from flask_jwt_extended import get_jwt_identity
-    tenant_id = get_tenant_id()
-    user_id = get_jwt_identity()
-
-    # Se o modelo tem tenant_id, SEMPRE filtra por tenant (proteção obrigatória)
-    if hasattr(model, 'tenant_id'):
-        if tenant_id is None:
-            abort(403, "Acesso Negado (LGPD): Usuário sem tenant atribuído.")
-        kwargs['tenant_id'] = tenant_id
-
-    # Se o modelo tem owner por usuário, filtrar também por user_id
-    if hasattr(model, 'user_id'):
-        kwargs['user_id'] = user_id
-
-    return model.query.filter_by(**kwargs).first()
+    return query_for_tenant(model).filter_by(**kwargs).first()
 # Inicialização das extensões
 db = SQLAlchemy()
 migrate = Migrate()
@@ -1280,6 +1306,7 @@ def create_app(config_class=Config):
     @clientes_ns.route('/')
     class ClienteListAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @clientes_ns.marshal_list_with(cliente_model_dto)
         @clientes_ns.doc(security='jsonWebToken', description="Lista todos os clientes do usuário autenticado.")
         def get(self):
@@ -1288,7 +1315,7 @@ def create_app(config_class=Config):
             tipo_pessoa = request.args.get('tipo_pessoa', '').strip()
             sort_by = request.args.get('sort_by', 'nome_razao_social')
             sort_order = request.args.get('sort_order', 'asc')
-            query = Cliente.query.filter_by(user_id=user_id)
+            query = query_for_tenant(Cliente)
             
             if search:
                 like = f'%{search}%'
@@ -1309,6 +1336,7 @@ def create_app(config_class=Config):
             return query.all()
 
         @jwt_required()
+        @tenant_scoped
         @clientes_ns.expect(cliente_input_model_dto)
         @clientes_ns.marshal_with(cliente_model_dto, code=201)
         @clientes_ns.doc(security='jsonWebToken', description="Cria um novo cliente para o usuário autenticado.")
@@ -1338,6 +1366,7 @@ def create_app(config_class=Config):
     @clientes_ns.param('cliente_id_param', 'O ID único do cliente')
     class ClienteDetailAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @clientes_ns.marshal_with(cliente_model_dto)
         @clientes_ns.doc(security='jsonWebToken', description="Obtém os detalhes de um cliente específico.")
         def get(self, cliente_id_param):
@@ -1345,6 +1374,7 @@ def create_app(config_class=Config):
             return cliente
 
         @jwt_required()
+        @tenant_scoped
         @clientes_ns.expect(cliente_input_model_dto)
         @clientes_ns.marshal_with(cliente_model_dto)
         @clientes_ns.doc(security='jsonWebToken', description="Atualiza os dados de um cliente existente.")
@@ -1361,6 +1391,7 @@ def create_app(config_class=Config):
             return cliente
 
         @jwt_required()
+        @tenant_scoped
         @clientes_ns.response(204, 'Cliente deletado com sucesso.')
         @clientes_ns.response(400, 'Não é possível deletar cliente com casos associados.')
         @clientes_ns.doc(security='jsonWebToken', description="Deleta um cliente, se não houver casos associados.")
@@ -1380,6 +1411,7 @@ def create_app(config_class=Config):
     @clientes_ns.param('cliente_id_param', 'O ID único do cliente')
     class ClienteAnonimizarAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @clientes_ns.doc(security='jsonWebToken', description="Executa o Direito ao Esquecimento (Art. 18 LGPD). Mascara os dados pessoais e exclui documentos associados.")
         def post(self, cliente_id_param):
             user_id = get_jwt_identity()
@@ -1574,6 +1606,7 @@ def create_app(config_class=Config):
     @casos_ns.route('/')
     class CasoListAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @casos_ns.marshal_list_with(caso_model_dto)
         @casos_ns.doc(security='jsonWebToken', description="Lista todos os casos jurídicos do usuário.")
         def get(self):
@@ -1583,7 +1616,7 @@ def create_app(config_class=Config):
             cliente_id_f = request.args.get('cliente_id', '').strip()
             sort_by = request.args.get('sort_by', 'data_atualizacao')
             sort_order = request.args.get('sort_order', 'desc')
-            query = Caso.query.filter_by(user_id=user_id)
+            query = query_for_tenant(Caso)
             
             if search:
                 like = f'%{search}%'
@@ -1606,6 +1639,7 @@ def create_app(config_class=Config):
             return query.all()
 
         @jwt_required()
+        @tenant_scoped
         @casos_ns.expect(caso_input_model_dto)
         @casos_ns.marshal_with(caso_model_dto, code=201)
         @casos_ns.doc(security='jsonWebToken', description="Cria um novo caso jurídico.")
@@ -1614,7 +1648,7 @@ def create_app(config_class=Config):
             data = request.get_json()
             if not data.get('titulo') or data.get('cliente_id') is None:
                 return {"message": "Título do caso e ID do cliente são obrigatórios."}, 400
-            cliente = Cliente.query.filter_by(id=data['cliente_id'], user_id=user_id).first()
+            cliente = query_for_tenant(Cliente).filter_by(id=data['cliente_id']).first()
             if not cliente:
                 return {"message": f"Cliente com ID {data['cliente_id']} não encontrado."}, 404
             num_proc_strip = data.get('numero_processo', '').strip() or None
@@ -1639,6 +1673,7 @@ def create_app(config_class=Config):
     @casos_ns.param('caso_id_param', 'O ID do caso jurídico')
     class CasoDetailAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @casos_ns.marshal_with(caso_model_dto)
         @casos_ns.doc(security='jsonWebToken', description="Obtém os detalhes de um caso jurídico.")
         def get(self, caso_id_param):
@@ -1647,6 +1682,7 @@ def create_app(config_class=Config):
             return caso
 
         @jwt_required()
+        @tenant_scoped
         @casos_ns.expect(caso_input_model_dto)
         @casos_ns.marshal_with(caso_model_dto)
         @casos_ns.doc(security='jsonWebToken', description="Atualiza um caso jurídico existente.")
@@ -1658,7 +1694,7 @@ def create_app(config_class=Config):
                 return {"message": "Título do caso é obrigatório."}, 400
             novo_numero_processo = data.get('numero_processo', '').strip() or None
             if novo_numero_processo and novo_numero_processo != caso.numero_processo:
-                if Caso.query.filter(Caso.user_id == user_id, Caso.numero_processo == novo_numero_processo, Caso.id != caso_id_param).first():
+                if query_for_tenant(Caso).filter(Caso.numero_processo == novo_numero_processo, Caso.id != caso_id_param).first():
                     return {"message": f"Outro caso já utiliza o número de processo '{novo_numero_processo}'."}, 409
             caso.numero_processo = novo_numero_processo
             _preencher_caso_from_data(caso, data)
@@ -1668,6 +1704,7 @@ def create_app(config_class=Config):
             return caso
 
         @jwt_required()
+        @tenant_scoped
         @casos_ns.response(204, 'Caso deletado com sucesso.')
         @casos_ns.doc(security='jsonWebToken', description="Deleta um caso jurídico.")
         def delete(self, caso_id_param):
@@ -1685,17 +1722,14 @@ def create_app(config_class=Config):
         @casos_ns.doc('atualizar_caso_via_cnj_endpoint', security='jsonWebToken',
                      description="Consulta a API do CNJ para um caso específico, buscando as últimas movimentações e atualizando o status do caso e registrando novas movimentações no sistema local.")
         @jwt_required()
+        @tenant_scoped
         def post(self, caso_id): 
             user_id_atual = get_jwt_identity()
-            caso_para_atualizar = db.session.get(Caso, caso_id)
+            caso_para_atualizar = query_for_tenant(Caso).filter_by(id=caso_id).first()
 
             if not caso_para_atualizar:
                 app.logger.info(f"API CNJ: Tentativa de atualizar caso inexistente ID {caso_id} por usuário {user_id_atual}")
                 return {"message": f"Caso com ID {caso_id} não encontrado."}, 404
-            
-            if caso_para_atualizar.user_id != user_id_atual:
-                app.logger.warning(f"API CNJ: Usuário {user_id_atual} tentou acesso não autorizado ao caso {caso_id} (pertence a user {caso_para_atualizar.user_id}).")
-                return {"message": "Acesso não autorizado a este caso."}, 403
                 
             if not caso_para_atualizar.numero_processo or not caso_para_atualizar.numero_processo.strip():
                 app.logger.info(f"API CNJ: Caso {caso_id} não possui número de processo para consulta.")
@@ -1834,6 +1868,7 @@ def create_app(config_class=Config):
     @eventos_ns.route('/')
     class EventoListAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @eventos_ns.marshal_list_with(evento_model_dto)
         @eventos_ns.doc(security='jsonWebToken')
         def get(self):
@@ -1842,6 +1877,7 @@ def create_app(config_class=Config):
             return eventos
 
         @jwt_required()
+        @tenant_scoped
         @eventos_ns.expect(evento_input_model_dto)
         @eventos_ns.marshal_with(evento_model_dto, code=201)
         @eventos_ns.doc(security='jsonWebToken')
@@ -1874,6 +1910,7 @@ def create_app(config_class=Config):
     @eventos_ns.param('evento_id_param', 'O ID único do evento da agenda')
     class EventoDetailAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @eventos_ns.marshal_with(evento_model_dto)
         @eventos_ns.doc(security='jsonWebToken')
         def get(self, evento_id_param):
@@ -1882,6 +1919,7 @@ def create_app(config_class=Config):
             return evento
 
         @jwt_required()
+        @tenant_scoped
         @eventos_ns.expect(evento_input_model_dto)
         @eventos_ns.marshal_with(evento_model_dto)
         @eventos_ns.doc(security='jsonWebToken')
@@ -1908,6 +1946,7 @@ def create_app(config_class=Config):
             return evento
 
         @jwt_required()
+        @tenant_scoped
         @eventos_ns.response(204, 'Evento deletado com sucesso.')
         @eventos_ns.doc(security='jsonWebToken')
         def delete(self, evento_id_param):
@@ -1926,13 +1965,14 @@ def create_app(config_class=Config):
     @documentos_ns.route('/')
     class DocumentoListAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @documentos_ns.marshal_list_with(documento_model_dto)
         @documentos_ns.doc(security='jsonWebToken', description="Lista documentos do usuário, com filtro opcional por 'caso_id'.")
         @documentos_ns.param('caso_id', 'ID do caso para filtrar os documentos (opcional)', type=int)
         def get(self):
             user_id = get_jwt_identity()
             caso_id_query_param = request.args.get('caso_id', type=int)
-            query = Documento.query.filter_by(user_id=user_id)
+            query = query_for_tenant(Documento)
             if caso_id_query_param is not None:
                 query = query.filter_by(caso_id=caso_id_query_param)
             documentos = query.order_by(Documento.data_upload.desc()).all()
@@ -1941,6 +1981,7 @@ def create_app(config_class=Config):
     @documentos_ns.route('/upload')
     class DocumentoUploadAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @documentos_ns.doc(security='jsonWebToken', description="Faz upload de um novo documento. Use 'multipart/form-data'. Campo 'file' para o arquivo e opcionalmente 'caso_id' no formulário.")
         @documentos_ns.response(201, "Documento enviado com sucesso.", model=documento_model_dto)
         @documentos_ns.response(400, "Erro nos dados de entrada ou tipo de arquivo não permitido.")
@@ -1969,7 +2010,7 @@ def create_app(config_class=Config):
                 if caso_id_from_form:
                     try:
                         db_caso_id = int(caso_id_from_form)
-                        if not Caso.query.filter_by(id=db_caso_id, user_id=user_id).first():
+                        if not query_for_tenant(Caso).filter_by(id=db_caso_id).first():
                             os.remove(full_file_path_to_save)
                             return {'message': f'Caso com ID {db_caso_id} não encontrado ou não pertence ao usuário.'}, 400
                     except ValueError:
@@ -1990,6 +2031,7 @@ def create_app(config_class=Config):
     @documentos_ns.param('doc_id_param', 'O ID do documento para realizar o download')
     class DocumentoDownloadAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @documentos_ns.doc(security='jsonWebToken', description="Permite o download de um documento específico.")
         @documentos_ns.response(404, "Documento não encontrado ou acesso negado.")
         @documentos_ns.response(500, "Erro no servidor ao tentar enviar o arquivo.")
@@ -2012,6 +2054,7 @@ def create_app(config_class=Config):
     @documentos_ns.param('doc_id_param', 'O ID do documento a ser deletado')
     class DocumentoDetailAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @documentos_ns.response(204, 'Documento deletado com sucesso.')
         @documentos_ns.doc(security='jsonWebToken', description="Deleta um documento específico.")
         def delete(self, doc_id_param):
@@ -2032,6 +2075,7 @@ def create_app(config_class=Config):
     @despesas_ns.route('/')
     class DespesaListAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @despesas_ns.marshal_list_with(despesa_model_dto)
         @despesas_ns.doc(security='jsonWebToken')
@@ -2040,6 +2084,7 @@ def create_app(config_class=Config):
             despesas = get_list_query(Despesa).order_by(Despesa.data_despesa.desc()).all()
             return despesas
         @jwt_required()
+        @tenant_scoped
         @despesas_ns.expect(despesa_input_model_dto)
         @despesas_ns.marshal_with(despesa_model_dto, code=201)
         @despesas_ns.doc(security='jsonWebToken')
@@ -2054,7 +2099,7 @@ def create_app(config_class=Config):
             except ValueError: return {"message": "Formato de valor ou data inválido."}, 400
             caso_id_val = data.get('caso_id')
             if caso_id_val:
-                if not Caso.query.filter_by(id=caso_id_val, user_id=user_id).first():
+                if not query_for_tenant(Caso).filter_by(id=caso_id_val).first():
                     return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
             nova_despesa = Despesa(descricao=data['descricao'], valor=valor_decimal, data_despesa=data_despesa_obj, pago=data.get('pago', False), caso_id=caso_id_val, user_id=user_id, tenant_id=get_tenant_id())
             db.session.add(nova_despesa)
@@ -2067,6 +2112,7 @@ def create_app(config_class=Config):
     @despesas_ns.param('despesa_id_param', 'O ID da despesa')
     class DespesaDetailAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @despesas_ns.marshal_with(despesa_model_dto)
         @despesas_ns.doc(security='jsonWebToken')
@@ -2075,6 +2121,7 @@ def create_app(config_class=Config):
             despesa = get_item_or_404(Despesa, despesa_id_param)
             return despesa
         @jwt_required()
+        @tenant_scoped
         @despesas_ns.expect(despesa_input_model_dto)
         @despesas_ns.marshal_with(despesa_model_dto)
         @despesas_ns.doc(security='jsonWebToken')
@@ -2091,7 +2138,7 @@ def create_app(config_class=Config):
             caso_id_val = data.get('caso_id')
             if 'caso_id' in data:
                 if caso_id_val is not None:
-                    if not Caso.query.filter_by(id=caso_id_val, user_id=user_id).first():
+                    if not query_for_tenant(Caso).filter_by(id=caso_id_val).first():
                         return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
                     despesa.caso_id = caso_id_val
                 else: despesa.caso_id = None
@@ -2103,6 +2150,7 @@ def create_app(config_class=Config):
             app.logger.info(f"Despesa ID {despesa.id} atualizada pelo usuário ID {user_id}.")
             return despesa
         @jwt_required()
+        @tenant_scoped
         @despesas_ns.response(204, 'Despesa deletada.')
         @despesas_ns.doc(security='jsonWebToken')
         def delete(self, despesa_id_param):
@@ -2116,6 +2164,7 @@ def create_app(config_class=Config):
     @recebimentos_ns.route('/')
     class RecebimentoListAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @recebimentos_ns.marshal_list_with(recebimento_model_dto)
         @recebimentos_ns.doc(security='jsonWebToken')
@@ -2124,6 +2173,7 @@ def create_app(config_class=Config):
             recebimentos = get_list_query(Recebimento).order_by(Recebimento.data_recebimento.desc()).all()
             return recebimentos
         @jwt_required()
+        @tenant_scoped
         @recebimentos_ns.expect(recebimento_input_model_dto)
         @recebimentos_ns.marshal_with(recebimento_model_dto, code=201)
         @recebimentos_ns.doc(security='jsonWebToken')
@@ -2138,7 +2188,7 @@ def create_app(config_class=Config):
             except ValueError: return {"message": "Formato de valor ou data inválido."}, 400
             caso_id_val = data.get('caso_id')
             if caso_id_val:
-                if not Caso.query.filter_by(id=caso_id_val, user_id=user_id).first():
+                if not query_for_tenant(Caso).filter_by(id=caso_id_val).first():
                     return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
             novo_recebimento = Recebimento(descricao=data['descricao'], valor=valor_decimal, data_recebimento=data_recebimento_obj, 
                                            recebido=data.get('recebido', False), caso_id=caso_id_val, user_id=user_id, tenant_id=get_tenant_id())
@@ -2152,6 +2202,7 @@ def create_app(config_class=Config):
     @recebimentos_ns.param('recebimento_id_param', 'O ID do recebimento')
     class RecebimentoDetailAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @recebimentos_ns.marshal_with(recebimento_model_dto)
         @recebimentos_ns.doc(security='jsonWebToken')
@@ -2160,6 +2211,7 @@ def create_app(config_class=Config):
             recebimento = get_item_or_404(Recebimento, recebimento_id_param)
             return recebimento
         @jwt_required()
+        @tenant_scoped
         @recebimentos_ns.expect(recebimento_input_model_dto)
         @recebimentos_ns.marshal_with(recebimento_model_dto)
         @recebimentos_ns.doc(security='jsonWebToken')
@@ -2176,7 +2228,7 @@ def create_app(config_class=Config):
             caso_id_val = data.get('caso_id')
             if 'caso_id' in data:
                 if caso_id_val is not None:
-                    if not Caso.query.filter_by(id=caso_id_val, user_id=user_id).first():
+                    if not query_for_tenant(Caso).filter_by(id=caso_id_val).first():
                         return {"message": f"Caso ID {caso_id_val} não encontrado."}, 404
                     recebimento.caso_id = caso_id_val
                 else: recebimento.caso_id = None
@@ -2188,6 +2240,7 @@ def create_app(config_class=Config):
             app.logger.info(f"Recebimento ID {recebimento.id} atualizado pelo usuário ID {user_id}.")
             return recebimento
         @jwt_required()
+        @tenant_scoped
         @recebimentos_ns.response(204, 'Recebimento deletado.')
         @recebimentos_ns.doc(security='jsonWebToken')
         def delete(self, recebimento_id_param):
@@ -2290,6 +2343,7 @@ def create_app(config_class=Config):
     @contratos_ns.route('/')
     class ContratoListAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @contratos_ns.marshal_list_with(contrato_model_dto)
         @contratos_ns.doc(security='jsonWebToken')
@@ -2298,6 +2352,7 @@ def create_app(config_class=Config):
             return contratos
 
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @contratos_ns.expect(contrato_input_model_dto)
         @contratos_ns.marshal_with(contrato_model_dto, code=201)
@@ -2306,7 +2361,7 @@ def create_app(config_class=Config):
             user_id = get_jwt_identity()
             data = request.get_json()
             
-            caso = Caso.query.filter_by(id=data['caso_id']).first()
+            caso = query_for_tenant(Caso).filter_by(id=data['caso_id']).first()
             if not caso:
                 return {"message": "Caso não encontrado."}, 404
 
@@ -2342,6 +2397,7 @@ def create_app(config_class=Config):
     @contratos_ns.route('/<int:id>')
     class ContratoDetailAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @contratos_ns.marshal_with(contrato_model_dto)
         @contratos_ns.doc(security='jsonWebToken')
@@ -2350,6 +2406,7 @@ def create_app(config_class=Config):
             return contrato
 
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @contratos_ns.expect(contrato_input_model_dto)
         @contratos_ns.marshal_with(contrato_model_dto)
@@ -2372,6 +2429,7 @@ def create_app(config_class=Config):
             return contrato
 
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @contratos_ns.response(204, 'Deletado com sucesso')
         @contratos_ns.doc(security='jsonWebToken')
@@ -2384,6 +2442,7 @@ def create_app(config_class=Config):
     @contratos_ns.route('/<int:id>/gerar-parcelas')
     class ContratoGerarParcelasAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @finance_access_required
         @contratos_ns.doc(security='jsonWebToken')
         def post(self, id):
@@ -2451,6 +2510,7 @@ def create_app(config_class=Config):
     @tarefas_ns.route('/')
     class TarefaListAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @tarefas_ns.marshal_list_with(tarefa_model_dto)
         @tarefas_ns.doc(security='jsonWebToken')
         def get(self):
@@ -2458,6 +2518,7 @@ def create_app(config_class=Config):
             return tarefas
 
         @jwt_required()
+        @tenant_scoped
         @tarefas_ns.expect(tarefa_input_model_dto)
         @tarefas_ns.marshal_with(tarefa_model_dto, code=201)
         @tarefas_ns.doc(security='jsonWebToken')
@@ -2494,6 +2555,7 @@ def create_app(config_class=Config):
     @tarefas_ns.route('/<int:id>')
     class TarefaDetailAPI(Resource):
         @jwt_required()
+        @tenant_scoped
         @tarefas_ns.marshal_with(tarefa_model_dto)
         @tarefas_ns.doc(security='jsonWebToken')
         def get(self, id):
@@ -2501,6 +2563,7 @@ def create_app(config_class=Config):
             return tarefa
 
         @jwt_required()
+        @tenant_scoped
         @tarefas_ns.expect(tarefa_input_model_dto)
         @tarefas_ns.marshal_with(tarefa_model_dto)
         @tarefas_ns.doc(security='jsonWebToken')
@@ -2531,6 +2594,7 @@ def create_app(config_class=Config):
             return tarefa
 
         @jwt_required()
+        @tenant_scoped
         @tarefas_ns.response(204, 'Deletado com sucesso')
         @tarefas_ns.doc(security='jsonWebToken')
         def delete(self, id):

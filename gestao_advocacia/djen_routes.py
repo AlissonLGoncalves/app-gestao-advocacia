@@ -30,6 +30,36 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
         bucket = int(digest[:8], 16) % 100
         return bucket < rollout
 
+    def _get_user_or_401():
+        from app import User
+        user_id = get_jwt_identity()
+        user = User.query.get(int(user_id))
+        if not user:
+            djen_ns.abort(401, "Usuário não encontrado.")
+        if user.tenant_id is None:
+            djen_ns.abort(403, "Acesso Negado (LGPD): Usuário sem tenant atribuído.")
+        return user
+
+    def _log_cross_tenant(user, model_name, target_id, tenant_alvo):
+        logger.warning(
+            "Cross-tenant access blocked | user_id=%s tenant_id_atual=%s tenant_id_alvo=%s endpoint=%s item_id=%s model=%s",
+            user.id,
+            user.tenant_id,
+            tenant_alvo,
+            request.path,
+            target_id,
+            model_name,
+        )
+
+    def _get_scoped_or_404(model, user, item_id, model_name, mensagem_404):
+        item = model.query.filter_by(id=item_id, tenant_id=user.tenant_id).first()
+        if item:
+            return item
+        alvo = model.query.filter_by(id=item_id).first()
+        if alvo and getattr(alvo, 'tenant_id', None) != user.tenant_id:
+            _log_cross_tenant(user, model_name, item_id, getattr(alvo, 'tenant_id', None))
+        djen_ns.abort(404, mensagem_404)
+
     def _registrar_decisao(pub, user_id, acao, origem_acao='manual', cliente_id=None, caso_id=None, confianca=None, motivo=None, payload=None):
         from app import DjenVinculoDecisao
 
@@ -230,11 +260,7 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
         @jwt_required()
         def get(self):
             """Lista as OABs configuradas para monitoramento no tenant."""
-            user_id = get_jwt_identity()
-            from app import User
-            user = User.query.get(int(user_id))
-            if not user:
-                djen_ns.abort(401, "Usuário não encontrado.")
+            user = _get_user_or_401()
             return DjenOabMonitoramento.query.filter_by(
                 tenant_id=user.tenant_id
             ).order_by(DjenOabMonitoramento.data_criacao.desc()).all()
@@ -246,10 +272,7 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
         def post(self):
             """Cadastra uma OAB para monitoramento automático."""
             user_id = get_jwt_identity()
-            from app import User
-            user = User.query.get(int(user_id))
-            if not user:
-                djen_ns.abort(401, "Usuário não encontrado.")
+            user = _get_user_or_401()
             data = request.json
             numero = (data.get('numero_oab') or '').strip()
             uf = (data.get('uf_oab') or '').strip().upper()
@@ -280,12 +303,8 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
         @jwt_required()
         def delete(self, oab_id):
             """Remove uma OAB do monitoramento."""
-            user_id = get_jwt_identity()
-            from app import User
-            user = User.query.get(int(user_id))
-            oab = DjenOabMonitoramento.query.filter_by(id=oab_id, tenant_id=user.tenant_id).first()
-            if not oab:
-                djen_ns.abort(404, "OAB não encontrada.")
+            user = _get_user_or_401()
+            oab = _get_scoped_or_404(DjenOabMonitoramento, user, oab_id, 'DjenOabMonitoramento', 'OAB não encontrada.')
             db.session.delete(oab)
             db.session.commit()
             return '', 204
@@ -607,12 +626,8 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
         @jwt_required()
         def get(self, pub_id):
             """Retorna o detalhe de uma publicação."""
-            user_id = get_jwt_identity()
-            from app import User
-            user = User.query.get(int(user_id))
-            pub = PublicacaoDJEN.query.filter_by(id=pub_id, tenant_id=user.tenant_id).first()
-            if not pub:
-                djen_ns.abort(404, "Publicação não encontrada.")
+            user = _get_user_or_401()
+            pub = _get_scoped_or_404(PublicacaoDJEN, user, pub_id, 'PublicacaoDJEN', 'Publicação não encontrada.')
             return pub.to_dict()
 
         @djen_ns.expect(pub_patch_dto)
@@ -621,20 +636,17 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
         def patch(self, pub_id):
             """Marca como lida, vincula a caso ou adiciona notas."""
             user_id = get_jwt_identity()
-            from app import User
-            user = User.query.get(int(user_id))
+            user = _get_user_or_401()
             if not _tenant_djen_habilitado(user.tenant_id):
                 djen_ns.abort(403, 'Módulo DJEN desabilitado para este tenant no rollout atual.')
-            pub = PublicacaoDJEN.query.filter_by(id=pub_id, tenant_id=user.tenant_id).first()
-            if not pub:
-                djen_ns.abort(404, "Publicação não encontrada.")
+            pub = _get_scoped_or_404(PublicacaoDJEN, user, pub_id, 'PublicacaoDJEN', 'Publicação não encontrada.')
             data = request.json or {}
             if 'lida' in data:
                 pub.lida = bool(data['lida'])
             if 'caso_id' in data:
                 caso_id = data['caso_id']
                 if caso_id is not None:
-                    caso = Caso.query.filter_by(id=int(caso_id), user_id=int(user_id)).first()
+                    caso = Caso.query.filter_by(id=int(caso_id), user_id=int(user_id), tenant_id=user.tenant_id).first()
                     if not caso:
                         djen_ns.abort(404, "Caso não encontrado ou sem permissão.")
                     pub.status_origem = 'revisado_manual'
@@ -659,13 +671,10 @@ def registrar_rotas_djen(djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso
         @jwt_required()
         def get(self, pub_id):
             """Proxy para baixar a certidão da publicação no CNJ."""
-            user_id = get_jwt_identity()
-            from app import User
+            _ = get_jwt_identity()
             from djen_service import obter_certidao, DjenAPIError
-            user = User.query.get(int(user_id))
-            pub = PublicacaoDJEN.query.filter_by(id=pub_id, tenant_id=user.tenant_id).first()
-            if not pub:
-                djen_ns.abort(404, "Publicação não encontrada.")
+            user = _get_user_or_401()
+            pub = _get_scoped_or_404(PublicacaoDJEN, user, pub_id, 'PublicacaoDJEN', 'Publicação não encontrada.')
             if not pub.hash_comunicacao:
                 djen_ns.abort(422, "Esta publicação não possui hash para emissão de certidão.")
             try:

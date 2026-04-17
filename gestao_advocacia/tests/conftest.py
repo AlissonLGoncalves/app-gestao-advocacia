@@ -143,6 +143,9 @@ def auth_client(client, db):
             self.user = user_data
             self._client = http_client
 
+        def __getattr__(self, name):
+            return getattr(self._client, name)
+
         def _headers(self):
             return {'Authorization': f'Bearer {self.token}'}
 
@@ -153,6 +156,10 @@ def auth_client(client, db):
         def post(self, url, **kwargs):
             kwargs.setdefault('headers', {}).update(self._headers())
             return self._client.post(url, **kwargs)
+
+        def put(self, url, **kwargs):
+            kwargs.setdefault('headers', {}).update(self._headers())
+            return self._client.put(url, **kwargs)
 
         def patch(self, url, **kwargs):
             kwargs.setdefault('headers', {}).update(self._headers())
