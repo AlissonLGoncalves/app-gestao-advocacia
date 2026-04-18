@@ -23,6 +23,7 @@ instance/
 
 # Pasta de uploads (se for local)
 uploads/ 
+uploads_documentos/
 
 # Logs
 *.log
