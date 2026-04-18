@@ -361,7 +361,7 @@ class TestDjenSync:
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert "message" in data
-        assert "SincronizaÃ§Ã£o" in data["message"]
+        assert "Sincroniza" in data["message"]
         assert "resumo" in data
 
     def test_sync_sem_autenticacao(self, client, db):
