@@ -1,11 +1,11 @@
-from .auditoria import register_auditoria_routes
-from .auth import register_auth_routes
-from .casos import register_casos_routes
-from .clientes import register_clientes_routes
-from .contratos import register_contratos_routes
-from .dashboard import register_dashboard_routes
-from .despesas import register_despesas_routes
-from .documentos import register_documentos_routes
-from .eventos import register_eventos_routes
-from .recebimentos import register_recebimentos_routes
-from .tarefas import register_tarefas_routes
+from .auditoria import register_auditoria_routes as register_auditoria_routes
+from .auth import register_auth_routes as register_auth_routes
+from .casos import register_casos_routes as register_casos_routes
+from .clientes import register_clientes_routes as register_clientes_routes
+from .contratos import register_contratos_routes as register_contratos_routes
+from .dashboard import register_dashboard_routes as register_dashboard_routes
+from .despesas import register_despesas_routes as register_despesas_routes
+from .documentos import register_documentos_routes as register_documentos_routes
+from .eventos import register_eventos_routes as register_eventos_routes
+from .recebimentos import register_recebimentos_routes as register_recebimentos_routes
+from .tarefas import register_tarefas_routes as register_tarefas_routes

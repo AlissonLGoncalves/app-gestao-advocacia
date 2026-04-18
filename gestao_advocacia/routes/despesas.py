@@ -20,7 +20,6 @@ def register_despesas_routes(
         @despesas_ns.marshal_list_with(despesa_model_dto)
         @despesas_ns.doc(security="jsonWebToken")
         def get(self):
-            user_id = get_jwt_identity()
             despesas = get_list_query(Despesa).order_by(Despesa.data_despesa.desc()).all()
             return despesas
 
@@ -69,7 +68,6 @@ def register_despesas_routes(
         @despesas_ns.marshal_with(despesa_model_dto)
         @despesas_ns.doc(security="jsonWebToken")
         def get(self, despesa_id_param):
-            user_id = get_jwt_identity()
             despesa = get_item_or_404(Despesa, despesa_id_param)
             return despesa
 

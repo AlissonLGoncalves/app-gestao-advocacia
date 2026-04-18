@@ -4,6 +4,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource
 
 from extensions import db
+from helpers import get_tenant_id
 from models import Caso, Cliente, Despesa, EventoAgenda, PublicacaoDJEN, Recebimento
 
 
@@ -17,6 +18,7 @@ def register_dashboard_routes(app, dashboard_ns):
         )
         def get(self):
             user_id = get_jwt_identity()
+            tenant_id = get_tenant_id()
 
             total_clientes = Cliente.query.filter_by(user_id=user_id).count()
 
@@ -59,13 +61,13 @@ def register_dashboard_routes(app, dashboard_ns):
 
             try:
                 djen_nao_lidas = PublicacaoDJEN.query.filter_by(
-                    tenant_id=user.tenant_id,
+                    tenant_id=tenant_id,
                     lida=False,
                     triagem_ignorada=False,
                 ).count()
                 djen_sem_vinculo = (
                     PublicacaoDJEN.query.filter_by(
-                        tenant_id=user.tenant_id,
+                        tenant_id=tenant_id,
                         triagem_ignorada=False,
                     )
                     .filter(PublicacaoDJEN.caso_id.is_(None))

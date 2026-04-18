@@ -1,4 +1,4 @@
-﻿import os
+import os
 from functools import wraps
 
 from dotenv import load_dotenv
@@ -37,7 +37,8 @@ def finance_access_required(fn):
     return wrapper
 
 
-from models import (  # noqa: E402
+from helpers import get_item_or_404  # noqa: E402, F401
+from models import (  # noqa: E402, F401
     Caso,
     Cliente,
     Despesa,
@@ -48,7 +49,6 @@ from models import (  # noqa: E402
     Tenant,
     User,
 )
-from helpers import get_item_or_404  # noqa: E402, F401
 
 
 def create_app(config_class=Config):

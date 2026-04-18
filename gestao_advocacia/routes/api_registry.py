@@ -106,7 +106,9 @@ def register_api_routes(app, api, finance_access_required):
         "Token",
         {
             "access_token": fields.String(description="Token JWT"),
-            "user": fields.Nested(user_output_model_dto, description="Dados do usuario", skip_none=True),
+            "user": fields.Nested(
+                user_output_model_dto, description="Dados do usuario", skip_none=True
+            ),
         },
     )
 
@@ -124,7 +126,9 @@ def register_api_routes(app, api, finance_access_required):
     cliente_input_model_dto = clientes_ns.model(
         "ClienteInput",
         {
-            "nome_razao_social": fields.String(required=True, description="Nome completo ou Razao Social"),
+            "nome_razao_social": fields.String(
+                required=True, description="Nome completo ou Razao Social"
+            ),
             "cpf_cnpj": fields.String(required=True, description="CPF ou CNPJ principal"),
             "tipo_pessoa": fields.String(required=True, description="PF ou PJ", enum=["PF", "PJ"]),
             "email": fields.String(description="Email do cliente"),
@@ -265,7 +269,9 @@ def register_api_routes(app, api, finance_access_required):
         "EventoInput",
         {
             "titulo": fields.String(required=True, description="Titulo do evento"),
-            "data_inicio": fields.DateTime(required=True, description="Data/hora inicio (ISO 8601)"),
+            "data_inicio": fields.DateTime(
+                required=True, description="Data/hora inicio (ISO 8601)"
+            ),
             "data_fim": fields.DateTime(description="Data/hora fim (ISO 8601)"),
             "descricao": fields.String(description="Descricao extra"),
             "tipo_evento": fields.String(description="Prazo, Audiencia, Reuniao, Outros"),

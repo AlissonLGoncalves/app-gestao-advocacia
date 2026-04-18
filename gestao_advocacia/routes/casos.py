@@ -99,7 +99,9 @@ def register_casos_routes(
             instancia = (
                 "1ª Instância"
                 if instancia_raw == "G1"
-                else "2ª Instância" if instancia_raw == "G2" else instancia_raw
+                else "2ª Instância"
+                if instancia_raw == "G2"
+                else instancia_raw
             )
 
             data_distribuicao = dados_processo.get("dataAjuizamento", "")[:10]
@@ -158,7 +160,6 @@ def register_casos_routes(
         @casos_ns.marshal_list_with(caso_model_dto)
         @casos_ns.doc(security="jsonWebToken")
         def get(self):
-            user_id = get_jwt_identity()
             query = query_for_tenant(Caso)
             casos = query.order_by(Caso.data_criacao.desc()).all()
             return casos
@@ -378,7 +379,7 @@ def register_casos_routes(
                         desc_parts.append(str(movimento_json["nome"]))
 
                     for comp in movimento_json.get("complementosTabelados", []):
-                        if type(comp) == dict and comp.get("nome"):
+                        if isinstance(comp, dict) and comp.get("nome"):
                             desc_parts.append(str(comp["nome"]))
 
                     mov_nacional = movimento_json.get("movimentoNacional")

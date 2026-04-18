@@ -104,7 +104,7 @@ def extract_client_data_from_file(file_stream, filename):
                 # Tenta processar em PT-BR primeiro se o language pack estiver instalado.
                 try:
                     text = pytesseract.image_to_string(img, lang="por")
-                except:
+                except Exception:
                     # Fallback pro basico inglês.
                     text = pytesseract.image_to_string(img)
             except pytesseract.pytesseract.TesseractNotFoundError:
@@ -186,8 +186,7 @@ def _extract_case_data_with_gemini(text):
         # O cliente coleta a API key automaticamente da var GEMINI_API_KEY
         client = genai.Client()
 
-        prompt = (
-            """
+        prompt = """
 Você é um extator de dados jurídicos brasileiro (Legaltech).
 Analise o texto desta capa de processo/petição inicial e retorne APENAS um JSON válido. 
 Nenhuma outra palavra. Apenas o JSON cru com estas chaves:
@@ -197,9 +196,7 @@ Nenhuma outra palavra. Apenas o JSON cru com estas chaves:
 - "resumo_fatos" (string, um parágrafo que resume a tese/fatos do caso para um advogado ler rapidamente)
 
 TEXTO DA PETIÇÃO:
-"""
-            + text[:15000]
-        )  # Limite de texto
+""" + text[:15000]  # Limite de texto
 
         response = client.models.generate_content(
             model="gemini-2.5-flash",
@@ -251,7 +248,7 @@ def extract_case_data_from_file(file_stream, filename):
             try:
                 img = Image.open(file_stream)
                 text = pytesseract.image_to_string(img, lang="por")
-            except:
+            except Exception:
                 pass
 
         if not text.strip():
