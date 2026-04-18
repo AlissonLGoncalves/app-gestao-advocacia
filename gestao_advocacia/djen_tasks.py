@@ -281,6 +281,26 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         data_fim = datetime.utcnow().date()
         data_inicio = data_fim - timedelta(days=janela_dias)
 
+        # ── Verificação de backlog: pula sync se fila de triagem pendente for grande ──
+        if not force:
+            backlog_limit = int(app.config.get("DJEN_SYNC_BACKLOG_LIMIT", 50))
+            backlog_query = PublicacaoDJEN.query.filter_by(status_origem="pendente")
+            if tenant_id is not None:
+                backlog_query = backlog_query.filter_by(tenant_id=tenant_id)
+            backlog_count = backlog_query.count()
+            if backlog_count > backlog_limit:
+                logger.warning(
+                    "JOB DJEN: sync pulado — backlog de %d pendentes (limite: %d). "
+                    "Processe a triagem antes de buscar novas publicações.",
+                    backlog_count,
+                    backlog_limit,
+                )
+                return {
+                    "ok": False,
+                    "skipped": True,
+                    "reason": f"backlog={backlog_count} > limit={backlog_limit}",
+                }
+
         logger.info(
             "JOB DJEN: iniciando monitoramento de publicações "
             f"(janela: {janela_dias} dia(s), de {data_inicio} até {data_fim})."

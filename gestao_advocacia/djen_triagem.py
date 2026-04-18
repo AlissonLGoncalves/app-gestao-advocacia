@@ -1,11 +1,51 @@
 import re
 import unicodedata
 
-CNJ_REGEX = re.compile(r"\b\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}\b")
+CNJ_REGEX = re.compile(r"(?<!\d)\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}(?!\d)")
 OAB_REGEX = re.compile(r"\b(?:OAB\/?[A-Z]{2}\s*)?\d{4,10}\b", re.IGNORECASE)
 CPF_CNPJ_REGEX = re.compile(
     r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b|\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b|\b\d{11}\b|\b\d{14}\b"
 )
+
+# Mapa estado → sigla do tribunal (chaves normalizadas: sem acento, minúsculo)
+_TRIBUNAL_MAP = {
+    "parana": "TJPR",
+    "sao paulo": "TJSP",
+    "minas gerais": "TJMG",
+    "rio de janeiro": "TJRJ",
+    "bahia": "TJBA",
+    "rio grande do sul": "TJRS",
+    "santa catarina": "TJSC",
+    "goias": "TJGO",
+    "espirito santo": "TJES",
+    "para": "TJPA",
+    "pernambuco": "TJPE",
+    "ceara": "TJCE",
+    "amazonas": "TJAM",
+    "maranhao": "TJMA",
+    "mato grosso do sul": "TJMS",
+    "mato grosso": "TJMT",
+    "rondonia": "TJRO",
+    "roraima": "TJRR",
+    "tocantins": "TJTO",
+    "amapa": "TJAP",
+    "acre": "TJAC",
+    "alagoas": "TJAL",
+    "sergipe": "TJSE",
+    "piaui": "TJPI",
+    "paraiba": "TJPB",
+    "rio grande do norte": "TJRN",
+    "distrito federal": "TJDFT",
+}
+
+
+def normalizar_nome(s: str) -> str:
+    """Normaliza nome para comparação: lowercase, sem acentos, whitespace colapsado."""
+    s = (s or "").strip()
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    s = re.sub(r"\s+", " ", s)
+    return s.lower().strip()
 
 
 def _normalize_text(value):
@@ -33,12 +73,29 @@ def _dedupe_preserving_order(values):
     return out
 
 
+def _inferir_tribunal(text):
+    """Infere sigla do tribunal a partir do texto da publicação."""
+    text_norm = normalizar_nome(text[:800])
+    for keyword, sigla in _TRIBUNAL_MAP.items():
+        if keyword in text_norm:
+            return sigla
+    return None
+
+
 def _extract_labeled_entities(text, labels):
     found = []
     for label in labels:
-        regex = re.compile(rf"(?:^|[;\n\r])\s*{label}\s*[:\-]\s*([^;\n\r]+)", re.IGNORECASE)
+        # (?<!\w) — não casa dentro de palavras (ex.: "coautor" não dispara "autor")
+        regex = re.compile(
+            rf"(?<!\w){label}\s*[:\-]\s*([^;\n\r]+)",
+            re.IGNORECASE,
+        )
         for match in regex.finditer(text):
             candidate = match.group(1).strip()
+            # Remove padrão de próximo campo colado no final (ex.: "DIRCE... Reu(s):")
+            candidate = re.sub(r"\s+\w+(?:\([^)]*\))?\s*[:\-]\s*$", "", candidate).strip()
+            # Remove itens numerados no corpo do texto (ex.: " 1. Nao obstante...")
+            candidate = re.sub(r"\s+\d+\.\s+\S.*$", "", candidate, flags=re.DOTALL).strip()
             candidate = re.sub(r"\s+", " ", candidate)
             if len(candidate) >= 3:
                 found.append(candidate)
@@ -57,6 +114,8 @@ def analisar_publicacao(publicacao):
                 raw_text_chunks.append(str(value))
 
     texto_total = " ".join([texto] + raw_text_chunks).strip()
+    # Normaliza múltiplos espaços/tabs consecutivos como separadores de campo (→ \n)
+    texto_total = re.sub(r"[ \t]{2,}", "\n", texto_total)
 
     numero_processo = getattr(publicacao, "numero_processo", None)
     if not numero_processo:
@@ -64,10 +123,26 @@ def analisar_publicacao(publicacao):
         numero_processo = match.group(0) if match else None
 
     autores = _extract_labeled_entities(
-        texto_total, [r"autor(?:a)?", r"requerente", r"exequente", r"polo\s*ativo", r"impetrante"]
+        texto_total,
+        [
+            r"autor\(s\)",
+            r"autor(?:a)?",
+            r"requerente",
+            r"exequente",
+            r"polo\s*ativo",
+            r"impetrante",
+        ],
     )
     reus = _extract_labeled_entities(
-        texto_total, [r"reu", r"requerido", r"executado", r"polo\s*passivo", r"impetrado"]
+        texto_total,
+        [
+            r"reu\(s\)",
+            r"reu",
+            r"requerido",
+            r"executado",
+            r"polo\s*passivo",
+            r"impetrado",
+        ],
     )
     representantes = _extract_labeled_entities(
         texto_total, [r"advogado(?:\(a\))?", r"procurador(?:\(a\))?", r"representante(?:\s*legal)?"]
@@ -87,6 +162,9 @@ def analisar_publicacao(publicacao):
     tribunal = getattr(publicacao, "sigla_tribunal", None) or (
         raw.get("siglaTribunal") if isinstance(raw, dict) else None
     )
+    # Fallback: inferir tribunal a partir do texto quando não disponível nos metadados
+    if not tribunal:
+        tribunal = _inferir_tribunal(texto_total)
 
     confidence = 0.0
     if numero_processo:
@@ -177,7 +255,7 @@ def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise):
         )
         for cliente in candidatos:
             score = 0.7
-            if _normalize_text(cliente.nome_razao_social) == _normalize_text(nome):
+            if normalizar_nome(cliente.nome_razao_social) == normalizar_nome(nome):
                 score = 0.92
             sugestoes_clientes.append(
                 {
