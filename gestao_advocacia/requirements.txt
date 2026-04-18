@@ -14,6 +14,7 @@ Pillow==12.2.0
 psycopg2-binary==2.9.11
 PyJWT==2.12.0
 pypdf==6.10.2
+pypdfium2==4.30.0
 pytesseract==0.3.13
 python-json-logger==2.0.7
 pytest==9.0.3

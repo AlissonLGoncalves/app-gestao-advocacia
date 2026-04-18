@@ -23,7 +23,7 @@ const MovimentacoesRecentes = ({ className = '' }) => {
     setLoading(true)
     setError(null)
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = localStorage.getItem('token') || localStorage.getItem('auth_token')
       const response = await fetch(
         `${API_URL}/dashboard/publicacoes-recentes?dias=${dias}`,
         {

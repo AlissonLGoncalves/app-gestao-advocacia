@@ -1,11 +1,9 @@
 services:
   - type: web
     name: gestao-advocacia-api
-    env: python
+    env: docker
     region: oregon
-    rootDir: gestao_advocacia
-    buildCommand: pip install -r requirements.txt
-    startCommand: bash start.sh
+    dockerfilePath: ./Dockerfile
     plan: free
     envVars:
       - key: SECRET_KEY

@@ -1,6 +1,7 @@
 ﻿# Arquivo: tests/test_clientes_api.py
 # Testes para as rotas da API de Clientes usando pytest-flask.
 
+import io
 import json
 
 from app import Cliente
@@ -96,3 +97,74 @@ def test_delete_cliente_sucesso(auth_client, db):
 
     response_get = auth_client.get(f"/api/v1/clientes/{cliente_id}")
     assert response_get.status_code == 404
+
+
+def test_extrair_dados_procuração_upload_singular(auth_client, db):
+    texto = (
+        "PROCURAÇÃO\n"
+        "OUTORGANTE: EDIMILSON FRANCISCO DA COSTA\n"
+        "CPF: 123.456.789-00\n"
+        "RG: 12.345.678-9\n"
+        "ESTADO CIVIL: Casado\n"
+        "PROFISSÃO: Motorista\n"
+        "NACIONALIDADE: Brasileiro\n"
+        "E-MAIL: edimilson@email.com\n"
+        "TELEFONE: (11) 91234-5678\n"
+        "ENDEREÇO: Rua das Flores, 123, Centro\n"
+        "CEP: 01001-000\n"
+    )
+
+    data = {
+        "documento": (io.BytesIO(texto.encode("utf-8")), "procuracao.txt"),
+    }
+
+    response = auth_client.post(
+        "/api/v1/clientes/extrair-dados-doc",
+        data=data,
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200, response.data
+    payload = json.loads(response.data)
+    assert payload["nome_razao_social"] == "Edimilson Francisco Da Costa"
+    assert payload["cpf"] == "123.456.789-00"
+    assert payload["documento_principal"] == "123.456.789-00"
+    assert payload["tipo_pessoa_sugerida"] == "PF"
+    assert payload["email"] == "edimilson@email.com"
+    assert payload["telefone"] == "(11) 91234-5678"
+
+
+def test_extrair_dados_doc_aceita_documentos_em_lote(auth_client, db):
+    texto = "NOME: CLEUSA MARIA SILVA\nCPF: 98765432100\n"
+    data = {
+        "documentos": [(io.BytesIO(texto.encode("utf-8")), "cliente.txt")],
+    }
+
+    response = auth_client.post(
+        "/api/v1/clientes/extrair-dados-doc",
+        data=data,
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200, response.data
+    payload = json.loads(response.data)
+    assert payload["cpf"] == "98765432100"
+
+
+def test_extrair_dados_doc_sugere_pj_por_cnpj(auth_client, db):
+    texto = "RAZAO SOCIAL: EMPRESA XPTO LTDA\nCNPJ: 12.345.678/0001-90\n"
+    data = {
+        "documento": (io.BytesIO(texto.encode("utf-8")), "empresa.txt"),
+    }
+
+    response = auth_client.post(
+        "/api/v1/clientes/extrair-dados-doc",
+        data=data,
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200, response.data
+    payload = json.loads(response.data)
+    assert payload["cnpj"] == "12.345.678/0001-90"
+    assert payload["documento_principal"] == "12.345.678/0001-90"
+    assert payload["tipo_pessoa_sugerida"] == "PJ"

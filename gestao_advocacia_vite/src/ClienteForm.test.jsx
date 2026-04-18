@@ -97,4 +97,39 @@ describe('ClienteForm', () => {
       expect(toastMock.error).toHaveBeenCalled()
     })
   })
+
+  it('seleciona PJ automaticamente e preenche CNPJ quando OCR retorna CNPJ', async () => {
+    globalThis.fetch = vi.fn((url) => {
+      if (String(url).includes('/clientes/extrair-dados-doc')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            cnpj: '12.345.678/0001-90',
+            documento_principal: '12.345.678/0001-90',
+            tipo_pessoa_sugerida: 'PJ',
+            nome_razao_social: 'Empresa XPTO LTDA',
+          }),
+        })
+      }
+      if (String(url).includes('/clientes/?sort_by=')) {
+        return Promise.resolve({ ok: true, json: async () => [] })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ id: 10 }) })
+    })
+
+    const { container } = render(<ClienteForm onClienteChange={vi.fn()} />)
+
+    const inputFile = container.querySelector('#documento_ocr')
+    const arquivo = new File(['conteudo'], 'empresa.txt', { type: 'text/plain' })
+    fireEvent.change(inputFile, { target: { files: [arquivo] } })
+
+    await waitFor(() => {
+      const tipoPessoa = screen.getByLabelText(/tipo pessoa/i)
+      expect(tipoPessoa.value).toBe('PJ')
+    })
+
+    const campoCnpj = screen.getByLabelText(/cnpj principal \*/i)
+    expect(campoCnpj.value).toBe('12.345.678/0001-90')
+    expect(screen.getByLabelText(/razao social \*/i).value).toBe('Empresa XPTO LTDA')
+  })
 })

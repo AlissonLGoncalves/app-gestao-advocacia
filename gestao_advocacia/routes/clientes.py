@@ -82,10 +82,17 @@ def register_clientes_routes(app, clientes_ns, cliente_input_model_dto, cliente_
         )
         def post(self):
             user_id = get_jwt_identity()
-            if "documentos" not in request.files:
-                return {"message": "Nenhum arquivo 'documentos' foi enviado no form-data."}, 400
+            files = []
+            if "documentos" in request.files:
+                files = request.files.getlist("documentos")
+            elif "documento" in request.files:
+                # Compatibilidade para upload singular (ex.: procuração em PDF)
+                files = [request.files["documento"]]
+            else:
+                return {
+                    "message": "Nenhum arquivo enviado. Use o campo 'documentos' (lote) ou 'documento' (único)."
+                }, 400
 
-            files = request.files.getlist("documentos")
             if not files or files[0].filename == "":
                 return {"message": "Nenhum arquivo selecionado."}, 400
 

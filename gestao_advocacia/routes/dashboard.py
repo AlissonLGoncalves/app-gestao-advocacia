@@ -158,7 +158,7 @@ def register_dashboard_routes(app, dashboard_ns):
                         if caso and caso.cliente_id:
                             cliente = Cliente.query.get(caso.cliente_id)
                             if cliente:
-                                cliente_nome = cliente.nome
+                                cliente_nome = cliente.nome_razao_social
                                 cliente_id = cliente.id
 
                     resumo = pub.texto[:200] if pub.texto else ""

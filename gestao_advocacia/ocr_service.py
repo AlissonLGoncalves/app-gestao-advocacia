@@ -1,12 +1,95 @@
 import json
 import os
 import re
+from io import BytesIO
 
 import openpyxl
 import pytesseract
 from docx import Document
 from PIL import Image
 from pypdf import PdfReader
+
+try:
+    import pypdfium2
+except Exception:  # pragma: no cover
+    pypdfium2 = None
+
+
+def _configure_tesseract_binary():
+    env_cmd = os.environ.get("TESSERACT_CMD")
+    if env_cmd and os.path.exists(env_cmd):
+        pytesseract.pytesseract.tesseract_cmd = env_cmd
+        return
+
+    # Fallback Windows: evita depender da atualização do PATH após instalação.
+    candidate_paths = [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Tesseract-OCR", "tesseract.exe"),
+    ]
+    for candidate in candidate_paths:
+        if candidate and os.path.exists(candidate):
+            pytesseract.pytesseract.tesseract_cmd = candidate
+            return
+
+
+_configure_tesseract_binary()
+
+
+def _extract_text_from_pdf_bytes(pdf_bytes, max_pages=10):
+    text = ""
+    reader = PdfReader(BytesIO(pdf_bytes))
+    for page in reader.pages[:max_pages]:
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text + "\n"
+    return text
+
+
+def _looks_like_low_quality_text(text):
+    normalized = re.sub(r"\s+", "", text or "")
+    if len(normalized) < 120:
+        return True
+
+    # Em documentos de cliente, pelo menos um desses padrões costuma existir.
+    expected_markers = [
+        r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b",  # CPF formatado
+        r"\b\d{11}\b",  # CPF sem máscara
+        r"\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b",  # CNPJ formatado
+        r"\b\d{14}\b",  # CNPJ sem máscara
+        r"\b(outorgante|cpf|cnpj|rg|procura[cç][aã]o)\b",
+    ]
+    return not any(re.search(marker, text, re.IGNORECASE) for marker in expected_markers)
+
+
+def _extract_text_from_pdf_ocr(pdf_bytes, max_pages=5):
+    if pypdfium2 is None:
+        return ""
+
+    try:
+        pdf_doc = pypdfium2.PdfDocument(pdf_bytes)
+        text_parts = []
+
+        page_count = min(len(pdf_doc), max_pages)
+        for idx in range(page_count):
+            page = pdf_doc[idx]
+            pil_image = page.render(scale=2.0).to_pil()
+
+            # OCR em PT-BR com fallback para idioma padrão.
+            try:
+                page_text = pytesseract.image_to_string(pil_image, lang="por")
+            except Exception:
+                page_text = pytesseract.image_to_string(pil_image)
+
+            if page_text:
+                text_parts.append(page_text)
+
+            page.close()
+
+        pdf_doc.close()
+        return "\n".join(text_parts)
+    except Exception:
+        return ""
 
 
 def _extract_biometria_from_text(text):
@@ -15,12 +98,38 @@ def _extract_biometria_from_text(text):
     """
     extracted_data = {
         "cpf": "",
+        "cnpj": "",
+        "documento_principal": "",
+        "tipo_pessoa_sugerida": "",
         "rg": "",
         "nome_razao_social": "",
         "nome_fantasia": "",
         "data_nascimento": "",
         "nome_mae": "",
+        "email": "",
+        "telefone": "",
+        "cep": "",
+        "rua": "",
+        "numero": "",
+        "bairro": "",
+        "cidade": "",
+        "estado": "",
+        "nacionalidade": "",
+        "estado_civil": "",
+        "profissao": "",
     }
+
+    def _clean_line(value):
+        value = (value or "").strip()
+        value = re.sub(r"\s+", " ", value)
+        return value.strip(" -:;")
+
+    def _extract_labeled_value(patterns, source_text):
+        for pattern in patterns:
+            match = re.search(pattern, source_text, re.IGNORECASE)
+            if match:
+                return _clean_line(match.group(1))
+        return ""
 
     # Extração do CPF
     cpf_match = re.search(r"\b(\d{3}\.\d{3}\.\d{3}-\d{2})\b", text)
@@ -29,6 +138,12 @@ def _extract_biometria_from_text(text):
 
     if cpf_match:
         extracted_data["cpf"] = cpf_match.group(1)
+
+    cnpj_match = re.search(r"\b(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})\b", text)
+    if not cnpj_match:
+        cnpj_match = re.search(r"\b(\d{14})\b", text)
+    if cnpj_match:
+        extracted_data["cnpj"] = cnpj_match.group(1)
 
     # Extração do RG
     rg_match = re.search(r"\b(\d{1,2}\.?\d{3}\.?\d{3}-?[a-zA-Z0-9X]{1,2})\b", text, re.IGNORECASE)
@@ -45,12 +160,31 @@ def _extract_biometria_from_text(text):
         extracted_data["data_nascimento"] = f"{ano}-{mes}-{dia}"
 
     # Extração Qualitativa (Nome e Mãe)
+    nome_outorgante = _extract_labeled_value(
+        [
+            r"outorgante\s*[:\-]\s*([^\n\r]+)",
+            r"nome\s+do\s+outorgante\s*[:\-]\s*([^\n\r]+)",
+            r"nome\s*[:\-]\s*([^\n\r]+)",
+        ],
+        text,
+    )
+    if nome_outorgante:
+        # Evita lixo quando a linha traz vários rótulos concatenados
+        nome_outorgante = re.split(
+            r"\b(?:outorgad[oa]|cpf|cnpj|rg|nacionalidade|estado\s*civil|profissao|endereco)\b",
+            nome_outorgante,
+            maxsplit=1,
+            flags=re.IGNORECASE,
+        )[0].strip(" -:;")
+        extracted_data["nome_razao_social"] = nome_outorgante.title()
+
     linhas = [linha.strip() for linha in text.split("\n") if linha.strip()]
-    for i, linha in enumerate(linhas):
-        if linha.upper() == "NOME" or linha.upper().startswith("NOME:"):
-            if i + 1 < len(linhas):
-                extracted_data["nome_razao_social"] = linhas[i + 1].title()
-            break
+    if not extracted_data["nome_razao_social"]:
+        for i, linha in enumerate(linhas):
+            if linha.upper() == "NOME" or linha.upper().startswith("NOME:"):
+                if i + 1 < len(linhas):
+                    extracted_data["nome_razao_social"] = linhas[i + 1].title()
+                break
 
     for i, linha in enumerate(linhas):
         if (
@@ -61,6 +195,70 @@ def _extract_biometria_from_text(text):
             if i + 1 < len(linhas):
                 extracted_data["nome_mae"] = linhas[i + 1].title()
             break
+
+    # Campos comuns em procuração
+    extracted_data["email"] = _extract_labeled_value(
+        [r"e-?mail\s*[:\-]\s*([^\s,;]+@[^\s,;]+)", r"email\s*[:\-]\s*([^\s,;]+@[^\s,;]+)"],
+        text,
+    )
+
+    phone_match = re.search(
+        r"(?:telefone|celular|fone)\s*[:\-]?\s*(\(?\d{2}\)?\s*\d{4,5}[-\s]?\d{4})",
+        text,
+        re.IGNORECASE,
+    )
+    if not phone_match:
+        phone_match = re.search(r"\b(\(?\d{2}\)?\s*\d{4,5}[-\s]?\d{4})\b", text)
+    if phone_match:
+        extracted_data["telefone"] = _clean_line(phone_match.group(1))
+
+    extracted_data["nacionalidade"] = _extract_labeled_value(
+        [r"nacionalidade\s*[:\-]\s*([^\n\r,;]+)"], text
+    )
+    extracted_data["estado_civil"] = _extract_labeled_value(
+        [r"estado\s+civil\s*[:\-]\s*([^\n\r,;]+)"], text
+    )
+    extracted_data["profissao"] = _extract_labeled_value(
+        [r"profiss[aã]o\s*[:\-]\s*([^\n\r,;]+)"], text
+    )
+
+    cep_match = re.search(r"\b(\d{5}-?\d{3})\b", text)
+    if cep_match:
+        extracted_data["cep"] = cep_match.group(1)
+
+    endereco_linha = _extract_labeled_value(
+        [r"endere[cç]o\s*[:\-]\s*([^\n\r]+)", r"domiciliad[oa]\s+em\s*([^\n\r]+)"], text
+    )
+    if endereco_linha:
+        extracted_data["rua"] = endereco_linha[:120]
+
+    cidade_uf_match = re.search(
+        r"\b([A-Za-zÀ-ÿ\s]{3,})\s*/\s*([A-Z]{2})\b",
+        text,
+        re.IGNORECASE,
+    )
+    if cidade_uf_match:
+        extracted_data["cidade"] = _clean_line(cidade_uf_match.group(1)).title()
+        extracted_data["estado"] = cidade_uf_match.group(2).upper()
+
+    numero_match = re.search(r"(?:n[ºo°]|numero)\s*[:\-]?\s*(\d+[A-Za-z]?)", text, re.IGNORECASE)
+    if numero_match:
+        extracted_data["numero"] = numero_match.group(1)
+
+    bairro_match = re.search(r"bairro\s*[:\-]?\s*([^\n\r,;]+)", text, re.IGNORECASE)
+    if bairro_match:
+        extracted_data["bairro"] = _clean_line(bairro_match.group(1)).title()
+
+    cpf_digits = re.sub(r"\D", "", extracted_data.get("cpf") or "")
+    cnpj_digits = re.sub(r"\D", "", extracted_data.get("cnpj") or "")
+
+    # Prioriza CNPJ quando identificado com 14 dígitos; caso contrário, usa CPF.
+    if len(cnpj_digits) == 14:
+        extracted_data["documento_principal"] = extracted_data["cnpj"]
+        extracted_data["tipo_pessoa_sugerida"] = "PJ"
+    elif len(cpf_digits) == 11:
+        extracted_data["documento_principal"] = extracted_data["cpf"]
+        extracted_data["tipo_pessoa_sugerida"] = "PF"
 
     return extracted_data
 
@@ -75,11 +273,16 @@ def extract_client_data_from_file(file_stream, filename):
         text = ""
 
         if ext == "pdf":
-            reader = PdfReader(file_stream)
-            for page in reader.pages[:10]:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+            pdf_bytes = file_stream.read()
+            file_stream.seek(0)
+
+            text = _extract_text_from_pdf_bytes(pdf_bytes)
+
+            # Fallback profissional para PDF escaneado/imagem quando texto vier fraco.
+            if _looks_like_low_quality_text(text):
+                ocr_text = _extract_text_from_pdf_ocr(pdf_bytes)
+                if ocr_text:
+                    text = f"{text}\n{ocr_text}".strip()
 
         elif ext == "txt":
             text = file_stream.read().decode("utf-8", errors="ignore")

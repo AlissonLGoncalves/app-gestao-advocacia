@@ -348,10 +348,36 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
 
       const messageExtraida = []
       setFormData((prev) => {
-        const updates = { ...prev }
-        if (data.cpf) {
-          updates.cpf_cnpj = formatCPFCNPJ(data.cpf, 'PF', false)
-          messageExtraida.push('CPF')
+        const documento = data.documento_principal || data.cnpj || data.cpf
+        const tipoDetectado =
+          data.tipo_pessoa_sugerida || (data.cnpj ? 'PJ' : data.cpf ? 'PF' : prev.tipo_pessoa)
+
+        let updates = { ...prev }
+        if (tipoDetectado !== prev.tipo_pessoa) {
+          const commonData = {
+            nome_razao_social: prev.nome_razao_social,
+            cep: prev.cep,
+            rua: prev.rua,
+            numero: prev.numero,
+            bairro: prev.bairro,
+            cidade: prev.cidade,
+            estado: prev.estado,
+            pais: prev.pais,
+            telefone: prev.telefone,
+            email: prev.email,
+            notas_gerais: prev.notas_gerais,
+          }
+          updates = {
+            ...(tipoDetectado === 'PJ' ? initialStatePJ : initialStatePF),
+            ...commonData,
+            tipo_pessoa: tipoDetectado,
+          }
+          messageExtraida.push(`Tipo Pessoa (${tipoDetectado})`)
+        }
+
+        if (documento) {
+          updates.cpf_cnpj = formatCPFCNPJ(documento, tipoDetectado, false)
+          messageExtraida.push(tipoDetectado === 'PJ' ? 'CNPJ' : 'CPF')
         }
         if (data.nome_razao_social) {
           updates.nome_razao_social = data.nome_razao_social
@@ -371,6 +397,50 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
             ? `${updates.notas_gerais}\n${maeStr}`
             : maeStr
           messageExtraida.push('Filiação')
+        }
+        if (data.email) {
+          updates.email = data.email
+          messageExtraida.push('E-mail')
+        }
+        if (data.telefone) {
+          updates.telefone = data.telefone
+          messageExtraida.push('Telefone')
+        }
+        if (data.cep) {
+          updates.cep = data.cep
+          messageExtraida.push('CEP')
+        }
+        if (data.rua) {
+          updates.rua = data.rua
+          messageExtraida.push('Rua')
+        }
+        if (data.numero) {
+          updates.numero = data.numero
+          messageExtraida.push('Número')
+        }
+        if (data.bairro) {
+          updates.bairro = data.bairro
+          messageExtraida.push('Bairro')
+        }
+        if (data.cidade) {
+          updates.cidade = data.cidade
+          messageExtraida.push('Cidade')
+        }
+        if (data.estado) {
+          updates.estado = data.estado
+          messageExtraida.push('UF')
+        }
+        if (data.nacionalidade && tipoDetectado === 'PF') {
+          updates.nacionalidade = data.nacionalidade
+          messageExtraida.push('Nacionalidade')
+        }
+        if (data.estado_civil && tipoDetectado === 'PF') {
+          updates.estado_civil = data.estado_civil
+          messageExtraida.push('Estado Civil')
+        }
+        if (data.profissao && tipoDetectado === 'PF') {
+          updates.profissao = data.profissao
+          messageExtraida.push('Profissão')
         }
         return updates
       })
@@ -437,8 +507,8 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
             <div className="flex-grow-1">
               <h6 className="mb-1 text-dark fw-bold">Auto-Preenchimento Mágico (Leitura IA)</h6>
               <p className="mb-0 small text-muted">
-                Envie um arquivo PDF, Word, Excel, Imagem ou Texto para extrair dados
-                automaticamente.
+                Envie a procuração em PDF (ou outros formatos) para extrair e preencher
+                automaticamente os dados do cliente.
               </p>
             </div>
             <div>
@@ -461,7 +531,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
                     Lote...
                   </>
                 ) : (
-                  'Importar Lote (Arqs/Fots)'
+                  'Importar Procuração/Documentos'
                 )}
               </label>
             </div>
