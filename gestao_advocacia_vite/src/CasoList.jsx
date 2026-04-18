@@ -1,5 +1,6 @@
 // src/CasoList.jsx
 import React, { useState, useEffect, useCallback } from 'react'
+import { useLocation } from 'react-router-dom'
 import { API_URL } from './config.js'
 import {
   PencilSquareIcon,
@@ -14,6 +15,7 @@ import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
 
 function CasoList({ onEditCaso, refreshKey }) {
+  const location = useLocation()
   const [casos, setCasos] = useState([])
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -30,6 +32,11 @@ function CasoList({ onEditCaso, refreshKey }) {
   const [showFilters, setShowFilters] = useState(false)
 
   const [sortConfig, setSortConfig] = useState({ key: 'data_atualizacao', direction: 'desc' })
+
+  useEffect(() => {
+    const clienteIdDaUrl = new URLSearchParams(location.search).get('cliente_id') || ''
+    setClienteFilter((prev) => (prev === clienteIdDaUrl ? prev : clienteIdDaUrl))
+  }, [location.search])
 
   const fetchClientesParaFiltro = useCallback(async () => {
     const token = localStorage.getItem('token')

@@ -35,6 +35,10 @@ function ClienteList({ onEditCliente, refreshKey }) {
   const [clienteCasos, setClienteCasos] = useState({})
   const [loadingCasos, setLoadingCasos] = useState({})
 
+  const abrirCasosDoCliente = (clienteId) => {
+    navigate(`/casos?cliente_id=${clienteId}`)
+  }
+
   const fetchClientes = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -312,7 +316,14 @@ function ClienteList({ onEditCliente, refreshKey }) {
               <React.Fragment key={cliente.id}>
                 <tr className={expandedRowId === cliente.id ? 'table-active' : ''}>
                   <td className="px-3 py-2">
-                    {cliente.nome_razao_social}
+                    <button
+                      type="button"
+                      className="btn btn-link p-0 align-baseline fw-semibold text-decoration-underline"
+                      onClick={() => abrirCasosDoCliente(cliente.id)}
+                      title="Abrir casos/processos deste cliente"
+                    >
+                      {cliente.nome_razao_social}
+                    </button>
                     {cliente.tipo_pessoa === 'PJ' &&
                       (cliente.cnpj_secundario || cliente.cnpj_terciario) && (
                         <InformationCircleIcon
