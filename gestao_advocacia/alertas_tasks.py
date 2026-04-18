@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from app import EventoAgenda, User, db
+from models import EventoAgenda, User
+from extensions import db
 from mail_service import enviar_alerta_email
 
 
