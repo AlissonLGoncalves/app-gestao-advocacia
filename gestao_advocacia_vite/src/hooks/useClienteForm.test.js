@@ -4,7 +4,7 @@ import useClienteForm from './useClienteForm.js'
 
 vi.mock('react-toastify', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
-global.fetch = vi.fn()
+globalThis.fetch = vi.fn()
 
 const makeFormData = (overrides = {}) => ({
   nome_razao_social: 'Empresa Teste Ltda',
@@ -39,7 +39,7 @@ describe('useClienteForm', () => {
 
   it('chama setLoading quando dados PJ validos', async () => {
     const setLoading = vi.fn()
-    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1 }) })
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1 }) })
 
     const { result } = renderHook(() => useClienteForm(makeProps({ setLoading })))
 
@@ -81,7 +81,7 @@ describe('useClienteForm', () => {
 
   it('nao gera erro de email quando email valido', async () => {
     const setLoading = vi.fn()
-    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 2 }) })
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 2 }) })
 
     const { result } = renderHook(() =>
       useClienteForm(

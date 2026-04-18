@@ -4,7 +4,7 @@ import useCasoForm from './useCasoForm.js'
 
 vi.mock('react-toastify', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
-global.fetch = vi.fn()
+globalThis.fetch = vi.fn()
 
 const makeFormData = (overrides = {}) => ({
   titulo: 'Caso Teste',
@@ -103,7 +103,7 @@ describe('useCasoForm', () => {
 
   it('chama setLoading quando dados validos', async () => {
     const setLoading = vi.fn()
-    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1 }) })
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1 }) })
 
     const { result } = renderHook(() => useCasoForm(makeProps({ setLoading })))
 
