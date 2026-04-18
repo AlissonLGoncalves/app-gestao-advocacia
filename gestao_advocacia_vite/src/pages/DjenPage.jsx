@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
 import DOMPurify from 'dompurify'
+import ModalCriarClienteCaso from '../components/djen/ModalCriarClienteCaso.jsx'
 
 const decodeHtmlEntities = (texto = '') => {
   if (!texto) return ''
@@ -214,6 +215,7 @@ export default function DjenPage() {
   const TRIAGEM_LIMIT = 20
   const [triagemBusca, setTriagemBusca] = useState('')
   const [triagemExpandido, setTriagemExpandido] = useState({})
+  const [itemModalCriar, setItemModalCriar] = useState(null)
 
   // Detalhe
   const [pubSelecionada, setPubSelecionada] = useState(null)
@@ -423,7 +425,7 @@ export default function DjenPage() {
 
   const mesclarTriagemCaso = async (pub, casoId) => {
     try {
-      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/mesclar`, {
+      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/vincular-caso`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ caso_id: casoId }),
@@ -469,31 +471,18 @@ export default function DjenPage() {
 
   // ── Criar cliente + caso via triagem ──────────────────────────────────────
   const criarClienteECasoTriagem = async (pub) => {
-    try {
-      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/criar-cliente-caso`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      })
-
-      const payload = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(payload.message || 'Erro ao criar cliente/caso pela triagem.')
-        return
-      }
-
-      setTriagemItems((prev) => prev.filter((i) => i.publicacao.id !== pub.id))
-      setTriagemTotal((prev) => Math.max(0, prev - 1))
-      await carregarPublicacoes(0)
-      await carregarCasos()
-      await carregarUltimasPublicacoesDjen()
-
-      const clienteNome = payload?.cliente?.nome_razao_social || 'Cliente'
-      const casoNumero =
-        payload?.caso?.numero_processo || payload?.caso?.titulo || `#${payload?.caso?.id}`
-      toast.success(`Cliente/Caso processados: ${clienteNome} · ${casoNumero}`)
-    } catch {
-      toast.error('Erro de conexão ao criar cliente/caso.')
+    const item = triagemItems.find((i) => i.publicacao.id === pub.id)
+    if (item) {
+      setItemModalCriar(item)
     }
+  }
+
+  const onSucessoModalCriar = async () => {
+    setItemModalCriar(null)
+    await carregarTriagem(triagemOffset)
+    await carregarPublicacoes(0)
+    await carregarCasos()
+    await carregarUltimasPublicacoesDjen()
   }
 
   const toggleSelecaoTriagem = (pubId) => {
@@ -1497,7 +1486,7 @@ export default function DjenPage() {
                   {triagemFiltrados.map((item) => {
                     const pub = item.publicacao
                     const analise = item.analise || {}
-                    const sugestoes = item.sugestoes || {}
+                    const sugestoes = item.sugestoes_vinculo || item.sugestoes || {}
                     const tribunal = analise.tribunal || pub.sigla_tribunal || ''
                     const dataFormatada = pub.data_disponibilizacao
                       ? new Date(pub.data_disponibilizacao).toLocaleDateString('pt-BR')
@@ -1805,6 +1794,14 @@ export default function DjenPage() {
             </div>
           )
         })()}
+
+      {itemModalCriar && (
+        <ModalCriarClienteCaso
+          publicacao={itemModalCriar}
+          onClose={() => setItemModalCriar(null)}
+          onSuccess={onSucessoModalCriar}
+        />
+      )}
     </div>
   )
 }

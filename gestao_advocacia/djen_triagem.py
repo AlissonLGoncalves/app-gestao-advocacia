@@ -102,6 +102,57 @@ def _extract_labeled_entities(text, labels):
     return _dedupe_preserving_order(found)
 
 
+def _extract_labeled_value(text, labels):
+    for label in labels:
+        regex = re.compile(
+            rf"(?<!\w){label}\s*[:\-]\s*([^\n\r]+)",
+            re.IGNORECASE,
+        )
+        match = regex.search(text)
+        if not match:
+            continue
+        value = (match.group(1) or "").strip()
+        value = re.sub(r"\s+\w+(?:\([^)]*\))?\s*[:\-]\s*$", "", value).strip()
+        value = re.sub(r"\s+", " ", value)
+        if value:
+            return value
+    return None
+
+
+def _extract_valor_causa(text):
+    match = re.search(r"valor\s+da\s+causa\s*[:\-]?\s*(R\$\s*[\d\.,]+)", text, re.IGNORECASE)
+    if not match:
+        return None
+    return re.sub(r"\s+", " ", match.group(1)).strip()
+
+
+def _extract_comarca(text):
+    match = re.search(r"comarca\s+de\s+([^\n\r\-]+)", text, re.IGNORECASE)
+    if not match:
+        return None
+    comarca = (match.group(1) or "").strip()
+    comarca = re.sub(r"\s+", " ", comarca)
+    return comarca or None
+
+
+def _extract_nome_juiz(text):
+    padroes = [
+        r"juiz(?:a)?\s+de\s+direito\s*[:\-]?\s*([^\n\r]+)",
+        r"magistrad[oa]\s*[:\-]?\s*([^\n\r]+)",
+        r"nome\s+juiz\s*[:\-]?\s*([^\n\r]+)",
+    ]
+    for padrao in padroes:
+        match = re.search(padrao, text, re.IGNORECASE)
+        if not match:
+            continue
+        nome = (match.group(1) or "").strip()
+        nome = re.sub(r"\s+\w+(?:\([^)]*\))?\s*[:\-]\s*$", "", nome).strip()
+        nome = re.sub(r"\s+", " ", nome)
+        if nome:
+            return nome
+    return None
+
+
 def analisar_publicacao(publicacao):
     texto = (getattr(publicacao, "texto", None) or "").strip()
     raw = getattr(publicacao, "raw_json", None) or {}
@@ -148,6 +199,12 @@ def analisar_publicacao(publicacao):
         texto_total, [r"advogado(?:\(a\))?", r"procurador(?:\(a\))?", r"representante(?:\s*legal)?"]
     )
 
+    classe_processual = _extract_labeled_value(texto_total, [r"classe\s+processual"])
+    assunto_principal = _extract_labeled_value(texto_total, [r"assunto\s+principal"])
+    valor_causa = _extract_valor_causa(texto_total)
+    comarca = _extract_comarca(texto_total)
+    nome_juiz = getattr(publicacao, "nome_juiz", None) or _extract_nome_juiz(texto_total)
+
     # fallback mínimo usando nomeParte da API quando disponível
     nome_parte = ""
     if isinstance(raw, dict):
@@ -184,6 +241,11 @@ def analisar_publicacao(publicacao):
     return {
         "numero_processo": numero_processo,
         "tribunal": tribunal,
+        "classe_processual": classe_processual,
+        "assunto_principal": assunto_principal,
+        "valor_causa": valor_causa,
+        "comarca": comarca,
+        "nome_juiz": nome_juiz,
         "partes_autoras": autores,
         "partes_reus": reus,
         "representantes": representantes,

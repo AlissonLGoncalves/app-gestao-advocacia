@@ -84,6 +84,26 @@ def test_texto_real_confianca_minima():
     )
 
 
+def test_texto_real_campos_processuais_extraidos():
+    resultado = analisar_publicacao(MockPub(TEXTO_REAL))
+    assert resultado["classe_processual"] == "Procedimento Comum Civel"
+    assert resultado["assunto_principal"].startswith("Praticas Abusivas")
+    assert resultado["valor_causa"] == "R$150.000,00"
+    assert resultado["comarca"].startswith("CORNELIO PROCOPIO")
+
+
+def test_extrai_nome_juiz_do_texto():
+    texto = (
+        "Processo: 0005555-44.2025.8.16.0001\n"
+        "Classe Processual: Procedimento Comum Civel\n"
+        "Juiz de Direito: Fulano de Tal\n"
+        "Autor(s): Ana Souza\n"
+        "Reu(s): Empresa XPTO"
+    )
+    resultado = analisar_publicacao(MockPub(texto))
+    assert resultado["nome_juiz"] == "Fulano de Tal"
+
+
 # ---------------------------------------------------------------------------
 # Casos de borda
 # ---------------------------------------------------------------------------

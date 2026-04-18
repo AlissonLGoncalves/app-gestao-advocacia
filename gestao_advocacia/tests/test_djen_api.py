@@ -540,7 +540,7 @@ class TestDjenTriagem:
             pub_id = pub.id
 
         resp = auth_client.post(f"/api/v1/djen/triagem/{pub_id}/criar-cliente-caso")
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         payload = json.loads(resp.data)
 
         assert payload["cliente"]["id"] is not None
