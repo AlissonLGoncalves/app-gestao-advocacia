@@ -179,6 +179,7 @@ export default function DjenPage() {
   const [naoLidas, setNaoLidas] = useState(0)
   const [loadingPubs, setLoadingPubs] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [autoSyncExecutada, setAutoSyncExecutada] = useState(false)
   const [diasSync, setDiasSync] = useState(30)
 
   // Filtros
@@ -351,7 +352,7 @@ export default function DjenPage() {
   ])
 
   // ── Sincronizar ─────────────────────────────────────────────────────────────
-  const sincronizar = async () => {
+  const sincronizar = async ({ silencioso = false } = {}) => {
     setSyncing(true)
     try {
       const res = await fetch(`${API_URL}/djen/sync`, {
@@ -366,23 +367,42 @@ export default function DjenPage() {
         const encontrados = resumo.itens_encontrados ?? 0
         const oabsProc = resumo.oabs_processadas ?? 0
         const casosProc = resumo.casos_processados ?? 0
-        toast.success(
-          `Sync DJEN concluído: ${salvas} nova(s), ${encontrados} encontrada(s), OABs ${oabsProc}, casos ${casosProc}.`
-        )
+        if (!silencioso) {
+          toast.success(
+            `Sync DJEN concluído: ${salvas} nova(s), ${encontrados} encontrada(s), OABs ${oabsProc}, casos ${casosProc}.`
+          )
+        }
         setOffset(0)
         await carregarPublicacoes(0)
         await carregarOabs()
         await carregarTriagem()
         await carregarUltimasPublicacoesDjen()
       } else {
-        toast.error(payload.message || 'Erro ao sincronizar.')
+        if (!silencioso) {
+          toast.error(payload.message || 'Erro ao sincronizar.')
+        }
       }
     } catch {
-      toast.error('Erro de conexão.')
+      if (!silencioso) {
+        toast.error('Erro de conexão.')
+      }
     } finally {
       setSyncing(false)
     }
   }
+
+  useEffect(() => {
+    if (autoSyncExecutada || loadingOabs || syncing) return
+
+    // Não força sync quando não há OAB cadastrada.
+    if (oabs.length === 0) {
+      setAutoSyncExecutada(true)
+      return
+    }
+
+    setAutoSyncExecutada(true)
+    sincronizar({ silencioso: true })
+  }, [autoSyncExecutada, loadingOabs, syncing, oabs])
 
   // ── Marcar publicação como lida ─────────────────────────────────────────────
   const marcarLida = async (pub, lida) => {
@@ -623,10 +643,16 @@ export default function DjenPage() {
     setTimeout(() => carregarPublicacoes(0), 50)
   }
 
-  const fmtData = (str) => {
-    if (!str) return '—'
-    const d = new Date(str + 'T12:00:00')
-    return d.toLocaleDateString('pt-BR')
+  const fmtData = (valor, comHora = false) => {
+    if (!valor) return '—'
+
+    const texto = String(valor).trim()
+    const normalizado = /^\d{4}-\d{2}-\d{2}$/.test(texto) ? `${texto}T12:00:00` : texto
+    const d = new Date(normalizado)
+
+    if (Number.isNaN(d.getTime())) return '—'
+
+    return d.toLocaleString('pt-BR', comHora ? { dateStyle: 'short', timeStyle: 'short' } : {})
   }
 
   const textoDetalheOriginal = (pubSelecionada?.texto || '').trim()
@@ -1292,7 +1318,11 @@ export default function DjenPage() {
                           </td>
                           <td className="small text-muted">{o.nome_advogado || '—'}</td>
                           <td className="small text-muted">
-                            {o.ultima_sincronizacao ? fmtData(o.ultima_sincronizacao) : 'Nunca'}
+                            {o.ultima_sincronizacao
+                              ? fmtData(o.ultima_sincronizacao, true)
+                              : o.data_criacao
+                                ? `Aguardando 1ª sync (cadastro em ${fmtData(o.data_criacao, true)})`
+                                : 'Nunca'}
                           </td>
                           <td>
                             <button
