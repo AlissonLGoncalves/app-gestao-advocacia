@@ -423,9 +423,9 @@ def test_log_warning_quando_cross_tenant_bloqueado(app):
 
     alvo = type("Target", (), {"tenant_id": 999})()
     with app.test_request_context("/api/fake/99"):
-        with patch("app.query_for_tenant", return_value=FakeQuery()):
-            with patch("app.get_tenant_id", return_value=1):
-                with patch("app.get_jwt_identity", return_value=123):
-                    with patch("app.db.session.get", return_value=alvo):
+        with patch("helpers.tenant.query_for_tenant", return_value=FakeQuery()):
+            with patch("helpers.tenant.get_tenant_id", return_value=1):
+                with patch("helpers.tenant.get_jwt_identity", return_value=123):
+                    with patch("helpers.tenant.db.session.get", return_value=alvo):
                         with pytest.raises(NotFound):
                             get_item_or_404(FakeModel, 99)
