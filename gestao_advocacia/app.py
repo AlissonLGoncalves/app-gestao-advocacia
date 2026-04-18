@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Blueprint, Flask, redirect, request
+from flask import Blueprint, Flask, make_response, redirect, request
 from flask_cors import CORS
 from flask_jwt_extended import get_jwt
 from flask_restx import Api, abort
@@ -105,6 +105,11 @@ def create_app(config_class=Config):
         "/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     )
     def legacy_redirect(subpath):
+        # Browsers do not allow redirects during CORS preflight.
+        # Return 204 so Flask-CORS can attach the proper CORS headers.
+        if request.method == "OPTIONS":
+            return make_response("", 204)
+
         target = f"/api/v1/{subpath}"
         qs = request.query_string.decode("utf-8")
         if qs:
