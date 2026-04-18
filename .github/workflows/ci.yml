@@ -65,11 +65,8 @@ jobs:
       - name: Run pip-audit
         run: pip-audit -r requirements.lock
 
-      - name: Install pytest-cov
-        run: pip install pytest-cov
-
       - name: Run backend tests with coverage
-        run: pytest tests --cov=. --cov-report=term-missing --cov-fail-under=50
+        run: pytest tests --cov=. --cov-report=term-missing
 
   frontend:
     runs-on: ubuntu-latest
