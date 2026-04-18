@@ -1,6 +1,7 @@
 // src/Dashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from './config.js'
+import MovimentacoesRecentes from './components/MovimentacoesRecentes.jsx'
 
 import {
   UsersIcon as UsersIconSolid,
@@ -416,7 +417,12 @@ function Dashboard({ mudarSecao }) {
           </div>
         </div>
       </div>
-    </div>
+      {/* Movimentacoes Recentes Widget */}
+      <div className="row mt-4 g-3">
+        <div className="col-12">
+          <MovimentacoesRecentes />
+        </div>
+      </div>    </div>
   )
 }
 
