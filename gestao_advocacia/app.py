@@ -4,11 +4,12 @@
 # namespaces da API, rotas e inicialização do APScheduler.
 # ==============================================================================
 import os
-import logging # Para configurar o logging
-from flask import Flask, request, jsonify, send_from_directory, Blueprint
+import uuid
+from flask import Flask, request, jsonify, send_from_directory, Blueprint, g
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import HTTPException
 from datetime import datetime
 from flask_cors import CORS
 import re
@@ -29,6 +30,7 @@ from config import Config
 from cnj_service import consultar_processo_cnj 
 from tasks import job_verificar_processos_cnj 
 from extensions import db, jwt, migrate, scheduler, mail
+from logging_config import configure_json_logging
 from helpers import (
     get_existing_item,
     get_item_or_404,
@@ -88,20 +90,15 @@ def create_app(config_class=Config):
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
     app.url_map.strict_slashes = False
 
-    # Configuração de Logging
-    if not app.logger.handlers:
-        log_level_config = app.config.get('LOG_LEVEL', 'INFO').upper()
-        log_level_map = {
-            'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 
-            'WARNING': logging.WARNING, 'ERROR': logging.ERROR, 'CRITICAL': logging.CRITICAL
-        }
-        app.logger.setLevel(log_level_map.get(log_level_config, logging.INFO))
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-        ))
-        app.logger.addHandler(stream_handler)
-    app.logger.info(f"Aplicação Gestão Advocacia (v{app.config.get('APP_VERSION')}) iniciando com LOG_LEVEL={app.config.get('LOG_LEVEL')}")
+    configure_json_logging(app)
+    app.logger.info(
+        "app_startup",
+        extra={
+            "event": "app_startup",
+            "app_version": app.config.get('APP_VERSION'),
+            "log_level": app.config.get('LOG_LEVEL'),
+        },
+    )
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -119,6 +116,36 @@ def create_app(config_class=Config):
     if extra_origins:
         allowed_origins.extend([o.strip() for o in extra_origins.split(',') if o.strip()])
     CORS(app, origins=allowed_origins)
+
+    @app.before_request
+    def set_request_context():
+        incoming_request_id = request.headers.get('X-Request-ID')
+        g.request_id = incoming_request_id if incoming_request_id else str(uuid.uuid4())
+
+    @app.after_request
+    def add_request_id_header(response):
+        response.headers['X-Request-ID'] = getattr(g, 'request_id', '-')
+        return response
+
+    @app.errorhandler(Exception)
+    def handle_unhandled_exception(error):
+        if isinstance(error, HTTPException) and error.code < 500:
+            return error
+
+        status_code = error.code if isinstance(error, HTTPException) else 500
+        app.logger.exception(
+            "server_error",
+            extra={
+                "event": "server_error",
+                "endpoint": request.path,
+                "method": request.method,
+                "status_code": status_code,
+            },
+        )
+
+        if isinstance(error, HTTPException):
+            return error
+        return jsonify({"message": "Erro interno do servidor."}), 500
 
     api_bp = Blueprint('api', __name__, url_prefix='/api')
     # Disable Swagger UI in production to avoid exposing the full API surface

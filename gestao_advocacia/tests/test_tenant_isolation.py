@@ -409,7 +409,9 @@ def test_usuario_sem_tenant_e_bloqueado(client, tenants_setup, app):
     assert resp_casos.status_code == 403
 
 
-def test_log_warning_quando_cross_tenant_bloqueado(app):
+def test_log_warning_quando_cross_tenant_bloqueado(app, caplog):
+    caplog.set_level("WARNING")
+
     class FakeQuery:
         def filter_by(self, **_kwargs):
             return self
@@ -429,3 +431,11 @@ def test_log_warning_quando_cross_tenant_bloqueado(app):
                     with patch("helpers.tenant.db.session.get", return_value=alvo):
                         with pytest.raises(NotFound):
                             get_item_or_404(FakeModel, 99)
+
+    record = next((r for r in caplog.records if r.getMessage() == "cross_tenant_access_blocked"), None)
+    assert record is not None
+    assert getattr(record, "event", None) == "cross_tenant_access_blocked"
+    assert getattr(record, "user_id", None) == 123
+    assert getattr(record, "current_tenant", None) == 1
+    assert getattr(record, "target_tenant", None) == 999
+    assert getattr(record, "endpoint", None) == "/api/fake/99"

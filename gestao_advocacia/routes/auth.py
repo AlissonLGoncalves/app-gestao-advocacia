@@ -178,9 +178,23 @@ def register_auth_routes(
             if user and user.check_password(password):
                 expires = timedelta(days=app.config.get('JWT_ACCESS_TOKEN_EXPIRES_DAYS', 1))
                 access_token = create_access_token(identity=str(user.id), additional_claims={'role': user.role}, expires_delta=expires)
-                app.logger.info(f"Usuário {user.username} (ID: {user.id}) logado com sucesso.")
+                app.logger.info(
+                    "login_success",
+                    extra={
+                        "event": "login_success",
+                        "user_id": user.id,
+                        "tenant_id": user.tenant_id,
+                    },
+                )
                 return {'access_token': access_token, 'user': user.to_dict()}, 200
-            app.logger.warning(f"Tentativa de login falhou para: {username_or_email}")
+            app.logger.warning(
+                "login_failed",
+                extra={
+                    "event": "login_failed",
+                    "email": username_or_email,
+                    "reason": "invalid_credentials",
+                },
+            )
             return {'message': 'Nome de usuário/email ou senha inválidos.'}, 401
 
     @auth_ns.route('/me')
