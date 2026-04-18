@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Corrige tenants para um usuário específico no banco de produção.
-- Faz backup das linhas afetadas (CSV) em `backups/<timestamp>/`
-- Cria um tenant novo (se necessário)
-- Atualiza `user.tenant_id` e preenche `tenant_id` nas tabelas que tinham NULL para registros do `user_id`
+Corrige tenant_id para um usuario especifico no banco.
+
+Comportamento padrao: DRY-RUN (nao altera dados).
+Para aplicar alteracoes, use --execute.
 
 Uso:
-  python corrigir_tenants_prod.py --db "<DATABASE_URL>" --user-id 2 --tenant-name "Alisson - Patronus" --yes
-
-IMPORTANTE: Este script aplica alterações no banco de produção. Use com cuidado.
+    python scripts/maintenance/corrigir_tenants_prod.py --db "<DATABASE_URL>" --user-id 2 --tenant-name "Alisson - Patronus"
+    python scripts/maintenance/corrigir_tenants_prod.py --db "<DATABASE_URL>" --user-id 2 --tenant-name "Alisson - Patronus" --execute
 """
 import os
 import argparse
@@ -44,7 +43,7 @@ def main():
     parser.add_argument('--db', required=True, help='Database URL')
     parser.add_argument('--user-id', type=int, default=2, help='ID do usuário a corrigir')
     parser.add_argument('--tenant-name', default=None, help='Nome do tenant a criar')
-    parser.add_argument('--yes', action='store_true', help='Confirma execução sem pedir input')
+    parser.add_argument('--execute', action='store_true', help='Aplica alteracoes no banco. Sem essa flag, roda em dry-run.')
     args = parser.parse_args()
 
     db_url = args.db
@@ -79,9 +78,19 @@ def main():
 
             print(f"\nTotal linhas em backup: {total_backed}")
 
-        # Escrita/alterações em transação separada
         tenant_name = args.tenant_name or f'tenant_user_{args.user_id}_auto'
-        print(f"\nAplicando alterações: criando tenant '{tenant_name}' e atualizando registros do user_id={args.user_id}")
+
+        if not args.execute:
+            print('\n[DRY-RUN] Nenhuma alteracao foi aplicada.')
+            print(f"[DRY-RUN] Seria criado um tenant com nome '{tenant_name}'")
+            print(f"[DRY-RUN] Seria atualizado user.tenant_id para user_id={args.user_id}")
+            print('[DRY-RUN] Seriam atualizadas as linhas com tenant_id NULL nas tabelas listadas acima.')
+            print('Backups salvos em:', backup_dir)
+            return
+
+        # Escrita/alteracoes em transacao separada
+        tenant_name = args.tenant_name or f'tenant_user_{args.user_id}_auto'
+        print(f"\n[EXECUTE] Aplicando alteracoes: criando tenant '{tenant_name}' e atualizando registros do user_id={args.user_id}")
         with engine.begin() as conn_tx:
             insert_t = text("INSERT INTO tenant (nome_escritorio, documento, created_at) VALUES (:nome, NULL, now()) RETURNING id;")
             res = conn_tx.execute(insert_t, {'nome': tenant_name})
@@ -106,7 +115,7 @@ def main():
 
             print(f"\nTotal linhas atualizadas: {total_updated}")
 
-        print('\nAlterações aplicadas com sucesso.')
+        print('\nAlteracoes aplicadas com sucesso.')
         print('Backups salvos em:', backup_dir)
 
     except SQLAlchemyError as e:

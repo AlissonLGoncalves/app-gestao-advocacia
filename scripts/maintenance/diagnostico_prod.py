@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Diagnóstico rápido para verificar isolamento por `tenant_id` na tabela `cliente`.
+Diagnostico rapido para verificar isolamento por tenant_id na tabela cliente.
 Uso:
-  - Defina a variável de ambiente `DATABASE_URL` (ou passe --db)
-  - Execute: `python diagnostico_prod.py --cpf 62985302668`
+    - Defina a variavel de ambiente DATABASE_URL (ou passe --db)
+    - Execute: python scripts/maintenance/diagnostico_prod.py --cpf 62985302668
 
-Suporta Postgres (recomenda-se usar o URL do Render). O script apenas lê dados (somente SELECT).
+Suporta Postgres (recomenda-se usar o URL do Render). O script apenas le dados (somente SELECT).
 """
 import os
 import argparse
@@ -15,13 +15,13 @@ from sqlalchemy.exc import SQLAlchemyError
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Diagnóstico de isolamento de tenants (tabela cliente)')
+    parser = argparse.ArgumentParser(description='Diagnostico de isolamento de tenants (tabela cliente)')
     parser.add_argument('--db', help='Database URL (ex: postgres://user:pass@host:5432/dbname)', default=os.environ.get('DATABASE_URL'))
     parser.add_argument('--cpf', help='CPF/CNPJ para buscar (pode ser só dígitos)', default=None)
     args = parser.parse_args()
     db_url = args.db
     if not db_url:
-        print('ERRO: Forneça DATABASE_URL via --db ou variável de ambiente DATABASE_URL')
+        print('ERRO: Forneca DATABASE_URL via --db ou variavel de ambiente DATABASE_URL')
         return
 
     if db_url.startswith('postgres://'):
@@ -49,7 +49,7 @@ def main():
             for u in res_users:
                 print(f" id={u['id']} | {u['username']} | {u['email']} | tenant_id={u['tenant_id']}")
 
-            print('\n2) Registros com tenant_id IS NULL (óRFÃOS):')
+            print('\n2) Registros com tenant_id IS NULL (ORFAOS):')
             q2 = text('SELECT id, nome_razao_social, cpf_cnpj, tenant_id, user_id FROM cliente WHERE tenant_id IS NULL LIMIT 200;')
             res2 = conn.execute(q2).mappings().all()
             if res2:
