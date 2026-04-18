@@ -6,8 +6,8 @@ Cobre:
 - Casos de borda: sem CNJ, múltiplos autores, nomes em caixa mista
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
