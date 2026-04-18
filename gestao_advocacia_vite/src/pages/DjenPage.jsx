@@ -1,6 +1,53 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from '../config.js';
 import { toast } from 'react-toastify';
+import DOMPurify from 'dompurify';
+
+const decodeHtmlEntities = (texto = '') => {
+  if (!texto) return '';
+
+  // Alguns tribunais enviam HTML com codificacao em camadas
+  // (ex.: &amp;lt;table&amp;gt;), entao decodificamos em ate 5 passagens.
+  const textarea = document.createElement('textarea');
+  let atual = texto;
+
+  for (let i = 0; i < 5; i += 1) {
+    textarea.innerHTML = atual;
+    const decodificado = textarea.value;
+    if (decodificado === atual) break;
+    atual = decodificado;
+  }
+
+  return atual;
+};
+
+const sanitizarHtmlTribunal = (texto = '') => {
+  if (!texto) return '';
+  return DOMPurify.sanitize(texto, {
+    // Preserva ao maximo a formatacao do CNJ (cores, tamanhos, tabelas, classes)
+    // sem permitir execucao de scripts/eventos inseguros.
+    USE_PROFILES: { html: true },
+    ADD_TAGS: [
+      'style', 'font', 'center',
+      'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
+      'colgroup', 'col', 'caption', 'br',
+    ],
+    ADD_ATTR: [
+      'style', 'class', 'align', 'bgcolor',
+      'cellpadding', 'cellspacing', 'border',
+      'width', 'height', 'valign', 'colspan', 'rowspan',
+    ],
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
+    FORBID_ATTR: [/^on/i],
+  });
+};
+
+const extrairTextoPlano = (html = '') => {
+  if (!html) return '';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+};
 
 // ── Lista completa de tribunais brasileiros ────────────────────────────────
 const TRIBUNAIS = [
@@ -537,6 +584,11 @@ export default function DjenPage() {
     return d.toLocaleDateString('pt-BR');
   };
 
+  const textoDetalheOriginal = (pubSelecionada?.texto || '').trim();
+  const textoDetalheDecodificado = decodeHtmlEntities(textoDetalheOriginal);
+  const textoDetalheHtmlSeguro = sanitizarHtmlTribunal(textoDetalheDecodificado);
+  const textoDetalhePlano = extrairTextoPlano(textoDetalheHtmlSeguro);
+
   return (
     <div className="container-fluid py-4">
       {/* Cabeçalho */}
@@ -830,9 +882,15 @@ export default function DjenPage() {
                   {/* Texto da publicação */}
                   <div className="mb-3">
                     <div className="text-muted small fw-semibold mb-1">Texto da Publicação</div>
-                    <div className="p-2 bg-light rounded border small" style={{ whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>
-                      {pubSelecionada.texto || 'Sem texto disponível.'}
-                    </div>
+                    {textoDetalhePlano ? (
+                      <div
+                        className="p-2 bg-light rounded border small"
+                        style={{ maxHeight: 260, overflowY: 'auto', overflowX: 'auto', wordBreak: 'break-word' }}
+                        dangerouslySetInnerHTML={{ __html: textoDetalheHtmlSeguro }}
+                      />
+                    ) : (
+                      <div className="p-2 bg-light rounded border small text-muted">Sem texto disponível.</div>
+                    )}
                   </div>
 
                   {/* Vincular ao caso */}
@@ -1029,13 +1087,14 @@ export default function DjenPage() {
           ? triagemItems.filter(item => {
               const pub = item.publicacao;
               const analise = item.analise || {};
+              const textoNormalizado = extrairTextoPlano(sanitizarHtmlTribunal(decodeHtmlEntities(pub.texto || '')));
               const haystack = [
                 pub.numero_processo,
                 pub.numero_processo_mascara,
                 pub.nome_orgao,
                 pub.sigla_tribunal,
                 analise.tribunal,
-                pub.texto,
+                textoNormalizado,
                 ...(analise.partes_autoras || []),
                 ...(analise.partes_reus || []),
                 ...(analise.representantes || []),
@@ -1109,7 +1168,10 @@ export default function DjenPage() {
                   const dataFormatada = pub.data_disponibilizacao
                     ? new Date(pub.data_disponibilizacao).toLocaleDateString('pt-BR')
                     : null;
-                  const textoPreview = (pub.texto || '').trim();
+                  const textoOriginal = (pub.texto || '').trim();
+                  const textoDecodificado = decodeHtmlEntities(textoOriginal);
+                  const textoHtmlSeguro = sanitizarHtmlTribunal(textoDecodificado);
+                  const textoPreview = extrairTextoPlano(textoHtmlSeguro);
                   const expandido = !!triagemExpandido[pub.id];
                   const temPartes = (analise.partes_autoras || []).length > 0 || (analise.partes_reus || []).length > 0;
                   const temRepresentantes = (analise.representantes || []).length > 0;
@@ -1167,12 +1229,20 @@ export default function DjenPage() {
                           {/* Preview do texto */}
                           {textoPreview && (
                             <div className="mb-3">
-                              <div
-                                className="small text-secondary p-2 rounded"
-                                style={{ background: '#f8f9fa', borderLeft: '3px solid #dee2e6', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                              >
-                                {expandido ? textoPreview : textoPreview.slice(0, 320) + (textoPreview.length > 320 ? '…' : '')}
-                              </div>
+                              {expandido ? (
+                                <div
+                                  className="small text-secondary p-2 rounded"
+                                  style={{ background: '#f8f9fa', borderLeft: '3px solid #dee2e6', wordBreak: 'break-word', overflowX: 'auto' }}
+                                  dangerouslySetInnerHTML={{ __html: textoHtmlSeguro }}
+                                />
+                              ) : (
+                                <div
+                                  className="small text-secondary p-2 rounded"
+                                  style={{ background: '#f8f9fa', borderLeft: '3px solid #dee2e6', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                                >
+                                  {textoPreview.slice(0, 320) + (textoPreview.length > 320 ? '…' : '')}
+                                </div>
+                              )}
                               {textoPreview.length > 320 && (
                                 <button
                                   className="btn btn-link btn-sm p-0 mt-1"
