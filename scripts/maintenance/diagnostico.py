@@ -5,7 +5,7 @@ import sys
 from dotenv import load_dotenv
 
 load_dotenv()
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'gestao_advocacia'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from gestao_advocacia.app import create_app, db, Cliente, User
 

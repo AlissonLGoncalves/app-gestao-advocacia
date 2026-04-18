@@ -12,9 +12,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Adiciona o diretório ao path para importar módulos do projeto
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'gestao_advocacia'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from app import create_app, db, Cliente, Caso, EventoAgenda, Documento, Despesa, Recebimento, ContratoHonorario, TarefaPrazo, User
+from gestao_advocacia.app import create_app, db, Cliente, Caso, EventoAgenda, Documento, Despesa, Recebimento, ContratoHonorario, TarefaPrazo, User
 
 def limpar_tenant_ids():
     """Atribui tenant_id aos registros órfãos baseado no user_id"""
