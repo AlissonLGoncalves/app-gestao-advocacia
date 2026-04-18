@@ -131,6 +131,13 @@ npm run lint
 npm run build
 ```
 
+## Scripts de manutencao
+
+Scripts operacionais ficam centralizados em `scripts/maintenance`.
+
+- Antes de executar qualquer script, leia `scripts/maintenance/README.md`.
+- Scripts mutaveis devem rodar em dry-run por padrao e exigir confirmacao explicita para aplicar alteracoes.
+
 ## Estrutura de pastas
 
 ```text
@@ -151,6 +158,7 @@ app-gestao-advocacia/
 |  |- package.json
 |  |- package-lock.json
 |- scripts/maintenance/       # scripts operacionais
+|  |- README.md               # guia de uso seguro dos scripts
 |- .env.example               # exemplo de variaveis backend/root
 |- README.md
 ```
