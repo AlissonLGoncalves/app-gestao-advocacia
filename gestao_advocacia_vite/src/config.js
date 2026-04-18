@@ -4,10 +4,24 @@ function normalizeBaseUrl(url) {
   return String(url || '').replace(/\/+$/, '')
 }
 
+function ensureV1Prefix(url) {
+  const normalized = normalizeBaseUrl(url)
+
+  if (/\/api\/v1$/i.test(normalized)) {
+    return normalized
+  }
+
+  if (/\/api$/i.test(normalized)) {
+    return `${normalized}/v1`
+  }
+
+  return normalized
+}
+
 function resolveApiUrl() {
   const envUrl = import.meta.env.VITE_API_URL
   if (envUrl) {
-    return normalizeBaseUrl(envUrl)
+    return ensureV1Prefix(envUrl)
   }
 
   const host = typeof window !== 'undefined' ? window.location.hostname : ''
