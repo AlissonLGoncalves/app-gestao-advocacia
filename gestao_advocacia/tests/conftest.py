@@ -72,7 +72,9 @@ def app(request):
         except Exception as e:
             print(f"Erro ao remover arquivo de banco de dados de teste {actual_db_path}: {e}")
     else:
-        print(f"Arquivo de banco de dados de teste nÃ£o encontrado para remoÃ§Ã£o: {actual_db_path}")
+        print(
+            f"Arquivo de banco de dados de teste nÃ£o encontrado para remoÃ§Ã£o: {actual_db_path}"
+        )
 
     # Limpeza da pasta de uploads de teste
     actual_upload_folder = os.path.join(
@@ -184,4 +186,3 @@ def auth_client(client, db):
             return self._client.delete(url, **kwargs)
 
     yield _AuthClient(client, token, data.get("user", {}))
-

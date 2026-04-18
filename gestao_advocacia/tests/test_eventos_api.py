@@ -80,4 +80,3 @@ def test_delete_evento_sucesso(auth_client, db):
 
     response_get = auth_client.get(f"/api/v1/eventos/{evento_id}")
     assert response_get.status_code == 404
-

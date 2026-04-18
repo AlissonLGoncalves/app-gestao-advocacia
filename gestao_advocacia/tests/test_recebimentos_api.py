@@ -96,4 +96,3 @@ def test_delete_recebimento_sucesso(auth_client, db):
 
     response_get = auth_client.get(f"/api/v1/recebimentos/{receb_id}")
     assert response_get.status_code == 404
-

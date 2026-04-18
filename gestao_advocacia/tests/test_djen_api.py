@@ -805,4 +805,3 @@ class TestDjenTriagemAcoesExtras:
     def test_qualidade_sem_autenticacao(self, client, db):
         resp = client.get("/api/v1/djen/qualidade")
         assert resp.status_code == 401
-

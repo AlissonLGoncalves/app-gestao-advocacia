@@ -96,4 +96,3 @@ def test_delete_cliente_sucesso(auth_client, db):
 
     response_get = auth_client.get(f"/api/v1/clientes/{cliente_id}")
     assert response_get.status_code == 404
-

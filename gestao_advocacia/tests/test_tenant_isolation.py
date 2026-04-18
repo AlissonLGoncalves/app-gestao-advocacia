@@ -534,4 +534,3 @@ def test_log_warning_quando_cross_tenant_bloqueado(app, caplog):
     assert getattr(record, "current_tenant", None) == 1
     assert getattr(record, "target_tenant", None) == 999
     assert getattr(record, "endpoint", None) == "/api/v1/fake/99"
-

@@ -1,6 +1,6 @@
 import os
-from functools import wraps
 from datetime import datetime, timedelta
+from functools import wraps
 
 from dotenv import load_dotenv
 from flask import Blueprint, Flask, redirect, request
@@ -101,7 +101,9 @@ def create_app(config_class=Config):
     # Mantem compatibilidade temporaria com clientes antigos em /api.
     legacy_api_bp = Blueprint("legacy_api", __name__, url_prefix="/api")
 
-    @legacy_api_bp.route("/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+    @legacy_api_bp.route(
+        "/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    )
     def legacy_redirect(subpath):
         target = f"/api/v1/{subpath}"
         qs = request.query_string.decode("utf-8")
@@ -110,9 +112,9 @@ def create_app(config_class=Config):
 
         response = redirect(target, code=308)
         response.headers["Deprecation"] = "true"
-        response.headers["Sunset"] = (
-            datetime.utcnow() + timedelta(days=30)
-        ).strftime("%a, %d %b %Y %H:%M:%S GMT")
+        response.headers["Sunset"] = (datetime.utcnow() + timedelta(days=30)).strftime(
+            "%a, %d %b %Y %H:%M:%S GMT"
+        )
         return response
 
     app.register_blueprint(legacy_api_bp)
