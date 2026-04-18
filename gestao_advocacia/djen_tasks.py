@@ -9,6 +9,7 @@
 #      mesmo que não tenham OAB configurada.
 # ==============================================================================
 import logging
+import re
 import time
 from datetime import datetime, timedelta
 
@@ -16,6 +17,116 @@ from djen_service import DjenAPIError, DjenRateLimitError, consultar_comunicacoe
 
 RATE_LIMIT_SLEEP = 65  # segundos a aguardar após HTTP 429
 DELAY_ENTRE_REQUISICOES = 3  # segundos entre cada requisição
+
+
+_CNJ_REGEX = re.compile(r"^(\d{7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})$")
+
+
+def _inferir_sigla_tribunal_por_numero_processo(numero_processo):
+    """Infere sigla do tribunal (DJEN) a partir do número CNJ.
+
+    Ex.: 0001234-12.2026.8.16.0001 -> TJPR
+    """
+    if not numero_processo:
+        return None
+
+    numero = str(numero_processo).strip()
+    m = _CNJ_REGEX.match(numero)
+    if not m:
+        return None
+
+    j = m.group(4)
+    tt = m.group(5)
+
+    if j == "1":
+        return "STF"
+    if j == "3":
+        return "STJ"
+    if j == "4":
+        return f"TRF{int(tt)}"
+    if j == "5":
+        return f"TRT{int(tt)}"
+    if j == "6":
+        return f"TRE-{tt}"
+    if j == "8":
+        uf_por_codigo_estadual = {
+            "01": "AC",
+            "02": "AL",
+            "03": "AP",
+            "04": "AM",
+            "05": "BA",
+            "06": "CE",
+            "07": "ES",
+            "08": "GO",
+            "09": "MA",
+            "10": "MT",
+            "11": "MS",
+            "12": "MG",
+            "13": "PA",
+            "14": "PB",
+            "15": "PE",
+            "16": "PR",
+            "17": "RN",
+            "18": "RS",
+            "19": "RO",
+            "20": "RR",
+            "21": "SC",
+            "22": "SP",
+            "23": "SE",
+            "24": "TO",
+            "25": "PI",
+            "26": "RJ",
+            "27": "RR",
+        }
+        uf = uf_por_codigo_estadual.get(tt)
+        if uf:
+            return f"TJ{uf}"
+
+    return None
+
+
+def _consultar_processo_com_fallback(*, numero_processo, sigla_tribunal, data_inicio, data_fim, logger):
+    """Consulta DJEN por processo com fallback de tribunal e paginação."""
+    tentativas = []
+    if sigla_tribunal:
+        tentativas.extend(
+            [
+                {"sigla_tribunal": sigla_tribunal, "pagina": 1},
+                {"sigla_tribunal": sigla_tribunal, "pagina": 0},
+            ]
+        )
+    tentativas.extend(
+        [
+            {"sigla_tribunal": None, "pagina": 1},
+            {"sigla_tribunal": None, "pagina": 0},
+        ]
+    )
+
+    ultimo_payload = {}
+    ultimo_items = []
+    for t in tentativas:
+        payload = consultar_comunicacoes(
+            numero_processo=numero_processo,
+            sigla_tribunal=t["sigla_tribunal"],
+            meio="D",
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            pagina=t["pagina"],
+        )
+        items = _extrair_items(payload)
+        logger.info(
+            "JOB DJEN: tentativa processo %s (sigla=%s, pagina=%s) retornou %s item(ns).",
+            numero_processo,
+            t["sigla_tribunal"] or "sem_filtro",
+            t["pagina"],
+            len(items),
+        )
+        ultimo_payload = payload
+        ultimo_items = items
+        if items:
+            return payload, items
+
+    return ultimo_payload, ultimo_items
 
 
 def _get_logger(app):
@@ -385,6 +496,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         casos_query = Caso.query.filter(
             Caso.numero_processo.isnot(None),
             Caso.numero_processo != "",
+            db.func.lower(Caso.status) == "ativo",
             db.or_(
                 Caso.data_ultima_verificacao_djen.is_(None),
                 Caso.data_ultima_verificacao_djen < limite_tempo,
@@ -404,13 +516,14 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         for caso in casos:
             logger.info(f"JOB DJEN: buscando processo {caso.numero_processo} (caso {caso.id})")
             try:
-                data = consultar_comunicacoes(
+                sigla_tribunal = _inferir_sigla_tribunal_por_numero_processo(caso.numero_processo)
+                data, items = _consultar_processo_com_fallback(
                     numero_processo=caso.numero_processo,
-                    meio="D",
+                    sigla_tribunal=sigla_tribunal,
                     data_inicio=data_inicio,
                     data_fim=data_fim,
+                    logger=logger,
                 )
-                items = _extrair_items(data)
                 total_itens_encontrados += len(items)
                 user = User.query.get(caso.user_id)
                 tenant_id_caso = user.tenant_id if user else None

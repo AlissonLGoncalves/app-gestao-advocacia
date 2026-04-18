@@ -436,6 +436,40 @@ class TestDjenPayloadCompat:
             assert payload.get("items")[0]["id"] == 7
             assert mocked.call_count == 3
 
+    def test_inferir_sigla_tribunal_por_numero_processo(self):
+        """Infere sigla do tribunal corretamente para CNJs de diferentes segmentos."""
+        from djen_tasks import _inferir_sigla_tribunal_por_numero_processo
+
+        assert _inferir_sigla_tribunal_por_numero_processo("0001234-12.2026.8.16.0001") == "TJPR"
+        assert _inferir_sigla_tribunal_por_numero_processo("0001234-12.2026.8.26.0001") == "TJRJ"
+        assert _inferir_sigla_tribunal_por_numero_processo("0001234-12.2026.4.03.0001") == "TRF3"
+        assert _inferir_sigla_tribunal_por_numero_processo("numero-invalido") is None
+
+    def test_consultar_processo_com_fallback_tenta_tribunal_e_sem_tribunal(self):
+        """Busca por processo deve tentar com sigla inferida e fallback sem sigla."""
+        from djen_tasks import _consultar_processo_com_fallback
+
+        class DummyLogger:
+            def info(self, *args, **kwargs):
+                return None
+
+        side_effect = [
+            {"items": []},
+            {"items": [{"id": 99}]},
+        ]
+        with patch("djen_tasks.consultar_comunicacoes", side_effect=side_effect) as mocked:
+            payload, items = _consultar_processo_com_fallback(
+                numero_processo="0001234-12.2026.8.16.0001",
+                sigla_tribunal="TJPR",
+                data_inicio="2026-04-01",
+                data_fim="2026-04-17",
+                logger=DummyLogger(),
+            )
+
+            assert len(items) == 1
+            assert payload.get("items")[0]["id"] == 99
+            assert mocked.call_count == 2
+
 
 # ---------------------------------------------------------------------------
 # Triagem inteligente (parser + matching)
