@@ -186,8 +186,7 @@ def _extract_case_data_with_gemini(text):
         # O cliente coleta a API key automaticamente da var GEMINI_API_KEY
         client = genai.Client()
 
-        prompt = (
-            """
+        prompt = """
 Você é um extator de dados jurídicos brasileiro (Legaltech).
 Analise o texto desta capa de processo/petição inicial e retorne APENAS um JSON válido. 
 Nenhuma outra palavra. Apenas o JSON cru com estas chaves:
@@ -197,9 +196,7 @@ Nenhuma outra palavra. Apenas o JSON cru com estas chaves:
 - "resumo_fatos" (string, um parágrafo que resume a tese/fatos do caso para um advogado ler rapidamente)
 
 TEXTO DA PETIÇÃO:
-"""
-            + text[:15000]
-        )  # Limite de texto
+""" + text[:15000]  # Limite de texto
 
         response = client.models.generate_content(
             model="gemini-2.5-flash",

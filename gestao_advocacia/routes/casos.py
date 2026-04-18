@@ -99,7 +99,9 @@ def register_casos_routes(
             instancia = (
                 "1ª Instância"
                 if instancia_raw == "G1"
-                else "2ª Instância" if instancia_raw == "G2" else instancia_raw
+                else "2ª Instância"
+                if instancia_raw == "G2"
+                else instancia_raw
             )
 
             data_distribuicao = dados_processo.get("dataAjuizamento", "")[:10]
