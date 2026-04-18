@@ -62,9 +62,19 @@ def finance_access_required(fn):
 
 from models import (
     Caso,
+    Cliente,
+    Despesa,
     DjenOabMonitoramento,
+    DjenVinculoDecisao,
     PublicacaoDJEN,
+    Recebimento,
+    Tenant,
+    User,
 )
+
+# Re-exports de compat para código legado que ainda importa de 'app'.
+from extensions import db  # noqa: F401  (já importado acima via extensions)
+from helpers import get_item_or_404  # noqa: F401
 
 
 # Factory Function para criar a aplicação Flask
