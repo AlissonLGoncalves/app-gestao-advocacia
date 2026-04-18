@@ -17,7 +17,6 @@ def register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_mode
         @eventos_ns.marshal_list_with(evento_model_dto)
         @eventos_ns.doc(security="jsonWebToken")
         def get(self):
-            user_id = get_jwt_identity()
             eventos = get_list_query(EventoAgenda).order_by(EventoAgenda.data_inicio.asc()).all()
             return eventos
 
@@ -67,7 +66,6 @@ def register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_mode
         @eventos_ns.marshal_with(evento_model_dto)
         @eventos_ns.doc(security="jsonWebToken")
         def get(self, evento_id_param):
-            user_id = get_jwt_identity()
             evento = get_item_or_404(EventoAgenda, evento_id_param)
             return evento
 

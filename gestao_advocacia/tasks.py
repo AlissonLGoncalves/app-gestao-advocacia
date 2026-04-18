@@ -138,7 +138,7 @@ def job_verificar_processos_cnj():
                                     desc_parts_job.append(str(mov_json_job["nome"]))
 
                                 for comp in mov_json_job.get("complementosTabelados", []):
-                                    if type(comp) == dict and comp.get("nome"):
+                                    if isinstance(comp, dict) and comp.get("nome"):
                                         desc_parts_job.append(str(comp["nome"]))
 
                                 # Fallbacks antigos/emergenciais

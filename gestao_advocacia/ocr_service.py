@@ -104,7 +104,7 @@ def extract_client_data_from_file(file_stream, filename):
                 # Tenta processar em PT-BR primeiro se o language pack estiver instalado.
                 try:
                     text = pytesseract.image_to_string(img, lang="por")
-                except:
+                except Exception:
                     # Fallback pro basico inglês.
                     text = pytesseract.image_to_string(img)
             except pytesseract.pytesseract.TesseractNotFoundError:
@@ -251,7 +251,7 @@ def extract_case_data_from_file(file_stream, filename):
             try:
                 img = Image.open(file_stream)
                 text = pytesseract.image_to_string(img, lang="por")
-            except:
+            except Exception:
                 pass
 
         if not text.strip():

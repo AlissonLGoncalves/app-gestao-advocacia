@@ -24,7 +24,6 @@ def register_recebimentos_routes(
         @recebimentos_ns.marshal_list_with(recebimento_model_dto)
         @recebimentos_ns.doc(security="jsonWebToken")
         def get(self):
-            user_id = get_jwt_identity()
             recebimentos = (
                 get_list_query(Recebimento).order_by(Recebimento.data_recebimento.desc()).all()
             )
@@ -79,7 +78,6 @@ def register_recebimentos_routes(
         @recebimentos_ns.marshal_with(recebimento_model_dto)
         @recebimentos_ns.doc(security="jsonWebToken")
         def get(self, recebimento_id_param):
-            user_id = get_jwt_identity()
             recebimento = get_item_or_404(Recebimento, recebimento_id_param)
             return recebimento
 

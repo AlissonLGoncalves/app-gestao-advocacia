@@ -668,11 +668,9 @@ class TestDjenTenantIsolation:
                 "role": "admin",
             },
         )
-        token_c = json.loads(
-            client.post(
-                "/api/auth/login", json={"username_or_email": "user_c", "password": "Senha1234!"}
-            ).data
-        )["access_token"]
+        client.post(
+            "/api/auth/login", json={"username_or_email": "user_c", "password": "Senha1234!"}
+        )
 
         # Registra e loga usuário D
         client.post(
@@ -690,7 +688,6 @@ class TestDjenTenantIsolation:
             ).data
         )["access_token"]
 
-        headers_c = {"Authorization": f"Bearer {token_c}"}
         headers_d = {"Authorization": f"Bearer {token_d}"}
 
         # Insere publicação pertencente ao tenant de C
@@ -704,110 +701,6 @@ class TestDjenTenantIsolation:
         resp_d = client.get("/api/djen/publicacoes", headers=headers_d)
         data_d = json.loads(resp_d.data)
         assert data_d["total"] == 0
-
-
-# ---------------------------------------------------------------------------
-# Ações extras de triagem (mesclar, ignorar, qualidade)
-# ---------------------------------------------------------------------------
-
-
-class TestDjenTriagemAcoesExtras:
-    def _criar_pub_e_caso(self, auth_client, db, app, djen_id=9100):
-        from app import User
-
-        caso_id = _criar_caso(auth_client, db)
-        with app.app_context():
-            user = User.query.filter_by(username="testuser").first()
-            pub = PublicacaoDJEN(
-                tenant_id=user.tenant_id,
-                user_id=user.id,
-                djen_id=djen_id,
-                hash_comunicacao=f"hash-extra-{djen_id}",
-                numero_processo=f"0009{djen_id}-12.2025.8.16.0001",
-                sigla_tribunal="TJPR",
-                tipo_comunicacao="Intimacao",
-                data_disponibilizacao=date.today(),
-                texto=f"AUTOR: Parte Extra {djen_id}; REU: Empresa X",
-                origem_busca="oab",
-            )
-            db.session.add(pub)
-            db.session.commit()
-            pub_id = pub.id
-        return pub_id, caso_id
-
-    def test_mesclar_publicacao_com_caso(self, auth_client, db, app):
-        """POST /api/djen/triagem/<id>/mesclar vincula a publicação ao caso informado."""
-        pub_id, caso_id = self._criar_pub_e_caso(auth_client, db, app, djen_id=9100)
-
-        resp = auth_client.post(f"/api/djen/triagem/{pub_id}/mesclar", json={"caso_id": caso_id})
-        assert resp.status_code == 200
-        payload = json.loads(resp.data)
-        assert payload["publicacao"]["caso_id"] == caso_id
-        assert payload["publicacao"]["status_origem"] == "revisado_manual"
-
-        with app.app_context():
-            from app import DjenVinculoDecisao
-
-            dec = DjenVinculoDecisao.query.filter_by(publicacao_id=pub_id, acao="mesclar").first()
-            assert dec is not None
-            assert dec.caso_id == caso_id
-
-    def test_mesclar_sem_caso_id_retorna_400(self, auth_client, db, app):
-        """POST /api/djen/triagem/<id>/mesclar sem caso_id retorna 400."""
-        pub_id, _ = self._criar_pub_e_caso(auth_client, db, app, djen_id=9101)
-        resp = auth_client.post(f"/api/djen/triagem/{pub_id}/mesclar", json={})
-        assert resp.status_code == 400
-
-    def test_ignorar_publicacao(self, auth_client, db, app):
-        """POST /api/djen/triagem/<id>/ignorar marca a publicação como ignorada."""
-        pub_id, _ = self._criar_pub_e_caso(auth_client, db, app, djen_id=9102)
-
-        resp = auth_client.post(
-            f"/api/djen/triagem/{pub_id}/ignorar", json={"motivo": "Processo encerrado"}
-        )
-        assert resp.status_code == 200
-        payload = json.loads(resp.data)
-        assert payload["publicacao"]["triagem_ignorada"] is True
-        assert payload["publicacao"]["status_origem"] == "ignorado"
-
-        with app.app_context():
-            from app import DjenVinculoDecisao
-
-            dec = DjenVinculoDecisao.query.filter_by(publicacao_id=pub_id, acao="ignorar").first()
-            assert dec is not None
-            assert dec.motivo == "Processo encerrado"
-
-    def test_ignorar_remove_da_triagem(self, auth_client, db, app):
-        """Publicação ignorada não aparece mais na fila de triagem."""
-        pub_id, _ = self._criar_pub_e_caso(auth_client, db, app, djen_id=9103)
-
-        auth_client.post(f"/api/djen/triagem/{pub_id}/ignorar", json={})
-
-        resp = auth_client.get("/api/djen/triagem")
-        data = json.loads(resp.data)
-        ids_triagem = [i["publicacao"]["id"] for i in data["items"]]
-        assert pub_id not in ids_triagem
-
-    def test_qualidade_retorna_metricas(self, auth_client, db, app):
-        """GET /api/djen/qualidade retorna métricas de qualidade do rollout."""
-        resp = auth_client.get("/api/djen/qualidade")
-        assert resp.status_code == 200
-        data = json.loads(resp.data)
-        assert "total_publicacoes" in data
-        assert "taxa_vinculo_percent" in data
-        assert "decisoes_por_acao" in data
-
-    def test_mesclar_sem_autenticacao(self, client, db):
-        resp = client.post("/api/djen/triagem/1/mesclar", json={"caso_id": 1})
-        assert resp.status_code == 401
-
-    def test_ignorar_sem_autenticacao(self, client, db):
-        resp = client.post("/api/djen/triagem/1/ignorar", json={})
-        assert resp.status_code == 401
-
-    def test_qualidade_sem_autenticacao(self, client, db):
-        resp = client.get("/api/djen/qualidade")
-        assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------

@@ -46,7 +46,6 @@ def register_documentos_routes(app, documentos_ns, documento_model_dto):
             "caso_id", "ID do caso para filtrar os documentos (opcional)", type=int
         )
         def get(self):
-            user_id = get_jwt_identity()
             caso_id_query_param = request.args.get("caso_id", type=int)
             query = query_for_tenant(Documento)
             if caso_id_query_param is not None:
@@ -133,7 +132,6 @@ def register_documentos_routes(app, documentos_ns, documento_model_dto):
         @documentos_ns.response(404, "Documento nao encontrado ou acesso negado.")
         @documentos_ns.response(500, "Erro no servidor ao tentar enviar o arquivo.")
         def get(self, doc_id_param):
-            user_id = get_jwt_identity()
             documento_db = get_item_or_404(Documento, doc_id_param)
             if not os.path.exists(documento_db.path_arquivo):
                 app.logger.error(

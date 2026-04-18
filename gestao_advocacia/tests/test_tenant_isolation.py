@@ -459,7 +459,6 @@ def test_cross_tenant_get_put_delete_retorna_404(
     update_payload,
 ):
     token_a = tenants_setup["token_a"]
-    token_b = tenants_setup["token_b"]
 
     id_a = tenants_setup["ids_a"][id_key]
     id_b = tenants_setup["ids_b"][id_key]

@@ -14,7 +14,6 @@ from flask_restx import Resource, fields
 def registrar_rotas_djen(
     djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso, jwt_required, get_jwt_identity, logger
 ):
-
     def _tenant_djen_habilitado(tenant_id):
         enabled_csv = (current_app.config.get("DJEN_ENABLED_TENANTS") or "").strip()
         rollout = max(0, min(int(current_app.config.get("DJEN_ROLLOUT_PERCENT", 100)), 100))
@@ -239,7 +238,7 @@ def registrar_rotas_djen(
         },
     )
 
-    pub_output_dto = djen_ns.model(
+    djen_ns.model(
         "PublicacaoDjenOutput",
         {
             "id": fields.Integer(readonly=True),
