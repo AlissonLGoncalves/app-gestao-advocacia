@@ -8,10 +8,19 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend-style:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: gestao_advocacia
@@ -29,17 +38,15 @@ jobs:
       - name: Install backend style tools
         run: pip install -r requirements-dev.txt
 
-      - name: Ruff auto-fix
-        run: ruff check . --fix
+      - name: Ruff check
+        run: ruff check .
 
-      - name: Black format
-        run: black .
-
-      - name: Fail if style generated diff
-        run: git diff --exit-code
+      - name: Black check
+        run: black --check .
 
   backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: gestao_advocacia
@@ -69,10 +76,18 @@ jobs:
         run: pip install pytest-cov
 
       - name: Run backend tests with coverage
-        run: pytest tests --cov=. --cov-report=term-missing --cov-fail-under=50
+        run: pytest tests --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=50
+
+      - name: Upload backend coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: gestao_advocacia/coverage.xml
+          if-no-files-found: warn
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: gestao_advocacia_vite
@@ -104,3 +119,10 @@ jobs:
 
       - name: Run frontend tests with coverage
         run: npm run test:coverage
+
+      - name: Upload frontend coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: gestao_advocacia_vite/coverage
+          if-no-files-found: warn
