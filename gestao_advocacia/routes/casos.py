@@ -158,8 +158,73 @@ def register_casos_routes(
         @casos_ns.marshal_list_with(caso_model_dto)
         @casos_ns.doc(security="jsonWebToken")
         def get(self):
-            query = query_for_tenant(Caso)
-            casos = query.order_by(Caso.data_criacao.desc()).all()
+            query = query_for_tenant(Caso).join(Cliente, Caso.cliente_id == Cliente.id)
+
+            search = request.args.get("search", "").strip()
+            status = request.args.get("status", "").strip()
+            cliente_id = request.args.get("cliente_id", "").strip()
+            data_criacao_inicio = request.args.get("data_criacao_inicio", "").strip()
+            data_criacao_fim = request.args.get("data_criacao_fim", "").strip()
+            data_atualizacao_inicio = request.args.get("data_atualizacao_inicio", "").strip()
+            data_atualizacao_fim = request.args.get("data_atualizacao_fim", "").strip()
+            sort_by = request.args.get("sort_by", "data_atualizacao").strip()
+            sort_order = request.args.get("sort_order", request.args.get("order", "desc")).strip()
+
+            if search:
+                like = f"%{search}%"
+                query = query.filter(
+                    db.or_(
+                        Caso.titulo.ilike(like),
+                        Caso.numero_processo.ilike(like),
+                        Caso.parte_contraria.ilike(like),
+                        Cliente.nome_razao_social.ilike(like),
+                    )
+                )
+
+            if status:
+                query = query.filter(Caso.status == status)
+
+            if cliente_id:
+                try:
+                    query = query.filter(Caso.cliente_id == int(cliente_id))
+                except ValueError:
+                    return {"message": "cliente_id inválido."}, 400
+
+            def _parse_date(value, field_name):
+                if not value:
+                    return None
+                try:
+                    return datetime.strptime(value, "%Y-%m-%d").date()
+                except ValueError:
+                    casos_ns.abort(400, f"{field_name} inválida. Use o formato YYYY-MM-DD.")
+
+            criacao_inicio = _parse_date(data_criacao_inicio, "data_criacao_inicio")
+            criacao_fim = _parse_date(data_criacao_fim, "data_criacao_fim")
+            atualizacao_inicio = _parse_date(data_atualizacao_inicio, "data_atualizacao_inicio")
+            atualizacao_fim = _parse_date(data_atualizacao_fim, "data_atualizacao_fim")
+
+            if criacao_inicio:
+                query = query.filter(db.func.date(Caso.data_criacao) >= criacao_inicio)
+            if criacao_fim:
+                query = query.filter(db.func.date(Caso.data_criacao) <= criacao_fim)
+            if atualizacao_inicio:
+                query = query.filter(db.func.date(Caso.data_atualizacao) >= atualizacao_inicio)
+            if atualizacao_fim:
+                query = query.filter(db.func.date(Caso.data_atualizacao) <= atualizacao_fim)
+
+            allowed_sort_fields = {
+                "titulo": Caso.titulo,
+                "cliente_nome": Cliente.nome_razao_social,
+                "numero_processo": Caso.numero_processo,
+                "status": Caso.status,
+                "data_criacao": Caso.data_criacao,
+                "data_atualizacao": Caso.data_atualizacao,
+            }
+            sort_column = allowed_sort_fields.get(sort_by, Caso.data_atualizacao)
+            sort_order = "asc" if sort_order == "asc" else "desc"
+            query = query.order_by(sort_column.asc() if sort_order == "asc" else sort_column.desc())
+
+            casos = query.all()
             return casos
 
         @jwt_required()

@@ -6,6 +6,8 @@
 # ==============================================================================
 import hashlib
 import io
+import re
+import unicodedata
 from decimal import Decimal, InvalidOperation
 
 from flask import current_app, request, send_file
@@ -15,6 +17,122 @@ from flask_restx import Resource, fields
 def registrar_rotas_djen(
     djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso, jwt_required, get_jwt_identity, logger
 ):
+    _LABEL_SPLIT_RE = re.compile(
+        r"(?i)\b(?:autor(?:\(s\))?|reu(?:\(s\))?|requerente|requerido|exequente|executado|"
+        r"polo\s*ativo|polo\s*passivo|vitima(?:\(s\))?|investigad(?:o|a)(?:\(s\))?)\s*:\s*"
+    )
+    _PARTS_SPLIT_RE = re.compile(r"\s*(?:;|\||\bvs\.?\b|\be\b|/|,)\s*", re.IGNORECASE)
+    _INSTITUTION_KEYWORDS = {
+        "ministerio publico",
+        "estado do",
+        "uniao",
+        "municipio",
+        "prefeitura",
+        "banco",
+        "cooperativa",
+        "s/a",
+        "ltda",
+        "me",
+        "eireli",
+        "tribunal",
+        "subdivisao policial",
+        "delegacia",
+        "secretaria",
+        "fazenda publica",
+    }
+
+    def _normalize_text(value):
+        text = (value or "").strip()
+        text = unicodedata.normalize("NFD", text)
+        text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+        text = re.sub(r"\s+", " ", text)
+        return text.lower().strip()
+
+    def _clean_party_candidate(value):
+        text = re.sub(r"\s+", " ", (value or "")).strip(" -:;")
+        text = re.sub(r"^(?:de|da|do|das|dos)\s+", "", text, flags=re.IGNORECASE)
+        return text.strip()
+
+    def _expand_party_candidates(value):
+        text = re.sub(r"\s+", " ", (value or "")).strip()
+        if not text:
+            return []
+
+        normalized = _LABEL_SPLIT_RE.sub("|", text)
+        chunks = [c.strip() for c in normalized.split("|") if c.strip()]
+        out = []
+        for chunk in chunks:
+            parts = [p.strip() for p in _PARTS_SPLIT_RE.split(chunk) if p.strip()]
+            if not parts:
+                parts = [chunk]
+            out.extend(parts)
+
+        dedup = []
+        seen = set()
+        for item in out:
+            cleaned = _clean_party_candidate(item)
+            if len(cleaned) < 3:
+                continue
+            key = _normalize_text(cleaned)
+            if key in seen:
+                continue
+            seen.add(key)
+            dedup.append(cleaned)
+        return dedup
+
+    def _looks_institutional(name):
+        n = _normalize_text(name)
+        if any(keyword in n for keyword in _INSTITUTION_KEYWORDS):
+            return True
+        if re.search(r"\\d", n):
+            return True
+        return False
+
+    def _person_score(name):
+        if not name:
+            return -999
+        score = 0
+        tokens = [t for t in re.split(r"\s+", name.strip()) if t]
+        if 2 <= len(tokens) <= 6:
+            score += 3
+        if _looks_institutional(name):
+            score -= 6
+        if any(len(t) >= 3 for t in tokens):
+            score += 1
+        if re.search(r"[A-Za-zÀ-ÿ]", name):
+            score += 1
+        return score
+
+    def _pick_best_cliente_name(autores, reus):
+        candidates = []
+
+        for raw in reus or []:
+            for part in _expand_party_candidates(raw):
+                candidates.append((part, "reu"))
+        for raw in autores or []:
+            for part in _expand_party_candidates(raw):
+                candidates.append((part, "autor"))
+
+        if not candidates:
+            return None, None
+
+        ranked = sorted(candidates, key=lambda item: _person_score(item[0]), reverse=True)
+        best_name, best_role = ranked[0]
+
+        if _person_score(best_name) >= 0:
+            return best_name, best_role
+
+        # Fallback: manter comportamento previsível com a primeira opção disponível.
+        return candidates[0]
+
+    def _pick_opposing_party(autores, reus, papel_cliente):
+        origem = reus if papel_cliente == "autor" else autores
+        for raw in origem or []:
+            expanded = _expand_party_candidates(raw)
+            if expanded:
+                return expanded[0]
+        return None
+
     def _tenant_djen_habilitado(tenant_id):
         enabled_csv = (current_app.config.get("DJEN_ENABLED_TENANTS") or "").strip()
         rollout = max(0, min(int(current_app.config.get("DJEN_ROLLOUT_PERCENT", 100)), 100))
@@ -122,20 +240,18 @@ def registrar_rotas_djen(
 
         analise = analisar_publicacao(pub)
         if not payload:
-            if analise.get("partes_autoras"):
-                nome_cliente_auto = analise["partes_autoras"][0]
-                papel_auto = "autor"
-            elif analise.get("partes_reus"):
-                nome_cliente_auto = analise["partes_reus"][0]
-                papel_auto = "reu"
-            else:
+            nome_cliente_auto, papel_auto = _pick_best_cliente_name(
+                analise.get("partes_autoras") or [],
+                analise.get("partes_reus") or [],
+            )
+            if not nome_cliente_auto:
                 nome_cliente_auto = f"Cliente DJEN {pub.id}"
                 papel_auto = "autor"
 
-            parte_contraria_auto = (
-                (analise.get("partes_reus") or [None])[0]
-                if papel_auto == "autor"
-                else (analise.get("partes_autoras") or [None])[0]
+            parte_contraria_auto = _pick_opposing_party(
+                analise.get("partes_autoras") or [],
+                analise.get("partes_reus") or [],
+                papel_auto,
             )
 
             payload = {
@@ -235,9 +351,11 @@ def registrar_rotas_djen(
                 }, 409
 
         parte_contraria_default = (
-            (analise.get("partes_reus") or [None])[0]
-            if papel_cliente == "autor"
-            else (analise.get("partes_autoras") or [None])[0]
+            _pick_opposing_party(
+                analise.get("partes_autoras") or [],
+                analise.get("partes_reus") or [],
+                papel_cliente,
+            )
         )
 
         titulo_caso = (caso_payload.get("titulo") or "").strip()

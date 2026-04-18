@@ -35,6 +35,48 @@ def test_get_casos_lista_vazia(auth_client, db):
     assert len(data) == 0
 
 
+def test_get_casos_filtra_por_busca_e_cliente(auth_client, db):
+    cliente_a = criar_cliente_teste(auth_client)
+    cliente_b_payload = {
+        "nome_razao_social": "Outro Cliente Para Casos",
+        "cpf_cnpj": "555.666.777-88",
+        "tipo_pessoa": "PF",
+        "email": "outro.cliente@teste.com",
+    }
+    cliente_b_resp = auth_client.post("/api/v1/clientes", json=cliente_b_payload)
+    assert cliente_b_resp.status_code == 201, cliente_b_resp.data
+    cliente_b = json.loads(cliente_b_resp.data)["id"]
+
+    caso_a = {
+        **CASO_BASE,
+        "cliente_id": cliente_a,
+        "titulo": "Execução Banco Alfa",
+        "numero_processo": "0001111-22.2026.8.16.0001",
+        "parte_contraria": "Banco Alfa SA",
+    }
+    caso_b = {
+        **CASO_BASE,
+        "cliente_id": cliente_b,
+        "titulo": "Cobrança Empresa Beta",
+        "numero_processo": "0002222-33.2026.8.16.0001",
+        "parte_contraria": "Empresa Beta Ltda",
+    }
+    assert auth_client.post("/api/v1/casos", json=caso_a).status_code == 201
+    assert auth_client.post("/api/v1/casos", json=caso_b).status_code == 201
+
+    response_busca = auth_client.get("/api/v1/casos?search=Banco%20Alfa")
+    assert response_busca.status_code == 200
+    data_busca = json.loads(response_busca.data)
+    assert len(data_busca) == 1
+    assert data_busca[0]["titulo"] == "Execução Banco Alfa"
+
+    response_cliente = auth_client.get(f"/api/v1/casos?cliente_id={cliente_b}")
+    assert response_cliente.status_code == 200
+    data_cliente = json.loads(response_cliente.data)
+    assert len(data_cliente) == 1
+    assert data_cliente[0]["cliente_id"] == cliente_b
+
+
 def test_create_caso_sucesso(auth_client, db):
     cliente_id = criar_cliente_teste(auth_client)
     payload = {**CASO_BASE, "cliente_id": cliente_id}
