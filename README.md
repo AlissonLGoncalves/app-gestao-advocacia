@@ -123,13 +123,24 @@ cd gestao_advocacia
 
 ### Frontend
 
-Atualmente o frontend nao possui script `test` no `package.json`. Validacao local recomendada:
+O frontend usa Vitest + React Testing Library:
 
 ```bash
 cd gestao_advocacia_vite
-npm run lint
-npm run build
+npm test            # executa suite Vitest (vitest run)
+npm run lint        # lint ESLint
+npm run build       # build de producao
 ```
+
+## Deploy
+
+A aplicacao e publicada em tres provedores:
+
+- **Backend (API Flask)** — [Fly.io](https://fly.io), app `app-gestao-advocacia`, regiao `gru` (Sao Paulo). Configuracao em `fly.toml`. Deploy via `flyctl deploy`.
+- **Backend (alternativo / backup)** — [Render](https://render.com), servico `gestao-advocacia-api` (Python, regiao `oregon`). Configuracao em `render.yaml`.
+- **Frontend (SPA React)** — [Vercel](https://vercel.com) (plano Hobby, repo privado). Configuracao em `vercel.json`. Deploy automatico a partir de `main`.
+
+> Aviso importante sobre commits: o plano Hobby do Vercel com repo privado nao aceita commits com `Co-Authored-By` — o deploy falha. Nao adicione essa linha em commits que tocam o frontend.
 
 ## Scripts de manutencao
 
@@ -162,3 +173,16 @@ app-gestao-advocacia/
 |- .env.example               # exemplo de variaveis backend/root
 |- README.md
 ```
+
+## Documentacao complementar
+
+Documentos tecnicos adicionais ficam em `docs/`:
+
+- [`docs/tenant-isolation.md`](docs/tenant-isolation.md) — modelo de isolamento multi-tenant e invariantes que os endpoints precisam respeitar.
+- [`docs/logging.md`](docs/logging.md) — configuracao de logging estruturado, niveis e request IDs.
+
+## Licenca
+
+Projeto proprietario. Todos os direitos reservados a Alisson L. Goncalves.
+Nao ha licenca open source publicada: o uso, copia ou redistribuicao do codigo requer autorizacao expressa do autor.
+
