@@ -63,7 +63,7 @@ def test_auth_login_logs_success_and_failure(client, caplog):
     caplog.set_level(logging.INFO)
 
     register_response = client.post(
-        "/api/auth/register",
+        "/api/v1/auth/register",
         json={
             "username": "obs_user",
             "email": "obs_user@test.com",
@@ -74,13 +74,13 @@ def test_auth_login_logs_success_and_failure(client, caplog):
     assert register_response.status_code == 201
 
     success_login = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username_or_email": "obs_user", "password": "Senha1234!"},
     )
     assert success_login.status_code == 200
 
     failed_login = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username_or_email": "obs_user", "password": "senha-errada"},
     )
     assert failed_login.status_code == 401

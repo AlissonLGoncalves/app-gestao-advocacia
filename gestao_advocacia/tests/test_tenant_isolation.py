@@ -1,4 +1,4 @@
-import io
+﻿import io
 import json
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
@@ -15,7 +15,7 @@ def _register_and_login(client, suffix):
     password = "Senha1234!"
 
     reg = client.post(
-        "/api/auth/register",
+        "/api/v1/auth/register",
         json={
             "username": username,
             "email": email,
@@ -26,7 +26,7 @@ def _register_and_login(client, suffix):
     assert reg.status_code == 201, reg.data
 
     login = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username_or_email": username, "password": password},
     )
     assert login.status_code == 200, login.data
@@ -47,7 +47,7 @@ def _make_base_data(client, token, tag):
     cliente_resp = _auth_json(
         client,
         "post",
-        "/api/clientes",
+        "/api/v1/clientes",
         token,
         {
             "nome_razao_social": f"Cliente {tag}",
@@ -62,12 +62,12 @@ def _make_base_data(client, token, tag):
     caso_resp = _auth_json(
         client,
         "post",
-        "/api/casos",
+        "/api/v1/casos",
         token,
         {
             "titulo": f"Caso {tag}",
             "status": "Ativo",
-            "tipo_acao": "Cível",
+            "tipo_acao": "CÃ­vel",
             "cliente_id": cliente_id,
             "numero_processo": f"0001234-12.2026.8.16.{1000 + tag}",
             "data_distribuicao": date.today().isoformat(),
@@ -85,10 +85,10 @@ def _make_evento(client, token, tag):
     resp = _auth_json(
         client,
         "post",
-        "/api/eventos",
+        "/api/v1/eventos",
         token,
         {
-            "tipo_evento": "Reunião",
+            "tipo_evento": "ReuniÃ£o",
             "titulo": f"Evento {tag}",
             "data_inicio": inicio,
             "data_fim": fim,
@@ -106,7 +106,7 @@ def _make_documento(client, token, cliente_id, caso_id, tag):
         "file": (io.BytesIO(b"arquivo de teste"), f"doc_{tag}.txt"),
     }
     resp = client.post(
-        "/api/documentos/upload",
+        "/api/v1/documentos/upload",
         headers=_headers(token),
         data=data,
         content_type="multipart/form-data",
@@ -119,7 +119,7 @@ def _make_despesa(client, token, caso_id, tag):
     resp = _auth_json(
         client,
         "post",
-        "/api/despesas",
+        "/api/v1/despesas",
         token,
         {
             "descricao": f"Despesa {tag}",
@@ -137,7 +137,7 @@ def _make_recebimento(client, token, caso_id, tag):
     resp = _auth_json(
         client,
         "post",
-        "/api/recebimentos",
+        "/api/v1/recebimentos",
         token,
         {
             "descricao": f"Recebimento {tag}",
@@ -155,7 +155,7 @@ def _make_contrato(client, token, cliente_id, caso_id, tag):
     resp = _auth_json(
         client,
         "post",
-        "/api/contratos",
+        "/api/v1/contratos",
         token,
         {
             "tipo_honorario": "Fixo",
@@ -174,7 +174,7 @@ def _make_tarefa(client, token, caso_id, tag):
     resp = _auth_json(
         client,
         "post",
-        "/api/tarefas",
+        "/api/v1/tarefas",
         token,
         {
             "titulo": f"Tarefa {tag}",
@@ -194,7 +194,7 @@ def _make_djen_oab(client, token, tag):
     resp = _auth_json(
         client,
         "post",
-        "/api/djen/oabs",
+        "/api/v1/djen/oabs",
         token,
         {
             "numero_oab": f"{90000 + tag}",
@@ -214,10 +214,10 @@ def _make_djen_publicacao_for_user(user_id, tenant_id, djen_id):
         hash_comunicacao=f"hash-{djen_id}",
         numero_processo="0001234-12.2026.8.16.0001",
         sigla_tribunal="TJPR",
-        nome_orgao="1ª Vara Cível",
-        tipo_comunicacao="Intimação",
+        nome_orgao="1Âª Vara CÃ­vel",
+        tipo_comunicacao="IntimaÃ§Ã£o",
         data_disponibilizacao=date.today(),
-        texto="Publicação de teste tenant isolation.",
+        texto="PublicaÃ§Ã£o de teste tenant isolation.",
         lida=False,
         origem_busca="oab",
     )
@@ -306,15 +306,15 @@ def tenants_setup(client, app, db):
 @pytest.mark.parametrize(
     "list_path,key,id_key,own_name,other_name",
     [
-        ("/api/clientes", "clientes", "cliente", "Cliente 1", "Cliente 2"),
-        ("/api/casos", "casos", "caso", "Caso 1", "Caso 2"),
-        ("/api/eventos", "eventos", "evento", "Evento 1", "Evento 2"),
-        ("/api/documentos", "documentos", "documento", "Documento 1", "Documento 2"),
-        ("/api/despesas", "despesas", "despesa", "Despesa 1", "Despesa 2"),
-        ("/api/recebimentos", "recebimentos", "recebimento", "Recebimento 1", "Recebimento 2"),
-        ("/api/contratos", "contratos", "contrato", "Contrato 1", "Contrato 2"),
-        ("/api/tarefas", "tarefas", "tarefa", "Tarefa 1", "Tarefa 2"),
-        ("/api/djen/oabs", None, "oab", "90001", "90002"),
+        ("/api/v1/clientes", "clientes", "cliente", "Cliente 1", "Cliente 2"),
+        ("/api/v1/casos", "casos", "caso", "Caso 1", "Caso 2"),
+        ("/api/v1/eventos", "eventos", "evento", "Evento 1", "Evento 2"),
+        ("/api/v1/documentos", "documentos", "documento", "Documento 1", "Documento 2"),
+        ("/api/v1/despesas", "despesas", "despesa", "Despesa 1", "Despesa 2"),
+        ("/api/v1/recebimentos", "recebimentos", "recebimento", "Recebimento 1", "Recebimento 2"),
+        ("/api/v1/contratos", "contratos", "contrato", "Contrato 1", "Contrato 2"),
+        ("/api/v1/tarefas", "tarefas", "tarefa", "Tarefa 1", "Tarefa 2"),
+        ("/api/v1/djen/oabs", None, "oab", "90001", "90002"),
     ],
 )
 def test_listagens_nunca_vazam_outro_tenant(
@@ -335,7 +335,7 @@ def test_listagens_nunca_vazam_outro_tenant(
     assert tenants_setup["ids_a"][id_key] in ids
     assert tenants_setup["ids_b"][id_key] not in ids
 
-    if list_path != "/api/documentos":
+    if list_path != "/api/v1/documentos":
         assert own_name in serialized
         assert other_name not in serialized
 
@@ -346,50 +346,50 @@ def test_listagens_nunca_vazam_outro_tenant(
         (
             "cliente",
             "cliente",
-            "/api/clientes/{id}",
-            "/api/clientes/{id}",
+            "/api/v1/clientes/{id}",
+            "/api/v1/clientes/{id}",
             "put",
-            "/api/clientes/{id}",
+            "/api/v1/clientes/{id}",
             {"nome_razao_social": "Atualizado A", "cpf_cnpj": "11122233399", "tipo_pessoa": "PF"},
         ),
         (
             "caso",
             "caso",
-            "/api/casos/{id}",
-            "/api/casos/{id}",
+            "/api/v1/casos/{id}",
+            "/api/v1/casos/{id}",
             "put",
-            "/api/casos/{id}",
-            {"titulo": "Caso atualizado", "status": "Ativo", "tipo_acao": "Cível"},
+            "/api/v1/casos/{id}",
+            {"titulo": "Caso atualizado", "status": "Ativo", "tipo_acao": "CÃ­vel"},
         ),
         (
             "evento",
             "evento",
-            "/api/eventos/{id}",
-            "/api/eventos/{id}",
+            "/api/v1/eventos/{id}",
+            "/api/v1/eventos/{id}",
             "put",
-            "/api/eventos/{id}",
+            "/api/v1/eventos/{id}",
             {
                 "titulo": "Evento atualizado",
-                "tipo_evento": "Reunião",
+                "tipo_evento": "ReuniÃ£o",
                 "data_inicio": (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(),
             },
         ),
         (
             "documento",
             "documento",
-            "/api/documentos/download/{id}",
+            "/api/v1/documentos/download/{id}",
             None,
             None,
-            "/api/documentos/{id}",
+            "/api/v1/documentos/{id}",
             None,
         ),
         (
             "despesa",
             "despesa",
-            "/api/despesas/{id}",
-            "/api/despesas/{id}",
+            "/api/v1/despesas/{id}",
+            "/api/v1/despesas/{id}",
             "put",
-            "/api/despesas/{id}",
+            "/api/v1/despesas/{id}",
             {
                 "descricao": "Despesa atualizada",
                 "valor": 101.0,
@@ -400,10 +400,10 @@ def test_listagens_nunca_vazam_outro_tenant(
         (
             "recebimento",
             "recebimento",
-            "/api/recebimentos/{id}",
-            "/api/recebimentos/{id}",
+            "/api/v1/recebimentos/{id}",
+            "/api/v1/recebimentos/{id}",
             "put",
-            "/api/recebimentos/{id}",
+            "/api/v1/recebimentos/{id}",
             {
                 "descricao": "Recebimento atualizado",
                 "valor": 300.0,
@@ -414,10 +414,10 @@ def test_listagens_nunca_vazam_outro_tenant(
         (
             "contrato",
             "contrato",
-            "/api/contratos/{id}",
-            "/api/contratos/{id}",
+            "/api/v1/contratos/{id}",
+            "/api/v1/contratos/{id}",
             "put",
-            "/api/contratos/{id}",
+            "/api/v1/contratos/{id}",
             {
                 "tipo_honorario": "Fixo",
                 "valor_total": 2000,
@@ -429,18 +429,18 @@ def test_listagens_nunca_vazam_outro_tenant(
         (
             "tarefa",
             "tarefa",
-            "/api/tarefas/{id}",
-            "/api/tarefas/{id}",
+            "/api/v1/tarefas/{id}",
+            "/api/v1/tarefas/{id}",
             "put",
-            "/api/tarefas/{id}",
+            "/api/v1/tarefas/{id}",
             {"titulo": "Tarefa atualizada"},
         ),
-        ("oab", "oab", None, None, None, "/api/djen/oabs/{id}", None),
+        ("oab", "oab", None, None, None, "/api/v1/djen/oabs/{id}", None),
         (
             "pub",
             "pub",
-            "/api/djen/publicacoes/{id}",
-            "/api/djen/publicacoes/{id}",
+            "/api/v1/djen/publicacoes/{id}",
+            "/api/v1/djen/publicacoes/{id}",
             "patch",
             None,
             {"lida": True},
@@ -480,7 +480,7 @@ def test_cross_tenant_get_put_delete_retorna_404(
         resp_del = client.delete(delete_path.format(id=id_b), headers=_headers(token_a))
         assert resp_del.status_code == 404, f"{resource} DELETE cross-tenant should be 404"
 
-    # Controle positivo: owner mantém acesso no próprio tenant
+    # Controle positivo: owner mantÃ©m acesso no prÃ³prio tenant
     if get_path:
         resp_own = client.get(get_path.format(id=id_a), headers=_headers(token_a))
         assert resp_own.status_code in (200, 500)
@@ -495,10 +495,10 @@ def test_usuario_sem_tenant_e_bloqueado(client, tenants_setup, app):
         user.tenant_id = None
         db.session.commit()
 
-    resp_clientes = client.get("/api/clientes", headers=_headers(token_a))
+    resp_clientes = client.get("/api/v1/clientes", headers=_headers(token_a))
     assert resp_clientes.status_code == 403
 
-    resp_casos = client.get("/api/casos", headers=_headers(token_a))
+    resp_casos = client.get("/api/v1/casos", headers=_headers(token_a))
     assert resp_casos.status_code == 403
 
 
@@ -517,7 +517,7 @@ def test_log_warning_quando_cross_tenant_bloqueado(app, caplog):
         __name__ = "FakeModel"
 
     alvo = type("Target", (), {"tenant_id": 999})()
-    with app.test_request_context("/api/fake/99"):
+    with app.test_request_context("/api/v1/fake/99"):
         with patch("helpers.tenant.query_for_tenant", return_value=FakeQuery()):
             with patch("helpers.tenant.get_tenant_id", return_value=1):
                 with patch("helpers.tenant.get_jwt_identity", return_value=123):
@@ -533,4 +533,4 @@ def test_log_warning_quando_cross_tenant_bloqueado(app, caplog):
     assert getattr(record, "user_id", None) == 123
     assert getattr(record, "current_tenant", None) == 1
     assert getattr(record, "target_tenant", None) == 999
-    assert getattr(record, "endpoint", None) == "/api/fake/99"
+    assert getattr(record, "endpoint", None) == "/api/v1/fake/99"

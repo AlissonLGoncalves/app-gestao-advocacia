@@ -1,6 +1,6 @@
-# Arquivo: tests/test_djen_api.py
-# Testes para o módulo DJEN — Diário de Justiça Eletrônico Nacional.
-# Cobre: OABs monitoradas, publicações, PATCH de publicação, não-lidas e sync manual.
+﻿# Arquivo: tests/test_djen_api.py
+# Testes para o mÃ³dulo DJEN â€” DiÃ¡rio de JustiÃ§a EletrÃ´nico Nacional.
+# Cobre: OABs monitoradas, publicaÃ§Ãµes, PATCH de publicaÃ§Ã£o, nÃ£o-lidas e sync manual.
 
 import json
 from datetime import date
@@ -17,7 +17,7 @@ def _criar_caso(auth_client, db):
     """Cria um cliente e um caso de teste, retorna o caso_id."""
     # Primeiro cria um cliente
     resp = auth_client.post(
-        "/api/clientes",
+        "/api/v1/clientes",
         json={
             "nome_razao_social": "Cliente DJEN Teste",
             "cpf_cnpj": "999.888.777-66",
@@ -29,11 +29,11 @@ def _criar_caso(auth_client, db):
     cliente_id = json.loads(resp.data)["id"]
 
     resp = auth_client.post(
-        "/api/casos",
+        "/api/v1/casos",
         json={
             "titulo": "Caso DJEN",
             "status": "Ativo",
-            "tipo_acao": "Cível",
+            "tipo_acao": "CÃ­vel",
             "cliente_id": cliente_id,
             "numero_processo": "0001234-12.2024.8.16.0001",
         },
@@ -43,7 +43,7 @@ def _criar_caso(auth_client, db):
 
 
 def _criar_publicacao(db, tenant_id, user_id, caso_id=None, lida=False, djen_id=1):
-    """Insere diretamente uma publicação no banco de teste."""
+    """Insere diretamente uma publicaÃ§Ã£o no banco de teste."""
     pub = PublicacaoDJEN(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -51,10 +51,10 @@ def _criar_publicacao(db, tenant_id, user_id, caso_id=None, lida=False, djen_id=
         hash_comunicacao=f"hash-{djen_id}",
         numero_processo="0001234-12.2024.8.16.0001",
         sigla_tribunal="TJPR",
-        nome_orgao="1ª Vara Cível",
-        tipo_comunicacao="Intimação",
+        nome_orgao="1Âª Vara CÃ­vel",
+        tipo_comunicacao="IntimaÃ§Ã£o",
         data_disponibilizacao=date.today(),
-        texto="Texto de intimação de teste.",
+        texto="Texto de intimaÃ§Ã£o de teste.",
         lida=lida,
         origem_busca="oab",
         caso_id=caso_id,
@@ -71,17 +71,17 @@ def _criar_publicacao(db, tenant_id, user_id, caso_id=None, lida=False, djen_id=
 
 class TestDjenOABs:
     def test_lista_oabs_vazia(self, auth_client, db):
-        """GET /api/djen/oabs retorna lista vazia quando não há OABs cadastradas."""
-        resp = auth_client.get("/api/djen/oabs")
+        """GET /api/v1/djen/oabs retorna lista vazia quando nÃ£o hÃ¡ OABs cadastradas."""
+        resp = auth_client.get("/api/v1/djen/oabs")
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert isinstance(data, list)
         assert len(data) == 0
 
     def test_cadastrar_oab_sucesso(self, auth_client, db):
-        """POST /api/djen/oabs cadastra uma OAB com sucesso."""
+        """POST /api/v1/djen/oabs cadastra uma OAB com sucesso."""
         resp = auth_client.post(
-            "/api/djen/oabs",
+            "/api/v1/djen/oabs",
             json={
                 "numero_oab": "123456",
                 "uf_oab": "PR",
@@ -96,9 +96,9 @@ class TestDjenOABs:
         assert "id" in data
 
     def test_cadastrar_oab_campos_obrigatorios(self, auth_client, db):
-        """POST /api/djen/oabs retorna 400 quando campos obrigatórios faltam."""
+        """POST /api/v1/djen/oabs retorna 400 quando campos obrigatÃ³rios faltam."""
         resp = auth_client.post(
-            "/api/djen/oabs",
+            "/api/v1/djen/oabs",
             json={
                 "numero_oab": "123456",
                 # uf_oab ausente
@@ -107,53 +107,53 @@ class TestDjenOABs:
         assert resp.status_code == 400
 
     def test_cadastrar_oab_duplicada_retorna_409(self, auth_client, db):
-        """POST /api/djen/oabs retorna 409 se a OAB já está cadastrada."""
+        """POST /api/v1/djen/oabs retorna 409 se a OAB jÃ¡ estÃ¡ cadastrada."""
         payload = {"numero_oab": "654321", "uf_oab": "SP"}
-        auth_client.post("/api/djen/oabs", json=payload)
-        resp = auth_client.post("/api/djen/oabs", json=payload)
+        auth_client.post("/api/v1/djen/oabs", json=payload)
+        resp = auth_client.post("/api/v1/djen/oabs", json=payload)
         assert resp.status_code == 409
 
     def test_listar_oabs_apos_cadastro(self, auth_client, db):
-        """GET /api/djen/oabs lista a OAB cadastrada."""
-        auth_client.post("/api/djen/oabs", json={"numero_oab": "111222", "uf_oab": "MG"})
-        resp = auth_client.get("/api/djen/oabs")
+        """GET /api/v1/djen/oabs lista a OAB cadastrada."""
+        auth_client.post("/api/v1/djen/oabs", json={"numero_oab": "111222", "uf_oab": "MG"})
+        resp = auth_client.get("/api/v1/djen/oabs")
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert any(o["numero_oab"] == "111222" for o in data)
 
     def test_deletar_oab_sucesso(self, auth_client, db):
-        """DELETE /api/djen/oabs/<id> remove a OAB com sucesso."""
-        resp = auth_client.post("/api/djen/oabs", json={"numero_oab": "999000", "uf_oab": "RJ"})
+        """DELETE /api/v1/djen/oabs/<id> remove a OAB com sucesso."""
+        resp = auth_client.post("/api/v1/djen/oabs", json={"numero_oab": "999000", "uf_oab": "RJ"})
         oab_id = json.loads(resp.data)["id"]
 
-        del_resp = auth_client.delete(f"/api/djen/oabs/{oab_id}")
+        del_resp = auth_client.delete(f"/api/v1/djen/oabs/{oab_id}")
         assert del_resp.status_code == 204
 
-        # Confirma remoção
-        list_resp = auth_client.get("/api/djen/oabs")
+        # Confirma remoÃ§Ã£o
+        list_resp = auth_client.get("/api/v1/djen/oabs")
         data = json.loads(list_resp.data)
         assert not any(o["id"] == oab_id for o in data)
 
     def test_deletar_oab_nao_existente(self, auth_client, db):
-        """DELETE /api/djen/oabs/<id> retorna 404 para OAB inexistente."""
-        resp = auth_client.delete("/api/djen/oabs/99999")
+        """DELETE /api/v1/djen/oabs/<id> retorna 404 para OAB inexistente."""
+        resp = auth_client.delete("/api/v1/djen/oabs/99999")
         assert resp.status_code == 404
 
     def test_oab_sem_autenticacao_retorna_401(self, client, db):
-        """GET /api/djen/oabs sem token retorna 401."""
-        resp = client.get("/api/djen/oabs")
+        """GET /api/v1/djen/oabs sem token retorna 401."""
+        resp = client.get("/api/v1/djen/oabs")
         assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
-# Publicações DJEN
+# PublicaÃ§Ãµes DJEN
 # ---------------------------------------------------------------------------
 
 
 class TestDjenPublicacoes:
     def test_lista_publicacoes_vazia(self, auth_client, db):
-        """GET /api/djen/publicacoes retorna lista vazia quando não há publicações."""
-        resp = auth_client.get("/api/djen/publicacoes")
+        """GET /api/v1/djen/publicacoes retorna lista vazia quando nÃ£o hÃ¡ publicaÃ§Ãµes."""
+        resp = auth_client.get("/api/v1/djen/publicacoes")
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert "items" in data
@@ -161,20 +161,20 @@ class TestDjenPublicacoes:
         assert len(data["items"]) == 0
 
     def test_lista_publicacoes_com_registro(self, auth_client, db, app):
-        """GET /api/djen/publicacoes retorna a publicação inserida."""
+        """GET /api/v1/djen/publicacoes retorna a publicaÃ§Ã£o inserida."""
         with app.app_context():
             from app import User
 
             user = User.query.filter_by(username="testuser").first()
             _criar_publicacao(db, user.tenant_id, user.id, djen_id=100)
 
-        resp = auth_client.get("/api/djen/publicacoes")
+        resp = auth_client.get("/api/v1/djen/publicacoes")
         data = json.loads(resp.data)
         assert data["total"] == 1
         assert data["items"][0]["sigla_tribunal"] == "TJPR"
 
     def test_filtro_por_lida_false(self, auth_client, db, app):
-        """GET /api/djen/publicacoes?lida=false filtra corretamente."""
+        """GET /api/v1/djen/publicacoes?lida=false filtra corretamente."""
         with app.app_context():
             from app import User
 
@@ -182,29 +182,29 @@ class TestDjenPublicacoes:
             _criar_publicacao(db, user.tenant_id, user.id, lida=False, djen_id=200)
             _criar_publicacao(db, user.tenant_id, user.id, lida=True, djen_id=201)
 
-        resp = auth_client.get("/api/djen/publicacoes?lida=false")
+        resp = auth_client.get("/api/v1/djen/publicacoes?lida=false")
         data = json.loads(resp.data)
         assert data["total"] == 1
         assert data["items"][0]["lida"] is False
 
     def test_filtro_por_tribunal(self, auth_client, db, app):
-        """GET /api/djen/publicacoes?sigla_tribunal=TJPR filtra por tribunal."""
+        """GET /api/v1/djen/publicacoes?sigla_tribunal=TJPR filtra por tribunal."""
         with app.app_context():
             from app import User
 
             user = User.query.filter_by(username="testuser").first()
             _criar_publicacao(db, user.tenant_id, user.id, djen_id=300)
 
-        resp = auth_client.get("/api/djen/publicacoes?sigla_tribunal=TJPR")
+        resp = auth_client.get("/api/v1/djen/publicacoes?sigla_tribunal=TJPR")
         data = json.loads(resp.data)
         assert data["total"] == 1
 
-        resp_outro = auth_client.get("/api/djen/publicacoes?sigla_tribunal=TJSP")
+        resp_outro = auth_client.get("/api/v1/djen/publicacoes?sigla_tribunal=TJSP")
         data_outro = json.loads(resp_outro.data)
         assert data_outro["total"] == 0
 
     def test_paginacao(self, auth_client, db, app):
-        """GET /api/djen/publicacoes com limit e offset pagina corretamente."""
+        """GET /api/v1/djen/publicacoes com limit e offset pagina corretamente."""
         with app.app_context():
             from app import User
 
@@ -212,17 +212,17 @@ class TestDjenPublicacoes:
             for i in range(5):
                 _criar_publicacao(db, user.tenant_id, user.id, djen_id=400 + i)
 
-        resp = auth_client.get("/api/djen/publicacoes?limit=2&offset=0")
+        resp = auth_client.get("/api/v1/djen/publicacoes?limit=2&offset=0")
         data = json.loads(resp.data)
         assert data["total"] == 5
         assert len(data["items"]) == 2
 
-        resp2 = auth_client.get("/api/djen/publicacoes?limit=2&offset=4")
+        resp2 = auth_client.get("/api/v1/djen/publicacoes?limit=2&offset=4")
         data2 = json.loads(resp2.data)
         assert len(data2["items"]) == 1
 
     def test_detalhe_publicacao_existente(self, auth_client, db, app):
-        """GET /api/djen/publicacoes/<id> retorna a publicação solicitada."""
+        """GET /api/v1/djen/publicacoes/<id> retorna a publicaÃ§Ã£o solicitada."""
         with app.app_context():
             from app import User
 
@@ -230,31 +230,31 @@ class TestDjenPublicacoes:
             pub = _criar_publicacao(db, user.tenant_id, user.id, djen_id=500)
             pub_id = pub.id
 
-        resp = auth_client.get(f"/api/djen/publicacoes/{pub_id}")
+        resp = auth_client.get(f"/api/v1/djen/publicacoes/{pub_id}")
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert data["id"] == pub_id
         assert data["sigla_tribunal"] == "TJPR"
 
     def test_detalhe_publicacao_inexistente(self, auth_client, db):
-        """GET /api/djen/publicacoes/<id> retorna 404 para publicação inexistente."""
-        resp = auth_client.get("/api/djen/publicacoes/99999")
+        """GET /api/v1/djen/publicacoes/<id> retorna 404 para publicaÃ§Ã£o inexistente."""
+        resp = auth_client.get("/api/v1/djen/publicacoes/99999")
         assert resp.status_code == 404
 
     def test_publicacoes_sem_autenticacao(self, client, db):
-        """GET /api/djen/publicacoes sem token retorna 401."""
-        resp = client.get("/api/djen/publicacoes")
+        """GET /api/v1/djen/publicacoes sem token retorna 401."""
+        resp = client.get("/api/v1/djen/publicacoes")
         assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
-# PATCH publicação (marcar lida, vincular caso, notas)
+# PATCH publicaÃ§Ã£o (marcar lida, vincular caso, notas)
 # ---------------------------------------------------------------------------
 
 
 class TestDjenPatchPublicacao:
     def test_marcar_publicacao_como_lida(self, auth_client, db, app):
-        """PATCH /api/djen/publicacoes/<id> marca a publicação como lida."""
+        """PATCH /api/v1/djen/publicacoes/<id> marca a publicaÃ§Ã£o como lida."""
         with app.app_context():
             from app import User
 
@@ -262,13 +262,13 @@ class TestDjenPatchPublicacao:
             pub = _criar_publicacao(db, user.tenant_id, user.id, lida=False, djen_id=600)
             pub_id = pub.id
 
-        resp = auth_client.patch(f"/api/djen/publicacoes/{pub_id}", json={"lida": True})
+        resp = auth_client.patch(f"/api/v1/djen/publicacoes/{pub_id}", json={"lida": True})
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert data["lida"] is True
 
     def test_adicionar_notas(self, auth_client, db, app):
-        """PATCH /api/djen/publicacoes/<id> atualiza notas da publicação."""
+        """PATCH /api/v1/djen/publicacoes/<id> atualiza notas da publicaÃ§Ã£o."""
         with app.app_context():
             from app import User
 
@@ -277,13 +277,13 @@ class TestDjenPatchPublicacao:
             pub_id = pub.id
 
         resp = auth_client.patch(
-            f"/api/djen/publicacoes/{pub_id}", json={"notas": "Verificar com o cliente."}
+            f"/api/v1/djen/publicacoes/{pub_id}", json={"notas": "Verificar com o cliente."}
         )
         assert resp.status_code == 200
         assert json.loads(resp.data)["notas"] == "Verificar com o cliente."
 
     def test_vincular_caso(self, auth_client, db, app):
-        """PATCH /api/djen/publicacoes/<id> vincula a publicação a um caso."""
+        """PATCH /api/v1/djen/publicacoes/<id> vincula a publicaÃ§Ã£o a um caso."""
         caso_id = _criar_caso(auth_client, db)
 
         with app.app_context():
@@ -293,35 +293,35 @@ class TestDjenPatchPublicacao:
             pub = _criar_publicacao(db, user.tenant_id, user.id, djen_id=602)
             pub_id = pub.id
 
-        resp = auth_client.patch(f"/api/djen/publicacoes/{pub_id}", json={"caso_id": caso_id})
+        resp = auth_client.patch(f"/api/v1/djen/publicacoes/{pub_id}", json={"caso_id": caso_id})
         assert resp.status_code == 200
         assert json.loads(resp.data)["caso_id"] == caso_id
 
     def test_patch_publicacao_inexistente(self, auth_client, db):
-        """PATCH /api/djen/publicacoes/<id> retorna 404 para publicação inexistente."""
-        resp = auth_client.patch("/api/djen/publicacoes/99999", json={"lida": True})
+        """PATCH /api/v1/djen/publicacoes/<id> retorna 404 para publicaÃ§Ã£o inexistente."""
+        resp = auth_client.patch("/api/v1/djen/publicacoes/99999", json={"lida": True})
         assert resp.status_code == 404
 
     def test_patch_sem_autenticacao(self, client, db):
-        """PATCH /api/djen/publicacoes/<id> sem token retorna 401."""
-        resp = client.patch("/api/djen/publicacoes/1", json={"lida": True})
+        """PATCH /api/v1/djen/publicacoes/<id> sem token retorna 401."""
+        resp = client.patch("/api/v1/djen/publicacoes/1", json={"lida": True})
         assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
-# Contagem de não-lidas (badge)
+# Contagem de nÃ£o-lidas (badge)
 # ---------------------------------------------------------------------------
 
 
 class TestDjenNaoLidas:
     def test_nao_lidas_zero_sem_publicacoes(self, auth_client, db):
-        """GET /api/djen/nao-lidas retorna 0 quando não há publicações."""
-        resp = auth_client.get("/api/djen/nao-lidas")
+        """GET /api/v1/djen/nao-lidas retorna 0 quando nÃ£o hÃ¡ publicaÃ§Ãµes."""
+        resp = auth_client.get("/api/v1/djen/nao-lidas")
         assert resp.status_code == 200
         assert json.loads(resp.data)["count"] == 0
 
     def test_nao_lidas_conta_corretamente(self, auth_client, db, app):
-        """GET /api/djen/nao-lidas retorna a contagem correta de não-lidas."""
+        """GET /api/v1/djen/nao-lidas retorna a contagem correta de nÃ£o-lidas."""
         with app.app_context():
             from app import User
 
@@ -330,23 +330,23 @@ class TestDjenNaoLidas:
             _criar_publicacao(db, user.tenant_id, user.id, lida=False, djen_id=701)
             _criar_publicacao(db, user.tenant_id, user.id, lida=True, djen_id=702)
 
-        resp = auth_client.get("/api/djen/nao-lidas")
+        resp = auth_client.get("/api/v1/djen/nao-lidas")
         assert json.loads(resp.data)["count"] == 2
 
     def test_nao_lidas_sem_autenticacao(self, client, db):
-        """GET /api/djen/nao-lidas sem token retorna 401."""
-        resp = client.get("/api/djen/nao-lidas")
+        """GET /api/v1/djen/nao-lidas sem token retorna 401."""
+        resp = client.get("/api/v1/djen/nao-lidas")
         assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
-# Sincronização manual
+# SincronizaÃ§Ã£o manual
 # ---------------------------------------------------------------------------
 
 
 class TestDjenSync:
     def test_sync_manual_sucesso(self, auth_client, db):
-        """POST /api/djen/sync inicia a sincronização manual (mockando o job)."""
+        """POST /api/v1/djen/sync inicia a sincronizaÃ§Ã£o manual (mockando o job)."""
         with patch("djen_tasks.job_monitorar_djen") as mock_job:
             mock_job.return_value = {
                 "ok": True,
@@ -357,21 +357,21 @@ class TestDjenSync:
                 "publicacoes_salvas": 1,
                 "erros": 0,
             }
-            resp = auth_client.post("/api/djen/sync", json={"dias": 1})
+            resp = auth_client.post("/api/v1/djen/sync", json={"dias": 1})
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert "message" in data
-        assert "Sincronização" in data["message"]
+        assert "Sincroniza" in data["message"]
         assert "resumo" in data
 
     def test_sync_sem_autenticacao(self, client, db):
-        """POST /api/djen/sync sem token retorna 401."""
-        resp = client.post("/api/djen/sync", json={"dias": 1})
+        """POST /api/v1/djen/sync sem token retorna 401."""
+        resp = client.post("/api/v1/djen/sync", json={"dias": 1})
         assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
-# Compatibilidade da integração DJEN (payload CNJ)
+# Compatibilidade da integraÃ§Ã£o DJEN (payload CNJ)
 # ---------------------------------------------------------------------------
 
 
@@ -402,7 +402,7 @@ class TestDjenPayloadCompat:
         assert _normalizar_sigla_tribunal(None) is None
 
     def test_normalizar_numero_oab_remove_mascara(self):
-        """_normalizar_numero_oab deve manter somente dígitos quando possível."""
+        """_normalizar_numero_oab deve manter somente dÃ­gitos quando possÃ­vel."""
         from djen_tasks import _normalizar_numero_oab
 
         assert _normalizar_numero_oab("94.297/PR") == "94297"
@@ -411,7 +411,7 @@ class TestDjenPayloadCompat:
         assert _normalizar_numero_oab(None) == ""
 
     def test_consultar_oab_com_fallback_tenta_paginas_e_sem_tribunal(self):
-        """Quando não encontra com tribunal/página inicial, tenta fallback até achar."""
+        """Quando nÃ£o encontra com tribunal/pÃ¡gina inicial, tenta fallback atÃ© achar."""
         from djen_tasks import _consultar_oab_com_fallback
 
         class DummyLogger:
@@ -444,7 +444,7 @@ class TestDjenPayloadCompat:
 
 class TestDjenTriagem:
     def test_triagem_retorna_analise_e_sugestoes(self, auth_client, db, app):
-        """GET /api/djen/triagem retorna análise de partes/representantes e sugestões."""
+        """GET /api/v1/djen/triagem retorna anÃ¡lise de partes/representantes e sugestÃµes."""
         caso_id = None
         pub_id = None
         with app.app_context():
@@ -494,7 +494,7 @@ class TestDjenTriagem:
             db.session.commit()
             pub_id = pub.id
 
-        resp = auth_client.get("/api/djen/triagem")
+        resp = auth_client.get("/api/v1/djen/triagem")
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert data["total"] >= 1
@@ -510,12 +510,12 @@ class TestDjenTriagem:
         assert any(c["id"] == caso_id for c in item["sugestoes"]["casos"])
 
     def test_triagem_sem_autenticacao(self, client, db):
-        """GET /api/djen/triagem sem token retorna 401."""
-        resp = client.get("/api/djen/triagem")
+        """GET /api/v1/djen/triagem sem token retorna 401."""
+        resp = client.get("/api/v1/djen/triagem")
         assert resp.status_code == 401
 
     def test_triagem_criar_cliente_caso(self, auth_client, db, app):
-        """POST /api/djen/triagem/<id>/criar-cliente-caso cria e vincula entidades."""
+        """POST /api/v1/djen/triagem/<id>/criar-cliente-caso cria e vincula entidades."""
         pub_id = None
         with app.app_context():
             from app import User
@@ -539,7 +539,7 @@ class TestDjenTriagem:
             db.session.commit()
             pub_id = pub.id
 
-        resp = auth_client.post(f"/api/djen/triagem/{pub_id}/criar-cliente-caso")
+        resp = auth_client.post(f"/api/v1/djen/triagem/{pub_id}/criar-cliente-caso")
         assert resp.status_code == 200
         payload = json.loads(resp.data)
 
@@ -554,12 +554,12 @@ class TestDjenTriagem:
             assert pub_db.caso_id == payload["caso"]["id"]
 
     def test_triagem_criar_cliente_caso_sem_autenticacao(self, client, db):
-        """POST /api/djen/triagem/<id>/criar-cliente-caso sem token retorna 401."""
-        resp = client.post("/api/djen/triagem/1/criar-cliente-caso")
+        """POST /api/v1/djen/triagem/<id>/criar-cliente-caso sem token retorna 401."""
+        resp = client.post("/api/v1/djen/triagem/1/criar-cliente-caso")
         assert resp.status_code == 401
 
     def test_triagem_processar_lote(self, auth_client, db, app):
-        """POST /api/djen/triagem/processar-lote processa múltiplas publicações."""
+        """POST /api/v1/djen/triagem/processar-lote processa mÃºltiplas publicaÃ§Ãµes."""
         pub_ids = []
         with app.app_context():
             from app import User
@@ -585,7 +585,7 @@ class TestDjenTriagem:
                 pub_ids.append(pub.id)
             db.session.commit()
 
-        resp = auth_client.post("/api/djen/triagem/processar-lote", json={"pub_ids": pub_ids})
+        resp = auth_client.post("/api/v1/djen/triagem/processar-lote", json={"pub_ids": pub_ids})
         assert resp.status_code == 200
         payload = json.loads(resp.data)
         assert payload["total_recebidas"] == 2
@@ -598,8 +598,8 @@ class TestDjenTriagem:
             assert all(p.lida is True for p in pubs)
 
     def test_triagem_processar_lote_sem_autenticacao(self, client, db):
-        """POST /api/djen/triagem/processar-lote sem token retorna 401."""
-        resp = client.post("/api/djen/triagem/processar-lote", json={"pub_ids": [1, 2]})
+        """POST /api/v1/djen/triagem/processar-lote sem token retorna 401."""
+        resp = client.post("/api/v1/djen/triagem/processar-lote", json={"pub_ids": [1, 2]})
         assert resp.status_code == 401
 
 
@@ -610,10 +610,10 @@ class TestDjenTriagem:
 
 class TestDjenTenantIsolation:
     def test_tenant_nao_ve_oab_de_outro(self, client, db, app):
-        """Dois tenants distintos não enxergam OABs um do outro."""
-        # Registra e loga usuário A
+        """Dois tenants distintos nÃ£o enxergam OABs um do outro."""
+        # Registra e loga usuÃ¡rio A
         client.post(
-            "/api/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "user_a",
                 "email": "a@test.com",
@@ -623,13 +623,13 @@ class TestDjenTenantIsolation:
         )
         token_a = json.loads(
             client.post(
-                "/api/auth/login", json={"username_or_email": "user_a", "password": "Senha1234!"}
+                "/api/v1/auth/login", json={"username_or_email": "user_a", "password": "Senha1234!"}
             ).data
         )["access_token"]
 
-        # Registra e loga usuário B (tenant separado)
+        # Registra e loga usuÃ¡rio B (tenant separado)
         client.post(
-            "/api/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "user_b",
                 "email": "b@test.com",
@@ -639,28 +639,28 @@ class TestDjenTenantIsolation:
         )
         token_b = json.loads(
             client.post(
-                "/api/auth/login", json={"username_or_email": "user_b", "password": "Senha1234!"}
+                "/api/v1/auth/login", json={"username_or_email": "user_b", "password": "Senha1234!"}
             ).data
         )["access_token"]
 
         headers_a = {"Authorization": f"Bearer {token_a}"}
         headers_b = {"Authorization": f"Bearer {token_b}"}
 
-        # Usuário A cadastra uma OAB
+        # UsuÃ¡rio A cadastra uma OAB
         client.post(
-            "/api/djen/oabs", json={"numero_oab": "888111", "uf_oab": "SC"}, headers=headers_a
+            "/api/v1/djen/oabs", json={"numero_oab": "888111", "uf_oab": "SC"}, headers=headers_a
         )
 
-        # Usuário B não deve ver a OAB do usuário A
-        resp_b = client.get("/api/djen/oabs", headers=headers_b)
+        # UsuÃ¡rio B nÃ£o deve ver a OAB do usuÃ¡rio A
+        resp_b = client.get("/api/v1/djen/oabs", headers=headers_b)
         oabs_b = json.loads(resp_b.data)
         assert not any(o["numero_oab"] == "888111" for o in oabs_b)
 
     def test_tenant_nao_ve_publicacao_de_outro(self, client, db, app):
-        """Dois tenants distintos não enxergam publicações um do outro."""
-        # Registra e loga usuário C
+        """Dois tenants distintos nÃ£o enxergam publicaÃ§Ãµes um do outro."""
+        # Registra e loga usuÃ¡rio C
         client.post(
-            "/api/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "user_c",
                 "email": "c@test.com",
@@ -669,12 +669,12 @@ class TestDjenTenantIsolation:
             },
         )
         client.post(
-            "/api/auth/login", json={"username_or_email": "user_c", "password": "Senha1234!"}
+            "/api/v1/auth/login", json={"username_or_email": "user_c", "password": "Senha1234!"}
         )
 
-        # Registra e loga usuário D
+        # Registra e loga usuÃ¡rio D
         client.post(
-            "/api/auth/register",
+            "/api/v1/auth/register",
             json={
                 "username": "user_d",
                 "email": "d@test.com",
@@ -684,27 +684,27 @@ class TestDjenTenantIsolation:
         )
         token_d = json.loads(
             client.post(
-                "/api/auth/login", json={"username_or_email": "user_d", "password": "Senha1234!"}
+                "/api/v1/auth/login", json={"username_or_email": "user_d", "password": "Senha1234!"}
             ).data
         )["access_token"]
 
         headers_d = {"Authorization": f"Bearer {token_d}"}
 
-        # Insere publicação pertencente ao tenant de C
+        # Insere publicaÃ§Ã£o pertencente ao tenant de C
         with app.app_context():
             from app import User
 
             user_c = User.query.filter_by(username="user_c").first()
             _criar_publicacao(db, user_c.tenant_id, user_c.id, djen_id=800)
 
-        # Usuário D não deve ver a publicação de C
-        resp_d = client.get("/api/djen/publicacoes", headers=headers_d)
+        # UsuÃ¡rio D nÃ£o deve ver a publicaÃ§Ã£o de C
+        resp_d = client.get("/api/v1/djen/publicacoes", headers=headers_d)
         data_d = json.loads(resp_d.data)
         assert data_d["total"] == 0
 
 
 # ---------------------------------------------------------------------------
-# Ações extras de triagem (mesclar, ignorar, qualidade)
+# AÃ§Ãµes extras de triagem (mesclar, ignorar, qualidade)
 # ---------------------------------------------------------------------------
 
 
@@ -733,10 +733,10 @@ class TestDjenTriagemAcoesExtras:
         return pub_id, caso_id
 
     def test_mesclar_publicacao_com_caso(self, auth_client, db, app):
-        """POST /api/djen/triagem/<id>/mesclar vincula a publicação ao caso informado."""
+        """POST /api/v1/djen/triagem/<id>/mesclar vincula a publicaÃ§Ã£o ao caso informado."""
         pub_id, caso_id = self._criar_pub_e_caso(auth_client, db, app, djen_id=9100)
 
-        resp = auth_client.post(f"/api/djen/triagem/{pub_id}/mesclar", json={"caso_id": caso_id})
+        resp = auth_client.post(f"/api/v1/djen/triagem/{pub_id}/mesclar", json={"caso_id": caso_id})
         assert resp.status_code == 200
         payload = json.loads(resp.data)
         assert payload["publicacao"]["caso_id"] == caso_id
@@ -750,17 +750,17 @@ class TestDjenTriagemAcoesExtras:
             assert dec.caso_id == caso_id
 
     def test_mesclar_sem_caso_id_retorna_400(self, auth_client, db, app):
-        """POST /api/djen/triagem/<id>/mesclar sem caso_id retorna 400."""
+        """POST /api/v1/djen/triagem/<id>/mesclar sem caso_id retorna 400."""
         pub_id, _ = self._criar_pub_e_caso(auth_client, db, app, djen_id=9101)
-        resp = auth_client.post(f"/api/djen/triagem/{pub_id}/mesclar", json={})
+        resp = auth_client.post(f"/api/v1/djen/triagem/{pub_id}/mesclar", json={})
         assert resp.status_code == 400
 
     def test_ignorar_publicacao(self, auth_client, db, app):
-        """POST /api/djen/triagem/<id>/ignorar marca a publicação como ignorada."""
+        """POST /api/v1/djen/triagem/<id>/ignorar marca a publicaÃ§Ã£o como ignorada."""
         pub_id, _ = self._criar_pub_e_caso(auth_client, db, app, djen_id=9102)
 
         resp = auth_client.post(
-            f"/api/djen/triagem/{pub_id}/ignorar", json={"motivo": "Processo encerrado"}
+            f"/api/v1/djen/triagem/{pub_id}/ignorar", json={"motivo": "Processo encerrado"}
         )
         assert resp.status_code == 200
         payload = json.loads(resp.data)
@@ -775,19 +775,19 @@ class TestDjenTriagemAcoesExtras:
             assert dec.motivo == "Processo encerrado"
 
     def test_ignorar_remove_da_triagem(self, auth_client, db, app):
-        """Publicação ignorada não aparece mais na fila de triagem."""
+        """PublicaÃ§Ã£o ignorada nÃ£o aparece mais na fila de triagem."""
         pub_id, _ = self._criar_pub_e_caso(auth_client, db, app, djen_id=9103)
 
-        auth_client.post(f"/api/djen/triagem/{pub_id}/ignorar", json={})
+        auth_client.post(f"/api/v1/djen/triagem/{pub_id}/ignorar", json={})
 
-        resp = auth_client.get("/api/djen/triagem")
+        resp = auth_client.get("/api/v1/djen/triagem")
         data = json.loads(resp.data)
         ids_triagem = [i["publicacao"]["id"] for i in data["items"]]
         assert pub_id not in ids_triagem
 
     def test_qualidade_retorna_metricas(self, auth_client, db, app):
-        """GET /api/djen/qualidade retorna métricas de qualidade do rollout."""
-        resp = auth_client.get("/api/djen/qualidade")
+        """GET /api/v1/djen/qualidade retorna mÃ©tricas de qualidade do rollout."""
+        resp = auth_client.get("/api/v1/djen/qualidade")
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert "total_publicacoes" in data
@@ -795,13 +795,13 @@ class TestDjenTriagemAcoesExtras:
         assert "decisoes_por_acao" in data
 
     def test_mesclar_sem_autenticacao(self, client, db):
-        resp = client.post("/api/djen/triagem/1/mesclar", json={"caso_id": 1})
+        resp = client.post("/api/v1/djen/triagem/1/mesclar", json={"caso_id": 1})
         assert resp.status_code == 401
 
     def test_ignorar_sem_autenticacao(self, client, db):
-        resp = client.post("/api/djen/triagem/1/ignorar", json={})
+        resp = client.post("/api/v1/djen/triagem/1/ignorar", json={})
         assert resp.status_code == 401
 
     def test_qualidade_sem_autenticacao(self, client, db):
-        resp = client.get("/api/djen/qualidade")
+        resp = client.get("/api/v1/djen/qualidade")
         assert resp.status_code == 401
