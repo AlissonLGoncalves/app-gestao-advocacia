@@ -1,7 +1,6 @@
-import logging
 from functools import wraps
 
-from flask import current_app, request
+from flask import current_app, request, g
 from flask_jwt_extended import get_jwt_identity
 from flask_restx import abort
 
@@ -26,6 +25,8 @@ def get_tenant_id():
         abort(401, "Acesso Inválido. Usuário não encontrado no banco.")
     if user.tenant_id is None:
         abort(403, "Acesso Negado (LGPD): Usuário sem tenant atribuído.")
+    g.user_id = user.id
+    g.tenant_id = user.tenant_id
     return user.tenant_id
 
 
@@ -59,44 +60,30 @@ def get_item_or_404(model, item_id):
         alvo = db.session.get(model, item_id)
         tenant_alvo = getattr(alvo, "tenant_id", None) if alvo is not None else None
         if hasattr(model, "tenant_id"):
-            msg = "Cross-tenant access blocked | user_id=%s tenant_id_atual=%s tenant_id_alvo=%s endpoint=%s item_id=%s model=%s"
             current_app.logger.warning(
-                msg,
-                user_id,
-                tenant_id,
-                tenant_alvo,
-                request.path,
-                item_id,
-                model.__name__,
-            )
-            logging.getLogger(__name__).warning(
-                msg,
-                user_id,
-                tenant_id,
-                tenant_alvo,
-                request.path,
-                item_id,
-                model.__name__,
+                "cross_tenant_access_blocked",
+                extra={
+                    "event": "cross_tenant_access_blocked",
+                    "user_id": user_id,
+                    "current_tenant": tenant_id,
+                    "target_tenant": tenant_alvo,
+                    "endpoint": request.path,
+                    "item_id": item_id,
+                    "model": model.__name__,
+                },
             )
         elif alvo is not None and hasattr(alvo, "user_id") and int(getattr(alvo, "user_id", -1)) != int(user_id):
-            msg = "Cross-user access blocked | user_id=%s tenant_id_atual=%s tenant_id_alvo=%s endpoint=%s item_id=%s model=%s"
             current_app.logger.warning(
-                msg,
-                user_id,
-                tenant_id,
-                tenant_alvo,
-                request.path,
-                item_id,
-                model.__name__,
-            )
-            logging.getLogger(__name__).warning(
-                msg,
-                user_id,
-                tenant_id,
-                tenant_alvo,
-                request.path,
-                item_id,
-                model.__name__,
+                "cross_user_access_blocked",
+                extra={
+                    "event": "cross_user_access_blocked",
+                    "user_id": user_id,
+                    "current_tenant": tenant_id,
+                    "target_tenant": tenant_alvo,
+                    "endpoint": request.path,
+                    "item_id": item_id,
+                    "model": model.__name__,
+                },
             )
     except Exception:
         pass
