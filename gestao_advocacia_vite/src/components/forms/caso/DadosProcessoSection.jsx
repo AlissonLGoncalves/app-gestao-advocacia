@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'
 
 function DadosProcessoSection({
   formData,
@@ -12,7 +12,9 @@ function DadosProcessoSection({
   return (
     <>
       <div className="mb-3">
-        <label htmlFor="numero_processo_caso" className="form-label form-label-sm">Número do Processo (CNJ)</label>
+        <label htmlFor="numero_processo_caso" className="form-label form-label-sm">
+          Número do Processo (CNJ)
+        </label>
         <input
           type="text"
           name="numero_processo"
@@ -25,13 +27,25 @@ function DadosProcessoSection({
         />
         {cnjInfo && (
           <div className="alert alert-info py-1 px-2 mt-1 mb-0 small d-flex gap-3 flex-wrap align-items-center">
-            <span><strong>Tribunal:</strong> {cnjInfo.tribunalNome}</span>
-            <span><strong>Âmbito:</strong> {cnjInfo.areaSugerida}</span>
-            <span><strong>Ano:</strong> {cnjInfo.ano}</span>
-            <span><strong>Instância sugerida:</strong> {cnjInfo.instanciaSugerida}</span>
+            <span>
+              <strong>Tribunal:</strong> {cnjInfo.tribunalNome}
+            </span>
+            <span>
+              <strong>Âmbito:</strong> {cnjInfo.areaSugerida}
+            </span>
+            <span>
+              <strong>Ano:</strong> {cnjInfo.ano}
+            </span>
+            <span>
+              <strong>Instância sugerida:</strong> {cnjInfo.instanciaSugerida}
+            </span>
             {isSyncingCNJ && (
               <span className="text-primary fw-semibold ms-auto" style={{ fontSize: '0.8rem' }}>
-                <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" />
+                <span
+                  className="spinner-border spinner-border-sm me-1"
+                  role="status"
+                  aria-hidden="true"
+                />
                 Apurando DataJud/TJPR...
               </span>
             )}
@@ -40,7 +54,9 @@ function DadosProcessoSection({
       </div>
 
       <div className="mb-3">
-        <label htmlFor="titulo_caso" className="form-label form-label-sm">Título do Caso *</label>
+        <label htmlFor="titulo_caso" className="form-label form-label-sm">
+          Título do Caso *
+        </label>
         <input
           type="text"
           name="titulo"
@@ -49,12 +65,16 @@ function DadosProcessoSection({
           value={formData.titulo}
           onChange={onChange}
         />
-        {validationErrors.titulo && <div className="invalid-feedback d-block">{validationErrors.titulo}</div>}
+        {validationErrors.titulo && (
+          <div className="invalid-feedback d-block">{validationErrors.titulo}</div>
+        )}
       </div>
 
       <div className="row">
         <div className="col-md-6 mb-3">
-          <label htmlFor="cliente_id_caso" className="form-label form-label-sm">Cliente Associado *</label>
+          <label htmlFor="cliente_id_caso" className="form-label form-label-sm">
+            Cliente Associado *
+          </label>
           <select
             name="cliente_id"
             id="cliente_id_caso"
@@ -64,13 +84,19 @@ function DadosProcessoSection({
           >
             <option value="">Selecione um cliente...</option>
             {clientes.map((c) => (
-              <option key={c.id} value={c.id}>{c.nome_razao_social}</option>
+              <option key={c.id} value={c.id}>
+                {c.nome_razao_social}
+              </option>
             ))}
           </select>
-          {validationErrors.cliente_id && <div className="invalid-feedback d-block">{validationErrors.cliente_id}</div>}
+          {validationErrors.cliente_id && (
+            <div className="invalid-feedback d-block">{validationErrors.cliente_id}</div>
+          )}
         </div>
         <div className="col-md-6 mb-3">
-          <label htmlFor="status_caso" className="form-label form-label-sm">Status *</label>
+          <label htmlFor="status_caso" className="form-label form-label-sm">
+            Status *
+          </label>
           <select
             name="status"
             id="status_caso"
@@ -88,12 +114,29 @@ function DadosProcessoSection({
 
       <div className="row">
         <div className="col-md-6 mb-3">
-          <label htmlFor="tipo_acao_caso" className="form-label form-label-sm">Tipo de Ação</label>
-          <input type="text" name="tipo_acao" id="tipo_acao_caso" className="form-control form-control-sm" value={formData.tipo_acao || ''} onChange={onChange} />
+          <label htmlFor="tipo_acao_caso" className="form-label form-label-sm">
+            Tipo de Ação
+          </label>
+          <input
+            type="text"
+            name="tipo_acao"
+            id="tipo_acao_caso"
+            className="form-control form-control-sm"
+            value={formData.tipo_acao || ''}
+            onChange={onChange}
+          />
         </div>
         <div className="col-md-6 mb-3">
-          <label htmlFor="area_direito_caso" className="form-label form-label-sm">Área do Direito</label>
-          <select name="area_direito" id="area_direito_caso" className="form-select form-select-sm" value={formData.area_direito || ''} onChange={onChange}>
+          <label htmlFor="area_direito_caso" className="form-label form-label-sm">
+            Área do Direito
+          </label>
+          <select
+            name="area_direito"
+            id="area_direito_caso"
+            className="form-select form-select-sm"
+            value={formData.area_direito || ''}
+            onChange={onChange}
+          >
             <option value="">Selecione...</option>
             <option>Cível</option>
             <option>Trabalhista</option>
@@ -115,7 +158,9 @@ function DadosProcessoSection({
       </div>
 
       <div className="mb-3">
-          <label htmlFor="valor_causa_caso" className="form-label form-label-sm">Valor da Causa (R$)</label>
+        <label htmlFor="valor_causa_caso" className="form-label form-label-sm">
+          Valor da Causa (R$)
+        </label>
         <input
           type="number"
           name="valor_causa"
@@ -126,15 +171,26 @@ function DadosProcessoSection({
           step="0.01"
           placeholder="Ex: 1500.50"
         />
-        {validationErrors.valor_causa && <div className="invalid-feedback d-block">{validationErrors.valor_causa}</div>}
+        {validationErrors.valor_causa && (
+          <div className="invalid-feedback d-block">{validationErrors.valor_causa}</div>
+        )}
       </div>
 
       <div className="mb-3">
-        <label htmlFor="notas_caso_form" className="form-label form-label-sm">Notas sobre o Caso</label>
-        <textarea name="notas_caso" id="notas_caso_form" className="form-control form-control-sm" value={formData.notas_caso || ''} onChange={onChange} rows="3" />
+        <label htmlFor="notas_caso_form" className="form-label form-label-sm">
+          Notas sobre o Caso
+        </label>
+        <textarea
+          name="notas_caso"
+          id="notas_caso_form"
+          className="form-control form-control-sm"
+          value={formData.notas_caso || ''}
+          onChange={onChange}
+          rows="3"
+        />
       </div>
     </>
-  );
+  )
 }
 
-export default DadosProcessoSection;
+export default DadosProcessoSection
