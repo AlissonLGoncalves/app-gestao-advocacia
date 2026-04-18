@@ -4,10 +4,22 @@ function normalizeBaseUrl(url) {
   return String(url || '').replace(/\/+$/, '')
 }
 
+// Garante que a URL base da API termine em /api/vN. Se veio so /api (sem versao),
+// adiciona /v1. Isso evita quebrar quando VITE_API_URL foi configurada no Vercel
+// antes do versionamento (N3) e nao foi atualizada — o backend redireciona
+// /api/* para /api/v1/* com 308, mas browsers recusam seguir 308 em POST.
+function ensureApiVersion(url) {
+  const base = normalizeBaseUrl(url)
+  if (!base) return base
+  if (/\/api\/v\d+$/.test(base)) return base
+  if (/\/api$/.test(base)) return `${base}/v1`
+  return base
+}
+
 function resolveApiUrl() {
   const envUrl = import.meta.env.VITE_API_URL
   if (envUrl) {
-    return normalizeBaseUrl(envUrl)
+    return ensureApiVersion(envUrl)
   }
 
   const host = typeof window !== 'undefined' ? window.location.hostname : ''
