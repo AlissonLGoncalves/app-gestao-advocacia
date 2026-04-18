@@ -20,7 +20,7 @@ describe('CasoForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.setItem('token', 'token-teste');
-    global.fetch = vi.fn((url, options) => {
+    globalThis.fetch = vi.fn((url, options) => {
       if (String(url).includes('/clientes/?sort_by=')) {
         return Promise.resolve({ ok: true, json: async () => [{ id: 1, nome_razao_social: 'Cliente A' }] });
       }
@@ -50,7 +50,7 @@ describe('CasoForm', () => {
       expect(toastMock.error).toHaveBeenCalled();
     });
 
-    const callsCasos = global.fetch.mock.calls.filter(([url]) => String(url).includes('/casos'));
+    const callsCasos = globalThis.fetch.mock.calls.filter(([url]) => String(url).includes('/casos'));
     expect(callsCasos.length).toBe(0);
   });
 
@@ -69,7 +69,7 @@ describe('CasoForm', () => {
   });
 
   it('exibe erro quando API retorna 4xx/5xx', async () => {
-    global.fetch = vi.fn((url, options) => {
+    globalThis.fetch = vi.fn((url, options) => {
       if (String(url).includes('/clientes/?sort_by=')) {
         return Promise.resolve({ ok: true, json: async () => [{ id: 1, nome_razao_social: 'Cliente A' }] });
       }

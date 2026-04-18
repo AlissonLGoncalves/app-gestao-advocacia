@@ -20,7 +20,7 @@ describe('HonorariosCasoCard (ContratoForm equivalente)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.setItem('token', 'token-teste');
-    global.fetch = vi.fn((url, options) => {
+    globalThis.fetch = vi.fn((url, options) => {
       if (String(url).includes('/contratos/') && !options?.method) {
         return Promise.resolve({ ok: true, json: async () => [] });
       }
@@ -52,7 +52,7 @@ describe('HonorariosCasoCard (ContratoForm equivalente)', () => {
   });
 
   it('submit com erro 4xx/5xx exibe toast de erro', async () => {
-    global.fetch = vi.fn((url, options) => {
+    globalThis.fetch = vi.fn((url, options) => {
       if (String(url).includes('/contratos/') && !options?.method) {
         return Promise.resolve({ ok: true, json: async () => [] });
       }
@@ -74,7 +74,7 @@ describe('HonorariosCasoCard (ContratoForm equivalente)', () => {
   });
 
   it('valida gerar parcelas sem campos obrigatorios', async () => {
-    global.fetch = vi.fn((url, options) => {
+    globalThis.fetch = vi.fn((url, options) => {
       if (String(url).includes('/contratos/') && !options?.method) {
         return Promise.resolve({ ok: true, json: async () => [{ id: 7, caso_id: 1, tipo_honorario: 'Fixo', valor_total: '1000' }] });
       }

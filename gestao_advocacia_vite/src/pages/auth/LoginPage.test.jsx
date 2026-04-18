@@ -30,7 +30,7 @@ describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    global.fetch = vi.fn();
+    globalThis.fetch = vi.fn();
   });
 
   it('renderiza campos e botao de login', () => {
@@ -58,11 +58,11 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(toastMock.error).toHaveBeenCalled();
     });
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it('faz submit com sucesso e redireciona', async () => {
-    global.fetch.mockResolvedValueOnce({
+    globalThis.fetch.mockResolvedValueOnce({
       ok: true,
       text: async () => JSON.stringify({ access_token: 'token-123', user: { id: 1 } }),
     });
@@ -78,7 +78,7 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /entrar/i }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
       expect(toastMock.success).toHaveBeenCalled();
       expect(navigateMock).toHaveBeenCalledWith('/dashboard');
     });
@@ -87,7 +87,7 @@ describe('LoginPage', () => {
   });
 
   it('exibe erro em resposta 4xx/5xx', async () => {
-    global.fetch.mockResolvedValueOnce({
+    globalThis.fetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
       text: async () => JSON.stringify({ message: 'Credenciais invalidas' }),

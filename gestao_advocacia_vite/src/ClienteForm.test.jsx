@@ -23,7 +23,7 @@ vi.mock('./components/DocumentosClienteTab.jsx', () => ({
 describe('ClienteForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn((url) => {
+    globalThis.fetch = vi.fn((url) => {
       if (String(url).includes('/clientes/?sort_by=')) {
         return Promise.resolve({ ok: true, json: async () => [] });
       }
@@ -51,7 +51,7 @@ describe('ClienteForm', () => {
       expect(toastMock.error).toHaveBeenCalled();
     });
 
-    const calls = global.fetch.mock.calls.filter(([url]) => !String(url).includes('/clientes/?sort_by='));
+    const calls = globalThis.fetch.mock.calls.filter(([url]) => !String(url).includes('/clientes/?sort_by='));
     expect(calls.length).toBe(0);
   });
 
@@ -70,7 +70,7 @@ describe('ClienteForm', () => {
   });
 
   it('exibe erro quando API retorna falha', async () => {
-    global.fetch = vi.fn((url) => {
+    globalThis.fetch = vi.fn((url) => {
       if (String(url).includes('/clientes/?sort_by=')) {
         return Promise.resolve({ ok: true, json: async () => [] });
       }
