@@ -1,32 +1,32 @@
-# Arquivo: tests/conftest.py
-# Configurações e fixtures para os testes pytest.
-# Este arquivo é executado automaticamente pelo pytest.
+﻿# Arquivo: tests/conftest.py
+# ConfiguraÃ§Ãµes e fixtures para os testes pytest.
+# Este arquivo Ã© executado automaticamente pelo pytest.
 
 import os
 import sys
 
 import pytest
 
-# Adiciona o diretório pai (raiz do projeto backend, onde 'app.py' está) ao sys.path
-# para que o módulo 'app' possa ser encontrado pelos testes.
+# Adiciona o diretÃ³rio pai (raiz do projeto backend, onde 'app.py' estÃ¡) ao sys.path
+# para que o mÃ³dulo 'app' possa ser encontrado pelos testes.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app import (  # Importa a factory e o objeto db
     create_app,
 )
 from app import db as _db
-from config_test import ConfigTest  # Importa a configuração de teste
+from config_test import ConfigTest  # Importa a configuraÃ§Ã£o de teste
 
 
 @pytest.fixture(scope="session")
 def app(request):
     """
-    Fixture de sessão para criar uma instância da aplicação Flask configurada para testes.
-    O banco de dados de teste é criado uma vez por sessão de teste e limpo no final.
+    Fixture de sessÃ£o para criar uma instÃ¢ncia da aplicaÃ§Ã£o Flask configurada para testes.
+    O banco de dados de teste Ã© criado uma vez por sessÃ£o de teste e limpo no final.
     """
     flask_app = create_app(ConfigTest)
 
-    # Cria a pasta de uploads de teste se não existir
+    # Cria a pasta de uploads de teste se nÃ£o existir
     upload_folder = flask_app.config["UPLOAD_FOLDER"]
     if not os.path.exists(upload_folder):
         os.makedirs(upload_folder)
@@ -36,31 +36,31 @@ def app(request):
 
     _db.create_all()  # Cria todas as tabelas no banco de dados de teste
 
-    yield flask_app  # Fornece a instância da aplicação para os testes
+    yield flask_app  # Fornece a instÃ¢ncia da aplicaÃ§Ã£o para os testes
 
-    _db.session.remove()  # Garante que a sessão do DB seja fechada
+    _db.session.remove()  # Garante que a sessÃ£o do DB seja fechada
     _db.drop_all()  # Apaga todas as tabelas do banco de dados de teste
     ctx.pop()
 
     # Limpeza do arquivo do banco de dados SQLite de teste
-    # O caminho para o db_path é relativo à raiz do projeto, não à pasta 'tests'
+    # O caminho para o db_path Ã© relativo Ã  raiz do projeto, nÃ£o Ã  pasta 'tests'
     db_path_str = flask_app.config["SQLALCHEMY_DATABASE_URI"].replace("sqlite:///", "")
-    # Garante que o caminho é absoluto a partir da raiz do projeto se for relativo
+    # Garante que o caminho Ã© absoluto a partir da raiz do projeto se for relativo
     if not os.path.isabs(db_path_str):
         db_path_str = os.path.join(
             flask_app.root_path, "..", db_path_str
-        )  # Ajuste para subir um nível se config_test está na raiz
+        )  # Ajuste para subir um nÃ­vel se config_test estÃ¡ na raiz
 
-    # Se config_test.py está na raiz, e basedir em config_test.py é a raiz,
-    # então flask_app.root_path (que é a pasta 'gestao_advocacia') já é o diretório correto
+    # Se config_test.py estÃ¡ na raiz, e basedir em config_test.py Ã© a raiz,
+    # entÃ£o flask_app.root_path (que Ã© a pasta 'gestao_advocacia') jÃ¡ Ã© o diretÃ³rio correto
     # para construir o caminho para app_test.db se ele for definido como 'sqlite:///' + os.path.join(basedir, 'app_test.db')
-    # No nosso caso, basedir em config_test.py é a raiz do projeto, então o caminho já é relativo à raiz.
-    # Apenas precisamos garantir que não estamos a tentar aceder a partir da pasta 'tests'.
+    # No nosso caso, basedir em config_test.py Ã© a raiz do projeto, entÃ£o o caminho jÃ¡ Ã© relativo Ã  raiz.
+    # Apenas precisamos garantir que nÃ£o estamos a tentar aceder a partir da pasta 'tests'.
 
-    # Correção para o caminho do banco de dados de teste:
-    # basedir em config_test.py é a raiz do projeto.
-    # flask_app.root_path é a pasta onde app.py está (gestao_advocacia).
-    # Se app_test.db está na raiz (onde config_test.py está), precisamos de:
+    # CorreÃ§Ã£o para o caminho do banco de dados de teste:
+    # basedir em config_test.py Ã© a raiz do projeto.
+    # flask_app.root_path Ã© a pasta onde app.py estÃ¡ (gestao_advocacia).
+    # Se app_test.db estÃ¡ na raiz (onde config_test.py estÃ¡), precisamos de:
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     db_file_name = os.path.basename(flask_app.config["SQLALCHEMY_DATABASE_URI"])
     actual_db_path = os.path.join(project_root, db_file_name)
@@ -72,12 +72,12 @@ def app(request):
         except Exception as e:
             print(f"Erro ao remover arquivo de banco de dados de teste {actual_db_path}: {e}")
     else:
-        print(f"Arquivo de banco de dados de teste não encontrado para remoção: {actual_db_path}")
+        print(f"Arquivo de banco de dados de teste nÃ£o encontrado para remoÃ§Ã£o: {actual_db_path}")
 
     # Limpeza da pasta de uploads de teste
     actual_upload_folder = os.path.join(
         project_root, os.path.basename(upload_folder)
-    )  # Garante que é relativo à raiz
+    )  # Garante que Ã© relativo Ã  raiz
     if os.path.exists(actual_upload_folder):
         try:
             for item in os.listdir(actual_upload_folder):
@@ -89,17 +89,17 @@ def app(request):
                 print(f"Pasta de uploads de teste removida: {actual_upload_folder}")
             else:
                 print(
-                    f"Atenção: A pasta de uploads de teste {actual_upload_folder} não está vazia e não foi removida."
+                    f"AtenÃ§Ã£o: A pasta de uploads de teste {actual_upload_folder} nÃ£o estÃ¡ vazia e nÃ£o foi removida."
                 )
         except OSError as e:
             print(f"Erro ao tentar limpar a pasta de uploads de teste {actual_upload_folder}: {e}")
     else:
-        print(f"Pasta de uploads de teste não encontrada para remoção: {actual_upload_folder}")
+        print(f"Pasta de uploads de teste nÃ£o encontrada para remoÃ§Ã£o: {actual_upload_folder}")
 
 
 @pytest.fixture()
 def client(app):
-    """Um cliente de teste para a aplicação Flask."""
+    """Um cliente de teste para a aplicaÃ§Ã£o Flask."""
     return app.test_client()
 
 
@@ -119,17 +119,17 @@ def db(app):
 @pytest.fixture()
 def auth_client(client, db):
     """
-    Retorna um cliente de teste já autenticado (com token JWT).
-    Registra um usuário de teste e faz login, expondo:
-      - auth_client.http  : flask test client com cabeçalho Authorization setado
+    Retorna um cliente de teste jÃ¡ autenticado (com token JWT).
+    Registra um usuÃ¡rio de teste e faz login, expondo:
+      - auth_client.http  : flask test client com cabeÃ§alho Authorization setado
       - auth_client.token : o access_token JWT
-      - auth_client.user  : dict com dados do usuário criado
+      - auth_client.user  : dict com dados do usuÃ¡rio criado
     """
     import json
 
-    # Registra um usuário de teste
+    # Registra um usuÃ¡rio de teste
     reg_resp = client.post(
-        "/api/auth/register",
+        "/api/v1/auth/register",
         json={
             "username": "testuser",
             "email": "testuser@teste.com",
@@ -141,7 +141,7 @@ def auth_client(client, db):
 
     # Faz login para obter o token
     login_resp = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={
             "username_or_email": "testuser",
             "password": "Senha1234!",
@@ -184,3 +184,4 @@ def auth_client(client, db):
             return self._client.delete(url, **kwargs)
 
     yield _AuthClient(client, token, data.get("user", {}))
+

@@ -49,7 +49,7 @@ function SettingsPage() {
     setLoadingLogs(true)
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-      const response = await fetch(`${apiUrl}/api/auditoria/`, {
+      const response = await fetch(`${apiUrl}/api/v1/auditoria/`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       })
       if (response.ok) {
@@ -76,7 +76,7 @@ function SettingsPage() {
     setIsInviting(true)
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-      const response = await fetch(`${apiUrl}/api/auth/invite`, {
+      const response = await fetch(`${apiUrl}/api/v1/auth/invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

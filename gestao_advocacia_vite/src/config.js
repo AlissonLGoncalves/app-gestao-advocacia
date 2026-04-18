@@ -15,11 +15,11 @@ function resolveApiUrl() {
 
   // Fallback de desenvolvimento local.
   if (isLocalHost || !host) {
-    return 'http://127.0.0.1:5000/api'
+    return 'http://127.0.0.1:5000/api/v1'
   }
 
   // Fallback de produção quando VITE_API_URL não foi definida no deploy do frontend.
-  return 'https://app-gestao-advocacia.fly.dev/api'
+  return 'https://app-gestao-advocacia.fly.dev/api/v1'
 }
 
 export const API_URL = resolveApiUrl()

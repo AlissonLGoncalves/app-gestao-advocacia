@@ -1,8 +1,9 @@
 import os
 from functools import wraps
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
-from flask import Blueprint, Flask
+from flask import Blueprint, Flask, redirect, request
 from flask_cors import CORS
 from flask_jwt_extended import get_jwt
 from flask_restx import Api, abort
@@ -75,8 +76,8 @@ def create_app(config_class=Config):
     configure_request_context(app)
     configure_error_handlers(app)
 
-    api_bp = Blueprint("api", __name__, url_prefix="/api")
-    swagger_doc_path = "/api/docs" if os.environ.get("FLASK_ENV") != "production" else False
+    api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
+    swagger_doc_path = "/api/v1/docs" if os.environ.get("FLASK_ENV") != "production" else False
     api = Api(
         api_bp,
         version="1.0",
@@ -96,6 +97,25 @@ def create_app(config_class=Config):
 
     register_api_routes(app, api, finance_access_required)
     app.register_blueprint(api_bp)
+
+    # Mantem compatibilidade temporaria com clientes antigos em /api.
+    legacy_api_bp = Blueprint("legacy_api", __name__, url_prefix="/api")
+
+    @legacy_api_bp.route("/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+    def legacy_redirect(subpath):
+        target = f"/api/v1/{subpath}"
+        qs = request.query_string.decode("utf-8")
+        if qs:
+            target += f"?{qs}"
+
+        response = redirect(target, code=308)
+        response.headers["Deprecation"] = "true"
+        response.headers["Sunset"] = (
+            datetime.utcnow() + timedelta(days=30)
+        ).strftime("%a, %d %b %Y %H:%M:%S GMT")
+        return response
+
+    app.register_blueprint(legacy_api_bp)
 
     configure_scheduler(app)
     register_status_route(app)
