@@ -20,12 +20,11 @@ primary_region = "gru"
   processes = ["app"]
 
   # Health check para garantir que o app está respondendo
-  [http_service.checks.http]
+  [[http_service.checks]]
     grace_period = "30s"
     interval = "30s"
-    method = "get"
+    method = "GET"
     path = "/"
-    protocol = "http"
     timeout = "5s"
 
   [http_service.concurrency]
