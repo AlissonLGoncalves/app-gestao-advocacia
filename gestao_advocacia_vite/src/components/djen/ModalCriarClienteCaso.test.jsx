@@ -40,7 +40,9 @@ const buildPublicacao = () => ({
 
 describe('ModalCriarClienteCaso', () => {
   it('renderiza com campos pre-preenchidos da analise', () => {
-    render(<ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />)
+    render(
+      <ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />
+    )
 
     expect(screen.getByLabelText(/Número do processo/i)).toHaveValue('0000472-75.2025.8.16.0075')
     expect(screen.getByLabelText(/Tipo da ação/i)).toHaveValue('Procedimento Comum Civel')
@@ -50,13 +52,17 @@ describe('ModalCriarClienteCaso', () => {
   })
 
   it('exibe badges de extraido automaticamente nos campos pre-preenchidos', () => {
-    render(<ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />)
+    render(
+      <ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />
+    )
 
     expect(screen.getAllByText('extraido automaticamente').length).toBeGreaterThan(3)
   })
 
   it('trocar radio Autor/Reu inverte a parte contraria sugerida', () => {
-    render(<ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />)
+    render(
+      <ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />
+    )
 
     const campoParteContraria = screen.getByLabelText(/Parte contrária/i)
     expect(campoParteContraria).toHaveValue('Banco do Brasil S/A')
@@ -66,7 +72,9 @@ describe('ModalCriarClienteCaso', () => {
   })
 
   it('selecionar cliente existente esconde form de novo cliente', () => {
-    render(<ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />)
+    render(
+      <ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />
+    )
 
     expect(screen.queryByTestId('novo-cliente-form')).not.toBeInTheDocument()
 
@@ -78,7 +86,9 @@ describe('ModalCriarClienteCaso', () => {
   })
 
   it('mostra banner de caso existente quando ha match por numero de processo', () => {
-    render(<ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />)
+    render(
+      <ModalCriarClienteCaso publicacao={buildPublicacao()} onClose={vi.fn()} onSuccess={vi.fn()} />
+    )
 
     expect(screen.getByText(/Já existe caso com este número/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Vincular a este caso' })).toBeInTheDocument()

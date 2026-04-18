@@ -48,7 +48,9 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
   }, [analise.partes_autoras, analise.partes_reus, papelCliente])
 
   const [formCaso, setFormCaso] = useState({
-    titulo: analise.numero_processo ? `Processo ${analise.numero_processo}` : `Caso DJEN #${pub.id || ''}`,
+    titulo: analise.numero_processo
+      ? `Processo ${analise.numero_processo}`
+      : `Caso DJEN #${pub.id || ''}`,
     numero_processo: analise.numero_processo || pub.numero_processo || '',
     tipo_acao: analise.classe_processual || '',
     vara_juizo: pub.nome_orgao || analise.vara || '',
@@ -201,7 +203,8 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
             {casoSugestaoPorNumero && (
               <div className="alert alert-warning d-flex justify-content-between align-items-center">
                 <span>
-                  Já existe caso com este número: <strong>{casoSugestaoPorNumero.numero_processo}</strong>
+                  Já existe caso com este número:{' '}
+                  <strong>{casoSugestaoPorNumero.numero_processo}</strong>
                 </span>
                 <button
                   className="btn btn-sm btn-outline-primary"
@@ -439,7 +442,12 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
             <button type="button" className="btn btn-outline-secondary" onClick={onClose}>
               Cancelar
             </button>
-            <button type="button" className="btn btn-primary" onClick={onConfirmar} disabled={carregando}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onConfirmar}
+              disabled={carregando}
+            >
               {carregando ? 'Processando...' : 'Confirmar'}
             </button>
           </div>
