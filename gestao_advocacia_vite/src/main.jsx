@@ -1,19 +1,21 @@
 ﻿// src/main.jsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import App from './App.jsx'; // Importa o componente App principal
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import App from './App.jsx' // Importa o componente App principal
 
 // Importações de CSS globais
-import 'bootstrap/dist/css/bootstrap.min.css'; // CSS do Bootstrap
-import './index.css'; // Seus estilos globais personalizados
+import 'bootstrap/dist/css/bootstrap.min.css' // CSS do Bootstrap
+import './index.css' // Seus estilos globais personalizados
 
 // Log para indicar que o main.jsx foi carregado
 // Verifica se o elemento root existe no DOM
-const rootElement = document.getElementById('root');
+const rootElement = document.getElementById('root')
 
 if (!rootElement) {
-  console.error("Erro Crítico: Elemento com id 'root' não encontrado no DOM. Verifique o seu arquivo public/index.html ou index.html na raiz do projeto.");
+  console.error(
+    "Erro Crítico: Elemento com id 'root' não encontrado no DOM. Verifique o seu arquivo public/index.html ou index.html na raiz do projeto."
+  )
 } else {
   // Cria a raiz do React e renderiza a aplicação
   ReactDOM.createRoot(rootElement).render(
@@ -22,7 +24,7 @@ if (!rootElement) {
         <App />
       </BrowserRouter>
     </React.StrictMode>
-  );
+  )
 }
 
 // Opcional: Se você usa reportWebVitals e o arquivo existe

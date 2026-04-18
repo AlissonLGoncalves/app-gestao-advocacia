@@ -1,6 +1,6 @@
 from functools import wraps
 
-from flask import current_app, request, g
+from flask import current_app, g, request
 from flask_jwt_extended import get_jwt_identity
 from flask_restx import abort
 
@@ -72,7 +72,11 @@ def get_item_or_404(model, item_id):
                     "model": model.__name__,
                 },
             )
-        elif alvo is not None and hasattr(alvo, "user_id") and int(getattr(alvo, "user_id", -1)) != int(user_id):
+        elif (
+            alvo is not None
+            and hasattr(alvo, "user_id")
+            and int(getattr(alvo, "user_id", -1)) != int(user_id)
+        ):
             current_app.logger.warning(
                 "cross_user_access_blocked",
                 extra={

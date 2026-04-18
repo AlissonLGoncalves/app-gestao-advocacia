@@ -317,7 +317,9 @@ def tenants_setup(client, app, db):
         ("/api/djen/oabs", None, "oab", "90001", "90002"),
     ],
 )
-def test_listagens_nunca_vazam_outro_tenant(client, tenants_setup, list_path, key, id_key, own_name, other_name):
+def test_listagens_nunca_vazam_outro_tenant(
+    client, tenants_setup, list_path, key, id_key, own_name, other_name
+):
     token_a = tenants_setup["token_a"]
     resp = client.get(list_path, headers=_headers(token_a))
     assert resp.status_code == 200
@@ -341,16 +343,108 @@ def test_listagens_nunca_vazam_outro_tenant(client, tenants_setup, list_path, ke
 @pytest.mark.parametrize(
     "resource,id_key,get_path,update_path,update_method,delete_path,update_payload",
     [
-        ("cliente", "cliente", "/api/clientes/{id}", "/api/clientes/{id}", "put", "/api/clientes/{id}", {"nome_razao_social": "Atualizado A", "cpf_cnpj": "11122233399", "tipo_pessoa": "PF"}),
-        ("caso", "caso", "/api/casos/{id}", "/api/casos/{id}", "put", "/api/casos/{id}", {"titulo": "Caso atualizado", "status": "Ativo", "tipo_acao": "Cível"}),
-        ("evento", "evento", "/api/eventos/{id}", "/api/eventos/{id}", "put", "/api/eventos/{id}", {"titulo": "Evento atualizado", "tipo_evento": "Reunião", "data_inicio": (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()}),
-        ("documento", "documento", "/api/documentos/download/{id}", None, None, "/api/documentos/{id}", None),
-        ("despesa", "despesa", "/api/despesas/{id}", "/api/despesas/{id}", "put", "/api/despesas/{id}", {"descricao": "Despesa atualizada", "valor": 101.0, "data_despesa": date.today().isoformat(), "pago": True}),
-        ("recebimento", "recebimento", "/api/recebimentos/{id}", "/api/recebimentos/{id}", "put", "/api/recebimentos/{id}", {"descricao": "Recebimento atualizado", "valor": 300.0, "data_recebimento": date.today().isoformat(), "recebido": True}),
-        ("contrato", "contrato", "/api/contratos/{id}", "/api/contratos/{id}", "put", "/api/contratos/{id}", {"tipo_honorario": "Fixo", "valor_total": 2000, "status": "Ativo", "caso_id": 1, "cliente_id": 1}),
-        ("tarefa", "tarefa", "/api/tarefas/{id}", "/api/tarefas/{id}", "put", "/api/tarefas/{id}", {"titulo": "Tarefa atualizada"}),
+        (
+            "cliente",
+            "cliente",
+            "/api/clientes/{id}",
+            "/api/clientes/{id}",
+            "put",
+            "/api/clientes/{id}",
+            {"nome_razao_social": "Atualizado A", "cpf_cnpj": "11122233399", "tipo_pessoa": "PF"},
+        ),
+        (
+            "caso",
+            "caso",
+            "/api/casos/{id}",
+            "/api/casos/{id}",
+            "put",
+            "/api/casos/{id}",
+            {"titulo": "Caso atualizado", "status": "Ativo", "tipo_acao": "Cível"},
+        ),
+        (
+            "evento",
+            "evento",
+            "/api/eventos/{id}",
+            "/api/eventos/{id}",
+            "put",
+            "/api/eventos/{id}",
+            {
+                "titulo": "Evento atualizado",
+                "tipo_evento": "Reunião",
+                "data_inicio": (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(),
+            },
+        ),
+        (
+            "documento",
+            "documento",
+            "/api/documentos/download/{id}",
+            None,
+            None,
+            "/api/documentos/{id}",
+            None,
+        ),
+        (
+            "despesa",
+            "despesa",
+            "/api/despesas/{id}",
+            "/api/despesas/{id}",
+            "put",
+            "/api/despesas/{id}",
+            {
+                "descricao": "Despesa atualizada",
+                "valor": 101.0,
+                "data_despesa": date.today().isoformat(),
+                "pago": True,
+            },
+        ),
+        (
+            "recebimento",
+            "recebimento",
+            "/api/recebimentos/{id}",
+            "/api/recebimentos/{id}",
+            "put",
+            "/api/recebimentos/{id}",
+            {
+                "descricao": "Recebimento atualizado",
+                "valor": 300.0,
+                "data_recebimento": date.today().isoformat(),
+                "recebido": True,
+            },
+        ),
+        (
+            "contrato",
+            "contrato",
+            "/api/contratos/{id}",
+            "/api/contratos/{id}",
+            "put",
+            "/api/contratos/{id}",
+            {
+                "tipo_honorario": "Fixo",
+                "valor_total": 2000,
+                "status": "Ativo",
+                "caso_id": 1,
+                "cliente_id": 1,
+            },
+        ),
+        (
+            "tarefa",
+            "tarefa",
+            "/api/tarefas/{id}",
+            "/api/tarefas/{id}",
+            "put",
+            "/api/tarefas/{id}",
+            {"titulo": "Tarefa atualizada"},
+        ),
         ("oab", "oab", None, None, None, "/api/djen/oabs/{id}", None),
-        ("pub", "pub", "/api/djen/publicacoes/{id}", "/api/djen/publicacoes/{id}", "patch", None, {"lida": True}),
+        (
+            "pub",
+            "pub",
+            "/api/djen/publicacoes/{id}",
+            "/api/djen/publicacoes/{id}",
+            "patch",
+            None,
+            {"lida": True},
+        ),
     ],
 )
 def test_cross_tenant_get_put_delete_retorna_404(
@@ -432,7 +526,9 @@ def test_log_warning_quando_cross_tenant_bloqueado(app, caplog):
                         with pytest.raises(NotFound):
                             get_item_or_404(FakeModel, 99)
 
-    record = next((r for r in caplog.records if r.getMessage() == "cross_tenant_access_blocked"), None)
+    record = next(
+        (r for r in caplog.records if r.getMessage() == "cross_tenant_access_blocked"), None
+    )
     assert record is not None
     assert getattr(record, "event", None) == "cross_tenant_access_blocked"
     assert getattr(record, "user_id", None) == 123

@@ -1,27 +1,29 @@
 ﻿// src/pages/RelatoriosPage.jsx
-import React, { useState } from 'react';
+import React, { useState } from 'react'
 // Ajuste estes caminhos se ContasAReceberReport.jsx e ContasAPagarReport.jsx estiverem em outro local
 // Por exemplo, se estiverem em src/components/reports/
-import ContasAReceberReport from '../ContasAReceberReport.jsx';
-import ContasAPagarReport from '../ContasAPagarReport.jsx';
+import ContasAReceberReport from '../ContasAReceberReport.jsx'
+import ContasAPagarReport from '../ContasAPagarReport.jsx'
 const TIPOS_RELATORIO = {
   NENHUM: 'NENHUM',
   CONTAS_A_RECEBER: 'CONTAS_A_RECEBER',
   CONTAS_A_PAGAR: 'CONTAS_A_PAGAR',
-};
+}
 
 function RelatoriosPage() {
-  const [relatorioAtivo, setRelatorioAtivo] = useState(TIPOS_RELATORIO.NENHUM);
+  const [relatorioAtivo, setRelatorioAtivo] = useState(TIPOS_RELATORIO.NENHUM)
   const renderRelatorioSelecionado = () => {
     switch (relatorioAtivo) {
       case TIPOS_RELATORIO.CONTAS_A_RECEBER:
-        return <ContasAReceberReport />;
+        return <ContasAReceberReport />
       case TIPOS_RELATORIO.CONTAS_A_PAGAR:
-        return <ContasAPagarReport />;
+        return <ContasAPagarReport />
       default:
-        return <p className="text-center text-muted">Selecione um tipo de relatório para visualizar.</p>;
+        return (
+          <p className="text-center text-muted">Selecione um tipo de relatório para visualizar.</p>
+        )
     }
-  };
+  }
 
   return (
     <div className="container-fluid mt-3">
@@ -31,13 +33,15 @@ function RelatoriosPage() {
         </div>
         <div className="card-body">
           <div className="mb-4">
-            <label htmlFor="selectRelatorio" className="form-label form-label-sm">Selecione o Relatório:</label>
+            <label htmlFor="selectRelatorio" className="form-label form-label-sm">
+              Selecione o Relatório:
+            </label>
             <select
               id="selectRelatorio"
               className="form-select form-select-sm"
               value={relatorioAtivo}
               onChange={(e) => {
-                setRelatorioAtivo(e.target.value);
+                setRelatorioAtivo(e.target.value)
               }}
             >
               <option value={TIPOS_RELATORIO.NENHUM}>-- Escolha um Relatório --</option>
@@ -46,13 +50,11 @@ function RelatoriosPage() {
             </select>
           </div>
           <hr />
-          <div className="mt-4">
-            {renderRelatorioSelecionado()}
-          </div>
+          <div className="mt-4">{renderRelatorioSelecionado()}</div>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-export default RelatoriosPage;
+export default RelatoriosPage

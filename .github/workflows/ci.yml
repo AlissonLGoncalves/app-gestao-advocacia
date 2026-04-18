@@ -10,6 +10,34 @@ on:
       - main
 
 jobs:
+  backend-style:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gestao_advocacia
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: gestao_advocacia/requirements-dev.txt
+
+      - name: Install backend style tools
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff auto-fix
+        run: ruff check . --fix
+
+      - name: Black format
+        run: black .
+
+      - name: Fail if style generated diff
+        run: git diff --exit-code
+
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -67,6 +95,9 @@ jobs:
 
       - name: Run frontend lint
         run: npm run lint
+
+      - name: Run prettier check
+        run: npm run prettier:check
 
       - name: Build frontend
         run: npm run build

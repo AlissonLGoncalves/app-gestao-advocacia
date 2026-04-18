@@ -1,25 +1,25 @@
 ﻿// src/config.js
 
 function normalizeBaseUrl(url) {
-	return String(url || '').replace(/\/+$/, '');
+  return String(url || '').replace(/\/+$/, '')
 }
 
 function resolveApiUrl() {
-	const envUrl = import.meta.env.VITE_API_URL;
-	if (envUrl) {
-		return normalizeBaseUrl(envUrl);
-	}
+  const envUrl = import.meta.env.VITE_API_URL
+  if (envUrl) {
+    return normalizeBaseUrl(envUrl)
+  }
 
-	const host = typeof window !== 'undefined' ? window.location.hostname : '';
-	const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+  const host = typeof window !== 'undefined' ? window.location.hostname : ''
+  const isLocalHost = host === 'localhost' || host === '127.0.0.1'
 
-	// Fallback de desenvolvimento local.
-	if (isLocalHost || !host) {
-		return 'http://127.0.0.1:5000/api';
-	}
+  // Fallback de desenvolvimento local.
+  if (isLocalHost || !host) {
+    return 'http://127.0.0.1:5000/api'
+  }
 
-	// Fallback de produção quando VITE_API_URL não foi definida no deploy do frontend.
-	return 'https://app-gestao-advocacia.fly.dev/api';
+  // Fallback de produção quando VITE_API_URL não foi definida no deploy do frontend.
+  return 'https://app-gestao-advocacia.fly.dev/api'
 }
 
-export const API_URL = resolveApiUrl();
+export const API_URL = resolveApiUrl()

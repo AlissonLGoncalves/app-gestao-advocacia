@@ -59,7 +59,9 @@ def configure_json_logging(app):
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
 
-    has_json_handler = any(getattr(handler, "_patronus_json", False) for handler in root_logger.handlers)
+    has_json_handler = any(
+        getattr(handler, "_patronus_json", False) for handler in root_logger.handlers
+    )
     if not has_json_handler:
         stream_handler = logging.StreamHandler()
         stream_handler.setLevel(level)

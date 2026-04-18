@@ -1,6 +1,6 @@
 import argparse
 
-from app import create_app, db, PublicacaoDJEN
+from app import PublicacaoDJEN, create_app, db
 from djen_tasks import _item_get, _parse_data_disponibilizacao
 
 
@@ -18,8 +18,15 @@ def main():
         description="Reprocessa publicações DJEN antigas para preencher data_disponibilizacao ausente."
     )
     parser.add_argument("--tenant-id", type=int, default=None, help="Filtra por tenant específico")
-    parser.add_argument("--limit", type=int, default=0, help="Limita quantidade de registros processados (0 = sem limite)")
-    parser.add_argument("--dry-run", action="store_true", help="Somente simula, sem gravar no banco")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="Limita quantidade de registros processados (0 = sem limite)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Somente simula, sem gravar no banco"
+    )
     args = parser.parse_args()
 
     app = create_app()

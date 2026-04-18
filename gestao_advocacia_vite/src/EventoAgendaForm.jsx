@@ -1,217 +1,232 @@
 // src/EventoAgendaForm.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js'; 
-import { toast } from 'react-toastify';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react'
+import { API_URL } from './config.js'
+import { toast } from 'react-toastify'
+import { useLocation } from 'react-router-dom'
 
 const formatDateTimeForInput = (dateTimeString) => {
-  if (!dateTimeString) return '';
+  if (!dateTimeString) return ''
   try {
-    const date = new Date(dateTimeString);
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    
-    if (!dateTimeString.includes('T')) {
-        return `${year}-${month}-${day}T00:00`;
-    }
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    const date = new Date(dateTimeString)
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    const hours = date.getHours().toString().padStart(2, '0')
+    const minutes = date.getMinutes().toString().padStart(2, '0')
 
-  } catch (error) {
-    console.error("Erro ao formatar data e hora para input:", dateTimeString, error);
-    if (typeof dateTimeString === 'string' && dateTimeString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        return `${dateTimeString}T00:00`;
+    if (!dateTimeString.includes('T')) {
+      return `${year}-${month}-${day}T00:00`
     }
-    return '';
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  } catch (error) {
+    console.error('Erro ao formatar data e hora para input:', dateTimeString, error)
+    if (typeof dateTimeString === 'string' && dateTimeString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return `${dateTimeString}T00:00`
+    }
+    return ''
   }
-};
+}
 
 const initialState = {
-    caso_id: '',
-    tipo_evento: 'Lembrete',
-    prioridade: 'Normal',
-    status_evento: 'Pendente',
-    titulo: '',
-    descricao: '',
-    data_inicio: formatDateTimeForInput(new Date().toISOString()),
-    data_fim: '',
-    local: '',
-    concluido: false,
-};
+  caso_id: '',
+  tipo_evento: 'Lembrete',
+  prioridade: 'Normal',
+  status_evento: 'Pendente',
+  titulo: '',
+  descricao: '',
+  data_inicio: formatDateTimeForInput(new Date().toISOString()),
+  data_fim: '',
+  local: '',
+  concluido: false,
+}
 
 function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
-  const location = useLocation();
-  const [formData, setFormData] = useState(initialState);
-  const [clientes, setClientes] = useState([]);
-  const [casos, setCasos] = useState([]);
-  const [selectedClienteId, setSelectedClienteId] = useState('');
+  const location = useLocation()
+  const [formData, setFormData] = useState(initialState)
+  const [clientes, setClientes] = useState([])
+  const [casos, setCasos] = useState([])
+  const [selectedClienteId, setSelectedClienteId] = useState('')
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [validationErrors, setValidationErrors] = useState({});
+  const [isEditing, setIsEditing] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [validationErrors, setValidationErrors] = useState({})
 
   const clearValidationErrors = useCallback(() => {
-    setValidationErrors({});
-  }, []);
+    setValidationErrors({})
+  }, [])
 
   const fetchClientes = useCallback(async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token')
     if (!token) {
-        toast.warn("Sessão não encontrada para carregar clientes.");
-        return;
+      toast.warn('Sessão não encontrada para carregar clientes.')
+      return
     }
-    const authHeaders = { 'Authorization': `Bearer ${token}` };
+    const authHeaders = { Authorization: `Bearer ${token}` }
     try {
-      const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders });
-      if (!response.ok) throw new Error('Falha ao carregar clientes');
-      const data = await response.json();
-      setClientes(Array.isArray(data) ? data : (data.clientes || []));
+      const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, {
+        headers: authHeaders,
+      })
+      if (!response.ok) throw new Error('Falha ao carregar clientes')
+      const data = await response.json()
+      setClientes(Array.isArray(data) ? data : data.clientes || [])
     } catch (error) {
-      console.error("EventoAgendaForm: Erro ao buscar clientes:", error);
-      toast.error(`Erro ao carregar clientes: ${error.message}`);
+      console.error('EventoAgendaForm: Erro ao buscar clientes:', error)
+      toast.error(`Erro ao carregar clientes: ${error.message}`)
     }
-  }, []);
+  }, [])
 
   const fetchCasos = useCallback(async (clienteId = null) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token')
     if (!token) {
-        toast.warn("Sessão não encontrada para carregar casos.");
-        return;
+      toast.warn('Sessão não encontrada para carregar casos.')
+      return
     }
-    const authHeaders = { 'Authorization': `Bearer ${token}` };
-    let url = `${API_URL}/casos/?sort_by=titulo&order=asc`;
+    const authHeaders = { Authorization: `Bearer ${token}` }
+    let url = `${API_URL}/casos/?sort_by=titulo&order=asc`
     if (clienteId) {
-      url += `&cliente_id=${clienteId}`;
+      url += `&cliente_id=${clienteId}`
     }
     try {
-      const response = await fetch(url, { headers: authHeaders });
-      if (!response.ok) throw new Error('Falha ao carregar casos');
-      const data = await response.json();
-      setCasos(Array.isArray(data) ? data : (data.casos || []));
+      const response = await fetch(url, { headers: authHeaders })
+      if (!response.ok) throw new Error('Falha ao carregar casos')
+      const data = await response.json()
+      setCasos(Array.isArray(data) ? data : data.casos || [])
     } catch (error) {
-      console.error("EventoAgendaForm: Erro ao buscar casos:", error);
-      toast.error(`Erro ao carregar casos: ${error.message}`);
+      console.error('EventoAgendaForm: Erro ao buscar casos:', error)
+      toast.error(`Erro ao carregar casos: ${error.message}`)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    fetchClientes();
-  }, [fetchClientes]);
+    fetchClientes()
+  }, [fetchClientes])
 
   useEffect(() => {
-    clearValidationErrors();
-    if (eventoParaEditar && eventoParaEditar.id) { 
-      const dadosEdit = { ...initialState, ...eventoParaEditar };
-      dadosEdit.data_inicio = formatDateTimeForInput(dadosEdit.data_inicio);
-      dadosEdit.data_fim = formatDateTimeForInput(dadosEdit.data_fim);
-      dadosEdit.caso_id = dadosEdit.caso_id ? String(dadosEdit.caso_id) : '';
-      dadosEdit.concluido = dadosEdit.concluido || false;
+    clearValidationErrors()
+    if (eventoParaEditar && eventoParaEditar.id) {
+      const dadosEdit = { ...initialState, ...eventoParaEditar }
+      dadosEdit.data_inicio = formatDateTimeForInput(dadosEdit.data_inicio)
+      dadosEdit.data_fim = formatDateTimeForInput(dadosEdit.data_fim)
+      dadosEdit.caso_id = dadosEdit.caso_id ? String(dadosEdit.caso_id) : ''
+      dadosEdit.concluido = dadosEdit.concluido || false
 
-      setFormData(dadosEdit);
-      setIsEditing(true);
+      setFormData(dadosEdit)
+      setIsEditing(true)
       if (dadosEdit.caso_id) {
-        const casoOriginal = eventoParaEditar.caso_ref; 
+        const casoOriginal = eventoParaEditar.caso_ref
         if (casoOriginal && casoOriginal.cliente_id) {
-            setSelectedClienteId(String(casoOriginal.cliente_id));
+          setSelectedClienteId(String(casoOriginal.cliente_id))
         } else {
-            const token = localStorage.getItem('token');
-            if(token){
-                fetch(`${API_URL}/casos/${dadosEdit.caso_id}`, { headers: { 'Authorization': `Bearer ${token}` }})
-                  .then(res => res.ok ? res.json() : Promise.reject('Caso não encontrado para o evento'))
-                  .then(casoData => {
-                    if (casoData && casoData.cliente_id) {
-                      setSelectedClienteId(String(casoData.cliente_id));
-                    }
-                  })
-                  .catch(err => console.warn("EventoAgendaForm: Não foi possível determinar o cliente do caso para edição do evento.", err));
-            }
+          const token = localStorage.getItem('token')
+          if (token) {
+            fetch(`${API_URL}/casos/${dadosEdit.caso_id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+              .then((res) =>
+                res.ok ? res.json() : Promise.reject('Caso não encontrado para o evento')
+              )
+              .then((casoData) => {
+                if (casoData && casoData.cliente_id) {
+                  setSelectedClienteId(String(casoData.cliente_id))
+                }
+              })
+              .catch((err) =>
+                console.warn(
+                  'EventoAgendaForm: Não foi possível determinar o cliente do caso para edição do evento.',
+                  err
+                )
+              )
+          }
         }
       } else {
-        setSelectedClienteId('');
+        setSelectedClienteId('')
       }
-    } else { 
-      const defaultValuesFromState = location.state || {};
+    } else {
+      const defaultValuesFromState = location.state || {}
       const newEventInitialState = {
         ...initialState,
-        data_inicio: formatDateTimeForInput(defaultValuesFromState.defaultDataInicio || new Date().toISOString()),
+        data_inicio: formatDateTimeForInput(
+          defaultValuesFromState.defaultDataInicio || new Date().toISOString()
+        ),
         data_fim: formatDateTimeForInput(defaultValuesFromState.defaultDataFim || ''),
-      };
-      setFormData(newEventInitialState);
-      setIsEditing(false);
-      setSelectedClienteId('');
+      }
+      setFormData(newEventInitialState)
+      setIsEditing(false)
+      setSelectedClienteId('')
     }
-  }, [eventoParaEditar, clearValidationErrors, location.state]);
+  }, [eventoParaEditar, clearValidationErrors, location.state])
 
   useEffect(() => {
-    fetchCasos(selectedClienteId || null);
-  }, [selectedClienteId, fetchCasos]);
+    fetchCasos(selectedClienteId || null)
+  }, [selectedClienteId, fetchCasos])
 
   const validateForm = () => {
-    const errors = {};
-    if (!formData.titulo || !formData.titulo.trim()) errors.titulo = 'Título é obrigatório.';
-    if (!formData.tipo_evento) errors.tipo_evento = 'Tipo de evento é obrigatório.';
+    const errors = {}
+    if (!formData.titulo || !formData.titulo.trim()) errors.titulo = 'Título é obrigatório.'
+    if (!formData.tipo_evento) errors.tipo_evento = 'Tipo de evento é obrigatório.'
     if (!formData.data_inicio) {
-      errors.data_inicio = 'Data/Hora de Início é obrigatória.';
+      errors.data_inicio = 'Data/Hora de Início é obrigatória.'
     } else {
-      try { new Date(formData.data_inicio); } 
-      catch { errors.data_inicio = 'Formato de Data/Hora de Início inválido.'; }
+      try {
+        new Date(formData.data_inicio)
+      } catch {
+        errors.data_inicio = 'Formato de Data/Hora de Início inválido.'
+      }
     }
 
     if (formData.data_fim) {
       try {
-        const inicio = new Date(formData.data_inicio);
-        const fim = new Date(formData.data_fim);
-        if (fim < inicio) errors.data_fim = 'Data/Hora de Fim não pode ser anterior à Data/Hora de Início.';
+        const inicio = new Date(formData.data_inicio)
+        const fim = new Date(formData.data_fim)
+        if (fim < inicio)
+          errors.data_fim = 'Data/Hora de Fim não pode ser anterior à Data/Hora de Início.'
       } catch {
-        errors.data_fim = 'Formato de Data/Hora de Fim inválido.';
+        errors.data_fim = 'Formato de Data/Hora de Fim inválido.'
       }
     }
-    setValidationErrors(errors);
-    const isValid = Object.keys(errors).length === 0;
-    return isValid;
-  };
+    setValidationErrors(errors)
+    const isValid = Object.keys(errors).length === 0
+    return isValid
+  }
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value, type, checked } = e.target
     if (validationErrors[name]) {
-      setValidationErrors(prev => ({ ...prev, [name]: '' }));
+      setValidationErrors((prev) => ({ ...prev, [name]: '' }))
     }
 
-    if (name === "selectedClienteId") {
-
-      setSelectedClienteId(value);
-      setFormData(prev => ({ ...prev, caso_id: '' })); 
+    if (name === 'selectedClienteId') {
+      setSelectedClienteId(value)
+      setFormData((prev) => ({ ...prev, caso_id: '' }))
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        [name]: type === 'checkbox' ? checked : value
-      }));
+        [name]: type === 'checkbox' ? checked : value,
+      }))
     }
-  };
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    clearValidationErrors();
+    e.preventDefault()
+    clearValidationErrors()
     if (!validateForm()) {
-      toast.error('Por favor, corrija os erros indicados no formulário.');
-      return;
+      toast.error('Por favor, corrija os erros indicados no formulário.')
+      return
     }
-    setLoading(true);
-    const token = localStorage.getItem('token');
+    setLoading(true)
+    const token = localStorage.getItem('token')
     if (!token) {
-        toast.error("Autenticação necessária para salvar. Faça login.");
-        setLoading(false);
-        return;
+      toast.error('Autenticação necessária para salvar. Faça login.')
+      setLoading(false)
+      return
     }
-    const authHeaders = { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-    };
+    const authHeaders = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
 
-    const dataInicioISO = formData.data_inicio ? new Date(formData.data_inicio).toISOString() : null;
-    const dataFimISO = formData.data_fim ? new Date(formData.data_fim).toISOString() : null;
+    const dataInicioISO = formData.data_inicio ? new Date(formData.data_inicio).toISOString() : null
+    const dataFimISO = formData.data_fim ? new Date(formData.data_fim).toISOString() : null
 
     const dadosParaEnviar = {
       ...formData,
@@ -219,60 +234,98 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       data_inicio: dataInicioISO,
       data_fim: dataFimISO,
       concluido: formData.concluido || false,
-    };
+    }
     try {
-      const url = isEditing ? `${API_URL}/eventos/${eventoParaEditar.id}` : `${API_URL}/eventos/`; // Barra final para POST
-      const method = isEditing ? 'PUT' : 'POST';
+      const url = isEditing ? `${API_URL}/eventos/${eventoParaEditar.id}` : `${API_URL}/eventos/` // Barra final para POST
+      const method = isEditing ? 'PUT' : 'POST'
       const response = await fetch(url, {
         method,
         headers: authHeaders,
         body: JSON.stringify(dadosParaEnviar),
-      });
-      const responseData = await response.json();
+      })
+      const responseData = await response.json()
       if (!response.ok) {
-        console.error("EventoAgendaForm: Erro da API:", responseData);
-        throw new Error(responseData.erro || `Falha ao ${isEditing ? 'atualizar' : 'adicionar'} evento. Status: ${response.status}`);
+        console.error('EventoAgendaForm: Erro da API:', responseData)
+        throw new Error(
+          responseData.erro ||
+            `Falha ao ${isEditing ? 'atualizar' : 'adicionar'} evento. Status: ${response.status}`
+        )
       }
-      toast.success(`Evento/Prazo ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`);
+      toast.success(`Evento/Prazo ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`)
       if (typeof onEventoChange === 'function') {
-        onEventoChange();
+        onEventoChange()
       }
-      if (!isEditing) setFormData(initialState);
+      if (!isEditing) setFormData(initialState)
     } catch (error) {
-      console.error("EventoAgendaForm: Erro no handleSubmit:", error);
-      toast.error(error.message || 'Erro desconhecido ao salvar o evento.');
+      console.error('EventoAgendaForm: Erro no handleSubmit:', error)
+      toast.error(error.message || 'Erro desconhecido ao salvar o evento.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const tipoEventoOptions = ["Prazo", "Audiência", "Reunião", "Lembrete", "Outro"];
+  const tipoEventoOptions = ['Prazo', 'Audiência', 'Reunião', 'Lembrete', 'Outro']
 
   return (
     <div className="card shadow-sm mb-4">
       <div className="card-header bg-light">
-        <h5 className="mb-0">{isEditing ? 'Editar Evento/Prazo' : 'Adicionar Novo Evento/Prazo'}</h5>
+        <h5 className="mb-0">
+          {isEditing ? 'Editar Evento/Prazo' : 'Adicionar Novo Evento/Prazo'}
+        </h5>
       </div>
       <div className="card-body p-4">
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label htmlFor="titulo_evento" className="form-label form-label-sm">Título *</label>
-            <input type="text" name="titulo" id="titulo_evento" className={`form-control form-control-sm ${validationErrors.titulo ? 'is-invalid' : ''}`} value={formData.titulo} onChange={handleChange} />
-            {validationErrors.titulo && <div className="invalid-feedback d-block">{validationErrors.titulo}</div>}
+            <label htmlFor="titulo_evento" className="form-label form-label-sm">
+              Título *
+            </label>
+            <input
+              type="text"
+              name="titulo"
+              id="titulo_evento"
+              className={`form-control form-control-sm ${validationErrors.titulo ? 'is-invalid' : ''}`}
+              value={formData.titulo}
+              onChange={handleChange}
+            />
+            {validationErrors.titulo && (
+              <div className="invalid-feedback d-block">{validationErrors.titulo}</div>
+            )}
           </div>
 
           <div className="row">
             <div className="col-md-6 mb-3">
-              <label htmlFor="tipo_evento" className="form-label form-label-sm">Tipo *</label>
-              <select name="tipo_evento" id="tipo_evento" className={`form-select form-select-sm ${validationErrors.tipo_evento ? 'is-invalid' : ''}`} value={formData.tipo_evento} onChange={handleChange}>
-                {tipoEventoOptions.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
+              <label htmlFor="tipo_evento" className="form-label form-label-sm">
+                Tipo *
+              </label>
+              <select
+                name="tipo_evento"
+                id="tipo_evento"
+                className={`form-select form-select-sm ${validationErrors.tipo_evento ? 'is-invalid' : ''}`}
+                value={formData.tipo_evento}
+                onChange={handleChange}
+              >
+                {tipoEventoOptions.map((tipo) => (
+                  <option key={tipo} value={tipo}>
+                    {tipo}
+                  </option>
+                ))}
               </select>
-              {validationErrors.tipo_evento && <div className="invalid-feedback d-block">{validationErrors.tipo_evento}</div>}
+              {validationErrors.tipo_evento && (
+                <div className="invalid-feedback d-block">{validationErrors.tipo_evento}</div>
+              )}
             </div>
-            
+
             <div className="col-md-3 mb-3">
-              <label htmlFor="prioridade" className="form-label form-label-sm">Prioridade *</label>
-              <select name="prioridade" id="prioridade" className="form-select form-select-sm" value={formData.prioridade} onChange={handleChange}>
+              <label htmlFor="prioridade" className="form-label form-label-sm">
+                Prioridade *
+              </label>
+              <select
+                name="prioridade"
+                id="prioridade"
+                className="form-select form-select-sm"
+                value={formData.prioridade}
+                onChange={handleChange}
+              >
                 <option value="Baixa">Baixa</option>
                 <option value="Normal">Normal</option>
                 <option value="Alta">Alta</option>
@@ -281,8 +334,16 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
             </div>
 
             <div className="col-md-3 mb-3">
-              <label htmlFor="status_evento" className="form-label form-label-sm">Status *</label>
-              <select name="status_evento" id="status_evento" className="form-select form-select-sm" value={formData.status_evento} onChange={handleChange}>
+              <label htmlFor="status_evento" className="form-label form-label-sm">
+                Status *
+              </label>
+              <select
+                name="status_evento"
+                id="status_evento"
+                className="form-select form-select-sm"
+                value={formData.status_evento}
+                onChange={handleChange}
+              >
                 <option value="Pendente">Pendente</option>
                 <option value="Concluído">Concluído</option>
                 <option value="Cancelado">Cancelado</option>
@@ -292,51 +353,136 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
 
           <div className="row">
             <div className="col-md-12 mb-3">
-              <label htmlFor="selectedClienteIdEvento" className="form-label form-label-sm">Filtrar Casos por Cliente (Opcional)</label>
-              <select name="selectedClienteId" id="selectedClienteIdEvento" className="form-select form-select-sm" value={selectedClienteId} onChange={handleChange}>
+              <label htmlFor="selectedClienteIdEvento" className="form-label form-label-sm">
+                Filtrar Casos por Cliente (Opcional)
+              </label>
+              <select
+                name="selectedClienteId"
+                id="selectedClienteIdEvento"
+                className="form-select form-select-sm"
+                value={selectedClienteId}
+                onChange={handleChange}
+              >
                 <option value="">Todos os clientes (para casos)</option>
-                {clientes.map(cliente => (<option key={cliente.id} value={cliente.id}>{cliente.nome_razao_social}</option>))}
+                {clientes.map((cliente) => (
+                  <option key={cliente.id} value={cliente.id}>
+                    {cliente.nome_razao_social}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
           <div className="mb-3">
-            <label htmlFor="caso_id_evento" className="form-label form-label-sm">Associar ao Caso (Opcional)</label>
-            <select name="caso_id" id="caso_id_evento" className="form-select form-select-sm" value={formData.caso_id || ''} onChange={handleChange} disabled={casos.length === 0 && !selectedClienteId}>
+            <label htmlFor="caso_id_evento" className="form-label form-label-sm">
+              Associar ao Caso (Opcional)
+            </label>
+            <select
+              name="caso_id"
+              id="caso_id_evento"
+              className="form-select form-select-sm"
+              value={formData.caso_id || ''}
+              onChange={handleChange}
+              disabled={casos.length === 0 && !selectedClienteId}
+            >
               <option value="">Nenhum caso (Evento Geral)</option>
-              {(selectedClienteId ? casos.filter(c => String(c.cliente_id) === selectedClienteId) : casos).map(cs => (
-                <option key={cs.id} value={cs.id}>{cs.titulo} ({cs.cliente?.nome_razao_social || 'Cliente N/A'})</option>
+              {(selectedClienteId
+                ? casos.filter((c) => String(c.cliente_id) === selectedClienteId)
+                : casos
+              ).map((cs) => (
+                <option key={cs.id} value={cs.id}>
+                  {cs.titulo} ({cs.cliente?.nome_razao_social || 'Cliente N/A'})
+                </option>
               ))}
             </select>
-             {!selectedClienteId && casos.length > 0 && <small className="form-text text-muted">Selecione um cliente para filtrar os casos ou deixe em branco para ver todos.</small>}
-             {selectedClienteId && (selectedClienteId ? casos.filter(c => String(c.cliente_id) === selectedClienteId) : casos).length === 0 && <small className="form-text text-muted">Nenhum caso encontrado para este cliente.</small>}
+            {!selectedClienteId && casos.length > 0 && (
+              <small className="form-text text-muted">
+                Selecione um cliente para filtrar os casos ou deixe em branco para ver todos.
+              </small>
+            )}
+            {selectedClienteId &&
+              (selectedClienteId
+                ? casos.filter((c) => String(c.cliente_id) === selectedClienteId)
+                : casos
+              ).length === 0 && (
+                <small className="form-text text-muted">
+                  Nenhum caso encontrado para este cliente.
+                </small>
+              )}
           </div>
-          
+
           <div className="row">
             <div className="col-md-6 mb-3">
-              <label htmlFor="data_inicio_evento" className="form-label form-label-sm">Data/Hora de Início *</label>
-              <input type="datetime-local" name="data_inicio" id="data_inicio_evento" className={`form-control form-control-sm ${validationErrors.data_inicio ? 'is-invalid' : ''}`} value={formData.data_inicio} onChange={handleChange} />
-              {validationErrors.data_inicio && <div className="invalid-feedback d-block">{validationErrors.data_inicio}</div>}
+              <label htmlFor="data_inicio_evento" className="form-label form-label-sm">
+                Data/Hora de Início *
+              </label>
+              <input
+                type="datetime-local"
+                name="data_inicio"
+                id="data_inicio_evento"
+                className={`form-control form-control-sm ${validationErrors.data_inicio ? 'is-invalid' : ''}`}
+                value={formData.data_inicio}
+                onChange={handleChange}
+              />
+              {validationErrors.data_inicio && (
+                <div className="invalid-feedback d-block">{validationErrors.data_inicio}</div>
+              )}
             </div>
             <div className="col-md-6 mb-3">
-              <label htmlFor="data_fim_evento" className="form-label form-label-sm">Data/Hora de Fim (Opcional)</label>
-              <input type="datetime-local" name="data_fim" id="data_fim_evento" className={`form-control form-control-sm ${validationErrors.data_fim ? 'is-invalid' : ''}`} value={formData.data_fim} onChange={handleChange} />
-              {validationErrors.data_fim && <div className="invalid-feedback d-block">{validationErrors.data_fim}</div>}
+              <label htmlFor="data_fim_evento" className="form-label form-label-sm">
+                Data/Hora de Fim (Opcional)
+              </label>
+              <input
+                type="datetime-local"
+                name="data_fim"
+                id="data_fim_evento"
+                className={`form-control form-control-sm ${validationErrors.data_fim ? 'is-invalid' : ''}`}
+                value={formData.data_fim}
+                onChange={handleChange}
+              />
+              {validationErrors.data_fim && (
+                <div className="invalid-feedback d-block">{validationErrors.data_fim}</div>
+              )}
             </div>
           </div>
 
           <div className="mb-3">
-            <label htmlFor="local_evento" className="form-label form-label-sm">Local (Opcional)</label>
-            <input type="text" name="local" id="local_evento" className="form-control form-control-sm" value={formData.local || ''} onChange={handleChange} />
+            <label htmlFor="local_evento" className="form-label form-label-sm">
+              Local (Opcional)
+            </label>
+            <input
+              type="text"
+              name="local"
+              id="local_evento"
+              className="form-control form-control-sm"
+              value={formData.local || ''}
+              onChange={handleChange}
+            />
           </div>
 
           <div className="mb-3">
-            <label htmlFor="descricao_evento" className="form-label form-label-sm">Descrição (Opcional)</label>
-            <textarea name="descricao" id="descricao_evento" className="form-control form-control-sm" value={formData.descricao || ''} onChange={handleChange} rows="3"></textarea>
+            <label htmlFor="descricao_evento" className="form-label form-label-sm">
+              Descrição (Opcional)
+            </label>
+            <textarea
+              name="descricao"
+              id="descricao_evento"
+              className="form-control form-control-sm"
+              value={formData.descricao || ''}
+              onChange={handleChange}
+              rows="3"
+            ></textarea>
           </div>
-          
+
           <div className="form-check mb-3">
-            <input className="form-check-input" type="checkbox" name="concluido" id="concluido_evento" checked={!!formData.concluido} onChange={handleChange} />
+            <input
+              className="form-check-input"
+              type="checkbox"
+              name="concluido"
+              id="concluido_evento"
+              checked={!!formData.concluido}
+              onChange={handleChange}
+            />
             <label className="form-check-label form-label-sm" htmlFor="concluido_evento">
               Marcar como Concluído
             </label>
@@ -345,19 +491,39 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
           <hr className="my-4" />
           <div className="d-flex justify-content-end">
             {typeof onCancel === 'function' && (
-              <button type="button" className="btn btn-outline-secondary me-2 btn-sm" onClick={onCancel} disabled={loading}>
+              <button
+                type="button"
+                className="btn btn-outline-secondary me-2 btn-sm"
+                onClick={onCancel}
+                disabled={loading}
+              >
                 Cancelar
               </button>
             )}
-            <button type="submit" className="btn btn-primary btn-sm" disabled={loading || Object.keys(validationErrors).some(key => validationErrors[key] && validationErrors[key] !== '')}>
-              {loading && <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>}
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              disabled={
+                loading ||
+                Object.keys(validationErrors).some(
+                  (key) => validationErrors[key] && validationErrors[key] !== ''
+                )
+              }
+            >
+              {loading && (
+                <span
+                  className="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
+              )}
               {isEditing ? 'Atualizar Evento' : 'Adicionar Evento'}
             </button>
           </div>
         </form>
       </div>
     </div>
-  );
+  )
 }
 
-export default EventoAgendaForm;
+export default EventoAgendaForm

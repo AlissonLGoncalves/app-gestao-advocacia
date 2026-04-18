@@ -53,10 +53,12 @@ def _build_session():
         version = current_app.config.get("APP_VERSION", "1.0.0")
     except Exception:
         version = "1.0.0"
-    session.headers.update({
-        "User-Agent": f"AppGestaoAdvocacia/{version} (+DJEN-integration)",
-        "Accept": "application/json",
-    })
+    session.headers.update(
+        {
+            "User-Agent": f"AppGestaoAdvocacia/{version} (+DJEN-integration)",
+            "Accept": "application/json",
+        }
+    )
     return session
 
 
@@ -176,7 +178,7 @@ def obter_certidao(hash_comunicacao):
     """Consulta GET /api/v1/comunicacao/{hash}/certidao."""
     path = ENDPOINT_CERTIDAO.format(hash=hash_comunicacao)
     response = _request("GET", path)
-    content_type = response.headers.get('content-type', 'application/pdf')
+    content_type = response.headers.get("content-type", "application/pdf")
     return response.content, content_type
 
 

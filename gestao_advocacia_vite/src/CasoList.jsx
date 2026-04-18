@@ -1,185 +1,224 @@
 // src/CasoList.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js';
-import { PencilSquareIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ArrowsUpDownIcon, FunnelIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
-import { toast } from 'react-toastify';
-import { exportarParaPDF } from './utils/pdfGenerator.js';
+import React, { useState, useEffect, useCallback } from 'react'
+import { API_URL } from './config.js'
+import {
+  PencilSquareIcon,
+  TrashIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  ArrowsUpDownIcon,
+  FunnelIcon,
+  DocumentArrowDownIcon,
+} from '@heroicons/react/24/outline'
+import { toast } from 'react-toastify'
+import { exportarParaPDF } from './utils/pdfGenerator.js'
 
 function CasoList({ onEditCaso, refreshKey }) {
-  const [casos, setCasos] = useState([]);
-  const [clientes, setClientes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [deletingId, setDeletingId] = useState(null);
+  const [casos, setCasos] = useState([])
+  const [clientes, setClientes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [deletingId, setDeletingId] = useState(null)
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [clienteFilter, setClienteFilter] = useState('');
-  const [dataCriacaoInicioFilter, setDataCriacaoInicioFilter] = useState('');
-  const [dataCriacaoFimFilter, setDataCriacaoFimFilter] = useState('');
-  const [dataAtualizacaoInicioFilter, setDataAtualizacaoInicioFilter] = useState('');
-  const [dataAtualizacaoFimFilter, setDataAtualizacaoFimFilter] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [clienteFilter, setClienteFilter] = useState('')
+  const [dataCriacaoInicioFilter, setDataCriacaoInicioFilter] = useState('')
+  const [dataCriacaoFimFilter, setDataCriacaoFimFilter] = useState('')
+  const [dataAtualizacaoInicioFilter, setDataAtualizacaoInicioFilter] = useState('')
+  const [dataAtualizacaoFimFilter, setDataAtualizacaoFimFilter] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
 
-  const [sortConfig, setSortConfig] = useState({ key: 'data_atualizacao', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'data_atualizacao', direction: 'desc' })
 
   const fetchClientesParaFiltro = useCallback(async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token')
     if (!token) {
       // Não precisa setar erro aqui, pois o fetchCasos também fará a checagem
-      return;
+      return
     }
-    const authHeaders = { 'Authorization': `Bearer ${token}` };
+    const authHeaders = { Authorization: `Bearer ${token}` }
 
     try {
-      const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, { headers: authHeaders }); // Adicionada barra final
+      const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, {
+        headers: authHeaders,
+      }) // Adicionada barra final
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.erro || 'Falha ao carregar clientes para filtro');
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.erro || 'Falha ao carregar clientes para filtro')
       }
-      const data = await response.json();
-      setClientes(Array.isArray(data) ? data : (data.clientes || []));
+      const data = await response.json()
+      setClientes(Array.isArray(data) ? data : data.clientes || [])
     } catch (err) {
-      console.error("CasoList: Erro ao buscar clientes para filtro:", err);
-      toast.error(`Erro ao carregar clientes para filtro: ${err.message}`);
+      console.error('CasoList: Erro ao buscar clientes para filtro:', err)
+      toast.error(`Erro ao carregar clientes para filtro: ${err.message}`)
     }
-  }, []);
+  }, [])
 
   const fetchCasos = useCallback(async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true)
+    setError('')
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token')
     if (!token) {
-      setError("Autenticação necessária.");
-      setLoading(false);
-      toast.error("Sessão expirada ou inválida. Por favor, faça login novamente.");
-      return;
+      setError('Autenticação necessária.')
+      setLoading(false)
+      toast.error('Sessão expirada ou inválida. Por favor, faça login novamente.')
+      return
     }
-    const authHeaders = { 'Authorization': `Bearer ${token}` };
+    const authHeaders = { Authorization: `Bearer ${token}` }
 
-    let url = `${API_URL}/casos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`; // Adicionada barra final
-    if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
-    if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
-    if (clienteFilter) url += `&cliente_id=${clienteFilter}`;
-    if (dataCriacaoInicioFilter) url += `&data_criacao_inicio=${dataCriacaoInicioFilter}`;
-    if (dataCriacaoFimFilter) url += `&data_criacao_fim=${dataCriacaoFimFilter}`;
-    if (dataAtualizacaoInicioFilter) url += `&data_atualizacao_inicio=${dataAtualizacaoInicioFilter}`;
-    if (dataAtualizacaoFimFilter) url += `&data_atualizacao_fim=${dataAtualizacaoFimFilter}`;
+    let url = `${API_URL}/casos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}` // Adicionada barra final
+    if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`
+    if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`
+    if (clienteFilter) url += `&cliente_id=${clienteFilter}`
+    if (dataCriacaoInicioFilter) url += `&data_criacao_inicio=${dataCriacaoInicioFilter}`
+    if (dataCriacaoFimFilter) url += `&data_criacao_fim=${dataCriacaoFimFilter}`
+    if (dataAtualizacaoInicioFilter)
+      url += `&data_atualizacao_inicio=${dataAtualizacaoInicioFilter}`
+    if (dataAtualizacaoFimFilter) url += `&data_atualizacao_fim=${dataAtualizacaoFimFilter}`
 
     try {
-      const response = await fetch(url, { headers: authHeaders });
+      const response = await fetch(url, { headers: authHeaders })
       if (!response.ok) {
-        const resData = await response.json().catch(() => ({}));
-        console.error("CasoList: Erro da API ao buscar casos:", resData);
-        throw new Error(resData.erro || `Erro HTTP: ${response.status} ao buscar casos`);
+        const resData = await response.json().catch(() => ({}))
+        console.error('CasoList: Erro da API ao buscar casos:', resData)
+        throw new Error(resData.erro || `Erro HTTP: ${response.status} ao buscar casos`)
       }
-      const data = await response.json();
-      setCasos(Array.isArray(data) ? data : (data.casos || []));
+      const data = await response.json()
+      setCasos(Array.isArray(data) ? data : data.casos || [])
     } catch (err) {
-      console.error("CasoList: Erro detalhado ao buscar casos:", err);
-      setError(`Erro ao carregar casos: ${err.message}`);
-      if (!err.message.includes("Autenticação")) {
-        toast.error(`Erro ao carregar casos: ${err.message}`);
+      console.error('CasoList: Erro detalhado ao buscar casos:', err)
+      setError(`Erro ao carregar casos: ${err.message}`)
+      if (!err.message.includes('Autenticação')) {
+        toast.error(`Erro ao carregar casos: ${err.message}`)
       }
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [searchTerm, statusFilter, clienteFilter, dataCriacaoInicioFilter, dataCriacaoFimFilter, dataAtualizacaoInicioFilter, dataAtualizacaoFimFilter, sortConfig]);
+  }, [
+    searchTerm,
+    statusFilter,
+    clienteFilter,
+    dataCriacaoInicioFilter,
+    dataCriacaoFimFilter,
+    dataAtualizacaoInicioFilter,
+    dataAtualizacaoFimFilter,
+    sortConfig,
+  ])
 
   useEffect(() => {
-    fetchClientesParaFiltro();
-  }, [fetchClientesParaFiltro]);
+    fetchClientesParaFiltro()
+  }, [fetchClientesParaFiltro])
 
   useEffect(() => {
-    fetchCasos();
-  }, [fetchCasos, refreshKey]);
+    fetchCasos()
+  }, [fetchCasos, refreshKey])
 
   const handleDeleteClick = async (id) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token')
     if (!token) {
-      toast.error("Autenticação expirada. Faça login novamente.");
-      return;
+      toast.error('Autenticação expirada. Faça login novamente.')
+      return
     }
-    const authHeaders = { 'Authorization': `Bearer ${token}` };
+    const authHeaders = { Authorization: `Bearer ${token}` }
 
-    if (window.confirm(`Tem certeza que deseja excluir o caso ID ${id}? Esta ação pode ser irreversível e afetar registos associados.`)) {
-      setDeletingId(id);
-      setError(null);
+    if (
+      window.confirm(
+        `Tem certeza que deseja excluir o caso ID ${id}? Esta ação pode ser irreversível e afetar registos associados.`
+      )
+    ) {
+      setDeletingId(id)
+      setError(null)
       try {
-        const response = await fetch(`${API_URL}/casos/${id}`, { method: 'DELETE', headers: authHeaders });
+        const response = await fetch(`${API_URL}/casos/${id}`, {
+          method: 'DELETE',
+          headers: authHeaders,
+        })
         if (!response.ok) {
-          const resData = await response.json().catch(() => ({}));
-          console.error("CasoList: Erro da API ao deletar caso:", resData);
-          throw new Error(resData.erro || `Erro HTTP: ${response.status}`);
+          const resData = await response.json().catch(() => ({}))
+          console.error('CasoList: Erro da API ao deletar caso:', resData)
+          throw new Error(resData.erro || `Erro HTTP: ${response.status}`)
         }
-        toast.success(`Caso ID ${id} excluído com sucesso!`);
-        fetchCasos();
+        toast.success(`Caso ID ${id} excluído com sucesso!`)
+        fetchCasos()
       } catch (err) {
-        console.error(`CasoList: Erro ao deletar caso ${id}:`, err);
-        setError(`Erro ao deletar caso: ${err.message}`);
-        toast.error(`Erro ao deletar caso: ${err.message}`);
+        console.error(`CasoList: Erro ao deletar caso ${id}:`, err)
+        setError(`Erro ao deletar caso: ${err.message}`)
+        toast.error(`Erro ao deletar caso: ${err.message}`)
       } finally {
-        setDeletingId(null);
+        setDeletingId(null)
       }
     }
-  };
+  }
 
   const requestSort = (key) => {
-    let direction = 'asc';
+    let direction = 'asc'
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+      direction = 'desc'
     }
-    setSortConfig({ key, direction });
-  };
+    setSortConfig({ key, direction })
+  }
 
   const getSortIcon = (key) => {
-    const iconStyle = { width: '14px', height: '14px', display: 'inline', verticalAlign: 'text-bottom', marginLeft: '4px' };
-    if (sortConfig.key !== key) return <ArrowsUpDownIcon className="text-muted" style={iconStyle} />;
-    if (sortConfig.direction === 'asc') return <ArrowUpIcon className="text-primary" style={iconStyle} />;
-    return <ArrowDownIcon className="text-primary" style={iconStyle} />;
-  };
+    const iconStyle = {
+      width: '14px',
+      height: '14px',
+      display: 'inline',
+      verticalAlign: 'text-bottom',
+      marginLeft: '4px',
+    }
+    if (sortConfig.key !== key) return <ArrowsUpDownIcon className="text-muted" style={iconStyle} />
+    if (sortConfig.direction === 'asc')
+      return <ArrowUpIcon className="text-primary" style={iconStyle} />
+    return <ArrowDownIcon className="text-primary" style={iconStyle} />
+  }
 
   const resetFilters = () => {
-    setSearchTerm('');
-    setStatusFilter('');
-    setClienteFilter('');
-    setDataCriacaoInicioFilter('');
-    setDataCriacaoFimFilter('');
-    setDataAtualizacaoInicioFilter('');
-    setDataAtualizacaoFimFilter('');
-    setShowFilters(false);
-  };
+    setSearchTerm('')
+    setStatusFilter('')
+    setClienteFilter('')
+    setDataCriacaoInicioFilter('')
+    setDataCriacaoFimFilter('')
+    setDataAtualizacaoInicioFilter('')
+    setDataAtualizacaoFimFilter('')
+    setShowFilters(false)
+  }
 
   const getStatusBadge = (status) => {
     switch (status) {
-        case 'Ativo': return 'bg-success-subtle text-success-emphasis';
-        case 'Encerrado': return 'bg-secondary-subtle text-secondary-emphasis';
-        case 'Suspenso': return 'bg-warning-subtle text-warning-emphasis';
-        case 'Arquivado': return 'bg-info-subtle text-info-emphasis';
-        default: return 'bg-light text-dark';
+      case 'Ativo':
+        return 'bg-success-subtle text-success-emphasis'
+      case 'Encerrado':
+        return 'bg-secondary-subtle text-secondary-emphasis'
+      case 'Suspenso':
+        return 'bg-warning-subtle text-warning-emphasis'
+      case 'Arquivado':
+        return 'bg-info-subtle text-info-emphasis'
+      default:
+        return 'bg-light text-dark'
     }
-  };
+  }
 
   const handleExportPDF = () => {
     if (casos.length === 0) {
-      toast.warn("Não existem dados para exportar com os filtros atuais.");
-      return;
+      toast.warn('Não existem dados para exportar com os filtros atuais.')
+      return
     }
 
-    const headers = ["Título do Caso", "Cliente", "Nº Processo", "Status", "Criação", "Atualização"];
-    const dados = casos.map(caso => [
+    const headers = ['Título do Caso', 'Cliente', 'Nº Processo', 'Status', 'Criação', 'Atualização']
+    const dados = casos.map((caso) => [
       caso.titulo || '-',
       caso.cliente?.nome_razao_social || 'N/A',
       caso.numero_processo || '-',
       caso.status || '-',
       caso.data_criacao ? new Date(caso.data_criacao).toLocaleDateString() : '-',
-      caso.data_atualizacao ? new Date(caso.data_atualizacao).toLocaleDateString() : '-'
-    ]);
+      caso.data_atualizacao ? new Date(caso.data_atualizacao).toLocaleDateString() : '-',
+    ])
 
-    exportarParaPDF('Relatório de Casos Processuais', headers, dados, 'relatorio_casos.pdf');
-    toast.success("PDF gerado com sucesso!");
-  };
+    exportarParaPDF('Relatório de Casos Processuais', headers, dados, 'relatorio_casos.pdf')
+    toast.success('PDF gerado com sucesso!')
+  }
 
   if (loading && casos.length === 0) {
     return (
@@ -189,11 +228,15 @@ function CasoList({ onEditCaso, refreshKey }) {
         </div>
         <span className="ms-3 text-muted">A carregar casos...</span>
       </div>
-    );
+    )
   }
 
   if (error && casos.length === 0) {
-    return <div className="alert alert-danger m-3 small" role="alert">{error}</div>;
+    return (
+      <div className="alert alert-danger m-3 small" role="alert">
+        {error}
+      </div>
+    )
   }
   return (
     <div className="card shadow-sm">
@@ -206,7 +249,7 @@ function CasoList({ onEditCaso, refreshKey }) {
               onClick={handleExportPDF}
               title="Gerar e Baixar Relatório em PDF dos casos listados"
             >
-              <DocumentArrowDownIcon style={{width: '16px', height: '16px'}} className="me-1" />
+              <DocumentArrowDownIcon style={{ width: '16px', height: '16px' }} className="me-1" />
               Exportar PDF
             </button>
             <button
@@ -215,7 +258,7 @@ function CasoList({ onEditCaso, refreshKey }) {
               aria-expanded={showFilters}
               aria-controls="filtrosAvancadosCasos"
             >
-              <FunnelIcon style={{width: '16px', height: '16px'}} className="me-1" />
+              <FunnelIcon style={{ width: '16px', height: '16px' }} className="me-1" />
               {showFilters ? 'Ocultar Avançados' : 'Mostrar Avançados'}
             </button>
           </div>
@@ -223,7 +266,9 @@ function CasoList({ onEditCaso, refreshKey }) {
 
         <div className="row g-2 align-items-end">
           <div className="col-lg-4 col-md-6">
-            <label htmlFor="searchTermCaso" className="form-label form-label-sm visually-hidden">Buscar</label>
+            <label htmlFor="searchTermCaso" className="form-label form-label-sm visually-hidden">
+              Buscar
+            </label>
             <input
               type="text"
               id="searchTermCaso"
@@ -234,7 +279,9 @@ function CasoList({ onEditCaso, refreshKey }) {
             />
           </div>
           <div className="col-lg-3 col-md-6">
-            <label htmlFor="clienteFilterCaso" className="form-label form-label-sm visually-hidden">Cliente</label>
+            <label htmlFor="clienteFilterCaso" className="form-label form-label-sm visually-hidden">
+              Cliente
+            </label>
             <select
               id="clienteFilterCaso"
               className="form-select form-select-sm"
@@ -242,13 +289,17 @@ function CasoList({ onEditCaso, refreshKey }) {
               onChange={(e) => setClienteFilter(e.target.value)}
             >
               <option value="">Todos os Clientes</option>
-              {clientes.map(cliente => (
-                <option key={cliente.id} value={cliente.id}>{cliente.nome_razao_social}</option>
+              {clientes.map((cliente) => (
+                <option key={cliente.id} value={cliente.id}>
+                  {cliente.nome_razao_social}
+                </option>
               ))}
             </select>
           </div>
           <div className="col-lg-3 col-md-6">
-            <label htmlFor="statusFilterCaso" className="form-label form-label-sm visually-hidden">Status</label>
+            <label htmlFor="statusFilterCaso" className="form-label form-label-sm visually-hidden">
+              Status
+            </label>
             <select
               id="statusFilterCaso"
               className="form-select form-select-sm"
@@ -263,7 +314,12 @@ function CasoList({ onEditCaso, refreshKey }) {
             </select>
           </div>
           <div className="col-lg-2 col-md-12 text-lg-end mt-2 mt-lg-0">
-            <button onClick={resetFilters} className="btn btn-sm btn-outline-secondary py-1 px-2 w-100">Limpar Filtros</button>
+            <button
+              onClick={resetFilters}
+              className="btn btn-sm btn-outline-secondary py-1 px-2 w-100"
+            >
+              Limpar Filtros
+            </button>
           </div>
         </div>
 
@@ -271,86 +327,171 @@ function CasoList({ onEditCaso, refreshKey }) {
           <div className="mt-3 pt-3 border-top" id="filtrosAvancadosCasos">
             <div className="row g-2 align-items-center mb-2">
               <div className="col-md-3 col-sm-6">
-                  <label htmlFor="dataCriacaoInicioFilter" className="form-label form-label-sm mb-1">Criação De:</label>
-                  <input type="date" id="dataCriacaoInicioFilter" className="form-control form-control-sm" value={dataCriacaoInicioFilter} onChange={e => setDataCriacaoInicioFilter(e.target.value)} />
+                <label htmlFor="dataCriacaoInicioFilter" className="form-label form-label-sm mb-1">
+                  Criação De:
+                </label>
+                <input
+                  type="date"
+                  id="dataCriacaoInicioFilter"
+                  className="form-control form-control-sm"
+                  value={dataCriacaoInicioFilter}
+                  onChange={(e) => setDataCriacaoInicioFilter(e.target.value)}
+                />
               </div>
               <div className="col-md-3 col-sm-6">
-                  <label htmlFor="dataCriacaoFimFilter" className="form-label form-label-sm mb-1">Criação Até:</label>
-                  <input type="date" id="dataCriacaoFimFilter" className="form-control form-control-sm" value={dataCriacaoFimFilter} onChange={e => setDataCriacaoFimFilter(e.target.value)} />
+                <label htmlFor="dataCriacaoFimFilter" className="form-label form-label-sm mb-1">
+                  Criação Até:
+                </label>
+                <input
+                  type="date"
+                  id="dataCriacaoFimFilter"
+                  className="form-control form-control-sm"
+                  value={dataCriacaoFimFilter}
+                  onChange={(e) => setDataCriacaoFimFilter(e.target.value)}
+                />
               </div>
               <div className="col-md-3 col-sm-6">
-                  <label htmlFor="dataAtualizacaoInicioFilter" className="form-label form-label-sm mb-1">Atualização De:</label>
-                  <input type="date" id="dataAtualizacaoInicioFilter" className="form-control form-control-sm" value={dataAtualizacaoInicioFilter} onChange={e => setDataAtualizacaoInicioFilter(e.target.value)} />
+                <label
+                  htmlFor="dataAtualizacaoInicioFilter"
+                  className="form-label form-label-sm mb-1"
+                >
+                  Atualização De:
+                </label>
+                <input
+                  type="date"
+                  id="dataAtualizacaoInicioFilter"
+                  className="form-control form-control-sm"
+                  value={dataAtualizacaoInicioFilter}
+                  onChange={(e) => setDataAtualizacaoInicioFilter(e.target.value)}
+                />
               </div>
               <div className="col-md-3 col-sm-6">
-                  <label htmlFor="dataAtualizacaoFimFilter" className="form-label form-label-sm mb-1">Atualização Até:</label>
-                  <input type="date" id="dataAtualizacaoFimFilter" className="form-control form-control-sm" value={dataAtualizacaoFimFilter} onChange={e => setDataAtualizacaoFimFilter(e.target.value)} />
+                <label htmlFor="dataAtualizacaoFimFilter" className="form-label form-label-sm mb-1">
+                  Atualização Até:
+                </label>
+                <input
+                  type="date"
+                  id="dataAtualizacaoFimFilter"
+                  className="form-control form-control-sm"
+                  value={dataAtualizacaoFimFilter}
+                  onChange={(e) => setDataAtualizacaoFimFilter(e.target.value)}
+                />
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {error && casos.length > 0 && <div className="alert alert-warning m-3 small" role="alert">Erro ao atualizar a lista: {error}. Exibindo dados anteriores.</div>}
+      {error && casos.length > 0 && (
+        <div className="alert alert-warning m-3 small" role="alert">
+          Erro ao atualizar a lista: {error}. Exibindo dados anteriores.
+        </div>
+      )}
 
       <div className="table-responsive">
         <table className="table table-hover table-striped table-sm mb-0 align-middle">
           <thead className="table-light">
             <tr>
-              <th onClick={() => requestSort('titulo')} style={{ cursor: 'pointer' }}>Título {getSortIcon('titulo')}</th>
-              <th onClick={() => requestSort('cliente_nome')} style={{ cursor: 'pointer' }}>Cliente {getSortIcon('cliente_nome')}</th>
-              <th onClick={() => requestSort('numero_processo')} style={{ cursor: 'pointer' }}>Nº Proc. {getSortIcon('numero_processo')}</th>
-              <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>Status {getSortIcon('status')}</th>
-              <th onClick={() => requestSort('data_criacao')} style={{ cursor: 'pointer' }}>Criação {getSortIcon('data_criacao')}</th>
-              <th onClick={() => requestSort('data_atualizacao')} style={{ cursor: 'pointer' }}>Atualização {getSortIcon('data_atualizacao')}</th>
-              <th className="text-center" style={{width: '100px'}}>Ações</th>
+              <th onClick={() => requestSort('titulo')} style={{ cursor: 'pointer' }}>
+                Título {getSortIcon('titulo')}
+              </th>
+              <th onClick={() => requestSort('cliente_nome')} style={{ cursor: 'pointer' }}>
+                Cliente {getSortIcon('cliente_nome')}
+              </th>
+              <th onClick={() => requestSort('numero_processo')} style={{ cursor: 'pointer' }}>
+                Nº Proc. {getSortIcon('numero_processo')}
+              </th>
+              <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>
+                Status {getSortIcon('status')}
+              </th>
+              <th onClick={() => requestSort('data_criacao')} style={{ cursor: 'pointer' }}>
+                Criação {getSortIcon('data_criacao')}
+              </th>
+              <th onClick={() => requestSort('data_atualizacao')} style={{ cursor: 'pointer' }}>
+                Atualização {getSortIcon('data_atualizacao')}
+              </th>
+              <th className="text-center" style={{ width: '100px' }}>
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody>
             {loading && casos.length > 0 && (
-              <tr><td colSpan="7" className="text-center p-4"><div className="spinner-border spinner-border-sm text-primary" role="status"><span className="visually-hidden">A atualizar...</span></div></td></tr>
+              <tr>
+                <td colSpan="7" className="text-center p-4">
+                  <div className="spinner-border spinner-border-sm text-primary" role="status">
+                    <span className="visually-hidden">A atualizar...</span>
+                  </div>
+                </td>
+              </tr>
             )}
             {!loading && casos.length === 0 && !error && (
               <tr>
-                <td colSpan="7" className="text-center text-muted p-4">Nenhum caso encontrado com os filtros aplicados.</td>
+                <td colSpan="7" className="text-center text-muted p-4">
+                  Nenhum caso encontrado com os filtros aplicados.
+                </td>
               </tr>
             )}
             {casos.map((caso) => (
-                <tr key={caso.id}>
-                  <td className="px-3 py-2">{caso.titulo}</td>
-                  <td className="px-3 py-2">{caso.cliente?.nome_razao_social || 'N/A'}</td>
-                  <td className="px-3 py-2">{caso.numero_processo || '-'}</td>
-                  <td className="px-3 py-2">
-                    <span className={`badge fs-xs ${getStatusBadge(caso.status)}`}>{caso.status}</span>
-                  </td>
-                  <td className="px-3 py-2">{caso.data_criacao ? new Date(caso.data_criacao).toLocaleDateString() : '-'}</td>
-                  <td className="px-3 py-2">{caso.data_atualizacao ? new Date(caso.data_atualizacao).toLocaleDateString() : '-'}</td>
-                  <td className="px-3 py-2 text-center">
-                    <button
-                      onClick={() => onEditCaso(caso)}
-                      className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
-                      title="Editar Caso"
-                      disabled={deletingId === caso.id}
-                      style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}
-                    >
-                      <PencilSquareIcon style={{ width: '16px', height: '16px' }} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(caso.id)}
-                      className="btn btn-sm btn-outline-danger p-1 lh-1"
-                      title="Deletar Caso"
-                      disabled={deletingId === caso.id}
-                      style={{width: '30px', height: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}
-                    >
-                      {deletingId === caso.id ? (
-                        <div className="spinner-border spinner-border-sm" role="status" style={{width: '1rem', height: '1rem'}}></div>
-                      ) : (
-                        <TrashIcon style={{ width: '16px', height: '16px' }} />
-                      )}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              <tr key={caso.id}>
+                <td className="px-3 py-2">{caso.titulo}</td>
+                <td className="px-3 py-2">{caso.cliente?.nome_razao_social || 'N/A'}</td>
+                <td className="px-3 py-2">{caso.numero_processo || '-'}</td>
+                <td className="px-3 py-2">
+                  <span className={`badge fs-xs ${getStatusBadge(caso.status)}`}>
+                    {caso.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2">
+                  {caso.data_criacao ? new Date(caso.data_criacao).toLocaleDateString() : '-'}
+                </td>
+                <td className="px-3 py-2">
+                  {caso.data_atualizacao
+                    ? new Date(caso.data_atualizacao).toLocaleDateString()
+                    : '-'}
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <button
+                    onClick={() => onEditCaso(caso)}
+                    className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
+                    title="Editar Caso"
+                    disabled={deletingId === caso.id}
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <PencilSquareIcon style={{ width: '16px', height: '16px' }} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(caso.id)}
+                    className="btn btn-sm btn-outline-danger p-1 lh-1"
+                    title="Deletar Caso"
+                    disabled={deletingId === caso.id}
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {deletingId === caso.id ? (
+                      <div
+                        className="spinner-border spinner-border-sm"
+                        role="status"
+                        style={{ width: '1rem', height: '1rem' }}
+                      ></div>
+                    ) : (
+                      <TrashIcon style={{ width: '16px', height: '16px' }} />
+                    )}
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -360,7 +501,7 @@ function CasoList({ onEditCaso, refreshKey }) {
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default CasoList;
+export default CasoList

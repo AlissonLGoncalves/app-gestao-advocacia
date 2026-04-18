@@ -88,7 +88,9 @@ body {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   box-shadow: 0 20px 46px rgba(2, 6, 23, 0.28);
-  transition: transform var(--ease), box-shadow var(--ease);
+  transition:
+    transform var(--ease),
+    box-shadow var(--ease);
 }
 
 .sidebar-brand {
@@ -158,7 +160,11 @@ body {
   background: transparent;
   font-size: 0.92rem;
   font-weight: 600;
-  transition: background var(--ease), transform var(--ease), color var(--ease), box-shadow var(--ease);
+  transition:
+    background var(--ease),
+    transform var(--ease),
+    color var(--ease),
+    box-shadow var(--ease);
 }
 
 .sidebar-link-icon {
@@ -178,7 +184,9 @@ body {
 .sidebar-link.active {
   color: #ffffff;
   background: linear-gradient(135deg, rgba(10, 132, 255, 0.42), rgba(6, 182, 212, 0.34));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 8px 20px rgba(2, 132, 199, 0.25);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15),
+    0 8px 20px rgba(2, 132, 199, 0.25);
 }
 
 .sidebar-link.active .sidebar-link-icon,
@@ -227,8 +235,7 @@ body {
   justify-content: space-between;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.84));
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.84));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--shadow-xs);
@@ -266,8 +273,7 @@ body {
   overflow-y: auto;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  background:
-    linear-gradient(125deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.58));
+  background: linear-gradient(125deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.58));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   padding: 1.35rem;
@@ -280,11 +286,13 @@ body {
 .card {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(249, 251, 255, 0.8));
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(249, 251, 255, 0.8));
   box-shadow: var(--shadow-xs);
   overflow: hidden;
-  transition: transform var(--ease), box-shadow var(--ease), border-color var(--ease);
+  transition:
+    transform var(--ease),
+    box-shadow var(--ease),
+    border-color var(--ease);
 }
 
 .card:hover {
@@ -339,7 +347,11 @@ body {
   font-size: 0.86rem;
   font-weight: 700;
   letter-spacing: 0.01em;
-  transition: transform var(--ease), box-shadow var(--ease), background-color var(--ease), border-color var(--ease);
+  transition:
+    transform var(--ease),
+    box-shadow var(--ease),
+    background-color var(--ease),
+    border-color var(--ease);
 }
 
 .btn-primary {
@@ -392,7 +404,10 @@ body {
   border-color: rgba(17, 24, 39, 0.12);
   background: rgba(255, 255, 255, 0.9);
   color: var(--text-1);
-  transition: border-color var(--ease), box-shadow var(--ease), background-color var(--ease);
+  transition:
+    border-color var(--ease),
+    box-shadow var(--ease),
+    background-color var(--ease);
 }
 
 .form-control::placeholder {
@@ -456,8 +471,7 @@ body {
   padding: 2.2rem;
   border-radius: 26px;
   border: 1px solid rgba(255, 255, 255, 0.9);
-  background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.78));
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.78));
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   box-shadow: var(--shadow-md);

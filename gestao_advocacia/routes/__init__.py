@@ -1,5 +1,5 @@
-from .auth import register_auth_routes
 from .auditoria import register_auditoria_routes
+from .auth import register_auth_routes
 from .casos import register_casos_routes
 from .clientes import register_clientes_routes
 from .contratos import register_contratos_routes

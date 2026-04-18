@@ -1,7 +1,8 @@
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from app import db, EventoAgenda, User
+
+from app import EventoAgenda, User, db
 from mail_service import enviar_alerta_email
+
 
 def job_verificar_prazos(app):
     """
@@ -9,12 +10,11 @@ def job_verificar_prazos(app):
     """
     with app.app_context():
         hoje = datetime.utcnow().date()
-        
+
         # Filtramos eventos Pendentes que sejam Prazos ou Audiências.
-        tipos_alvo = ['Prazo', 'Audiência']
+        tipos_alvo = ["Prazo", "Audiência"]
         eventos = EventoAgenda.query.filter(
-            EventoAgenda.status_evento == 'Pendente',
-            EventoAgenda.tipo_evento.in_(tipos_alvo)
+            EventoAgenda.status_evento == "Pendente", EventoAgenda.tipo_evento.in_(tipos_alvo)
         ).all()
 
         for ev in eventos:
@@ -26,7 +26,7 @@ def job_verificar_prazos(app):
                 marcador_tag = "7d"
             elif diff_dias == 3:
                 marcador_tag = "3d"
-            
+
             if marcador_tag:
                 notificacoes = ev.notificacoes_enviadas or {}
                 if not notificacoes.get(marcador_tag, False):
@@ -47,10 +47,11 @@ def job_verificar_prazos(app):
                         enviado = enviar_alerta_email(app, user.email, assunto, corpo)
                         if enviado:
                             notificacoes[marcador_tag] = True
-                            
+
                             # Atualiza a coluna no banco
                             # Para forçar o SQLAlchemy salvar colunas JSON, reatribuímos
                             import copy
+
                             evento_atualizado = copy.deepcopy(notificacoes)
                             ev.notificacoes_enviadas = evento_atualizado
                             try:

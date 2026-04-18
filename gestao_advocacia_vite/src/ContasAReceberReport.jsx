@@ -1,55 +1,63 @@
 ﻿// src/ContasAReceberReport.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { API_URL } from './config.js';
-import { toast } from 'react-toastify'; // Importar toast
+import React, { useState, useEffect, useCallback } from 'react'
+import { API_URL } from './config.js'
+import { toast } from 'react-toastify' // Importar toast
 
 function ContasAReceberReport() {
-  const [reportData, setReportData] = useState({ items: [], total_geral: "0.00", quantidade_items: 0 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [reportData, setReportData] = useState({
+    items: [],
+    total_geral: '0.00',
+    quantidade_items: 0,
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const fetchContasAReceber = useCallback(async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true)
+    setError('')
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token')
     if (!token) {
-        setError("Autenticação necessária para visualizar relatórios.");
-        setLoading(false);
-        toast.error("Sessão expirada ou inválida. Faça login.");
-        return;
+      setError('Autenticação necessária para visualizar relatórios.')
+      setLoading(false)
+      toast.error('Sessão expirada ou inválida. Faça login.')
+      return
     }
-    const authHeaders = { 'Authorization': `Bearer ${token}` };
+    const authHeaders = { Authorization: `Bearer ${token}` }
 
     try {
       // A API de relatórios pode não ter uma barra final, verifique a definição da rota no backend.
       // Se /api/relatorios/contas-a-receber é o endpoint exato:
-      const response = await fetch(`${API_URL}/relatorios/contas-a-receber`, { headers: authHeaders });
+      const response = await fetch(`${API_URL}/relatorios/contas-a-receber`, {
+        headers: authHeaders,
+      })
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ erro: `Erro HTTP: ${response.status}` }));
-        console.error("ContasAReceberReport: Erro da API ao buscar relatório:", errorData);
-        throw new Error(errorData.erro || `Erro HTTP: ${response.status}`);
+        const errorData = await response
+          .json()
+          .catch(() => ({ erro: `Erro HTTP: ${response.status}` }))
+        console.error('ContasAReceberReport: Erro da API ao buscar relatório:', errorData)
+        throw new Error(errorData.erro || `Erro HTTP: ${response.status}`)
       }
-      const data = await response.json();
+      const data = await response.json()
       setReportData({
         items: data.items || [],
-        total_geral: data.total_geral || "0.00",
-        quantidade_items: data.quantidade_items || 0
-      });
+        total_geral: data.total_geral || '0.00',
+        quantidade_items: data.quantidade_items || 0,
+      })
     } catch (err) {
-      console.error("ContasAReceberReport: Erro detalhado ao buscar relatório:", err);
-      setError(`Erro ao carregar relatório: ${err.message}`);
-      if (!err.message.includes("Autenticação")) {
-        toast.error(`Erro ao carregar relatório: ${err.message}`);
+      console.error('ContasAReceberReport: Erro detalhado ao buscar relatório:', err)
+      setError(`Erro ao carregar relatório: ${err.message}`)
+      if (!err.message.includes('Autenticação')) {
+        toast.error(`Erro ao carregar relatório: ${err.message}`)
       }
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    fetchContasAReceber();
-  }, [fetchContasAReceber]);
+    fetchContasAReceber()
+  }, [fetchContasAReceber])
 
   if (loading) {
     return (
@@ -59,12 +67,16 @@ function ContasAReceberReport() {
         </div>
         <span className="ms-2 text-muted small">A carregar Contas a Receber...</span>
       </div>
-    );
+    )
   }
 
   if (error) {
-    console.error("ContasAReceberReport: Renderizando estado de erro:", error);
-    return <div className="alert alert-danger small" role="alert">Erro ao carregar relatório: {error}</div>;
+    console.error('ContasAReceberReport: Renderizando estado de erro:', error)
+    return (
+      <div className="alert alert-danger small" role="alert">
+        Erro ao carregar relatório: {error}
+      </div>
+    )
   }
   return (
     <div>
@@ -86,24 +98,37 @@ function ContasAReceberReport() {
                 </tr>
               </thead>
               <tbody>
-                {reportData.items.map(item => (
+                {reportData.items.map((item) => (
                   <tr key={item.id}>
                     <td>{item.descricao}</td>
                     <td>{item.cliente_nome || '-'}</td>
                     <td>{item.caso_titulo || '-'}</td>
                     <td className="text-end">
-                      {typeof item.valor === 'number' || (typeof item.valor === 'string' && !isNaN(parseFloat(item.valor)))
-                        ? parseFloat(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                      {typeof item.valor === 'number' ||
+                      (typeof item.valor === 'string' && !isNaN(parseFloat(item.valor)))
+                        ? parseFloat(item.valor).toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })
                         : 'N/A'}
                     </td>
-                    <td>{item.data_vencimento ? new Date(item.data_vencimento).toLocaleDateString('pt-BR') : '-'}</td>
                     <td>
-                      <span className={`badge ${
-                        item.status === 'Pendente' ? 'bg-warning-subtle text-warning-emphasis' :
-                        item.status === 'Vencido' ? 'bg-danger-subtle text-danger-emphasis' :
-                        item.status === 'Pago' ? 'bg-success-subtle text-success-emphasis' :
-                        'bg-light text-dark'
-                      }`}>
+                      {item.data_vencimento
+                        ? new Date(item.data_vencimento).toLocaleDateString('pt-BR')
+                        : '-'}
+                    </td>
+                    <td>
+                      <span
+                        className={`badge ${
+                          item.status === 'Pendente'
+                            ? 'bg-warning-subtle text-warning-emphasis'
+                            : item.status === 'Vencido'
+                              ? 'bg-danger-subtle text-danger-emphasis'
+                              : item.status === 'Pago'
+                                ? 'bg-success-subtle text-success-emphasis'
+                                : 'bg-light text-dark'
+                        }`}
+                      >
                         {item.status}
                       </span>
                     </td>
@@ -112,10 +137,17 @@ function ContasAReceberReport() {
               </tbody>
               <tfoot>
                 <tr className="table-light fw-bold">
-                  <td colSpan="3" className="text-end">Total Geral a Receber:</td>
+                  <td colSpan="3" className="text-end">
+                    Total Geral a Receber:
+                  </td>
                   <td className="text-end">
-                     {typeof reportData.total_geral === 'number' || (typeof reportData.total_geral === 'string' && !isNaN(parseFloat(reportData.total_geral)))
-                      ? parseFloat(reportData.total_geral).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                    {typeof reportData.total_geral === 'number' ||
+                    (typeof reportData.total_geral === 'string' &&
+                      !isNaN(parseFloat(reportData.total_geral)))
+                      ? parseFloat(reportData.total_geral).toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })
                       : 'R$ 0,00'}
                   </td>
                   <td colSpan="2">({reportData.quantidade_items} item(s))</td>
@@ -126,7 +158,7 @@ function ContasAReceberReport() {
         </>
       )}
     </div>
-  );
+  )
 }
 
-export default ContasAReceberReport;
+export default ContasAReceberReport

@@ -8,11 +8,11 @@
 #   2. Por número de processo — captura publicações dos casos ativos cadastrados,
 #      mesmo que não tenham OAB configurada.
 # ==============================================================================
-import time
 import logging
+import time
 from datetime import datetime, timedelta
 
-from djen_service import consultar_comunicacoes, DjenAPIError, DjenRateLimitError
+from djen_service import DjenAPIError, DjenRateLimitError, consultar_comunicacoes
 
 RATE_LIMIT_SLEEP = 65  # segundos a aguardar após HTTP 429
 DELAY_ENTRE_REQUISICOES = 3  # segundos entre cada requisição
@@ -129,7 +129,7 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
         nome_juiz=nome_juiz,
         raw_json=item,
         origem_busca=origem,
-        status_origem='pendente',
+        status_origem="pendente",
         triagem_ignorada=False,
     )
     db.session.add(pub)
@@ -170,7 +170,7 @@ def _parse_data_disponibilizacao(valor):
 
 def _normalizar_sigla_tribunal(uf_ou_sigla):
     """Normaliza UF/sigla para formato aceito pelo CNJ.
-    
+
     - UF de 2 letras (ex.: PR) → TJPR
     - Siglas explícitas como TRT9, TST, STJ → retorna como está
     """
@@ -208,14 +208,18 @@ def _consultar_oab_com_fallback(*, numero_oab, sigla_tribunal, data_inicio, data
     """
     tentativas = []
     if sigla_tribunal:
-        tentativas.extend([
-            {"sigla_tribunal": sigla_tribunal, "pagina": 1},
-            {"sigla_tribunal": sigla_tribunal, "pagina": 0},
-        ])
-    tentativas.extend([
-        {"sigla_tribunal": None, "pagina": 1},
-        {"sigla_tribunal": None, "pagina": 0},
-    ])
+        tentativas.extend(
+            [
+                {"sigla_tribunal": sigla_tribunal, "pagina": 1},
+                {"sigla_tribunal": sigla_tribunal, "pagina": 0},
+            ]
+        )
+    tentativas.extend(
+        [
+            {"sigla_tribunal": None, "pagina": 1},
+            {"sigla_tribunal": None, "pagina": 0},
+        ]
+    )
 
     ultimo_payload = {}
     ultimo_items = []
@@ -257,7 +261,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             }
 
         try:
-            from app import db, PublicacaoDJEN, User, Caso, DjenOabMonitoramento
+            from app import Caso, DjenOabMonitoramento, PublicacaoDJEN, User, db
         except ImportError as e:
             logger.critical(f"JOB DJEN: falha ao importar modelos: {e}")
             return {
@@ -266,7 +270,9 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
                 "erro": str(e),
             }
 
-        janela_dias = lookback_days if lookback_days is not None else app.config.get("DJEN_LOOKBACK_DAYS", 30)
+        janela_dias = (
+            lookback_days if lookback_days is not None else app.config.get("DJEN_LOOKBACK_DAYS", 30)
+        )
         try:
             janela_dias = int(janela_dias)
         except (TypeError, ValueError):
@@ -306,7 +312,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             try:
                 sigla_tribunal = (
                     oab_mon.sigla_tribunal
-                    if getattr(oab_mon, 'sigla_tribunal', None)
+                    if getattr(oab_mon, "sigla_tribunal", None)
                     else _normalizar_sigla_tribunal(oab_mon.uf_oab)
                 )
                 numero_oab = _normalizar_numero_oab(oab_mon.numero_oab)
@@ -343,7 +349,9 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
                 db.session.rollback()
                 erros += 1
             except Exception as e:
-                logger.error(f"JOB DJEN: exceção inesperada (OAB {oab_mon.numero_oab}): {e}", exc_info=True)
+                logger.error(
+                    f"JOB DJEN: exceção inesperada (OAB {oab_mon.numero_oab}): {e}", exc_info=True
+                )
                 db.session.rollback()
                 erros += 1
 
@@ -365,7 +373,11 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         if tenant_id is not None:
             casos_query = casos_query.filter_by(tenant_id=tenant_id)
 
-        casos = casos_query.order_by(Caso.data_ultima_verificacao_djen.asc().nulls_first()).limit(max_casos).all()
+        casos = (
+            casos_query.order_by(Caso.data_ultima_verificacao_djen.asc().nulls_first())
+            .limit(max_casos)
+            .all()
+        )
 
         logger.info(f"JOB DJEN: {len(casos)} caso(s) para verificar por processo.")
 

@@ -25,10 +25,7 @@ export default [
       ...reactHooks.configs.recommended.rules,
       // TODO: voltar para error após tarefa N2/N1 (quebra de componentes e testes frontend)
       'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
   {

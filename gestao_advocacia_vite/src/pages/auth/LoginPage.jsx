@@ -1,27 +1,27 @@
 // Arquivo: gestao_advocacia_vite/src/pages/auth/LoginPage.jsx
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // CORRIGIDO AQUI
-import { API_URL } from '../../config';
-import { toast } from 'react-toastify';
-import { LockClosedIcon, UserIcon } from '@heroicons/react/24/outline';
-import { Link } from 'react-router-dom'; // Adicionado para o link de registro, se desejar
-import { APP_VERSION } from '../../version.js';
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom' // CORRIGIDO AQUI
+import { API_URL } from '../../config'
+import { toast } from 'react-toastify'
+import { LockClosedIcon, UserIcon } from '@heroicons/react/24/outline'
+import { Link } from 'react-router-dom' // Adicionado para o link de registro, se desejar
+import { APP_VERSION } from '../../version.js'
 
 function LoginPage() {
-  const [usernameOrEmail, setUsernameOrEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const [usernameOrEmail, setUsernameOrEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    toast.dismiss(); 
+    e.preventDefault()
+    setLoading(true)
+    toast.dismiss()
 
     if (!usernameOrEmail || !password) {
-        toast.error("Por favor, preencha o nome de usuário/email e a senha.");
-        setLoading(false);
-        return;
+      toast.error('Por favor, preencha o nome de usuário/email e a senha.')
+      setLoading(false)
+      return
     }
 
     try {
@@ -29,31 +29,33 @@ function LoginPage() {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username_or_email: usernameOrEmail, password: password })
-      });
-      const rawResponse = await response.text();
-      let data = {};
+        body: JSON.stringify({ username_or_email: usernameOrEmail, password: password }),
+      })
+      const rawResponse = await response.text()
+      let data = {}
       try {
-        data = rawResponse ? JSON.parse(rawResponse) : {};
+        data = rawResponse ? JSON.parse(rawResponse) : {}
       } catch {
-        data = {};
+        data = {}
       }
 
       if (response.ok) {
-        localStorage.setItem('token', data.access_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        toast.success("Login bem-sucedido! Redirecionando...");
-        navigate('/dashboard'); 
+        localStorage.setItem('token', data.access_token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+        toast.success('Login bem-sucedido! Redirecionando...')
+        navigate('/dashboard')
       } else {
-        toast.error(data.message || `Falha no login (HTTP ${response.status}). Verifique suas credenciais.`);
+        toast.error(
+          data.message || `Falha no login (HTTP ${response.status}). Verifique suas credenciais.`
+        )
       }
     } catch (error) {
-      console.error("Erro ao tentar fazer login:", error);
-      toast.error(`Erro de rede ao conectar em ${API_URL}. Verifique se backend está online.`);
+      console.error('Erro ao tentar fazer login:', error)
+      toast.error(`Erro de rede ao conectar em ${API_URL}. Verifique se backend está online.`)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="auth-container">
@@ -68,7 +70,10 @@ function LoginPage() {
         <form onSubmit={handleLogin}>
           <div className="mb-3">
             <label htmlFor="usernameOrEmail" className="form-label">
-              <UserIcon className="d-inline-block me-1" style={{ width: '16px', verticalAlign: 'text-bottom' }} />
+              <UserIcon
+                className="d-inline-block me-1"
+                style={{ width: '16px', verticalAlign: 'text-bottom' }}
+              />
               Usuário ou Email
             </label>
             <input
@@ -85,10 +90,20 @@ function LoginPage() {
           <div className="mb-4">
             <div className="d-flex justify-content-between">
               <label htmlFor="password" className="form-label">
-                <LockClosedIcon className="d-inline-block me-1" style={{ width: '16px', verticalAlign: 'text-bottom' }} />
+                <LockClosedIcon
+                  className="d-inline-block me-1"
+                  style={{ width: '16px', verticalAlign: 'text-bottom' }}
+                />
                 Senha
               </label>
-              <a href="#" onClick={(e) => { e.preventDefault(); toast.info("Link de recuperação enviado para o email (simulado)!"); }} className="small text-decoration-none fw-semibold">
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  toast.info('Link de recuperação enviado para o email (simulado)!')
+                }}
+                className="small text-decoration-none fw-semibold"
+              >
                 Esqueceu a senha?
               </a>
             </div>
@@ -106,7 +121,11 @@ function LoginPage() {
           <button type="submit" className="btn btn-primary w-100 py-2" disabled={loading}>
             {loading ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span
+                  className="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
                 Aguarde...
               </>
             ) : (
@@ -116,13 +135,16 @@ function LoginPage() {
         </form>
         <div className="text-center mt-4">
           <p className="text-muted small mb-0">
-            Não tem uma conta? <Link to="/register" className="fw-semibold">Registre-se aqui</Link>
+            Não tem uma conta?{' '}
+            <Link to="/register" className="fw-semibold">
+              Registre-se aqui
+            </Link>
           </p>
           <p className="auth-version mt-2 mb-0">Versao v{APP_VERSION}</p>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-export default LoginPage;
+export default LoginPage

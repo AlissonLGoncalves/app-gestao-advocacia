@@ -1,0 +1,19 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+exclude = '(migrations/versions|venv|\.venv|\.git|__pycache__)'
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+  "migrations/versions",
+  "venv",
+  ".venv",
+  ".git",
+  "__pycache__",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
