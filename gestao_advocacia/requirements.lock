@@ -14,6 +14,10 @@ aniso8601==10.0.1 \
     --hash=sha256:25488f8663dd1528ae1f54f94ac1ea51ae25b4d531539b8bc707fed184d16845 \
     --hash=sha256:eb19717fd4e0db6de1aab06f12450ab92144246b257423fe020af5748c0cb89e
     # via flask-restx
+apispec==6.8.4 \
+    --hash=sha256:18d6cfaf6a9742d4f9a8f364bfabb7e8884983e10b155ad13616e084f47164ef \
+    --hash=sha256:fd0ed14af71a2949d9aeb96b72ce1517cb4a48a5c55667cd0483b7ed33156a2a
+    # via -r requirements.txt
 apscheduler==3.11.2 \
     --hash=sha256:2a9966b052ec805f020c8c4c3ae6e6a06e24b1bf19f2e11d91d8cca0473eef41 \
     --hash=sha256:ce005177f741409db4e4dd40a7431b76feb856b9dd69d57e0da49d6715bfd26d
@@ -552,6 +556,7 @@ packaging==26.1 \
     --hash=sha256:5d9c0669c6285e491e0ced2eee587eaf67b670d94a19e94e3984a481aba6802f \
     --hash=sha256:f042152b681c4bfac5cae2742a55e103d27ab2ec0f3d88037136b6bfe7c9c5de
     # via
+    #   apispec
     #   gunicorn
     #   pytesseract
     #   pytest
