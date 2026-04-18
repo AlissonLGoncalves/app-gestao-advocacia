@@ -16,9 +16,9 @@ export default defineConfig({
         'src/ClienteForm.jsx',
         'src/CasoForm.jsx',
         'src/components/HonorariosCasoCard.jsx',
-        'src/pages/auth/LoginPage.jsx'
-      ]
-    }
+        'src/pages/auth/LoginPage.jsx',
+      ],
+    },
   },
   // Adicione aqui outras configurações do Vite, se necessário.
   // Por exemplo, se você precisar de um proxy para a sua API Flask:
