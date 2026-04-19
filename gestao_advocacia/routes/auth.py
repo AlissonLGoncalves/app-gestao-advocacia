@@ -8,7 +8,48 @@ from jwt.exceptions import DecodeError, ExpiredSignatureError
 
 from extensions import db
 from mail_service import enviar_alerta_email
-from models import Tenant, User
+from models import ConsentimentoUsuario, Tenant, User
+
+TIPOS_CONSENTIMENTO_OBRIGATORIOS = ("termos_uso", "lgpd")
+
+
+def _registrar_consentimentos(user, data):
+    """Valida aceites e persiste ConsentimentoUsuario. Retorna (ok, error_response_tuple)."""
+    if not data.get("aceite_termos"):
+        return False, ({"message": "É obrigatório aceitar os Termos de Uso."}, 400)
+    if not data.get("aceite_lgpd"):
+        return False, ({"message": "É obrigatório aceitar a Política de Privacidade (LGPD)."}, 400)
+    versao_termos = data.get("versao_termos")
+    versao_lgpd = data.get("versao_lgpd")
+    if not versao_termos or not versao_lgpd:
+        return False, ({"message": "Versão dos Termos/LGPD é obrigatória."}, 400)
+
+    from flask import request as _req
+
+    ip = _req.headers.get("X-Forwarded-For", _req.remote_addr or "").split(",")[0].strip()
+    ua = (_req.headers.get("User-Agent") or "")[:500]
+
+    db.session.add(
+        ConsentimentoUsuario(
+            user_id=user.id,
+            tipo="termos_uso",
+            versao=versao_termos,
+            ip=ip,
+            user_agent=ua,
+            hash_documento=data.get("hash_termos_uso"),
+        )
+    )
+    db.session.add(
+        ConsentimentoUsuario(
+            user_id=user.id,
+            tipo="lgpd",
+            versao=versao_lgpd,
+            ip=ip,
+            user_agent=ua,
+            hash_documento=data.get("hash_lgpd"),
+        )
+    )
+    return True, None
 
 
 def register_auth_routes(
@@ -66,6 +107,13 @@ def register_auth_routes(
             )
             new_user.set_password(password)
             db.session.add(new_user)
+            db.session.flush()
+
+            ok, err = _registrar_consentimentos(new_user, data)
+            if not ok:
+                db.session.rollback()
+                return err
+
             db.session.commit()
 
             app.logger.info(
@@ -167,6 +215,13 @@ def register_auth_routes(
                 )
                 new_user.set_password(password)
                 db.session.add(new_user)
+                db.session.flush()
+
+                ok, err = _registrar_consentimentos(new_user, data)
+                if not ok:
+                    db.session.rollback()
+                    return err
+
                 db.session.commit()
 
                 app.logger.info(
@@ -239,3 +294,28 @@ def register_auth_routes(
                 )
                 return {"message": "Usuário associado ao token não encontrado."}, 404
             return user, 200
+
+    @auth_ns.route("/me/consentimentos")
+    class MeConsentimentos(Resource):
+        @jwt_required()
+        @auth_ns.doc(
+            security="jsonWebToken", description="Lista os consentimentos do usuário autenticado."
+        )
+        def get(self):
+            user_id = get_jwt_identity()
+            itens = (
+                ConsentimentoUsuario.query.filter_by(user_id=user_id)
+                .order_by(ConsentimentoUsuario.aceito_em.desc())
+                .all()
+            )
+            return [
+                {
+                    "tipo": c.tipo,
+                    "versao": c.versao,
+                    "aceito_em": c.aceito_em.isoformat() if c.aceito_em else None,
+                    "ip": c.ip,
+                    "user_agent": c.user_agent,
+                    "hash_documento": c.hash_documento,
+                }
+                for c in itens
+            ], 200
