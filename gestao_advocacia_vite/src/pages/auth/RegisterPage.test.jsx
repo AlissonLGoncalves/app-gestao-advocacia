@@ -3,6 +3,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import RegisterPage from './RegisterPage'
 
+vi.mock('../../legal/termos-v1.0.md?raw', () => ({
+  default: '---\nversao: v1.0\n---\n\n# Mock Termos\nConteudo mock dos termos.',
+}))
+vi.mock('../../legal/lgpd-v1.0.md?raw', () => ({
+  default: '---\nversao: v1.0\n---\n\n# Mock LGPD\nConteudo mock da LGPD.',
+}))
+
 // Mock fetch globalmente
 const fetchMock = vi.fn()
 globalThis.fetch = fetchMock
@@ -22,11 +29,35 @@ function renderPage(initialEntries = ['/register']) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  fetchMock.mockImplementation(async (url) => {
+    if (String(url).includes('/auth/termos-vigentes')) {
+      return {
+        ok: true,
+        json: async () => ({
+          termos: {
+            versao: 'v1.0',
+            hash: 'hash-termos',
+            conteudo: '---\nversao: v1.0\n---\n\n# Termos Via API\nTexto termos.',
+          },
+          lgpd: {
+            versao: 'v1.0',
+            hash: 'hash-lgpd',
+            conteudo: '---\nversao: v1.0\n---\n\n# LGPD Via API\nTexto lgpd.',
+          },
+        }),
+      }
+    }
+
+    return {
+      ok: true,
+      json: async () => ({ message: 'ok' }),
+    }
+  })
 })
 
 describe('RegisterPage — aceite LGPD', () => {
   it('botão de submit fica desabilitado enquanto os dois checkboxes não estão marcados', () => {
-    const { container } = renderPage()
+    renderPage()
     const submitBtn = screen.getByRole('button', { name: /criar conta/i })
     // Ambos desmarcados → desabilitado
     expect(submitBtn).toBeDisabled()
@@ -43,11 +74,6 @@ describe('RegisterPage — aceite LGPD', () => {
   })
 
   it('ao submeter com aceites, o body enviado contém aceite_termos, aceite_lgpd, versao_termos e versao_lgpd', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ message: 'ok' }),
-    })
-
     const { container } = renderPage()
 
     // Preenche campos obrigatórios
@@ -75,14 +101,28 @@ describe('RegisterPage — aceite LGPD', () => {
 
     fireEvent.submit(screen.getByRole('button', { name: /criar conta/i }).closest('form'))
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/auth/register'))).toBe(true)
+    )
 
-    const [, options] = fetchMock.mock.calls[0]
+    const registerCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/auth/register'))
+    const [, options] = registerCall
     const body = JSON.parse(options.body)
 
     expect(body.aceite_termos).toBe(true)
     expect(body.aceite_lgpd).toBe(true)
     expect(body.versao_termos).toBe('v1.0')
     expect(body.versao_lgpd).toBe('v1.0')
+  })
+
+  it('carrega markdown no modal de termos', async () => {
+    renderPage()
+
+    fireEvent.click(screen.getByText(/termos de serviço/i))
+
+    await waitFor(() => {
+      expect(screen.getByText(/termos via api/i)).toBeInTheDocument()
+      expect(screen.getByText(/lgpd via api/i)).toBeInTheDocument()
+    })
   })
 })
