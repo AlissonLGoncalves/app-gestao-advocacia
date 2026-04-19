@@ -470,6 +470,93 @@ class TestDjenPayloadCompat:
             assert payload.get("items")[0]["id"] == 99
             assert mocked.call_count == 2
 
+    def test_extrair_siglas_tribunais_da_lista_do_cnj(self):
+        """Extrai siglas únicas da resposta de tribunais, preservando ordem."""
+        from djen_tasks import _extrair_siglas_tribunais
+
+        payload = {
+            "items": [
+                {"sigla": "TJPR"},
+                {"siglaTribunal": "tjsp"},
+                {"sigla": "TJPR"},
+                {"sigla": "TRF4"},
+            ]
+        }
+
+        siglas = _extrair_siglas_tribunais(payload)
+        assert siglas == ["TJPR", "TJSP", "TRF4"]
+
+    def test_extrair_siglas_tribunais_formato_com_chave_tribunais(self):
+        """Extrai siglas quando endpoint retorna payload com chave 'tribunais'."""
+        from djen_tasks import _extrair_siglas_tribunais
+
+        payload = {
+            "tribunais": [
+                {"sigla": "TJMG"},
+                {"sigla": "TRT9"},
+            ]
+        }
+
+        siglas = _extrair_siglas_tribunais(payload)
+        assert siglas == ["TJMG", "TRT9"]
+
+    def test_extrair_siglas_tribunais_formato_lista_uf_com_instituicoes(self):
+        """Extrai siglas quando endpoint retorna lista de UFs com instituições aninhadas."""
+        from djen_tasks import _extrair_siglas_tribunais
+
+        payload = [
+            {
+                "uf": "PR",
+                "instituicoes": [
+                    {"sigla": "TJPR"},
+                    {"sigla": "TRT9"},
+                ],
+            },
+            {
+                "uf": "SP",
+                "instituicoes": [
+                    {"sigla": "TJSP"},
+                    {"sigla": "TRF3"},
+                ],
+            },
+        ]
+
+        siglas = _extrair_siglas_tribunais(payload)
+        assert siglas == ["TJPR", "TRT9", "TJSP", "TRF3"]
+
+    def test_consultar_oab_em_todos_tribunais_acumula_e_deduplica(self):
+        """No modo todos tribunais, acumula resultados de todas tentativas com deduplicação."""
+        from djen_tasks import _consultar_oab_em_todos_tribunais
+
+        class DummyLogger:
+            def info(self, *args, **kwargs):
+                return None
+
+        side_effect = [
+            {"items": [{"id": 1, "hash": "dup"}]},  # sigla inicial, pagina 1
+            {"items": []},  # sigla inicial, pagina 0
+            {"items": [{"id": 2, "hash": "h2"}]},  # TJSP, pagina 1
+            {"items": [{"id": 1, "hash": "dup"}]},  # TJSP, pagina 0 (duplicado)
+            {"items": []},  # sem filtro, pagina 1
+            {"items": []},  # sem filtro, pagina 0
+        ]
+
+        with patch("djen_tasks.consultar_comunicacoes", side_effect=side_effect) as mocked:
+            payload, items = _consultar_oab_em_todos_tribunais(
+                numero_oab="94297",
+                sigla_tribunal="TJPR",
+                data_inicio="2026-04-01",
+                data_fim="2026-04-17",
+                logger=DummyLogger(),
+                siglas_tribunais=["TJSP"],
+            )
+
+            assert len(items) == 2
+            hashes = sorted([i.get("hash") for i in items])
+            assert hashes == ["dup", "h2"]
+            assert len(payload.get("items", [])) == 2
+            assert mocked.call_count == 6
+
 
 # ---------------------------------------------------------------------------
 # Triagem inteligente (parser + matching)

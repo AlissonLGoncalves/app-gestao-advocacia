@@ -13,7 +13,7 @@ import re
 import time
 from datetime import datetime, timedelta
 
-from djen_service import DjenAPIError, DjenRateLimitError, consultar_comunicacoes
+from djen_service import DjenAPIError, DjenRateLimitError, consultar_comunicacoes, listar_tribunais
 
 RATE_LIMIT_SLEEP = 65  # segundos a aguardar após HTTP 429
 DELAY_ENTRE_REQUISICOES = 3  # segundos entre cada requisição
@@ -126,6 +126,147 @@ def _consultar_processo_com_fallback(*, numero_processo, sigla_tribunal, data_in
         if items:
             return payload, items
 
+    return ultimo_payload, ultimo_items
+
+
+def _extrair_siglas_tribunais(payload):
+    """Extrai siglas de tribunais de diferentes formatos de resposta do CNJ."""
+    if isinstance(payload, list):
+        itens = payload
+    elif isinstance(payload, dict):
+        if isinstance(payload.get("tribunais"), list):
+            itens = payload.get("tribunais") or []
+        elif isinstance(payload.get("data"), list):
+            itens = payload.get("data") or []
+        else:
+            itens = _extrair_items(payload)
+    else:
+        itens = []
+
+    siglas = []
+    def _add_sigla(valor):
+        if not valor:
+            return
+        sigla_str = str(valor).strip().upper()
+        if sigla_str and sigla_str not in siglas:
+            siglas.append(sigla_str)
+
+    for item in itens:
+        if not isinstance(item, dict):
+            continue
+        _add_sigla(_item_get(item, "sigla", "siglaTribunal", "siglatribunal"))
+
+        instituicoes = item.get("instituicoes")
+        if isinstance(instituicoes, list):
+            for inst in instituicoes:
+                if isinstance(inst, dict):
+                    _add_sigla(_item_get(inst, "sigla", "siglaTribunal", "siglatribunal"))
+
+    return siglas
+
+
+def _dedupe_items_djen(items):
+    """Deduplica itens retornados pelo CNJ para evitar salvar duplicidades em lotes multi-tribunal."""
+    deduped = []
+    chaves = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        chave = (
+            _item_get(item, "hash", "id", "codigo"),
+            _item_get(item, "numeroProcesso", "numeroprocesso"),
+            _item_get(item, "dataDisponibilizacao", "datadisponibilizacao", "data"),
+        )
+        if chave in chaves:
+            continue
+        chaves.add(chave)
+        deduped.append(item)
+    return deduped
+
+
+def _build_tentativas_consulta(*, sigla_tribunal, siglas_tribunais=None):
+    """Monta sequência de tentativas por sigla/paginação com ordem estável e sem repetição."""
+    tentativas = []
+    visitados = set()
+
+    def _append(sigla, pagina):
+        chave = (sigla, pagina)
+        if chave in visitados:
+            return
+        visitados.add(chave)
+        tentativas.append({"sigla_tribunal": sigla, "pagina": pagina})
+
+    if sigla_tribunal:
+        _append(sigla_tribunal, 1)
+        _append(sigla_tribunal, 0)
+
+    for sigla in siglas_tribunais or []:
+        if sigla:
+            _append(sigla, 1)
+            _append(sigla, 0)
+
+    _append(None, 1)
+    _append(None, 0)
+    return tentativas
+
+
+def _consultar_com_tentativas(
+    *,
+    tipo,
+    numero_oab,
+    numero_processo,
+    sigla_tribunal,
+    data_inicio,
+    data_fim,
+    logger,
+    buscar_todos_tribunais=False,
+    siglas_tribunais=None,
+):
+    """Executa tentativas de consulta no CNJ.
+
+    Quando `buscar_todos_tribunais=True`, acumula resultados de todas as tentativas.
+    Caso contrário, mantém o comportamento legado de parar no primeiro lote com itens.
+    """
+    tentativas = _build_tentativas_consulta(
+        sigla_tribunal=sigla_tribunal,
+        siglas_tribunais=siglas_tribunais if buscar_todos_tribunais else None,
+    )
+
+    ultimo_payload = {}
+    ultimo_items = []
+    acumulado = []
+
+    for t in tentativas:
+        payload = consultar_comunicacoes(
+            numero_oab=numero_oab,
+            numero_processo=numero_processo,
+            sigla_tribunal=t["sigla_tribunal"],
+            meio="D",
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            pagina=t["pagina"],
+        )
+        items = _extrair_items(payload)
+        logger.info(
+            "JOB DJEN: tentativa %s %s (sigla=%s, pagina=%s) retornou %s item(ns).",
+            tipo,
+            numero_oab or numero_processo,
+            t["sigla_tribunal"] or "sem_filtro",
+            t["pagina"],
+            len(items),
+        )
+        ultimo_payload = payload
+        ultimo_items = items
+
+        if buscar_todos_tribunais:
+            acumulado.extend(items)
+            continue
+
+        if items:
+            return payload, items
+
+    if buscar_todos_tribunais:
+        return {"items": _dedupe_items_djen(acumulado)}, _dedupe_items_djen(acumulado)
     return ultimo_payload, ultimo_items
 
 
@@ -317,45 +458,51 @@ def _consultar_oab_com_fallback(*, numero_oab, sigla_tribunal, data_inicio, data
     3) Sem tribunal e página 1
     4) Sem tribunal e página 0
     """
-    tentativas = []
-    if sigla_tribunal:
-        tentativas.extend(
-            [
-                {"sigla_tribunal": sigla_tribunal, "pagina": 1},
-                {"sigla_tribunal": sigla_tribunal, "pagina": 0},
-            ]
-        )
-    tentativas.extend(
-        [
-            {"sigla_tribunal": None, "pagina": 1},
-            {"sigla_tribunal": None, "pagina": 0},
-        ]
+    return _consultar_com_tentativas(
+        tipo="OAB",
+        numero_oab=numero_oab,
+        numero_processo=None,
+        sigla_tribunal=sigla_tribunal,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        logger=logger,
+        buscar_todos_tribunais=False,
+        siglas_tribunais=None,
     )
 
-    ultimo_payload = {}
-    ultimo_items = []
-    for t in tentativas:
-        payload = consultar_comunicacoes(
-            numero_oab=numero_oab,
-            sigla_tribunal=t["sigla_tribunal"],
-            meio="D",
-            data_inicio=data_inicio,
-            data_fim=data_fim,
-            pagina=t["pagina"],
-        )
-        items = _extrair_items(payload)
-        logger.info(
-            "JOB DJEN: tentativa OAB %s (sigla=%s, pagina=%s) retornou %s item(ns).",
-            numero_oab,
-            t["sigla_tribunal"] or "sem_filtro",
-            t["pagina"],
-            len(items),
-        )
-        ultimo_payload = payload
-        ultimo_items = items
-        if items:
-            return payload, items
-    return ultimo_payload, ultimo_items
+
+def _consultar_oab_em_todos_tribunais(
+    *, numero_oab, sigla_tribunal, data_inicio, data_fim, logger, siglas_tribunais
+):
+    """Consulta OAB em todos os tribunais conhecidos, acumulando e deduplicando resultados."""
+    return _consultar_com_tentativas(
+        tipo="OAB",
+        numero_oab=numero_oab,
+        numero_processo=None,
+        sigla_tribunal=sigla_tribunal,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        logger=logger,
+        buscar_todos_tribunais=True,
+        siglas_tribunais=siglas_tribunais,
+    )
+
+
+def _consultar_processo_em_todos_tribunais(
+    *, numero_processo, sigla_tribunal, data_inicio, data_fim, logger, siglas_tribunais
+):
+    """Consulta processo em todos os tribunais conhecidos, acumulando e deduplicando resultados."""
+    return _consultar_com_tentativas(
+        tipo="processo",
+        numero_oab=None,
+        numero_processo=numero_processo,
+        sigla_tribunal=sigla_tribunal,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        logger=logger,
+        buscar_todos_tribunais=True,
+        siglas_tribunais=siglas_tribunais,
+    )
 
 
 def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
@@ -421,6 +568,23 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         total_oabs_processadas = 0
         total_casos_processados = 0
         erros = 0
+        buscar_todos_tribunais = bool(app.config.get("DJEN_BUSCAR_TODOS_TRIBUNAIS", True))
+        siglas_tribunais = []
+
+        if buscar_todos_tribunais:
+            try:
+                payload_tribunais = listar_tribunais()
+                siglas_tribunais = _extrair_siglas_tribunais(payload_tribunais)
+                logger.info(
+                    "JOB DJEN: busca em todos os tribunais ativada (%s sigla(s) carregada(s)).",
+                    len(siglas_tribunais),
+                )
+            except Exception as e:
+                logger.warning(
+                    "JOB DJEN: falha ao carregar lista de tribunais (%s). Seguindo sem varredura completa.",
+                    e,
+                )
+                buscar_todos_tribunais = False
 
         # ── Vetor 1: busca pelas OABs monitoradas no tenant ─────────────────
         q_oabs = DjenOabMonitoramento.query.filter(
@@ -447,13 +611,23 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
                     else _normalizar_sigla_tribunal(oab_mon.uf_oab)
                 )
                 numero_oab = _normalizar_numero_oab(oab_mon.numero_oab)
-                data, items = _consultar_oab_com_fallback(
-                    numero_oab=numero_oab,
-                    sigla_tribunal=sigla_tribunal,
-                    data_inicio=data_inicio,
-                    data_fim=data_fim,
-                    logger=logger,
-                )
+                if buscar_todos_tribunais:
+                    data, items = _consultar_oab_em_todos_tribunais(
+                        numero_oab=numero_oab,
+                        sigla_tribunal=sigla_tribunal,
+                        data_inicio=data_inicio,
+                        data_fim=data_fim,
+                        logger=logger,
+                        siglas_tribunais=siglas_tribunais,
+                    )
+                else:
+                    data, items = _consultar_oab_com_fallback(
+                        numero_oab=numero_oab,
+                        sigla_tribunal=sigla_tribunal,
+                        data_inicio=data_inicio,
+                        data_fim=data_fim,
+                        logger=logger,
+                    )
 
                 total_itens_encontrados += len(items)
                 for item in items:
@@ -517,13 +691,23 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             logger.info(f"JOB DJEN: buscando processo {caso.numero_processo} (caso {caso.id})")
             try:
                 sigla_tribunal = _inferir_sigla_tribunal_por_numero_processo(caso.numero_processo)
-                data, items = _consultar_processo_com_fallback(
-                    numero_processo=caso.numero_processo,
-                    sigla_tribunal=sigla_tribunal,
-                    data_inicio=data_inicio,
-                    data_fim=data_fim,
-                    logger=logger,
-                )
+                if buscar_todos_tribunais:
+                    data, items = _consultar_processo_em_todos_tribunais(
+                        numero_processo=caso.numero_processo,
+                        sigla_tribunal=sigla_tribunal,
+                        data_inicio=data_inicio,
+                        data_fim=data_fim,
+                        logger=logger,
+                        siglas_tribunais=siglas_tribunais,
+                    )
+                else:
+                    data, items = _consultar_processo_com_fallback(
+                        numero_processo=caso.numero_processo,
+                        sigla_tribunal=sigla_tribunal,
+                        data_inicio=data_inicio,
+                        data_fim=data_fim,
+                        logger=logger,
+                    )
                 total_itens_encontrados += len(items)
                 user = User.query.get(caso.user_id)
                 tenant_id_caso = user.tenant_id if user else None
