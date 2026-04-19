@@ -6,11 +6,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_URL } from '../config.js'
-import {
-  CalendarIcon,
-  ArrowPathIcon,
-  ExclamationCircleIcon,
-} from '@heroicons/react/24/outline'
+import { CalendarIcon, ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline'
 
 const MovimentacoesRecentes = ({ className = '' }) => {
   const navigate = useNavigate()
@@ -24,15 +20,12 @@ const MovimentacoesRecentes = ({ className = '' }) => {
     setError(null)
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('auth_token')
-      const response = await fetch(
-        `${API_URL}/dashboard/publicacoes-recentes?dias=${dias}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
+      const response = await fetch(`${API_URL}/dashboard/publicacoes-recentes?dias=${dias}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
 
       if (!response.ok) {
         throw new Error('Falha ao carregar publicações')
@@ -77,14 +70,18 @@ const MovimentacoesRecentes = ({ className = '' }) => {
   }
 
   return (
-    <div className={`card border-0 shadow-sm ${className}`} style={{ borderRadius: 'var(--radius-lg)' }}>
+    <div
+      className={`card border-0 shadow-sm ${className}`}
+      style={{ borderRadius: 'var(--radius-lg)' }}
+    >
       {/* Header */}
       <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center p-4">
         <div className="d-flex align-items-center gap-3">
           <div
             className="p-3 rounded-circle"
             style={{
-              background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
+              background:
+                'linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
             }}
           >
             <CalendarIcon style={{ width: '24px', height: '24px', color: 'var(--primary)' }} />
@@ -102,9 +99,7 @@ const MovimentacoesRecentes = ({ className = '' }) => {
               key={dias}
               type="button"
               className={`btn btn-sm ${
-                diasSelecionados === dias
-                  ? 'btn-primary'
-                  : 'btn-outline-secondary'
+                diasSelecionados === dias ? 'btn-primary' : 'btn-outline-secondary'
               }`}
               onClick={() => handleMudarPeriodo(dias)}
             >
@@ -133,9 +128,7 @@ const MovimentacoesRecentes = ({ className = '' }) => {
 
         {error && (
           <div className="alert alert-warning d-flex gap-3" role="alert">
-            <ExclamationCircleIcon
-              style={{ width: '24px', height: '24px', flexShrink: 0 }}
-            />
+            <ExclamationCircleIcon style={{ width: '24px', height: '24px', flexShrink: 0 }} />
             <div>
               <strong>Erro:</strong> {error}
             </div>

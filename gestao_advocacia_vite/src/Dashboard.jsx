@@ -422,7 +422,8 @@ function Dashboard({ mudarSecao }) {
         <div className="col-12">
           <MovimentacoesRecentes />
         </div>
-      </div>    </div>
+      </div>{' '}
+    </div>
   )
 }
 

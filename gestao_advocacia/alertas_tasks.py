@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from models import EventoAgenda, User
 from extensions import db
 from mail_service import enviar_alerta_email
+from models import EventoAgenda, User
 
 
 def job_verificar_prazos(app):

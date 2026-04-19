@@ -10,7 +10,7 @@ import MovimentacoesRecentes from './MovimentacoesRecentes'
 const mockNavigate = vi.fn()
 
 // Mock fetch
-global.fetch = vi.fn()
+globalThis.fetch = vi.fn()
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -86,7 +86,7 @@ describe('MovimentacoesRecentes', () => {
     mockNavigate.mockReset()
     localStorage.clear()
     localStorage.setItem('auth_token', 'test-token')
-    global.fetch.mockResolvedValue({
+    globalThis.fetch.mockResolvedValue({
       ok: true,
       json: async () => mockData,
     })
@@ -111,7 +111,7 @@ describe('MovimentacoesRecentes', () => {
     )
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining('/dashboard/publicacoes-recentes?dias=7'),
         expect.any(Object)
       )
@@ -143,7 +143,7 @@ describe('MovimentacoesRecentes', () => {
     fireEvent.click(btn15d)
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining('dias=15'),
         expect.any(Object)
       )
@@ -211,7 +211,9 @@ describe('MovimentacoesRecentes', () => {
 
     await waitFor(() => {
       // Verify unread publication exists
-      const direcElement = screen.getByText('Dirce de Oliveira Pedotti').closest('.publication-item')
+      const direcElement = screen
+        .getByText('Dirce de Oliveira Pedotti')
+        .closest('.publication-item')
       expect(direcElement).toBeInTheDocument()
       // The red dot should be present (as a styled div)
     })
@@ -232,7 +234,7 @@ describe('MovimentacoesRecentes', () => {
   })
 
   it('shows empty state when no publications', async () => {
-    global.fetch.mockResolvedValue({
+    globalThis.fetch.mockResolvedValue({
       ok: true,
       json: async () => ({
         dias: 7,
@@ -252,7 +254,7 @@ describe('MovimentacoesRecentes', () => {
   })
 
   it('displays error message on fetch failure', async () => {
-    global.fetch.mockResolvedValue({
+    globalThis.fetch.mockResolvedValue({
       ok: false,
     })
 

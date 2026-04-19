@@ -408,22 +408,25 @@ export default function DjenPage() {
   }, [autoSyncExecutada, loadingOabs, syncing, oabs])
 
   // ── Marcar publicação como lida ─────────────────────────────────────────────
-  const marcarLida = useCallback(async (pub, lida) => {
-    try {
-      const res = await fetch(`${API_URL}/djen/publicacoes/${pub.id}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lida }),
-      })
-      if (res.ok) {
-        setPublicacoes((prev) => prev.map((p) => (p.id === pub.id ? { ...p, lida } : p)))
-        setNaoLidas((prev) => (lida ? prev - 1 : prev + 1))
-        if (pubSelecionada?.id === pub.id) setPubSelecionada({ ...pubSelecionada, lida })
+  const marcarLida = useCallback(
+    async (pub, lida) => {
+      try {
+        const res = await fetch(`${API_URL}/djen/publicacoes/${pub.id}`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lida }),
+        })
+        if (res.ok) {
+          setPublicacoes((prev) => prev.map((p) => (p.id === pub.id ? { ...p, lida } : p)))
+          setNaoLidas((prev) => (lida ? prev - 1 : prev + 1))
+          if (pubSelecionada?.id === pub.id) setPubSelecionada({ ...pubSelecionada, lida })
+        }
+      } catch {
+        toast.error('Erro ao atualizar.')
       }
-    } catch {
-      toast.error('Erro ao atualizar.')
-    }
-  }, [pubSelecionada])
+    },
+    [pubSelecionada]
+  )
 
   const abrirDetalhePublicacao = useCallback(
     (pub) => {

@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
 from collections import defaultdict
+from datetime import datetime, timedelta
 
 from flask import request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -107,7 +107,7 @@ def register_dashboard_routes(app, dashboard_ns):
             params={"dias": "Numero de dias (1-30, default=7)"},
         )
         def get(self):
-            user_id = get_jwt_identity()
+            get_jwt_identity()
             tenant_id = get_tenant_id()
 
             # Validar parametro dias
@@ -128,13 +128,13 @@ def register_dashboard_routes(app, dashboard_ns):
                 PublicacaoDJEN.query.filter(
                     PublicacaoDJEN.tenant_id == tenant_id,
                     PublicacaoDJEN.data_disponibilizacao >= data_inicio,
-                    PublicacaoDJEN.ativo == True,
+                    PublicacaoDJEN.ativo.is_(True),
                 )
                 .filter(
                     db.or_(
                         PublicacaoDJEN.caso_id.isnot(None),
                         db.and_(
-                            PublicacaoDJEN.triagem_ignorada == False,
+                            PublicacaoDJEN.triagem_ignorada.is_(False),
                             PublicacaoDJEN.status_origem.in_(
                                 ["criado_automaticamente", "revisado_manual"]
                             ),
@@ -205,4 +205,3 @@ def register_dashboard_routes(app, dashboard_ns):
                 "dias": dias,
                 "grupos": grupos_list,
             }, 200
-

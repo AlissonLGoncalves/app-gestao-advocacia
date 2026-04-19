@@ -85,7 +85,9 @@ def _inferir_sigla_tribunal_por_numero_processo(numero_processo):
     return None
 
 
-def _consultar_processo_com_fallback(*, numero_processo, sigla_tribunal, data_inicio, data_fim, logger):
+def _consultar_processo_com_fallback(
+    *, numero_processo, sigla_tribunal, data_inicio, data_fim, logger
+):
     """Consulta DJEN por processo com fallback de tribunal e paginação."""
     tentativas = []
     if sigla_tribunal:
@@ -144,6 +146,7 @@ def _extrair_siglas_tribunais(payload):
         itens = []
 
     siglas = []
+
     def _add_sigla(valor):
         if not valor:
             return

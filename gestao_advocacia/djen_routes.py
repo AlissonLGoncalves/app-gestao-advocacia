@@ -350,12 +350,10 @@ def registrar_rotas_djen(
                     },
                 }, 409
 
-        parte_contraria_default = (
-            _pick_opposing_party(
-                analise.get("partes_autoras") or [],
-                analise.get("partes_reus") or [],
-                papel_cliente,
-            )
+        parte_contraria_default = _pick_opposing_party(
+            analise.get("partes_autoras") or [],
+            analise.get("partes_reus") or [],
+            papel_cliente,
         )
 
         titulo_caso = (caso_payload.get("titulo") or "").strip()
