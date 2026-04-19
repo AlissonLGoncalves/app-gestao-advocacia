@@ -7,6 +7,9 @@ primary_region = "gru"
 
 [build]
 
+[deploy]
+  release_command = "flask db upgrade"
+
 [env]
   PORT = "8080"
   FLASK_ENV = "production"
