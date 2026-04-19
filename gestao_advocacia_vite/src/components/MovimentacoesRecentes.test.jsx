@@ -7,6 +7,8 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { BrowserRouter } from 'react-router-dom'
 import MovimentacoesRecentes from './MovimentacoesRecentes'
 
+const mockNavigate = vi.fn()
+
 // Mock fetch
 global.fetch = vi.fn()
 
@@ -32,7 +34,7 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
     ...actual,
-    useNavigate: () => vi.fn(),
+    useNavigate: () => mockNavigate,
   }
 })
 
@@ -81,6 +83,7 @@ const mockData = {
 describe('MovimentacoesRecentes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockNavigate.mockReset()
     localStorage.clear()
     localStorage.setItem('auth_token', 'test-token')
     global.fetch.mockResolvedValue({
@@ -275,13 +278,7 @@ describe('MovimentacoesRecentes', () => {
     expect(cardElement).toHaveClass('custom-class')
   })
 
-  it('handles navigation to case on publication click', async () => {
-    const mockNavigate = vi.fn()
-    vi.doMock('react-router-dom', () => ({
-      ...vi.importActual('react-router-dom'),
-      useNavigate: () => mockNavigate,
-    }))
-
+  it('navigates to case detail when clicking the publication card', async () => {
     render(
       <BrowserRouter>
         <MovimentacoesRecentes />
@@ -292,7 +289,24 @@ describe('MovimentacoesRecentes', () => {
       expect(screen.getByText('Dirce de Oliveira Pedotti')).toBeInTheDocument()
     })
 
-    // Note: Click behavior requires more complex mocking of useNavigate
-    // This test validates the structure is in place for navigation
+    fireEvent.click(screen.getByText('Dirce de Oliveira Pedotti'))
+
+    expect(mockNavigate).toHaveBeenCalledWith('/casos/detalhe/67')
+  })
+
+  it('opens the DJEN publication detail when clicking the process number', async () => {
+    render(
+      <BrowserRouter>
+        <MovimentacoesRecentes />
+      </BrowserRouter>
+    )
+
+    const numeroProcesso = await screen.findByRole('button', {
+      name: '0000472-75.2025.8.16.0075',
+    })
+
+    fireEvent.click(numeroProcesso)
+
+    expect(mockNavigate).toHaveBeenCalledWith('/djen?publicacao=1')
   })
 })

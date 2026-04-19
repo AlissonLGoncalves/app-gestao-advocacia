@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
 import DOMPurify from 'dompurify'
@@ -173,6 +174,7 @@ const TRIBUNAIS = [
 ]
 
 export default function DjenPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [aba, setAba] = useState('publicacoes')
   const [publicacoes, setPublicacoes] = useState([])
   const [total, setTotal] = useState(0)
@@ -221,6 +223,7 @@ export default function DjenPage() {
   // Detalhe
   const [pubSelecionada, setPubSelecionada] = useState(null)
   const [casos, setCasos] = useState([])
+  const publicacaoAlvo = searchParams.get('publicacao')
 
   const token = () => localStorage.getItem('token')
 
@@ -405,7 +408,7 @@ export default function DjenPage() {
   }, [autoSyncExecutada, loadingOabs, syncing, oabs])
 
   // ── Marcar publicação como lida ─────────────────────────────────────────────
-  const marcarLida = async (pub, lida) => {
+  const marcarLida = useCallback(async (pub, lida) => {
     try {
       const res = await fetch(`${API_URL}/djen/publicacoes/${pub.id}`, {
         method: 'PATCH',
@@ -420,7 +423,88 @@ export default function DjenPage() {
     } catch {
       toast.error('Erro ao atualizar.')
     }
-  }
+  }, [pubSelecionada])
+
+  const abrirDetalhePublicacao = useCallback(
+    (pub) => {
+      if (!pub?.id) return
+
+      setAba('publicacoes')
+      setPubSelecionada(pub)
+
+      const novosParams = new URLSearchParams(searchParams)
+      novosParams.set('publicacao', String(pub.id))
+      setSearchParams(novosParams, { replace: true })
+
+      if (!pub.lida) {
+        marcarLida(pub, true)
+      }
+    },
+    [marcarLida, searchParams, setSearchParams]
+  )
+
+  const fecharDetalhePublicacao = useCallback(() => {
+    setPubSelecionada(null)
+    const novosParams = new URLSearchParams(searchParams)
+    novosParams.delete('publicacao')
+    setSearchParams(novosParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (!publicacaoAlvo) {
+      return
+    }
+
+    const publicacaoId = Number(publicacaoAlvo)
+    if (!Number.isInteger(publicacaoId) || publicacaoId <= 0) {
+      return
+    }
+
+    if (pubSelecionada?.id === publicacaoId) {
+      return
+    }
+
+    const pubNaLista = publicacoes.find((pub) => pub.id === publicacaoId)
+    if (pubNaLista) {
+      setAba('publicacoes')
+      setPubSelecionada(pubNaLista)
+      if (!pubNaLista.lida) {
+        marcarLida(pubNaLista, true)
+      }
+      return
+    }
+
+    let ativo = true
+
+    const carregarPublicacaoAlvo = async () => {
+      try {
+        const res = await fetch(`${API_URL}/djen/publicacoes/${publicacaoId}`, {
+          headers: { Authorization: `Bearer ${token()}` },
+        })
+        if (!res.ok) {
+          return
+        }
+
+        const data = await res.json()
+        if (!ativo) return
+
+        setAba('publicacoes')
+        setPubSelecionada(data)
+
+        if (!data.lida) {
+          marcarLida(data, true)
+        }
+      } catch {
+        /* silencioso */
+      }
+    }
+
+    carregarPublicacaoAlvo()
+
+    return () => {
+      ativo = false
+    }
+  }, [publicacaoAlvo, publicacoes, pubSelecionada, marcarLida])
 
   // ── Vincular caso ───────────────────────────────────────────────────────────
   const vincularCaso = async (pub, caso_id) => {
@@ -935,10 +1019,7 @@ export default function DjenPage() {
                     key={pub.id}
                     className={`card mb-2 border-0 shadow-sm cursor-pointer ${!pub.lida ? 'border-start border-4 border-primary' : ''} ${pubSelecionada?.id === pub.id ? 'bg-light' : ''}`}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => {
-                      setPubSelecionada(pub)
-                      if (!pub.lida) marcarLida(pub, true)
-                    }}
+                    onClick={() => abrirDetalhePublicacao(pub)}
                   >
                     <div className="card-body py-2 px-3">
                       <div className="d-flex justify-content-between align-items-start">
@@ -1014,7 +1095,7 @@ export default function DjenPage() {
               <div className="card shadow-sm border-0 h-100">
                 <div className="card-header bg-white d-flex justify-content-between align-items-center">
                   <strong className="small">Detalhe da Publicação</strong>
-                  <button className="btn-close btn-sm" onClick={() => setPubSelecionada(null)} />
+                  <button className="btn-close btn-sm" onClick={fecharDetalhePublicacao} />
                 </div>
                 <div className="card-body overflow-auto" style={{ maxHeight: '75vh' }}>
                   <table className="table table-sm table-borderless mb-3">
@@ -1372,10 +1453,7 @@ export default function DjenPage() {
                         key={pub.id}
                         type="button"
                         className="list-group-item list-group-item-action"
-                        onClick={() => {
-                          setAba('publicacoes')
-                          setPubSelecionada(pub)
-                        }}
+                        onClick={() => abrirDetalhePublicacao(pub)}
                       >
                         <div className="d-flex justify-content-between align-items-start gap-2">
                           <div className="small" style={{ minWidth: 0 }}>

@@ -58,7 +58,13 @@ const MovimentacoesRecentes = ({ className = '' }) => {
 
   const handleNavigateToCaso = (casoId) => {
     if (casoId) {
-      navigate(`/casos/${casoId}`)
+      navigate(`/casos/detalhe/${casoId}`)
+    }
+  }
+
+  const handleOpenPublicacao = (publicacaoId) => {
+    if (publicacaoId) {
+      navigate(`/djen?publicacao=${publicacaoId}`)
     }
   }
 
@@ -236,17 +242,25 @@ const MovimentacoesRecentes = ({ className = '' }) => {
                                 {pub.cliente_nome}
                               </p>
                               {pub.numero_processo && (
-                                <p
-                                  className="mb-2 text-primary"
+                                <button
+                                  type="button"
+                                  className="btn btn-link p-0 mb-2 text-primary text-start"
                                   style={{
                                     fontSize: '0.9rem',
                                     fontFamily: 'monospace',
-                                    cursor: 'pointer',
-                                    textDecoration: pub.caso_id ? 'underline' : 'none',
+                                    textDecoration: 'underline',
                                   }}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleOpenPublicacao(pub.id)
+                                  }}
+                                  onKeyDown={(e) => {
+                                    e.stopPropagation()
+                                  }}
+                                  title="Abrir conteúdo da publicação"
                                 >
                                   {pub.numero_processo}
-                                </p>
+                                </button>
                               )}
                             </div>
 
