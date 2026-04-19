@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { API_URL } from '../../config'
+import { LGPD_VERSION, TERMS_VERSION } from '../../constants/legal'
 import { toast } from 'react-toastify'
 import {
   LockClosedIcon,
@@ -117,7 +118,15 @@ function RegisterPage() {
         const response = await fetch(`${API_URL}/auth/register-invite`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ invite_token: inviteToken, username: nomeOuRazao, password }),
+          body: JSON.stringify({
+            invite_token: inviteToken,
+            username: nomeOuRazao,
+            password,
+            aceite_termos: true,
+            aceite_lgpd: true,
+            versao_termos: TERMS_VERSION,
+            versao_lgpd: LGPD_VERSION,
+          }),
         })
         const data = await response.json()
         if (response.ok) {
@@ -161,6 +170,10 @@ function RegisterPage() {
           documento_identificacao: documento,
           tipo_pessoa: tipoPessoa,
           oab: oab || null,
+          aceite_termos: true,
+          aceite_lgpd: true,
+          versao_termos: TERMS_VERSION,
+          versao_lgpd: LGPD_VERSION,
         }),
       })
       const data = await response.json()
@@ -413,7 +426,7 @@ function RegisterPage() {
               <button
                 type="submit"
                 className="btn btn-primary w-100 fw-bold py-2 shadow-sm"
-                disabled={loading || buscandoCnpj}
+                disabled={loading || buscandoCnpj || !aceiteTermos || !aceiteLgpd}
               >
                 {loading
                   ? 'Processando Informações...'
