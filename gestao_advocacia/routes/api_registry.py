@@ -40,6 +40,8 @@ def register_api_routes(app, api, finance_access_required):
         "UserRegistration",
         {
             "username": fields.String(required=True, description="Nome de usuario unico"),
+            "nome_completo": fields.String(description="Nome completo do advogado (PF)"),
+            "razao_social": fields.String(description="Razao social do escritorio (PJ)"),
             "email": fields.String(required=True, description="Email unico", format="email"),
             "password": fields.String(required=True, description="Senha", min_length=6),
             "role": fields.String(
@@ -49,7 +51,9 @@ def register_api_routes(app, api, finance_access_required):
             ),
             "documento_identificacao": fields.String(description="CPF ou CNPJ"),
             "tipo_pessoa": fields.String(description="PF ou PJ"),
+            "cpf": fields.String(description="CPF do advogado (PF)"),
             "oab": fields.String(description="Registro OAB"),
+            "sigla_oab_tribunal": fields.String(description="UF da OAB"),
             "aceite_termos": fields.Boolean(required=True),
             "aceite_lgpd": fields.Boolean(required=True),
             "versao_termos": fields.String(required=True, example="v1.0"),
@@ -72,6 +76,11 @@ def register_api_routes(app, api, finance_access_required):
             "username": fields.String(description="Nome de usuario"),
             "email": fields.String(description="Email"),
             "role": fields.String(description="Papel"),
+            "nome_completo": fields.String(description="Nome completo"),
+            "numero_oab": fields.String(description="Numero da OAB"),
+            "sigla_oab_tribunal": fields.String(description="UF da OAB"),
+            "tipo_pessoa": fields.String(description="Tipo de pessoa"),
+            "cpf": fields.String(description="CPF"),
         },
     )
 

@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import timedelta
 
 from flask import current_app, request
@@ -11,6 +12,70 @@ from mail_service import enviar_alerta_email
 from models import ConsentimentoUsuario, Tenant, User
 
 TIPOS_CONSENTIMENTO_OBRIGATORIOS = ("termos_uso", "lgpd")
+
+
+def _somente_digitos(valor):
+    return re.sub(r"\D", "", str(valor or ""))
+
+
+def _formatar_cpf(cpf):
+    digits = _somente_digitos(cpf)
+    if len(digits) != 11:
+        return None
+    return f"{digits[0:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:11]}"
+
+
+def _validar_cpf(cpf):
+    digits = _somente_digitos(cpf)
+    if len(digits) != 11 or digits == digits[0] * 11:
+        return False
+
+    soma_1 = sum(int(digits[i]) * (10 - i) for i in range(9))
+    dig_1 = (soma_1 * 10) % 11
+    dig_1 = 0 if dig_1 == 10 else dig_1
+
+    soma_2 = sum(int(digits[i]) * (11 - i) for i in range(10))
+    dig_2 = (soma_2 * 10) % 11
+    dig_2 = 0 if dig_2 == 10 else dig_2
+
+    return digits[-2:] == f"{dig_1}{dig_2}"
+
+
+def _normalizar_tipo_pessoa(tipo_pessoa):
+    if not tipo_pessoa:
+        return None
+    tipo = str(tipo_pessoa).strip().upper()
+    if tipo not in {"PF", "PJ"}:
+        return "INVALIDO"
+    return tipo
+
+
+def _normalizar_sigla_oab(sigla):
+    if not sigla:
+        return None
+    val = re.sub(r"[^A-Za-z]", "", str(sigla)).upper()
+    return val if len(val) == 2 else None
+
+
+def _normalizar_dados_oab(numero_oab_raw, sigla_raw):
+    if not numero_oab_raw:
+        return None, _normalizar_sigla_oab(sigla_raw), None
+
+    sigla = _normalizar_sigla_oab(sigla_raw)
+    bruto = re.sub(r"[^0-9A-Za-z]", "", str(numero_oab_raw)).upper()
+    match = re.fullmatch(r"([A-Z]{2})?([0-9]{4,12})([A-Z])?", bruto)
+    if not match:
+        return None, sigla, "Registro OAB inválido. Informe apenas números (4 a 12) e UF."
+
+    uf_no_numero, numero, sufixo = match.groups()
+    uf_final = sigla or uf_no_numero
+    if uf_no_numero and sigla and uf_no_numero != sigla:
+        return None, None, "UF da OAB inconsistente entre os campos informados."
+    if not uf_final:
+        return None, None, "UF da OAB é obrigatória quando o registro OAB for informado."
+
+    numero_final = f"{numero}{sufixo or ''}"
+    return numero_final, uf_final, None
 
 
 def _registrar_consentimentos(user, data):
@@ -69,12 +134,31 @@ def register_auth_routes(
         @auth_ns.response(400, "Dados de entrada inválidos.")
         @auth_ns.response(409, "Nome de usuário ou email já existem.")
         def post(self):
-            data = request.get_json()
+            data = request.get_json() or {}
             username = data.get("username")
             email = data.get("email")
             password = data.get("password")
             role = data.get("role", "admin")
             documento = data.get("documento_identificacao")
+            nome_completo = (data.get("nome_completo") or "").strip() or None
+            tipo_pessoa = _normalizar_tipo_pessoa(data.get("tipo_pessoa"))
+            if tipo_pessoa == "INVALIDO":
+                return {"message": "tipo_pessoa deve ser PF ou PJ."}, 400
+
+            oab_numero, oab_sigla, oab_err = _normalizar_dados_oab(
+                data.get("oab"), data.get("sigla_oab_tribunal")
+            )
+            if oab_err:
+                return {"message": oab_err}, 400
+
+            cpf_informado = data.get("cpf")
+            if tipo_pessoa == "PF" and not cpf_informado:
+                cpf_informado = documento
+            cpf_formatado = None
+            if cpf_informado:
+                if not _validar_cpf(cpf_informado):
+                    return {"message": "CPF inválido."}, 400
+                cpf_formatado = _formatar_cpf(cpf_informado)
 
             if role not in ["admin", "advogado", "assistente"]:
                 return {"message": "Role deve ser admin, advogado ou assistente."}, 400
@@ -94,7 +178,9 @@ def register_auth_routes(
             # Se for 'admin', significa que é uma criação de NOVO Escritório (Tenant)
             novo_tenant = None
             if role == "admin":
-                novo_tenant = Tenant(nome_escritorio=username, documento=documento)
+                nome_escritorio = (data.get("razao_social") or "").strip() or username
+                documento_tenant = documento if tipo_pessoa == "PJ" else None
+                novo_tenant = Tenant(nome_escritorio=nome_escritorio, documento=documento_tenant)
                 db.session.add(novo_tenant)
                 db.session.flush()  # Força injeção do ID pro Tenant para atrelar abaixo
 
@@ -104,6 +190,11 @@ def register_auth_routes(
                 email=email,
                 role=role,
                 tenant_id=novo_tenant.id if novo_tenant else None,
+                nome_completo=nome_completo,
+                cpf=cpf_formatado if tipo_pessoa == "PF" else None,
+                tipo_pessoa=tipo_pessoa,
+                numero_oab=oab_numero,
+                sigla_oab_tribunal=oab_sigla,
             )
             new_user.set_password(password)
             db.session.add(new_user)
@@ -294,6 +385,53 @@ def register_auth_routes(
                 )
                 return {"message": "Usuário associado ao token não encontrado."}, 404
             return user, 200
+
+        @jwt_required()
+        @auth_ns.doc(
+            security="jsonWebToken",
+            description="Atualiza dados permitidos do usuário autenticado.",
+        )
+        @auth_ns.response(400, "Dados inválidos.")
+        @auth_ns.response(404, "Usuário não encontrado.")
+        def put(self):
+            current_user_id = get_jwt_identity()
+            user = db.session.get(User, current_user_id)
+            if not user:
+                return {"message": "Usuário associado ao token não encontrado."}, 404
+
+            data = request.get_json() or {}
+
+            nome_completo = data.get("nome_completo")
+            if nome_completo is not None:
+                user.nome_completo = str(nome_completo).strip() or None
+
+            oab_numero, oab_sigla, oab_err = _normalizar_dados_oab(
+                data.get("numero_oab"), data.get("sigla_oab_tribunal")
+            )
+            if oab_err:
+                return {"message": oab_err}, 400
+
+            if data.get("numero_oab") is not None:
+                user.numero_oab = oab_numero
+            if data.get("sigla_oab_tribunal") is not None:
+                user.sigla_oab_tribunal = oab_sigla
+
+            if data.get("tipo_pessoa") is not None:
+                tipo = _normalizar_tipo_pessoa(data.get("tipo_pessoa"))
+                if tipo == "INVALIDO":
+                    return {"message": "tipo_pessoa deve ser PF ou PJ."}, 400
+                user.tipo_pessoa = tipo
+
+            cpf = data.get("cpf")
+            if cpf is not None:
+                if user.cpf:
+                    return {"message": "CPF já cadastrado e não pode ser alterado."}, 400
+                if not _validar_cpf(cpf):
+                    return {"message": "CPF inválido."}, 400
+                user.cpf = _formatar_cpf(cpf)
+
+            db.session.commit()
+            return user.to_dict(), 200
 
     @auth_ns.route("/me/consentimentos")
     class MeConsentimentos(Resource):

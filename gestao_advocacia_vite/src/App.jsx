@@ -23,6 +23,7 @@ import RegisterPage from './pages/auth/RegisterPage.jsx'
 import TermsPage from './pages/auth/TermsPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
+import PerfilPage from './pages/PerfilPage.jsx'
 import { APP_VERSION } from './version.js'
 
 // Importação dos ícones
@@ -42,6 +43,7 @@ import {
   Cog6ToothIcon,
   ClipboardDocumentListIcon,
   NewspaperIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline'
 
 const ProtectedRoute = ({ children }) => {
@@ -124,6 +126,8 @@ const MainLayout = () => {
         return 'DJEN — Diário de Justiça'
       case 'configuracoes':
         return 'Configurações do Sistema'
+      case 'perfil':
+        return 'Meu Perfil'
       default:
         baseTitle = baseSegment.replace('-', ' ')
     }
@@ -210,6 +214,9 @@ const MainLayout = () => {
           </SidebarLink>
           <SidebarLink to="/configuracoes" icon={Cog6ToothIcon}>
             Configurações SaaS
+          </SidebarLink>
+          <SidebarLink to="/perfil" icon={UserCircleIcon}>
+            Meu Perfil
           </SidebarLink>
         </nav>
 
@@ -319,6 +326,7 @@ function App() {
           <Route path="relatorios" element={<RelatoriosPage />} />
 
           <Route path="configuracoes" element={<SettingsPage />} />
+          <Route path="perfil" element={<PerfilPage />} />
 
           <Route path="*" element={<NotFoundPage />} />
         </Route>

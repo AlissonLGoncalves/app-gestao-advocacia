@@ -24,6 +24,9 @@ class User(db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     role = db.Column(db.String(20), nullable=False, default="admin")  # admin, advogado, assistente
+    nome_completo = db.Column(db.String(200), nullable=True)
+    cpf = db.Column(db.String(14), nullable=True)
+    tipo_pessoa = db.Column(db.String(2), nullable=True)
     numero_oab = db.Column(db.String(30), nullable=True)
     sigla_oab_tribunal = db.Column(db.String(10), nullable=True)
     djen_monitoramento_ativo = db.Column(db.Boolean, nullable=True, default=True)
@@ -72,7 +75,17 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
-        return {"id": self.id, "username": self.username, "email": self.email, "role": self.role}
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "role": self.role,
+            "nome_completo": self.nome_completo,
+            "numero_oab": self.numero_oab,
+            "sigla_oab_tribunal": self.sigla_oab_tribunal,
+            "tipo_pessoa": self.tipo_pessoa,
+            "cpf": self.cpf,
+        }
 
 
 class Cliente(db.Model):
