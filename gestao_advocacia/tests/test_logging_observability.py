@@ -69,6 +69,10 @@ def test_auth_login_logs_success_and_failure(client, caplog):
             "email": "obs_user@test.com",
             "password": "Senha1234!",
             "role": "admin",
+            "aceite_termos": True,
+            "aceite_lgpd": True,
+            "versao_termos": "v1.0",
+            "versao_lgpd": "v1.0",
         },
     )
     assert register_response.status_code == 201

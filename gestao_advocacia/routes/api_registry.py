@@ -50,6 +50,12 @@ def register_api_routes(app, api, finance_access_required):
             "documento_identificacao": fields.String(description="CPF ou CNPJ"),
             "tipo_pessoa": fields.String(description="PF ou PJ"),
             "oab": fields.String(description="Registro OAB"),
+            "aceite_termos": fields.Boolean(required=True),
+            "aceite_lgpd": fields.Boolean(required=True),
+            "versao_termos": fields.String(required=True, example="v1.0"),
+            "versao_lgpd": fields.String(required=True, example="v1.0"),
+            "hash_termos_uso": fields.String(required=False),
+            "hash_lgpd": fields.String(required=False),
         },
     )
     login_model_dto = auth_ns.model(
@@ -100,6 +106,12 @@ def register_api_routes(app, api, finance_access_required):
             "invite_token": fields.String(required=True, description="Token Magico JWT"),
             "username": fields.String(required=True, description="Nome do convidado"),
             "password": fields.String(required=True, description="Senha"),
+            "aceite_termos": fields.Boolean(required=True),
+            "aceite_lgpd": fields.Boolean(required=True),
+            "versao_termos": fields.String(required=True, example="v1.0"),
+            "versao_lgpd": fields.String(required=True, example="v1.0"),
+            "hash_termos_uso": fields.String(required=False),
+            "hash_lgpd": fields.String(required=False),
         },
     )
     token_model_dto = auth_ns.model(

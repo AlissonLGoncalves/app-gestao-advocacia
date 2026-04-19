@@ -192,6 +192,10 @@ class TestDjenRoutesTriagem:
                 "email": "triagem_a@test.com",
                 "password": "Senha1234!",
                 "role": "admin",
+                "aceite_termos": True,
+                "aceite_lgpd": True,
+                "versao_termos": "v1.0",
+                "versao_lgpd": "v1.0",
             },
         )
         token_a = json.loads(
@@ -209,6 +213,10 @@ class TestDjenRoutesTriagem:
                 "email": "triagem_b@test.com",
                 "password": "Senha1234!",
                 "role": "admin",
+                "aceite_termos": True,
+                "aceite_lgpd": True,
+                "versao_termos": "v1.0",
+                "versao_lgpd": "v1.0",
             },
         )
         token_b = json.loads(

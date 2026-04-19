@@ -1,4 +1,4 @@
-﻿# Arquivo: tests/test_djen_api.py
+# Arquivo: tests/test_djen_api.py
 # Testes para o mÃ³dulo DJEN â€” DiÃ¡rio de JustiÃ§a EletrÃ´nico Nacional.
 # Cobre: OABs monitoradas, publicaÃ§Ãµes, PATCH de publicaÃ§Ã£o, nÃ£o-lidas e sync manual.
 
@@ -731,8 +731,8 @@ class TestDjenTriagem:
 
 class TestDjenTenantIsolation:
     def test_tenant_nao_ve_oab_de_outro(self, client, db, app):
-        """Dois tenants distintos nÃ£o enxergam OABs um do outro."""
-        # Registra e loga usuÃ¡rio A
+        """Dois tenants distintos não enxergam OABs um do outro."""
+        # Registra e loga usuário A
         client.post(
             "/api/v1/auth/register",
             json={
@@ -740,6 +740,10 @@ class TestDjenTenantIsolation:
                 "email": "a@test.com",
                 "password": "Senha1234!",
                 "role": "admin",
+                "aceite_termos": True,
+                "aceite_lgpd": True,
+                "versao_termos": "v1.0",
+                "versao_lgpd": "v1.0",
             },
         )
         token_a = json.loads(
@@ -748,7 +752,7 @@ class TestDjenTenantIsolation:
             ).data
         )["access_token"]
 
-        # Registra e loga usuÃ¡rio B (tenant separado)
+        # Registra e loga usuário B (tenant separado)
         client.post(
             "/api/v1/auth/register",
             json={
@@ -756,6 +760,10 @@ class TestDjenTenantIsolation:
                 "email": "b@test.com",
                 "password": "Senha1234!",
                 "role": "admin",
+                "aceite_termos": True,
+                "aceite_lgpd": True,
+                "versao_termos": "v1.0",
+                "versao_lgpd": "v1.0",
             },
         )
         token_b = json.loads(
@@ -778,8 +786,8 @@ class TestDjenTenantIsolation:
         assert not any(o["numero_oab"] == "888111" for o in oabs_b)
 
     def test_tenant_nao_ve_publicacao_de_outro(self, client, db, app):
-        """Dois tenants distintos nÃ£o enxergam publicaÃ§Ãµes um do outro."""
-        # Registra e loga usuÃ¡rio C
+        """Dois tenants distintos nao enxergam publicacoes um do outro."""
+        # Registra e loga usuario C
         client.post(
             "/api/v1/auth/register",
             json={
@@ -787,13 +795,17 @@ class TestDjenTenantIsolation:
                 "email": "c@test.com",
                 "password": "Senha1234!",
                 "role": "admin",
+                "aceite_termos": True,
+                "aceite_lgpd": True,
+                "versao_termos": "v1.0",
+                "versao_lgpd": "v1.0",
             },
         )
         client.post(
             "/api/v1/auth/login", json={"username_or_email": "user_c", "password": "Senha1234!"}
         )
 
-        # Registra e loga usuÃ¡rio D
+        # Registra e loga usuario D
         client.post(
             "/api/v1/auth/register",
             json={
@@ -801,6 +813,10 @@ class TestDjenTenantIsolation:
                 "email": "d@test.com",
                 "password": "Senha1234!",
                 "role": "admin",
+                "aceite_termos": True,
+                "aceite_lgpd": True,
+                "versao_termos": "v1.0",
+                "versao_lgpd": "v1.0",
             },
         )
         token_d = json.loads(

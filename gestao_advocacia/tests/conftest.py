@@ -137,6 +137,10 @@ def auth_client(client, db):
             "email": "testuser@teste.com",
             "password": "Senha1234!",
             "role": "admin",
+            "aceite_termos": True,
+            "aceite_lgpd": True,
+            "versao_termos": "v1.0",
+            "versao_lgpd": "v1.0",
         },
     )
     assert reg_resp.status_code == 201, f"Registro falhou: {reg_resp.data}"

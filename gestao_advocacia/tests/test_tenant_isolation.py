@@ -21,6 +21,10 @@ def _register_and_login(client, suffix):
             "email": email,
             "password": password,
             "role": "admin",
+            "aceite_termos": True,
+            "aceite_lgpd": True,
+            "versao_termos": "v1.0",
+            "versao_lgpd": "v1.0",
         },
     )
     assert reg.status_code == 201, reg.data

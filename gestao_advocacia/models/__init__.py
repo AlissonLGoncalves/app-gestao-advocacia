@@ -754,3 +754,25 @@ class DjenVinculoDecisao(db.Model):
             "payload": self.payload,
             "data_decisao": self.data_decisao.isoformat() if self.data_decisao else None,
         }
+
+
+class ConsentimentoUsuario(db.Model):
+    __tablename__ = "consentimento_usuario"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    tipo = db.Column(db.String(32), nullable=False)  # "termos_uso" | "lgpd"
+    versao = db.Column(db.String(16), nullable=False)  # ex: "v1.0"
+    aceito_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    ip = db.Column(db.String(45))  # IPv6-safe
+    user_agent = db.Column(db.String(500))
+    hash_documento = db.Column(db.String(64))  # SHA-256 opcional
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "tipo", "versao", name="uq_consentimento_user_tipo_versao"),
+        db.Index("ix_consentimento_user_tipo", "user_id", "tipo"),
+    )
+
+    user = db.relationship(
+        "User",
+        backref=db.backref("consentimentos", lazy="dynamic", cascade="all, delete-orphan"),
+    )
