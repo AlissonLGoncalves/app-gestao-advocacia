@@ -78,7 +78,7 @@ class Config:
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
     CNJ_API_KEY = os.environ.get("CNJ_API_KEY", "")
-    APP_VERSION = os.environ.get("APP_VERSION") or "1.0.0"
+    APP_VERSION = os.environ.get("APP_VERSION") or "1.2.0"
 
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
