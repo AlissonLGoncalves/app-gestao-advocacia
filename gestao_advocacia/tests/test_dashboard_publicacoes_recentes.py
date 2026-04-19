@@ -1,9 +1,8 @@
 """Tests for dashboard publicacoes-recentes endpoint (F3)."""
 
-import pytest
-from datetime import datetime, timedelta
-from models import PublicacaoDJEN, Caso, Cliente, User
-from extensions import db
+from datetime import datetime
+
+from models import Caso, Cliente, PublicacaoDJEN, User
 
 
 def test_publicacoes_recentes_requires_auth(client):
@@ -118,6 +117,3 @@ def test_publicacoes_recentes_com_caso_e_cliente_retorna_nome_correto(auth_clien
     ]
     assert len(encontrados) == 1
     assert encontrados[0]["cliente_nome"] == "Edimilson Francisco Da Costa"
-
-
-
