@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { API_URL } from './config.js'
 import { toast } from 'react-toastify'
 import DocumentosClienteTab from './components/DocumentosClienteTab.jsx'
 import DadosPessoaisSection from './components/forms/cliente/DadosPessoaisSection.jsx'
 import EnderecoSection from './components/forms/cliente/EnderecoSection.jsx'
 import ContatoSection from './components/forms/cliente/ContatoSection.jsx'
 import useClienteForm from './hooks/useClienteForm.js'
+import { anonimizarCliente, extrairDadosDocumentoCliente } from './api/clientes.js'
 
 const initialStatePF = {
   nome_razao_social: '',
@@ -335,16 +335,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     Array.from(files).forEach((file) => dataToSend.append('documentos', file))
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_URL}/clientes/extrair-dados-doc`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: dataToSend,
-      })
-
-      const data = await response.json()
-      if (!response.ok)
-        throw new Error(data.message || 'Falha ao processar o documento PDF pelo OCR.')
+      const data = await extrairDadosDocumentoCliente(dataToSend)
 
       const messageExtraida = []
       setFormData((prev) => {
@@ -473,21 +464,12 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
 
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_URL}/clientes/${clienteParaEditar.id}/anonimizar`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.ok) {
-        toast.success('Direito ao esquecimento executado! Dados mascarados.')
-        if (typeof onClienteChange === 'function') onClienteChange()
-      } else {
-        const errorData = await response.json()
-        toast.error(`Falha ao anonimizar: ${errorData.message}`)
-      }
-    } catch (e) {
-      toast.error('Erro interno ao solicitar anonimização LGPD.')
+      await anonimizarCliente(clienteParaEditar.id)
+      toast.success('Direito ao esquecimento executado! Dados mascarados.')
+      if (typeof onClienteChange === 'function') onClienteChange()
+    } catch (error) {
+      const details = error.payload?.message || error.payload?.erro || error.message
+      toast.error(`Falha ao anonimizar: ${details}`)
     } finally {
       setLoading(false)
     }

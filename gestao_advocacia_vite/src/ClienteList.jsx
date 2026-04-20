@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_URL } from './config.js'
+import { deleteCliente, listClientes } from './api/clientes.js'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -43,32 +44,13 @@ function ClienteList({ onEditCliente, refreshKey }) {
     setLoading(true)
     setError('')
 
-    const token = localStorage.getItem('token')
-    if (!token) {
-      setError('Autenticação necessária.')
-      setLoading(false)
-      toast.error('Sessão expirada ou inválida. Por favor, faça login novamente.')
-      // Idealmente, redirecionar para login
-      return
-    }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-
-    let url = `${API_URL}/clientes/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}` // Adicionada barra final
-    if (appliedSearchTerm) {
-      url += `&search=${encodeURIComponent(appliedSearchTerm)}`
-    }
-    if (tipoPessoaFilter) {
-      url += `&tipo_pessoa=${encodeURIComponent(tipoPessoaFilter)}`
-    }
-
     try {
-      const response = await fetch(url, { headers: authHeaders })
-      if (!response.ok) {
-        const resData = await response.json().catch(() => ({}))
-        console.error('ClienteList: Erro da API ao buscar clientes:', resData)
-        throw new Error(resData.erro || `Erro HTTP: ${response.status} ao buscar clientes`)
-      }
-      const data = await response.json()
+      const data = await listClientes({
+        sort_by: sortConfig.key,
+        sort_order: sortConfig.direction,
+        search: appliedSearchTerm,
+        tipo_pessoa: tipoPessoaFilter,
+      })
       setClientes(Array.isArray(data) ? data : data.clientes || [])
     } catch (err) {
       console.error('ClienteList: Erro detalhado ao buscar clientes:', err)
@@ -113,13 +95,6 @@ function ClienteList({ onEditCliente, refreshKey }) {
   }
 
   const handleDeleteClick = async (id) => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      toast.error('Autenticação expirada. Faça login novamente.')
-      return
-    }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-
     if (
       window.confirm(
         `Tem certeza que deseja excluir o cliente ID ${id}? Esta ação pode ser irreversível e afetar registos associados (casos, recebimentos, etc.).`
@@ -128,33 +103,27 @@ function ClienteList({ onEditCliente, refreshKey }) {
       setDeletingId(id)
       setError(null)
       try {
-        const response = await fetch(`${API_URL}/clientes/${id}`, {
-          method: 'DELETE',
-          headers: authHeaders,
-        })
-        if (!response.ok) {
-          const resData = await response.json().catch(() => ({}))
-          console.error('ClienteList: Erro da API ao deletar cliente:', resData)
+        await deleteCliente(id)
+        toast.success(`Cliente ID ${id} excluído com sucesso!`)
+        fetchClientes()
+      } catch (err) {
+        const resData = err.payload || {}
+        console.error(`ClienteList: Erro ao deletar cliente ${id}:`, err)
+        if (err.status === 409 || (resData.erro && resData.erro.toLowerCase().includes('associados'))) {
           if (
-            response.status === 409 ||
+            err.status === 409 ||
             (resData.erro && resData.erro.toLowerCase().includes('associados'))
           ) {
             toast.error(
               resData.erro ||
                 'Não é possível deletar o cliente pois existem registos associados a ele.'
             )
-          } else {
-            throw new Error(resData.erro || `Erro HTTP: ${response.status}`)
           }
         } else {
-          toast.success(`Cliente ID ${id} excluído com sucesso!`)
-          fetchClientes()
-        }
-      } catch (err) {
-        console.error(`ClienteList: Erro ao deletar cliente ${id}:`, err)
-        setError(`Erro ao deletar cliente: ${err.message}`)
-        if (!err.message.toLowerCase().includes('associados')) {
-          toast.error(`Erro ao deletar cliente: ${err.message}`)
+          setError(`Erro ao deletar cliente: ${err.message}`)
+          if (!err.message.toLowerCase().includes('associados')) {
+            toast.error(`Erro ao deletar cliente: ${err.message}`)
+          }
         }
       } finally {
         setDeletingId(null)
