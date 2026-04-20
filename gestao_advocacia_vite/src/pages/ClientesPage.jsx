@@ -17,22 +17,26 @@ function ClientesPage() {
   // Determina se o formulário deve ser mostrado e em qual modo com base na URL
   const urlPath = location.pathname.toLowerCase() // Normaliza para minúsculas para segurança
   const mostrarFormulario =
-    urlPath.includes('/clientes/novo') || urlPath.startsWith('/clientes/editar/')
+    (urlPath.includes('/clientes/novo') && !urlPath.includes('/clientes/novo/procuracao')) ||
+    urlPath.startsWith('/clientes/editar/') ||
+    /^\/clientes\/\d+$/.test(urlPath)
   const modoFormulario = urlPath.includes('/clientes/novo')
     ? 'novo'
     : urlPath.startsWith('/clientes/editar/')
       ? 'editar'
-      : null
+      : /^\/clientes\/\d+$/.test(urlPath)
+        ? 'detalhe'
+        : null
   // Busca dados do cliente para edição se estiver no modo de edição e clienteId estiver presente
   useEffect(() => {
-    if (modoFormulario === 'editar' && params.clienteId) {
+    if ((modoFormulario === 'editar' || modoFormulario === 'detalhe') && params.clienteId) {
       setLoadingItem(true)
       getCliente(params.clienteId)
         .then((data) => setClienteParaEditar(data))
         .catch((error) => {
           console.error('ClientesPage: Erro ao buscar cliente:', error)
           // Adicionar feedback para o usuário, ex: toast
-          navigate('/clientes') // Volta para a lista em caso de erro
+          navigate('/clientes')
         })
         .finally(() => {
           setLoadingItem(false)
@@ -61,7 +65,7 @@ function ClientesPage() {
     navigate('/clientes') // Volta para a lista após fechar/salvar o formulário
   }, [navigate])
 
-  if (loadingItem && modoFormulario === 'editar') {
+  if (loadingItem && (modoFormulario === 'editar' || modoFormulario === 'detalhe')) {
     return (
       <div className="d-flex justify-content-center align-items-center p-5">
         <div className="spinner-border text-primary" role="status">
@@ -86,7 +90,17 @@ function ClientesPage() {
   }
   return (
     <>
-      <BotaoAdicionar texto="Adicionar Novo Cliente" onClick={handleAdicionarClick} />
+      <div className="d-flex flex-wrap gap-2 mb-3">
+        <BotaoAdicionar texto="Adicionar Novo Cliente" onClick={handleAdicionarClick} />
+        <button
+          type="button"
+          className="btn btn-outline-primary d-flex align-items-center mb-3"
+          onClick={() => navigate('/clientes/novo/procuracao')}
+        >
+          <i className="bi bi-file-earmark-arrow-up me-2"></i>
+          Cadastrar por Procuração
+        </button>
+      </div>
       <ClienteList key={refreshKey} onEditCliente={handleEditarCliente} />
     </>
   )
