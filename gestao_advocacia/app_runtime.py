@@ -1,5 +1,4 @@
 import os
-import re
 import uuid
 
 from flask import g, jsonify, request
@@ -8,19 +7,26 @@ from werkzeug.exceptions import HTTPException
 from extensions import scheduler
 from tasks import job_verificar_processos_cnj
 
+# Origins explicitamente permitidos — nao usar regex aberto (*.vercel.app aceita qualquer dominio)
+ALLOWED_ORIGINS = [
+    "https://app-gestao-advocacia.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 
 def configure_cors_origins():
-    allowed_origins = [
-        os.environ.get("FRONTEND_URL", "http://localhost:5173"),
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "https://app-gestao-advocacia.vercel.app",
-        re.compile(r"https://.*\.vercel\.app$"),
-    ]
+    origins = list(ALLOWED_ORIGINS)
+    # Preview URLs do Vercel para o projeto especifico (PRs de deploy)
+    # Formato: https://app-gestao-advocacia-<hash>.vercel.app
+    import re
+
+    origins.append(re.compile(r"https://app-gestao-advocacia-[\w-]+\.vercel\.app$"))
+    # Permite adicionar origens extras via env var (CSV), ex.: para staging
     extra_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
     if extra_origins:
-        allowed_origins.extend([o.strip() for o in extra_origins.split(",") if o.strip()])
-    return allowed_origins
+        origins.extend([o.strip() for o in extra_origins.split(",") if o.strip()])
+    return origins
 
 
 def configure_request_context(app):

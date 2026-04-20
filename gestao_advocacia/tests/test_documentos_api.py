@@ -24,11 +24,14 @@ def test_get_documentos_lista_vazia(auth_client, db):
     assert len(data) == 0
 
 
+_PDF_STUB = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"
+
+
 def test_upload_documento_sucesso(auth_client, db):
     cliente_id = criar_cliente_teste(auth_client, 1)
     data_form = {
         "cliente_id": str(cliente_id),
-        "file": (BytesIO(b"conteudo"), "teste.txt"),
+        "file": (BytesIO(_PDF_STUB), "teste.pdf"),
     }
     response = auth_client.post(
         "/api/v1/documentos/upload", data=data_form, content_type="multipart/form-data"
@@ -62,10 +65,10 @@ def test_upload_documento_tipo_nao_permitido(auth_client, db):
 
 def test_download_documento_existente(auth_client, db):
     cliente_id = criar_cliente_teste(auth_client, 2)
-    conteudo = b"download ok"
+    conteudo = _PDF_STUB
     data_form = {
         "cliente_id": str(cliente_id),
-        "file": (BytesIO(conteudo), "download_teste.txt"),
+        "file": (BytesIO(conteudo), "download_teste.pdf"),
     }
     res_upload = auth_client.post(
         "/api/v1/documentos/upload", data=data_form, content_type="multipart/form-data"
@@ -80,7 +83,7 @@ def test_download_documento_existente(auth_client, db):
 
 def test_delete_documento_sucesso(auth_client, db):
     data_form = {
-        "file": (BytesIO(b"delete"), "delete.txt"),
+        "file": (BytesIO(_PDF_STUB), "delete.pdf"),
     }
     res_upload = auth_client.post(
         "/api/v1/documentos/upload", data=data_form, content_type="multipart/form-data"
