@@ -1,39 +1,94 @@
-import { api } from './client'
+import { api } from './client.js'
 
-export function listDespesas() {
-  return api.get('/despesas')
+function toQueryString(params) {
+  const search = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === '') {
+      return
+    }
+
+    search.set(key, String(value))
+  })
+
+  const query = search.toString()
+  return query ? `?${query}` : ''
 }
 
-/** @param {object} payload */
-export function createDespesa(payload) {
-  return api.post('/despesas', payload)
+function normalizeListPayload(payload, key) {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  return payload?.[key] || []
 }
 
-/** @param {number|string} id @param {object} payload */
-export function updateDespesa(id, payload) {
-  return api.put(`/despesas/${id}`, payload)
+export async function listRecebimentos(params = {}) {
+  const data = await api.get(`/recebimentos/${toQueryString(params)}`)
+  return normalizeListPayload(data, 'recebimentos')
 }
 
-/** @param {number|string} id */
+export function getRecebimento(id) {
+  return api.get(`/recebimentos/${id}`)
+}
+
+export function createRecebimento(body) {
+  return api.post('/recebimentos/', body)
+}
+
+export function updateRecebimento(id, body) {
+  return api.put(`/recebimentos/${id}`, body)
+}
+
+export function deleteRecebimento(id) {
+  return api.del(`/recebimentos/${id}`)
+}
+
+export function marcarRecebimentoPago(id, body = {}) {
+  return api.put(`/recebimentos/${id}`, body)
+}
+
+export async function listDespesas(params = {}) {
+  const data = await api.get(`/despesas/${toQueryString(params)}`)
+  return normalizeListPayload(data, 'despesas')
+}
+
+export function getDespesa(id) {
+  return api.get(`/despesas/${id}`)
+}
+
+export function createDespesa(body) {
+  return api.post('/despesas/', body)
+}
+
+export function updateDespesa(id, body) {
+  return api.put(`/despesas/${id}`, body)
+}
+
 export function deleteDespesa(id) {
   return api.del(`/despesas/${id}`)
 }
 
-export function listRecebimentos() {
-  return api.get('/recebimentos')
+export function marcarDespesaPaga(id, body = {}) {
+  return api.put(`/despesas/${id}`, body)
 }
 
-/** @param {object} payload */
-export function createRecebimento(payload) {
-  return api.post('/recebimentos', payload)
+export function getResumoFinanceiro(params = {}) {
+  return api.get(`/dashboard/stats${toQueryString(params)}`)
 }
 
-/** @param {number|string} id @param {object} payload */
-export function updateRecebimento(id, payload) {
-  return api.put(`/recebimentos/${id}`, payload)
+export function getRelatorioContasAReceber(params = {}) {
+  return api.get(`/relatorios/contas-a-receber${toQueryString(params)}`)
 }
 
-/** @param {number|string} id */
-export function deleteRecebimento(id) {
-  return api.del(`/recebimentos/${id}`)
+export function getRelatorioContasAPagar(params = {}) {
+  return api.get(`/relatorios/contas-a-pagar${toQueryString(params)}`)
+}
+
+export function downloadRelatorioContasAReceber(params = {}) {
+  return api.getBlob(`/relatorios/contas-a-receber${toQueryString(params)}`)
+}
+
+export function downloadRelatorioContasAPagar(params = {}) {
+  return api.getBlob(`/relatorios/contas-a-pagar${toQueryString(params)}`)
 }

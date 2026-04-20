@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/solid'
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { formatCNJ } from './utils/cnj.js'
+import { getResumoFinanceiro } from './api/financeiro.js'
 
 const StatCard = ({
   title,
@@ -153,22 +154,7 @@ function Dashboard({ mudarSecao }) {
     }
 
     try {
-      const response = await fetch(`${API_URL}/dashboard/stats`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Sessão expirada. Por favor, faça login novamente.')
-        }
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || `Erro ao carregar dados (status ${response.status})`)
-      }
-
-      const data = await response.json()
+      const data = await getResumoFinanceiro()
 
       setStats({
         totalClientes: data.total_clientes ?? 0,

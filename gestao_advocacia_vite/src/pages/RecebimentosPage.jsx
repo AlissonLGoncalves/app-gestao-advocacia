@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import RecebimentoList from '../RecebimentoList.jsx' // Ajuste o caminho se RecebimentoList.jsx não estiver em src/
 import RecebimentoForm from '../RecebimentoForm.jsx' // Ajuste o caminho se RecebimentoForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
-import { API_URL } from '../config.js' // Ajuste o caminho se config.js não estiver em src/
+import { getRecebimento } from '../api/financeiro.js'
 
 function RecebimentosPage() {
   const navigate = useNavigate()
@@ -27,16 +27,7 @@ function RecebimentosPage() {
   useEffect(() => {
     if (modoFormulario === 'editar' && params.recebimentoId) {
       setLoadingItem(true)
-      fetch(`${API_URL}/recebimentos/${params.recebimentoId}`)
-        .then((response) => {
-          if (!response.ok) {
-            console.error(
-              `RecebimentosPage: Falha ao buscar recebimento ${params.recebimentoId}. Status: ${response.status}`
-            )
-            throw new Error('Falha ao buscar recebimento para edição.')
-          }
-          return response.json()
-        })
+      getRecebimento(params.recebimentoId)
         .then((data) => {
           setRecebimentoParaEditar(data)
         })

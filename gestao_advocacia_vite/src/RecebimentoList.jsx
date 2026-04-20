@@ -1,6 +1,5 @@
 // Arquivo: src/RecebimentoList.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { API_URL } from './config.js'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -12,6 +11,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
+import { api } from './api/client.js'
+import { deleteRecebimento, listRecebimentos } from './api/financeiro.js'
 
 function RecebimentoList({ onEditRecebimento, refreshKey }) {
   const [recebimentos, setRecebimentos] = useState([])
@@ -34,25 +35,21 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
   const [sortConfig, setSortConfig] = useState({ key: 'data_vencimento', direction: 'desc' })
 
   const fetchClientesECasosParaFiltro = useCallback(async () => {
-    const token = localStorage.getItem('token')
-    if (!token) return
-    const authHeaders = { Authorization: `Bearer ${token}` }
+    const hasToken =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('auth_token')
+    if (!hasToken) return
 
     try {
-      const clientesRes = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, {
-        headers: authHeaders,
-      }) // Adicionada barra final
-      if (!clientesRes.ok) throw new Error('Falha ao carregar clientes')
-      const clientesData = await clientesRes.json()
+      const clientesData = await api.get('/clientes/?sort_by=nome_razao_social&order=asc')
       setClientes(clientesData.clientes || [])
 
-      let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc` // Adicionada barra final
+      let casosUrl = '/casos/?sort_by=titulo&order=asc'
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`
       }
-      const casosRes = await fetch(casosUrl, { headers: authHeaders })
-      if (!casosRes.ok) throw new Error('Falha ao carregar casos')
-      const casosData = await casosRes.json()
+      const casosData = await api.get(casosUrl)
       setCasos(casosData.casos || [])
     } catch (err) {
       console.error('Erro ao buscar clientes/casos para filtro:', err)
@@ -63,33 +60,32 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
   const fetchRecebimentos = useCallback(async () => {
     setLoading(true)
     setError('')
-    const token = localStorage.getItem('token')
-    if (!token) {
+    const hasToken =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('auth_token')
+    if (!hasToken) {
       setError('Autenticação necessária.')
       setLoading(false)
       toast.error('Sessão expirada. Faça login.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-
-    let url = `${API_URL}/recebimentos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}` // Adicionada barra final
-    if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`
-    if (clienteFilter) url += `&cliente_id=${clienteFilter}`
-    if (casoFilter) url += `&caso_id=${casoFilter}`
-    if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`
-    if (dataVencimentoInicio) url += `&data_vencimento_inicio=${dataVencimentoInicio}`
-    if (dataVencimentoFim) url += `&data_vencimento_fim=${dataVencimentoFim}`
-    if (dataRecebimentoInicio) url += `&data_recebimento_inicio=${dataRecebimentoInicio}`
-    if (dataRecebimentoFim) url += `&data_recebimento_fim=${dataRecebimentoFim}`
 
     try {
-      const response = await fetch(url, { headers: authHeaders })
-      if (!response.ok) {
-        const resData = await response.json().catch(() => null)
-        throw new Error(resData?.erro || `Erro HTTP: ${response.status}`)
+      const params = {
+        sort_by: sortConfig.key,
+        sort_order: sortConfig.direction,
+        search: searchTerm,
+        cliente_id: clienteFilter,
+        caso_id: casoFilter,
+        status: statusFilter,
+        data_vencimento_inicio: dataVencimentoInicio,
+        data_vencimento_fim: dataVencimentoFim,
+        data_recebimento_inicio: dataRecebimentoInicio,
+        data_recebimento_fim: dataRecebimentoFim,
       }
-      const data = await response.json()
-      setRecebimentos(data.recebimentos || [])
+      const data = await listRecebimentos(params)
+      setRecebimentos(data)
     } catch (err) {
       console.error('Erro ao buscar recebimentos:', err)
       setError(`Erro ao carregar recebimentos: ${err.message}`)
@@ -120,25 +116,20 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
   }, [fetchRecebimentos, refreshKey])
 
   const handleDeleteClick = async (id) => {
-    const token = localStorage.getItem('token')
-    if (!token) {
+    const hasToken =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('auth_token')
+    if (!hasToken) {
       toast.error('Autenticação expirada. Faça login novamente.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
 
     if (window.confirm(`Tem certeza que deseja excluir o recebimento ID ${id}?`)) {
       setDeletingId(id)
       setError(null)
       try {
-        const response = await fetch(`${API_URL}/recebimentos/${id}`, {
-          method: 'DELETE',
-          headers: authHeaders,
-        })
-        if (!response.ok) {
-          const resData = await response.json().catch(() => ({}))
-          throw new Error(resData.erro || `Erro HTTP: ${response.status}`)
-        }
+        await deleteRecebimento(id)
         toast.success(`Recebimento ID ${id} excluído com sucesso!`)
         fetchRecebimentos()
       } catch (err) {

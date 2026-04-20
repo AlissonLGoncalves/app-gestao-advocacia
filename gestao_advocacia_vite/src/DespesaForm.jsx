@@ -1,7 +1,8 @@
 // src/DespesaForm.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { API_URL } from './config.js'
 import { toast } from 'react-toastify'
+import { api } from './api/client.js'
+import { createDespesa, updateDespesa } from './api/financeiro.js'
 
 const initialState = {
   caso_id: '',
@@ -29,18 +30,13 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
   }, [])
 
   const fetchClientes = useCallback(async () => {
-    const token = localStorage.getItem('token')
-    if (!token) {
+    const hasToken = localStorage.getItem('token') || localStorage.getItem('access_token')
+    if (!hasToken) {
       toast.warn('Sessão não encontrada para carregar clientes.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
     try {
-      const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, {
-        headers: authHeaders,
-      })
-      if (!response.ok) throw new Error('Falha ao carregar clientes')
-      const data = await response.json()
+      const data = await api.get('/clientes/?sort_by=nome_razao_social&order=asc')
       setClientes(Array.isArray(data) ? data : data.clientes || [])
     } catch (error) {
       console.error('DespesaForm: Erro ao buscar clientes:', error)
@@ -49,20 +45,17 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
   }, [])
 
   const fetchCasos = useCallback(async (clienteId = null) => {
-    const token = localStorage.getItem('token')
-    if (!token) {
+    const hasToken = localStorage.getItem('token') || localStorage.getItem('access_token')
+    if (!hasToken) {
       toast.warn('Sessão não encontrada para carregar casos.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-    let url = `${API_URL}/casos/?sort_by=titulo&order=asc`
+    let url = '/casos/?sort_by=titulo&order=asc'
     if (clienteId) {
       url += `&cliente_id=${clienteId}`
     }
     try {
-      const response = await fetch(url, { headers: authHeaders })
-      if (!response.ok) throw new Error('Falha ao carregar casos')
-      const data = await response.json()
+      const data = await api.get(url)
       setCasos(Array.isArray(data) ? data : data.casos || [])
     } catch (error) {
       console.error('DespesaForm: Erro ao buscar casos:', error)
@@ -105,12 +98,8 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
           // Fallback se a referência não vier, busca o caso para achar o cliente
           const token = localStorage.getItem('token')
           if (token) {
-            fetch(`${API_URL}/casos/${dadosEdit.caso_id}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            })
-              .then((res) =>
-                res.ok ? res.json() : Promise.reject('Caso não encontrado para despesa')
-              )
+            api
+              .get(`/casos/${dadosEdit.caso_id}`)
               .then((casoData) => {
                 if (casoData && casoData.cliente_id) {
                   setSelectedClienteId(String(casoData.cliente_id))
@@ -175,15 +164,14 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       return
     }
 
-    const token = localStorage.getItem('token')
-    if (!token) {
+    const hasToken =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('auth_token')
+    if (!hasToken) {
       toast.error('Autenticação necessária para salvar. Faça login.')
       setLoading(false)
       return
-    }
-    const authHeaders = {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
     }
     setLoading(true)
 
@@ -195,20 +183,10 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       data_despesa: formData.data_despesa || null,
     }
     try {
-      const url = isEditing ? `${API_URL}/despesas/${despesaParaEditar.id}` : `${API_URL}/despesas/` // Adicionada barra final para POST
-      const method = isEditing ? 'PUT' : 'POST'
-      const response = await fetch(url, {
-        method,
-        headers: authHeaders,
-        body: JSON.stringify(dadosParaEnviar),
-      })
-      const responseData = await response.json()
-      if (!response.ok) {
-        console.error('DespesaForm: Erro da API:', responseData)
-        throw new Error(
-          responseData.erro ||
-            `Falha ao ${isEditing ? 'atualizar' : 'adicionar'} despesa. Status: ${response.status}`
-        )
+      if (isEditing) {
+        await updateDespesa(despesaParaEditar.id, dadosParaEnviar)
+      } else {
+        await createDespesa(dadosParaEnviar)
       }
       toast.success(`Despesa ${isEditing ? 'atualizada' : 'adicionada'} com sucesso!`)
       if (typeof onDespesaChange === 'function') {

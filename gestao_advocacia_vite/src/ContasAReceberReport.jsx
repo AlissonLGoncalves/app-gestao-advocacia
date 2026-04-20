@@ -1,7 +1,7 @@
 ﻿// src/ContasAReceberReport.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { API_URL } from './config.js'
 import { toast } from 'react-toastify' // Importar toast
+import { getRelatorioContasAReceber } from './api/financeiro.js'
 
 function ContasAReceberReport() {
   const [reportData, setReportData] = useState({
@@ -16,29 +16,8 @@ function ContasAReceberReport() {
     setLoading(true)
     setError('')
 
-    const token = localStorage.getItem('token')
-    if (!token) {
-      setError('Autenticação necessária para visualizar relatórios.')
-      setLoading(false)
-      toast.error('Sessão expirada ou inválida. Faça login.')
-      return
-    }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-
     try {
-      // A API de relatórios pode não ter uma barra final, verifique a definição da rota no backend.
-      // Se /api/relatorios/contas-a-receber é o endpoint exato:
-      const response = await fetch(`${API_URL}/relatorios/contas-a-receber`, {
-        headers: authHeaders,
-      })
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ erro: `Erro HTTP: ${response.status}` }))
-        console.error('ContasAReceberReport: Erro da API ao buscar relatório:', errorData)
-        throw new Error(errorData.erro || `Erro HTTP: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await getRelatorioContasAReceber()
       setReportData({
         items: data.items || [],
         total_geral: data.total_geral || '0.00',
