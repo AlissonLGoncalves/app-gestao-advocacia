@@ -104,11 +104,13 @@ def _make_evento(client, token, tag):
 
 
 def _make_documento(client, token, cliente_id, caso_id, tag):
+    # Cabecalho PDF valido para passar na validacao de MIME por magic bytes
+    _pdf_stub = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"
     data = {
         "descricao": f"Documento {tag}",
         "cliente_id": str(cliente_id),
         "caso_id": str(caso_id),
-        "file": (io.BytesIO(b"arquivo de teste"), f"doc_{tag}.txt"),
+        "file": (io.BytesIO(_pdf_stub), f"doc_{tag}.pdf"),
     }
     resp = client.post(
         "/api/v1/documentos/upload",

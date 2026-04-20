@@ -8,28 +8,7 @@ from werkzeug.utils import secure_filename
 from extensions import db
 from helpers import get_item_or_404, get_tenant_id, query_for_tenant, tenant_scoped
 from models import Caso, Documento
-
-ALLOWED_EXTENSIONS_UPLOAD = {
-    "txt",
-    "pdf",
-    "png",
-    "jpg",
-    "jpeg",
-    "gif",
-    "doc",
-    "docx",
-    "xls",
-    "xlsx",
-    "ppt",
-    "pptx",
-    "odt",
-    "ods",
-    "odp",
-}
-
-
-def is_allowed_file_upload(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS_UPLOAD
+from upload_validator import validar_upload
 
 
 def register_documentos_routes(app, documentos_ns, documento_model_dto):
@@ -72,7 +51,8 @@ def register_documentos_routes(app, documentos_ns, documento_model_dto):
             file_storage = request.files["file"]
             if file_storage.filename == "":
                 return {"message": "Nenhum arquivo foi selecionado para upload."}, 400
-            if file_storage and is_allowed_file_upload(file_storage.filename):
+            ok, motivo = validar_upload(file_storage)
+            if file_storage and ok:
                 original_filename = secure_filename(file_storage.filename)
                 user_upload_folder_path = os.path.join(app.config["UPLOAD_FOLDER"], str(user_id))
                 os.makedirs(user_upload_folder_path, exist_ok=True)
@@ -116,10 +96,7 @@ def register_documentos_routes(app, documentos_ns, documento_model_dto):
                 )
                 doc_dict = novo_documento_db.to_dict()
                 return doc_dict, 201
-            return {
-                "message": "Tipo de arquivo nao permitido. Extensoes permitidas: "
-                + ", ".join(ALLOWED_EXTENSIONS_UPLOAD)
-            }, 400
+            return {"message": motivo or "Tipo de arquivo nao permitido."}, 400
 
     @documentos_ns.route("/download/<int:doc_id_param>")
     @documentos_ns.param("doc_id_param", "O ID do documento para realizar o download")
