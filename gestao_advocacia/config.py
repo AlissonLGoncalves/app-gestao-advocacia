@@ -2,6 +2,7 @@
 # ARQUIVO: gestao_advocacia/config.py
 # Modificado para incluir configurações do APScheduler e do Job CNJ.
 # ==============================================================================
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -78,6 +79,7 @@ class Config:
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
     CNJ_API_KEY = os.environ.get("CNJ_API_KEY", "")
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
     APP_VERSION = os.environ.get("APP_VERSION") or "1.2.0"
 
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -106,3 +108,8 @@ class Config:
     )
     DJEN_ENABLED_TENANTS = os.environ.get("DJEN_ENABLED_TENANTS", "")  # CSV: 1,2,3
     DJEN_ROLLOUT_PERCENT = int(os.environ.get("DJEN_ROLLOUT_PERCENT", 100))  # 10, 50, 100
+
+    if os.environ.get("FLASK_ENV") == "production" and not GEMINI_API_KEY:
+        logging.getLogger(__name__).warning(
+            "GEMINI_API_KEY não configurada em produção. Recursos Gemini ficarão desabilitados."
+        )

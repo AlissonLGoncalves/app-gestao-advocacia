@@ -180,6 +180,7 @@ Documentos tecnicos adicionais ficam em `docs/`:
 
 - [`docs/tenant-isolation.md`](docs/tenant-isolation.md) — modelo de isolamento multi-tenant e invariantes que os endpoints precisam respeitar.
 - [`docs/logging.md`](docs/logging.md) — configuracao de logging estruturado, niveis e request IDs.
+- [`docs/compliance/gemini-setup.md`](docs/compliance/gemini-setup.md) — setup seguro da GEMINI_API_KEY no backend e no Fly.
 
 ## Licenca
 
