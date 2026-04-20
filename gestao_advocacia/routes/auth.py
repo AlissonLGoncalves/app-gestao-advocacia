@@ -185,7 +185,7 @@ def register_auth_routes(
 
     @auth_ns.route("/register-invite")
     class RegisterInvite(Resource):
-        @limiter.limit("3 per hour")
+        @limiter.limit("10 per hour")
         @auth_ns.expect(user_register_invite_dto)
         def post(self):
             data = request.get_json()

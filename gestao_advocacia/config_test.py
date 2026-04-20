@@ -20,3 +20,5 @@ class ConfigTest:
     CNJ_JOB_ENABLED = False
     # Desabilitar o job DJEN nos testes
     DJEN_JOB_ENABLED = False
+    # Desabilitar rate limiting nos testes (para não atrapalhar outros testes)
+    RATELIMIT_ENABLED = False
