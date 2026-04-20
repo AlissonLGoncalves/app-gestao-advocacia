@@ -23,6 +23,7 @@ import RegisterPage from './pages/auth/RegisterPage.jsx'
 import TermsPage from './pages/auth/TermsPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
+import NovoClientePorProcuracao from './pages/clientes/NovoClientePorProcuracao.jsx'
 import { APP_VERSION } from './version.js'
 
 // Importação dos ícones
@@ -289,7 +290,9 @@ function App() {
 
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="clientes/novo" element={<ClientesPage />} />
+          <Route path="clientes/novo/procuracao" element={<NovoClientePorProcuracao />} />
           <Route path="clientes/editar/:clienteId" element={<ClientesPage />} />
+          <Route path="clientes/:clienteId" element={<ClientesPage />} />
 
           <Route path="casos" element={<CasosPage />} />
           <Route path="casos/novo" element={<CasosPage />} />
