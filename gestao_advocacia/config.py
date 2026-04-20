@@ -109,6 +109,9 @@ class Config:
     DJEN_ENABLED_TENANTS = os.environ.get("DJEN_ENABLED_TENANTS", "")  # CSV: 1,2,3
     DJEN_ROLLOUT_PERCENT = int(os.environ.get("DJEN_ROLLOUT_PERCENT", 100))  # 10, 50, 100
 
+    # Token de convite: padrão 48h. Ajuste com INVITE_TOKEN_HOURS env var.
+    INVITE_TOKEN_HOURS = int(os.environ.get("INVITE_TOKEN_HOURS", "48"))
+
     if os.environ.get("FLASK_ENV") == "production" and not GEMINI_API_KEY:
         logging.getLogger(__name__).warning(
             "GEMINI_API_KEY não configurada em produção. Recursos Gemini ficarão desabilitados."
