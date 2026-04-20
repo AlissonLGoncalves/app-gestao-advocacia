@@ -43,7 +43,7 @@ def test_json_formatter_produces_valid_json():
         extra={
             "event": "login_success",
             "request_id": "req-1",
-            "user_id": 1,
+            "user_id_hash": "6b86b273",
             "tenant_id": 10,
         },
     )
@@ -52,7 +52,7 @@ def test_json_formatter_produces_valid_json():
     assert payload["message"] == "login_success"
     assert payload["event"] == "login_success"
     assert payload["request_id"] == "req-1"
-    assert payload["user_id"] == 1
+    assert payload["user_id_hash"] == "6b86b273"
     assert payload["tenant_id"] == 10
     assert "timestamp" in payload
     assert payload["level"] == "INFO"
@@ -94,12 +94,12 @@ def test_auth_login_logs_success_and_failure(client, caplog):
 
     assert success_record is not None
     assert getattr(success_record, "event", None) == "login_success"
-    assert getattr(success_record, "user_id", None) is not None
+    assert getattr(success_record, "user_id_hash", None) is not None
     assert hasattr(success_record, "tenant_id")
 
     assert failed_record is not None
     assert getattr(failed_record, "event", None) == "login_failed"
-    assert getattr(failed_record, "email", None) == "obs_user"
+    assert getattr(failed_record, "email", None) == "obs***"
     assert getattr(failed_record, "reason", None) == "invalid_credentials"
 
 

@@ -9,6 +9,7 @@ from jwt.exceptions import DecodeError, ExpiredSignatureError
 from extensions import db
 from mail_service import enviar_alerta_email
 from models import ConsentimentoUsuario, Tenant, User
+from utils.log_sanitizer import mask_email, mask_user_id
 
 TIPOS_CONSENTIMENTO_OBRIGATORIOS = ("termos_uso", "lgpd")
 
@@ -261,7 +262,7 @@ def register_auth_routes(
                     "login_success",
                     extra={
                         "event": "login_success",
-                        "user_id": user.id,
+                        "user_id_hash": mask_user_id(user.id),
                         "tenant_id": user.tenant_id,
                     },
                 )
@@ -270,7 +271,7 @@ def register_auth_routes(
                 "login_failed",
                 extra={
                     "event": "login_failed",
-                    "email": username_or_email,
+                    "email": mask_email(username_or_email),
                     "reason": "invalid_credentials",
                 },
             )

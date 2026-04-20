@@ -6,6 +6,7 @@ from flask_restx import abort
 
 from extensions import db
 from models import User
+from utils.log_sanitizer import mask_user_id
 
 
 def tenant_scoped(fn):
@@ -64,7 +65,7 @@ def get_item_or_404(model, item_id):
                 "cross_tenant_access_blocked",
                 extra={
                     "event": "cross_tenant_access_blocked",
-                    "user_id": user_id,
+                    "user_id_hash": mask_user_id(user_id),
                     "current_tenant": tenant_id,
                     "target_tenant": tenant_alvo,
                     "endpoint": request.path,
@@ -81,7 +82,7 @@ def get_item_or_404(model, item_id):
                 "cross_user_access_blocked",
                 extra={
                     "event": "cross_user_access_blocked",
-                    "user_id": user_id,
+                    "user_id_hash": mask_user_id(user_id),
                     "current_tenant": tenant_id,
                     "target_tenant": tenant_alvo,
                     "endpoint": request.path,
