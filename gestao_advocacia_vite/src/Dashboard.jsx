@@ -37,47 +37,53 @@ const StatCard = ({
   colorClass = 'text-primary',
   bgColorClass = 'bg-primary-subtle',
   onClick,
-}) => (
-  <div
-    className={`card border-0 shadow-sm transition-shadow duration-200 ease-in-out d-flex flex-row align-items-center p-4 ${onClick ? 'cursor-pointer hover-shadow-lg' : ''}`}
-    onClick={onClick}
-    style={
-      onClick
-        ? { cursor: 'pointer', borderRadius: 'var(--radius-lg)' }
-        : { borderRadius: 'var(--radius-lg)' }
-    }
-    role={onClick ? 'button' : 'figure'}
-    tabIndex={onClick ? 0 : -1}
-    onKeyDown={
-      onClick
-        ? (e) => {
-            if (e.key === 'Enter' || e.key === ' ') onClick()
-          }
-        : undefined
-    }
-  >
+}) => {
+  const iconElement = React.createElement(IconComponent, {
+    style: { width: '28px', height: '28px', color: 'var(--primary)' },
+  })
+
+  return (
     <div
-      className={`p-3 rounded-circle me-4 ${bgColorClass} ${colorClass}`}
-      style={{
-        background:
-          'linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
-      }}
+      className={`card border-0 shadow-sm transition-shadow duration-200 ease-in-out d-flex flex-row align-items-center p-4 ${onClick ? 'cursor-pointer hover-shadow-lg' : ''}`}
+      onClick={onClick}
+      style={
+        onClick
+          ? { cursor: 'pointer', borderRadius: 'var(--radius-lg)' }
+          : { borderRadius: 'var(--radius-lg)' }
+      }
+      role={onClick ? 'button' : 'figure'}
+      tabIndex={onClick ? 0 : -1}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') onClick()
+            }
+          : undefined
+      }
     >
-      <IconComponent style={{ width: '28px', height: '28px', color: 'var(--primary)' }} />
-    </div>
-    <div className="flex-grow-1">
-      <p
-        className="text-muted small text-uppercase mb-1"
-        style={{ fontSize: '0.75rem', letterSpacing: '0.05em', fontWeight: '600' }}
+      <div
+        className={`p-3 rounded-circle me-4 ${bgColorClass} ${colorClass}`}
+        style={{
+          background:
+            'linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
+        }}
       >
-        {title}
-      </p>
-      <p className="h3 mb-0 fw-bold text-dark" style={{ fontFamily: 'var(--font-heading)' }}>
-        {value === undefined || value === null ? '...' : value}
-      </p>
+        {iconElement}
+      </div>
+      <div className="flex-grow-1">
+        <p
+          className="text-muted small text-uppercase mb-1"
+          style={{ fontSize: '0.75rem', letterSpacing: '0.05em', fontWeight: '600' }}
+        >
+          {title}
+        </p>
+        <p className="h3 mb-0 fw-bold text-dark" style={{ fontFamily: 'var(--font-heading)' }}>
+          {value === undefined || value === null ? '...' : value}
+        </p>
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 const EventListItem = ({ evento, onClick }) => {
   if (!evento || typeof evento !== 'object' || !evento.id || !evento.data_inicio) {
@@ -342,7 +348,7 @@ function Dashboard({ mudarSecao }) {
       } else {
         setResultadoConsulta(data)
       }
-    } catch (e) {
+    } catch {
       setResultadoConsulta({ erro: 'Erro de conexão ao acessar o Tribunal/DataJud.' })
     } finally {
       setBuscandoConsulta(false)

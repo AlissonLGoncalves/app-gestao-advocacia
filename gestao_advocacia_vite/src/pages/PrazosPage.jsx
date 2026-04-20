@@ -62,8 +62,17 @@ export default function PrazosPage() {
       const res = await fetch(`${API_URL}/tarefas`, {
         headers: { Authorization: `Bearer ${token}` },
       })
+<<<<<<< HEAD
       if (res.ok) setTarefas(await res.json())
       else toast.error('Erro ao carregar prazos.')
+=======
+      if (res.ok) {
+        const data = await res.json()
+        setTarefas(data)
+      } else {
+        toast.error('Erro ao carregar prazos.')
+      }
+>>>>>>> 94b5776 (refactor: lint and validation cleanup for C3)
     } catch {
       toast.error('Erro de conexão.')
     } finally {
@@ -77,9 +86,18 @@ export default function PrazosPage() {
       const res = await fetch(`${API_URL}/casos`, {
         headers: { Authorization: `Bearer ${token}` },
       })
+<<<<<<< HEAD
       if (res.ok) setCasos(await res.json())
     } catch {
       /* ignore */
+=======
+      if (res.ok) {
+        const data = await res.json()
+        setCasos(data)
+      }
+    } catch {
+      // ignore
+>>>>>>> 94b5776 (refactor: lint and validation cleanup for C3)
     }
   }, [])
 
@@ -148,7 +166,13 @@ export default function PrazosPage() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: novoStatus }),
       })
+<<<<<<< HEAD
       if (res.ok) carregarTarefas()
+=======
+      if (res.ok) {
+        carregarTarefas()
+      }
+>>>>>>> 94b5776 (refactor: lint and validation cleanup for C3)
     } catch {
       toast.error('Falha ao atualizar tarefa.')
     }
