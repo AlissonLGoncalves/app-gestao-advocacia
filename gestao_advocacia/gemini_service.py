@@ -13,7 +13,7 @@ def get_gemini_client():
         return None
 
     try:
-        import google.generativeai as genai
+        from google import genai
     except Exception:
         return None
 
@@ -21,5 +21,4 @@ def get_gemini_client():
     if not api_key:
         return None
 
-    genai.configure(api_key=api_key)
-    return genai
+    return genai.Client(api_key=api_key)
