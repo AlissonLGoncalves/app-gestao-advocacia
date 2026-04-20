@@ -6,7 +6,7 @@ from flask_jwt_extended import create_access_token, decode_token, get_jwt_identi
 from flask_restx import Resource
 from jwt.exceptions import DecodeError, ExpiredSignatureError
 
-from extensions import db
+from extensions import db, limiter
 from mail_service import enviar_alerta_email
 from models import ConsentimentoUsuario, Tenant, User
 
@@ -64,6 +64,7 @@ def register_auth_routes(
 ):
     @auth_ns.route("/register")
     class UserRegister(Resource):
+        @limiter.limit("3 per hour")
         @auth_ns.expect(user_model_dto)
         @auth_ns.response(201, "Usuário registrado com sucesso.")
         @auth_ns.response(400, "Dados de entrada inválidos.")
@@ -125,6 +126,7 @@ def register_auth_routes(
 
     @auth_ns.route("/invite")
     class UserInvite(Resource):
+        @limiter.limit("10 per hour")
         @auth_ns.expect(user_invite_dto)
         @jwt_required()
         def post(self):
@@ -182,6 +184,7 @@ def register_auth_routes(
 
     @auth_ns.route("/register-invite")
     class RegisterInvite(Resource):
+        @limiter.limit("3 per hour")
         @auth_ns.expect(user_register_invite_dto)
         def post(self):
             data = request.get_json()
@@ -238,6 +241,7 @@ def register_auth_routes(
 
     @auth_ns.route("/login")
     class UserLogin(Resource):
+        @limiter.limit("5 per minute; 20 per hour")
         @auth_ns.expect(login_model_dto)
         @auth_ns.marshal_with(token_model_dto)
         @auth_ns.response(401, "Credenciais inválidas.")
