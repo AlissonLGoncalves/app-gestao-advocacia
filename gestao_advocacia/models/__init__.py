@@ -432,6 +432,49 @@ class Documento(db.Model):
         }
 
 
+class ProcuracaoAnalise(db.Model):
+    __tablename__ = "procuracao_analise"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_procuracao_analise_tenant_id"),
+        nullable=False,
+    )
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_procuracao_analise_user_id"),
+        nullable=False,
+    )
+    arquivo_path = db.Column(db.String(500), nullable=False)
+    arquivo_hash = db.Column(db.String(64), nullable=False)
+    status = db.Column(
+        db.Enum("pending", "processing", "done", "failed", name="procuracao_analise_status"),
+        nullable=False,
+        default="pending",
+    )
+    dados_extraidos = db.Column(db.JSON, nullable=True)
+    erro = db.Column(db.Text, nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    processado_em = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (db.Index("ix_procuracao_analise_tenant_status", "tenant_id", "status"),)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+            "arquivo_path": self.arquivo_path,
+            "arquivo_hash": self.arquivo_hash,
+            "status": self.status,
+            "dados_extraidos": self.dados_extraidos,
+            "erro": self.erro,
+            "criado_em": self.criado_em.isoformat() if self.criado_em else None,
+            "processado_em": self.processado_em.isoformat() if self.processado_em else None,
+        }
+
+
 class ContratoHonorario(db.Model):
     __tablename__ = "contrato_honorario"
     id = db.Column(db.Integer, primary_key=True)
