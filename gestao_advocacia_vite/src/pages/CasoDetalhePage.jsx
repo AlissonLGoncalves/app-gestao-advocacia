@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { API_URL } from '../config.js' // Importa API_URL
 import { toast } from 'react-toastify' // Para notificações
+import { atualizarCasoViaCnj, getCaso, listMovimentacoesCaso } from '../api/casos.js'
 import HonorariosCasoCard from '../components/HonorariosCasoCard'
 import DocumentosCasoTab from '../components/DocumentosCasoTab'
 
@@ -65,33 +66,11 @@ function CasoDetalhePage() {
     setAtualizacaoCNJSuccess('')
 
     try {
-      // No backend, a rota para um caso específico é /api/casos/<id>, sem barra no final.
-      const resCaso = await fetch(`${API_URL}/casos/${casoId}`, { headers: authHeaders })
-      if (!resCaso.ok) {
-        const errDataCaso = await resCaso
-          .json()
-          .catch(() => ({ message: `Erro HTTP ${resCaso.status} ao buscar caso.` }))
-        throw new Error(
-          errDataCaso.message || `Erro ao buscar detalhes do caso: ${resCaso.statusText}`
-        )
-      }
-      const dataCaso = await resCaso.json()
+      const dataCaso = await getCaso(casoId)
       setCaso(dataCaso)
       setIsLoadingCaso(false)
 
-      // No backend, a rota para movimentações de um caso é /api/casos/<id>/movimentacoes-cnj
-      const resMovCNJ = await fetch(`${API_URL}/casos/${casoId}/movimentacoes-cnj`, {
-        headers: authHeaders,
-      })
-      if (!resMovCNJ.ok) {
-        const errDataMov = await resMovCNJ
-          .json()
-          .catch(() => ({ message: `Erro HTTP ${resMovCNJ.status} ao buscar movimentações.` }))
-        throw new Error(
-          errDataMov.message || `Erro ao buscar movimentações do CNJ: ${resMovCNJ.statusText}`
-        )
-      }
-      const dataMovCNJ = await resMovCNJ.json()
+      const dataMovCNJ = await listMovimentacoesCaso(casoId)
       setMovimentacoesCNJ(dataMovCNJ)
 
       // Buscar Prazos/Tarefas Vinculados
@@ -127,26 +106,9 @@ function CasoDetalhePage() {
     setIsLoadingAtualizacaoCNJ(true)
     setAtualizacaoCNJError('')
     setAtualizacaoCNJSuccess('')
-    const authHeaders = {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    }
 
     try {
-      // No backend, a rota é /api/casos/<id>/atualizar-cnj
-      const response = await fetch(`${API_URL}/casos/${caso.id}/atualizar-cnj`, {
-        method: 'POST',
-        headers: authHeaders,
-      })
-      const dataResposta = await response.json()
-
-      if (!response.ok) {
-        throw new Error(
-          dataResposta.message ||
-            dataResposta.details ||
-            `Erro ${response.status} ao tentar atualizar via CNJ.`
-        )
-      }
+      const dataResposta = await atualizarCasoViaCnj(caso.id)
 
       setAtualizacaoCNJSuccess(
         dataResposta.message || 'Informações do caso atualizadas com sucesso a partir do CNJ!'

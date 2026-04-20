@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { API_URL } from './config.js'
 import { toast } from 'react-toastify'
 import { parseCNJ, formatCNJ } from './utils/cnj.js'
+import { consultaPublicaCnj } from './api/casos.js'
 import DadosProcessoSection from './components/forms/caso/DadosProcessoSection.jsx'
 import TramitacaoSection from './components/forms/caso/TramitacaoSection.jsx'
 import EventoAgendaSection from './components/forms/caso/EventoAgendaSection.jsx'
@@ -105,34 +106,25 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
   const buscarDadosDataJud = async (numeroCNJ) => {
     setIsSyncingCNJ(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(
-        `${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(numeroCNJ)}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
+      const data = await consultaPublicaCnj(numeroCNJ)
+      setFormData((prev) => {
+        let dataDistr = prev.data_distribuicao
+        if (data.data_distribuicao && !prev.data_distribuicao) dataDistr = data.data_distribuicao
+        return {
+          ...prev,
+          vara_juizo: data.vara_juizo || prev.vara_juizo,
+          instancia: data.instancia || prev.instancia,
+          tipo_acao: data.classe_acao || prev.tipo_acao,
+          fase_processual: data.fase_processual || prev.fase_processual,
+          data_distribuicao: dataDistr,
+          notas_caso: data.resumo_andamentos
+            ? prev.notas_caso
+              ? `${prev.notas_caso}\n\n${data.resumo_andamentos}`
+              : data.resumo_andamentos
+            : prev.notas_caso,
         }
-      )
-      if (response.ok) {
-        const data = await response.json()
-        setFormData((prev) => {
-          let dataDistr = prev.data_distribuicao
-          if (data.data_distribuicao && !prev.data_distribuicao) dataDistr = data.data_distribuicao
-          return {
-            ...prev,
-            vara_juizo: data.vara_juizo || prev.vara_juizo,
-            instancia: data.instancia || prev.instancia,
-            tipo_acao: data.classe_acao || prev.tipo_acao,
-            fase_processual: data.fase_processual || prev.fase_processual,
-            data_distribuicao: dataDistr,
-            notas_caso: data.resumo_andamentos
-              ? prev.notas_caso
-                ? `${prev.notas_caso}\n\n${data.resumo_andamentos}`
-                : data.resumo_andamentos
-              : prev.notas_caso,
-          }
-        })
-        toast.info('Resumo das movimentacoes e vara do processo preenchidos com sucesso!')
-      }
+      })
+      toast.info('Resumo das movimentacoes e vara do processo preenchidos com sucesso!')
     } catch (e) {
       console.warn('Falha silenciosa ao sincronizar CNJ ao digitar: ', e)
     } finally {

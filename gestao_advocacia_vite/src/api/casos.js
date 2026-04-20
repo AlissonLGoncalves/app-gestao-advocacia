@@ -1,25 +1,28 @@
 import { api } from './client'
 
-export function listCasos() {
-  return api.get('/casos')
+const toQuery = (params = {}) => {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, String(value))
+    }
+  })
+  const qs = query.toString()
+  return qs ? `?${qs}` : ''
 }
 
-/** @param {number|string} id */
-export function getCaso(id) {
-  return api.get(`/casos/${id}`)
-}
+export const listCasos = (params = {}) => api.get(`/casos/${toQuery(params)}`)
+export const getCaso = (id) => api.get(`/casos/${id}`)
+export const createCaso = (data) => api.post('/casos', data)
+export const updateCaso = (id, data) => api.put(`/casos/${id}`, data)
+export const deleteCaso = (id) => api.del(`/casos/${id}`)
 
-/** @param {object} payload */
-export function createCaso(payload) {
-  return api.post('/casos', payload)
-}
+export const listCasosByCliente = (clienteId, params = {}) =>
+  listCasos({ ...params, cliente_id: clienteId })
 
-/** @param {number|string} id @param {object} payload */
-export function updateCaso(id, payload) {
-  return api.put(`/casos/${id}`, payload)
-}
+export const listMovimentacoesCaso = (id) => api.get(`/casos/${id}/movimentacoes-cnj`)
+export const listAndamentosCaso = (id) => api.get(`/casos/${id}/andamentos`)
 
-/** @param {number|string} id */
-export function deleteCaso(id) {
-  return api.del(`/casos/${id}`)
-}
+export const atualizarCasoViaCnj = (id) => api.post(`/casos/${id}/atualizar-cnj`, {})
+export const consultaPublicaCnj = (numero) =>
+  api.get(`/casos/consulta-publica-cnj${toQuery({ numero })}`)
