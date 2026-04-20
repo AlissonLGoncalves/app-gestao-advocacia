@@ -224,7 +224,10 @@ def register_clientes_routes(app, clientes_ns, cliente_input_model_dto, cliente_
                 tenant_id = g.tenant_id
                 caso_existente = _find_caso_por_cnj_no_tenant(tenant_id, processo_cnj)
 
-                if caso_existente and getattr(caso_existente, "cliente_id", None) == novo_cliente.id:
+                if (
+                    caso_existente
+                    and getattr(caso_existente, "cliente_id", None) == novo_cliente.id
+                ):
                     db.session.commit()
                     return {
                         "cliente": novo_cliente.to_dict(),

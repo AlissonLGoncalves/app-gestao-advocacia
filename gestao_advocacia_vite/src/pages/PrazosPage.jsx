@@ -39,7 +39,7 @@ export default function PrazosPage() {
       } else {
         toast.error('Erro ao carregar prazos.')
       }
-    } catch (e) {
+    } catch {
       toast.error('Erro de conexão.')
     } finally {
       setLoading(false)
@@ -56,7 +56,7 @@ export default function PrazosPage() {
         const data = await res.json()
         setCasos(data)
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, [])
@@ -98,7 +98,7 @@ export default function PrazosPage() {
         const err = await res.json()
         toast.error(err.message || 'Erro ao salvar.')
       }
-    } catch (e) {
+    } catch {
       toast.error('Erro na comunicação com servidor.')
     }
   }
@@ -117,7 +117,7 @@ export default function PrazosPage() {
       if (res.ok) {
         carregarTarefas()
       }
-    } catch (e) {
+    } catch {
       toast.error('Falha ao atualizar tarefa.')
     }
   }

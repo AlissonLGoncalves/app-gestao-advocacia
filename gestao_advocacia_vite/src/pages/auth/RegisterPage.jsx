@@ -26,17 +26,8 @@ function RegisterPage() {
 
   // Gatekeeper de Scroll Obrigatório (Termos)
   const [showTermsModal, setShowTermsModal] = useState(false)
-  const [scrolledToBottom, setScrolledToBottom] = useState(false)
 
   // Algoritmo que detecta quando a barra de rolagem atinge o fundo
-  const handleScrollTerms = (e) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.target
-    // Se a barra estiver a 10px ou menos do fim, libera.
-    if (scrollHeight - scrollTop <= clientHeight + 10) {
-      setScrolledToBottom(true)
-    }
-  }
-
   const aceitarNoModal = () => {
     setAceiteTermos(true)
     setShowTermsModal(false)
@@ -135,7 +126,7 @@ function RegisterPage() {
         } else {
           toast.error(data.message || 'Link de Convite expirado ou inválido.')
         }
-      } catch (error) {
+      } catch {
         toast.error('Erro de rede ao processar o link mágico.')
       } finally {
         setLoading(false)
@@ -491,7 +482,6 @@ function RegisterPage() {
                 backgroundColor: '#fcfcfc',
                 textAlign: 'justify',
               }}
-              onScroll={handleScrollTerms}
             >
               <h5 className="fw-bold mb-3 text-dark border-bottom pb-2">
                 1. ACEITAÇÃO DOS TERMOS E CONDIÇÕES

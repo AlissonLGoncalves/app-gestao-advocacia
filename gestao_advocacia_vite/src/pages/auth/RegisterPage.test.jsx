@@ -26,7 +26,7 @@ beforeEach(() => {
 
 describe('RegisterPage — aceite LGPD', () => {
   it('botão de submit fica desabilitado enquanto os dois checkboxes não estão marcados', () => {
-    const { container } = renderPage()
+    renderPage()
     const submitBtn = screen.getByRole('button', { name: /criar conta/i })
     // Ambos desmarcados → desabilitado
     expect(submitBtn).toBeDisabled()

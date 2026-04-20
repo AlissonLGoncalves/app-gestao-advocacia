@@ -142,17 +142,21 @@ const MainLayout = () => {
     return finalTitle.charAt(0).toUpperCase() + finalTitle.slice(1)
   }
 
-  const SidebarLink = ({ to, icon: IconComponent, children }) => (
-    <NavLink
-      to={to}
-      onClick={() => setSidebarOpen(false)}
-      className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-      title={children}
-    >
-      <IconComponent className="sidebar-link-icon" />
-      <span>{children}</span>
-    </NavLink>
-  )
+  const SidebarLink = ({ to, icon: IconComponent, children }) => {
+    const iconElement = React.createElement(IconComponent, { className: 'sidebar-link-icon' })
+
+    return (
+      <NavLink
+        to={to}
+        onClick={() => setSidebarOpen(false)}
+        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+        title={children}
+      >
+        {iconElement}
+        <span>{children}</span>
+      </NavLink>
+    )
+  }
 
   return (
     <div className="app-shell">

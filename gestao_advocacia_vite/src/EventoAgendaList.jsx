@@ -119,7 +119,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     }
   }, [
     searchTerm,
-    clienteFilter,
     casoFilter,
     tipoEventoFilter,
     statusConclusaoFilter,
