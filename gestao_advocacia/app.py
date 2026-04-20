@@ -137,6 +137,18 @@ def create_app(config_class=Config):
             "retry_after": e.description,
         }, 429
 
+    # Flask-RESTX tem sua propria cadeia de error handlers que pode
+    # interceptar 429 antes do @app.errorhandler acima.
+    # Registramos tambem no objeto `api` para garantir a mensagem customizada.
+    from werkzeug.exceptions import TooManyRequests
+
+    @api.errorhandler(TooManyRequests)
+    def api_ratelimit_handler(e):
+        return {
+            "message": "Muitas tentativas. Aguarde e tente novamente.",
+            "retry_after": getattr(e, "description", None),
+        }, 429
+
     return app
 
 
