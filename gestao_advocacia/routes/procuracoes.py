@@ -1,5 +1,6 @@
 import hashlib
 import os
+import re
 import uuid
 from datetime import datetime
 
@@ -9,7 +10,7 @@ from flask_restx import Resource
 
 from extensions import db
 from helpers import tenant_scoped
-from models import ProcuracaoAnalise, log_audit
+from models import Caso, Cliente, ProcuracaoAnalise, log_audit
 from procuracao_service import extrair_dados_procuracao, validar_extracao
 
 ALLOWED_MIME_TYPES = {
@@ -23,6 +24,10 @@ def _upload_root(app):
     return app.config.get("PROCURACOES_UPLOAD_ROOT") or os.path.join(
         os.sep, "data", "uploads", "procuracoes"
     )
+
+
+def _cnj_valido(numero_cnj):
+    return bool(re.fullmatch(r"\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}", numero_cnj or ""))
 
 
 def register_procuracoes_routes(app, procuracoes_ns, procuracao_model_dto):
@@ -137,3 +142,71 @@ def register_procuracoes_routes(app, procuracoes_ns, procuracao_model_dto):
             response_payload = analise.to_dict()
             response_payload["avisos_validacao"] = avisos_validacao
             return response_payload
+
+    @procuracoes_ns.route("/<int:analise_id>/criar-caso")
+    class ProcuracaoCriarCasoAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @procuracoes_ns.doc(
+            security="jsonWebToken",
+            description="Cria caso a partir dos dados de processo extraídos da procuração.",
+        )
+        def post(self, analise_id):
+            payload = request.get_json() or {}
+            cliente_id = payload.get("cliente_id")
+            if not cliente_id:
+                procuracoes_ns.abort(400, "cliente_id é obrigatório.")
+
+            analise = db.session.get(ProcuracaoAnalise, analise_id)
+            if not analise:
+                procuracoes_ns.abort(404, "Análise de procuração não encontrada.")
+            if analise.tenant_id != g.tenant_id:
+                procuracoes_ns.abort(403, "Acesso negado a análise de outro tenant.")
+
+            cliente = (
+                Cliente.query.filter_by(id=cliente_id, tenant_id=g.tenant_id).first()
+                if cliente_id
+                else None
+            )
+            if not cliente:
+                procuracoes_ns.abort(404, "Cliente não encontrado no tenant atual.")
+
+            processo = (analise.dados_extraidos or {}).get("processo") or {}
+            numero_cnj = (processo.get("numero_cnj") or "").strip()
+            tribunal = (processo.get("tribunal") or "").strip()
+            vara = (processo.get("vara") or "").strip()
+
+            if not _cnj_valido(numero_cnj):
+                procuracoes_ns.abort(400, "Número CNJ inválido para criação de caso.")
+            if not tribunal:
+                procuracoes_ns.abort(400, "Tribunal ausente na extração da procuração.")
+            if not vara:
+                procuracoes_ns.abort(400, "Vara ausente na extração da procuração.")
+
+            caso_existente = Caso.query.filter_by(
+                tenant_id=g.tenant_id,
+                numero_processo=numero_cnj,
+            ).first()
+            if caso_existente:
+                procuracoes_ns.abort(409, "Já existe caso com esse número CNJ no tenant.")
+
+            user_id = get_jwt_identity()
+            caso = Caso(
+                titulo=f"Processo {numero_cnj}",
+                numero_processo=numero_cnj,
+                vara_juizo=vara,
+                comarca=tribunal,
+                cliente_id=cliente.id,
+                user_id=user_id,
+                tenant_id=g.tenant_id,
+            )
+            db.session.add(caso)
+            db.session.flush()
+            log_audit(
+                "CREATE",
+                "Caso",
+                caso.id,
+                f"Caso criado via procuração {analise.id} para cliente {cliente.id}.",
+            )
+            db.session.commit()
+            return caso.to_dict(), 201
