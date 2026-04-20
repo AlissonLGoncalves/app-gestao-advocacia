@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import RegisterPage from './RegisterPage'
+import { register as registerRequest } from '../../api/auth'
 
-// Mock fetch globalmente
-const fetchMock = vi.fn()
-globalThis.fetch = fetchMock
+vi.mock('../../api/auth', () => ({
+  register: vi.fn(),
+  registerInvite: vi.fn(),
+}))
 
 // Mock react-toastify
 vi.mock('react-toastify', () => ({
@@ -43,10 +45,7 @@ describe('RegisterPage — aceite LGPD', () => {
   })
 
   it('ao submeter com aceites, o body enviado contém aceite_termos, aceite_lgpd, versao_termos e versao_lgpd', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ message: 'ok' }),
-    })
+    registerRequest.mockResolvedValueOnce({ message: 'ok' })
 
     const { container } = renderPage()
 
@@ -75,10 +74,9 @@ describe('RegisterPage — aceite LGPD', () => {
 
     fireEvent.submit(screen.getByRole('button', { name: /criar conta/i }).closest('form'))
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await waitFor(() => expect(registerRequest).toHaveBeenCalled())
 
-    const [, options] = fetchMock.mock.calls[0]
-    const body = JSON.parse(options.body)
+    const body = registerRequest.mock.calls[0][0]
 
     expect(body.aceite_termos).toBe(true)
     expect(body.aceite_lgpd).toBe(true)

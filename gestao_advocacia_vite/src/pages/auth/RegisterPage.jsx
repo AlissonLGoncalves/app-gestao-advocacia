@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { API_URL } from '../../config'
 import { LGPD_VERSION, TERMS_VERSION } from '../../constants/legal'
 import { toast } from 'react-toastify'
+import { register as registerRequest, registerInvite } from '../../api/auth'
 import {
   LockClosedIcon,
   UserIcon,
@@ -115,28 +115,19 @@ function RegisterPage() {
         return
       }
       try {
-        const response = await fetch(`${API_URL}/auth/register-invite`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            invite_token: inviteToken,
-            username: nomeOuRazao,
-            password,
-            aceite_termos: true,
-            aceite_lgpd: true,
-            versao_termos: TERMS_VERSION,
-            versao_lgpd: LGPD_VERSION,
-          }),
+        const data = await registerInvite({
+          invite_token: inviteToken,
+          username: nomeOuRazao,
+          password,
+          aceite_termos: true,
+          aceite_lgpd: true,
+          versao_termos: TERMS_VERSION,
+          versao_lgpd: LGPD_VERSION,
         })
-        const data = await response.json()
-        if (response.ok) {
-          toast.success(data.message || 'Conta ativada com sucesso no ambiente corporativo!')
-          navigate('/login')
-        } else {
-          toast.error(data.message || 'Link de Convite expirado ou inválido.')
-        }
+        toast.success(data.message || 'Conta ativada com sucesso no ambiente corporativo!')
+        navigate('/login')
       } catch (error) {
-        toast.error('Erro de rede ao processar o link mágico.')
+        toast.error(error.message || 'Erro ao processar o link mágico.')
       } finally {
         setLoading(false)
       }
@@ -157,36 +148,25 @@ function RegisterPage() {
     }
 
     try {
-      // Por enquanto, envia "nomeOuRazao" como "username", pois o Backend ainda não foi atualizado
-      // para isolar as colunas Tenant/Escritorio. Esta porta frontal já fica preparada.
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: nomeOuRazao,
-          email,
-          password,
-          role: 'admin', // Quem cria o escritório é o Admin do escritório dele
-          documento_identificacao: documento,
-          tipo_pessoa: tipoPessoa,
-          oab: oab || null,
-          aceite_termos: true,
-          aceite_lgpd: true,
-          versao_termos: TERMS_VERSION,
-          versao_lgpd: LGPD_VERSION,
-        }),
+      const data = await registerRequest({
+        username: nomeOuRazao,
+        email,
+        password,
+        role: 'admin', // Quem cria o escritório é o Admin do escritório dele
+        documento_identificacao: documento,
+        tipo_pessoa: tipoPessoa,
+        oab: oab || null,
+        aceite_termos: true,
+        aceite_lgpd: true,
+        versao_termos: TERMS_VERSION,
+        versao_lgpd: LGPD_VERSION,
       })
-      const data = await response.json()
 
-      if (response.ok) {
-        toast.success(data.message || 'Conta Criada! Seu Escritório Mestre foi gerado.')
-        navigate('/login')
-      } else {
-        toast.error(data.message || 'Falha no registro. Verifique os dados.')
-      }
+      toast.success(data.message || 'Conta Criada! Seu Escritório Mestre foi gerado.')
+      navigate('/login')
     } catch (error) {
       console.error('Erro ao tentar registrar SaaS:', error)
-      toast.error('Erro de rede. Nosso servidor pode estar indisponível.')
+      toast.error(error.message || 'Erro de rede. Nosso servidor pode estar indisponível.')
     } finally {
       setLoading(false)
     }

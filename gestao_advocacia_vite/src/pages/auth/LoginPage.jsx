@@ -1,11 +1,11 @@
 // Arquivo: gestao_advocacia_vite/src/pages/auth/LoginPage.jsx
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom' // CORRIGIDO AQUI
-import { API_URL } from '../../config'
 import { toast } from 'react-toastify'
 import { LockClosedIcon, UserIcon } from '@heroicons/react/24/outline'
 import { Link } from 'react-router-dom' // Adicionado para o link de registro, se desejar
 import { APP_VERSION } from '../../version.js'
+import { login as loginRequest } from '../../api/auth'
 
 function LoginPage() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('')
@@ -25,33 +25,15 @@ function LoginPage() {
     }
 
     try {
-      // A rota de login no backend é /api/auth/login, não precisa de barra final.
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username_or_email: usernameOrEmail, password: password }),
-      })
-      const rawResponse = await response.text()
-      let data = {}
-      try {
-        data = rawResponse ? JSON.parse(rawResponse) : {}
-      } catch {
-        data = {}
-      }
-
-      if (response.ok) {
-        localStorage.setItem('token', data.access_token)
-        localStorage.setItem('user', JSON.stringify(data.user))
-        toast.success('Login bem-sucedido! Redirecionando...')
-        navigate('/dashboard')
-      } else {
-        toast.error(
-          data.message || `Falha no login (HTTP ${response.status}). Verifique suas credenciais.`
-        )
-      }
+      const data = await loginRequest({ username_or_email: usernameOrEmail, password })
+      localStorage.setItem('token', data.access_token)
+      localStorage.setItem('access_token', data.access_token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      toast.success('Login bem-sucedido! Redirecionando...')
+      navigate('/dashboard')
     } catch (error) {
       console.error('Erro ao tentar fazer login:', error)
-      toast.error(`Erro de rede ao conectar em ${API_URL}. Verifique se backend está online.`)
+      toast.error(error.message || 'Falha no login. Verifique suas credenciais.')
     } finally {
       setLoading(false)
     }
