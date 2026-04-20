@@ -6,8 +6,8 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from flask_restx import Resource
 
 from extensions import db
-from helpers import get_item_or_404, get_list_query, get_tenant_id, query_for_tenant, tenant_scoped
-from models import Caso, ContratoHonorario, Recebimento
+from helpers import get_item_or_404, get_list_query, get_tenant_id, tenant_scoped
+from models import Caso, ContratoHonorario, Recebimento, User
 
 
 def register_contratos_routes(
@@ -34,9 +34,13 @@ def register_contratos_routes(
             user_id = get_jwt_identity()
             data = request.get_json()
 
-            caso = query_for_tenant(Caso).filter_by(id=data["caso_id"]).first()
+            user = User.query.get(int(user_id))
+            if not user:
+                contratos_ns.abort(401)
+
+            caso = Caso.query.filter_by(id=data["caso_id"], tenant_id=user.tenant_id).first()
             if not caso:
-                return {"message": "Caso não encontrado."}, 404
+                contratos_ns.abort(404, "Caso não encontrado.")
 
             if get_jwt().get("role") == "advogado" and caso.user_id != user_id:
                 return {"message": "Acesso negado ao caso informado."}, 403

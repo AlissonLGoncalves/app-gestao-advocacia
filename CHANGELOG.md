@@ -3,6 +3,12 @@
 Todos os releases significativos do Sistema de Gestao para Advocacia.
 Segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+### Security
+
+- [S1][SEC] Fechado IDOR multi-tenant em vinculo de contratos e vinculo de publicacoes DJEN, reforcando filtro por tenant e retorno 404 para evitar enumeracao entre tenants.
+
 ## [1.2.0] - 2026-04-18
 
 Ciclo grande de refatoracao, hardening e observabilidade. Todas as tarefas do
