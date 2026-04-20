@@ -108,6 +108,12 @@ foram voltadas para o fluxo real de um advogado — menos cliques, mais contexto
 - `dashboard.py`: adicionadas queries de `tarefas_vencidas` e `tarefas_vencendo_hoje`
   ao endpoint `/dashboard/stats` (resposta expandida com `alertas_tarefas`)
 
+### Security
+
+- **[S1][SEC]** Fechado IDOR multi-tenant em vinculo de contratos e vinculo
+  de publicacoes DJEN, reforcando filtro por tenant e retorno 404 para
+  evitar enumeracao entre tenants.
+
 ## [1.2.0] - 2026-04-18
 
 Ciclo grande de refatoracao, hardening e observabilidade. Todas as tarefas do
