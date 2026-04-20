@@ -106,6 +106,10 @@ function NovoClientePorProcuracao() {
   const [avisosValidacao, setAvisosValidacao] = useState([])
   const [analiseResult, setAnaliseResult] = useState(null)
   const [formData, setFormData] = useState(initialStatePF)
+  const [showCriarCasoModal, setShowCriarCasoModal] = useState(false)
+  const [clienteCriadoId, setClienteCriadoId] = useState(null)
+  const [numeroCnjSugerido, setNumeroCnjSugerido] = useState('')
+  const [criandoCaso, setCriandoCaso] = useState(false)
 
   const extractedMap = useMemo(() => {
     const mapped = toFieldMap(analiseResult?.dados_extraidos || {})
@@ -212,6 +216,7 @@ function NovoClientePorProcuracao() {
       const payload = {
         ...formData,
         cpf_cnpj: String(formData.cpf_cnpj || '').replace(/\D/g, ''),
+        processo_cnj: processoExtraido?.numero_cnj || undefined,
       }
 
       const response = await fetch(`${API_URL}/clientes`, {
@@ -228,13 +233,84 @@ function NovoClientePorProcuracao() {
         throw new Error(data?.erro || data?.message || 'Falha ao criar cliente.')
       }
 
-      toast.success('Cliente criado com sucesso.')
       const id = data?.id || data?.cliente?.id
+
+      if (data?.caso_existente === true && data?.caso_id) {
+        toast.success(
+          <span>
+            Cliente vinculado ao caso já existente.{' '}
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 align-baseline"
+              onClick={() => navigate(`/casos/detalhe/${data.caso_id}`)}
+            >
+              Abrir caso
+            </button>
+          </span>
+        )
+        navigate(id ? `/clientes/${id}` : '/clientes')
+        return
+      }
+
+      if (data?.caso_existente === false && data?.numero_cnj_sugerido && id) {
+        setClienteCriadoId(id)
+        setNumeroCnjSugerido(data.numero_cnj_sugerido)
+        setShowCriarCasoModal(true)
+        return
+      }
+
+      toast.success('Cliente criado com sucesso.')
       navigate(id ? `/clientes/${id}` : '/clientes')
     } catch (error) {
       toast.error(error.message || 'Erro ao criar cliente.')
     } finally {
       setSalvando(false)
+    }
+  }
+
+  async function handleCriarCasoAutomatico() {
+    if (!clienteCriadoId || !analiseResult?.id) {
+      setShowCriarCasoModal(false)
+      navigate(clienteCriadoId ? `/clientes/${clienteCriadoId}` : '/clientes')
+      return
+    }
+
+    setCriandoCaso(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/procuracoes/${analiseResult.id}/criar-caso`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ cliente_id: clienteCriadoId }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.message || data?.erro || 'Falha ao criar caso automaticamente.')
+      }
+
+      toast.success(
+        <span>
+          Caso criado com sucesso.{' '}
+          <button
+            type="button"
+            className="btn btn-link btn-sm p-0 align-baseline"
+            onClick={() => navigate(`/casos/detalhe/${data.id}`)}
+          >
+            Abrir caso
+          </button>
+        </span>
+      )
+      setShowCriarCasoModal(false)
+      navigate(`/clientes/${clienteCriadoId}`)
+    } catch (error) {
+      toast.error(error.message || 'Erro ao criar caso.')
+      setShowCriarCasoModal(false)
+      navigate(`/clientes/${clienteCriadoId}`)
+    } finally {
+      setCriandoCaso(false)
     }
   }
 
@@ -637,6 +713,44 @@ function NovoClientePorProcuracao() {
           </section>
         )}
       </div>
+
+      {showCriarCasoModal ? (
+        <div className="modal d-block" tabIndex="-1" role="dialog" aria-modal="true">
+          <div className="modal-dialog modal-dialog-centered" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Criar caso automaticamente</h5>
+              </div>
+              <div className="modal-body">
+                <p className="mb-0">
+                  Criar caso para processo <strong>{numeroCnjSugerido}</strong>?
+                </p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => {
+                    setShowCriarCasoModal(false)
+                    navigate(clienteCriadoId ? `/clientes/${clienteCriadoId}` : '/clientes')
+                  }}
+                  disabled={criandoCaso}
+                >
+                  Pular
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleCriarCasoAutomatico}
+                  disabled={criandoCaso}
+                >
+                  {criandoCaso ? 'Criando caso...' : 'Criar caso'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

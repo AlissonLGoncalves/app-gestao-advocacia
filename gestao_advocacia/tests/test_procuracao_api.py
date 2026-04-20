@@ -2,7 +2,7 @@ import io
 import json
 from unittest.mock import patch
 
-from app import ProcuracaoAnalise, User, db
+from app import Caso, ProcuracaoAnalise, User, db
 
 
 def _register_and_login(client, suffix):
@@ -194,3 +194,124 @@ def test_extrair_dados_procuracao_com_client_fake(app):
                 result = extrair_dados_procuracao(__file__, "application/pdf")
 
     assert result["outorgante"]["nome_completo"] == "Maria da Silva"
+
+
+def test_criar_caso_via_procuracao_valida(auth_client, app, tmp_path):
+    app.config["PROCURACOES_UPLOAD_ROOT"] = str(tmp_path)
+
+    cliente_resp = auth_client.post(
+        "/api/v1/clientes",
+        json={
+            "nome_razao_social": "Cliente Proc Caso",
+            "cpf_cnpj": "12312312399",
+            "tipo_pessoa": "PF",
+        },
+    )
+    assert cliente_resp.status_code == 201
+    cliente_id = json.loads(cliente_resp.data)["id"]
+
+    with app.app_context():
+        user = db.session.get(User, auth_client.user["id"])
+        analise = ProcuracaoAnalise(
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            arquivo_path=str(tmp_path / "p.pdf"),
+            arquivo_hash="b" * 64,
+            status="done",
+            dados_extraidos={
+                "processo": {
+                    "numero_cnj": "0001234-12.2026.8.16.0001",
+                    "tribunal": "TJPR",
+                    "vara": "1a Vara Civel",
+                }
+            },
+        )
+        db.session.add(analise)
+        db.session.commit()
+        analise_id = analise.id
+
+    response = auth_client.post(
+        f"/api/v1/procuracoes/{analise_id}/criar-caso",
+        json={"cliente_id": cliente_id},
+    )
+    assert response.status_code == 201, response.data
+    payload = json.loads(response.data)
+    assert payload["numero_processo"] == "0001234-12.2026.8.16.0001"
+
+    with app.app_context():
+        caso_db = db.session.get(Caso, payload["id"])
+        assert caso_db is not None
+        assert caso_db.cliente_id == cliente_id
+
+
+def test_criar_caso_outro_tenant_retorna_403(client, app, tmp_path):
+    app.config["PROCURACOES_UPLOAD_ROOT"] = str(tmp_path)
+    token_a, user_a = _register_and_login(client, "ca")
+    token_b, _ = _register_and_login(client, "cb")
+
+    with app.app_context():
+        analise = ProcuracaoAnalise(
+            tenant_id=user_a["tenant_id"],
+            user_id=user_a["id"],
+            arquivo_path=str(tmp_path / "x.pdf"),
+            arquivo_hash="c" * 64,
+            status="done",
+            dados_extraidos={
+                "processo": {
+                    "numero_cnj": "0001234-12.2026.8.16.0001",
+                    "tribunal": "TJPR",
+                    "vara": "1a Vara Civel",
+                }
+            },
+        )
+        db.session.add(analise)
+        db.session.commit()
+        analise_id = analise.id
+
+    response = client.post(
+        f"/api/v1/procuracoes/{analise_id}/criar-caso",
+        json={"cliente_id": 99999},
+        headers=_headers(token_b),
+    )
+    assert response.status_code == 403
+
+
+def test_criar_caso_numero_cnj_invalido_retorna_400(auth_client, app, tmp_path):
+    app.config["PROCURACOES_UPLOAD_ROOT"] = str(tmp_path)
+
+    cliente_resp = auth_client.post(
+        "/api/v1/clientes",
+        json={
+            "nome_razao_social": "Cliente CNJ Invalido",
+            "cpf_cnpj": "32132132100",
+            "tipo_pessoa": "PF",
+        },
+    )
+    assert cliente_resp.status_code == 201
+    cliente_id = json.loads(cliente_resp.data)["id"]
+
+    with app.app_context():
+        user = db.session.get(User, auth_client.user["id"])
+        analise = ProcuracaoAnalise(
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            arquivo_path=str(tmp_path / "invalid.pdf"),
+            arquivo_hash="d" * 64,
+            status="done",
+            dados_extraidos={
+                "processo": {
+                    "numero_cnj": "CNJ-INVALIDO",
+                    "tribunal": "TJPR",
+                    "vara": "1a Vara Civel",
+                }
+            },
+        )
+        db.session.add(analise)
+        db.session.commit()
+        analise_id = analise.id
+
+    response = auth_client.post(
+        f"/api/v1/procuracoes/{analise_id}/criar-caso",
+        json={"cliente_id": cliente_id},
+    )
+    assert response.status_code == 400

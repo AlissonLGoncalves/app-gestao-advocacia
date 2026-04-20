@@ -1,7 +1,8 @@
 import os
+import re
 from datetime import datetime
 
-from flask import request
+from flask import g, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource
 from werkzeug.datastructures import FileStorage
@@ -14,10 +15,27 @@ from helpers import (
     query_for_tenant,
     tenant_scoped,
 )
-from models import Cliente, log_audit
+from models import Caso, Cliente, log_audit
 
 
 def register_clientes_routes(app, clientes_ns, cliente_input_model_dto, cliente_model_dto):
+    def _cnj_digits(value):
+        return re.sub(r"\D", "", value or "")
+
+    def _find_caso_por_cnj_no_tenant(tenant_id, numero_cnj):
+        target_digits = _cnj_digits(numero_cnj)
+        if not target_digits:
+            return None
+
+        casos_tenant = Caso.query.filter(
+            Caso.tenant_id == tenant_id,
+            Caso.numero_processo.isnot(None),
+        ).all()
+        for caso in casos_tenant:
+            if _cnj_digits(caso.numero_processo) == target_digits:
+                return caso
+        return None
+
     def _preencher_cliente_from_data(cliente, data):
         """Helper para preencher campos do cliente a partir dos dados recebidos."""
         cliente.nome_razao_social = data.get("nome_razao_social", cliente.nome_razao_social)
@@ -171,13 +189,13 @@ def register_clientes_routes(app, clientes_ns, cliente_input_model_dto, cliente_
         @jwt_required()
         @tenant_scoped
         @clientes_ns.expect(cliente_input_model_dto)
-        @clientes_ns.marshal_with(cliente_model_dto, code=201)
         @clientes_ns.doc(
             security="jsonWebToken", description="Cria um novo cliente para o usuário autenticado."
         )
         def post(self):
             user_id = get_jwt_identity()
             data = request.get_json()
+            processo_cnj = (data or {}).pop("processo_cnj", None)
             if (
                 not data.get("nome_razao_social")
                 or not data.get("cpf_cnpj")
@@ -201,11 +219,39 @@ def register_clientes_routes(app, clientes_ns, cliente_input_model_dto, cliente_
             log_audit(
                 "CREATE", "Cliente", novo_cliente.id, f"Cliente {novo_cliente.cpf_cnpj} cadastrado."
             )
+
+            if processo_cnj:
+                tenant_id = g.tenant_id
+                caso_existente = _find_caso_por_cnj_no_tenant(tenant_id, processo_cnj)
+
+                if caso_existente and getattr(caso_existente, "cliente_id", None) == novo_cliente.id:
+                    db.session.commit()
+                    return {
+                        "cliente": novo_cliente.to_dict(),
+                        "caso_existente": True,
+                        "caso_id": caso_existente.id,
+                    }, 201
+
+                if caso_existente:
+                    db.session.commit()
+                    return {
+                        "cliente": novo_cliente.to_dict(),
+                        "caso_existente": True,
+                        "caso_id": caso_existente.id,
+                    }, 201
+
+                db.session.commit()
+                return {
+                    "cliente": novo_cliente.to_dict(),
+                    "caso_existente": False,
+                    "numero_cnj_sugerido": processo_cnj,
+                }, 201
+
             db.session.commit()
             app.logger.info(
                 f"Novo cliente '{novo_cliente.nome_razao_social}' (ID: {novo_cliente.id}) criado para usuário ID {user_id}."
             )
-            return novo_cliente, 201
+            return novo_cliente.to_dict(), 201
 
     @clientes_ns.route("/<int:cliente_id_param>")
     @clientes_ns.response(404, "Cliente não encontrado ou não pertence ao usuário.")

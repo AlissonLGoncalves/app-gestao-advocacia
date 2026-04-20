@@ -146,6 +146,9 @@ def register_api_routes(app, api, finance_access_required):
             ),
             "cpf_cnpj": fields.String(required=True, description="CPF ou CNPJ principal"),
             "tipo_pessoa": fields.String(required=True, description="PF ou PJ", enum=["PF", "PJ"]),
+            "processo_cnj": fields.String(
+                description="Número CNJ opcional para sugestão/vinculação de caso"
+            ),
             "email": fields.String(description="Email do cliente"),
             "telefone": fields.String(description="Telefone do cliente"),
             "rg": fields.String(description="RG (PF)"),
