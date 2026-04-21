@@ -26,7 +26,7 @@ describe('EnderecoSection', () => {
     )
 
     expect(screen.getByLabelText(/^cep$/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/^rua$/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/rua/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/bairro/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/cidade/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/estado \(uf\)/i)).toBeInTheDocument()
