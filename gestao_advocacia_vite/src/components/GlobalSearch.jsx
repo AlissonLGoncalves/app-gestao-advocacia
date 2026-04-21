@@ -148,6 +148,7 @@ export default function GlobalSearch() {
             overflowY: 'auto',
             borderRadius: '10px',
             minWidth: '300px',
+            zIndex: 2000,
           }}
         >
           {!temResultados && !loading && (
