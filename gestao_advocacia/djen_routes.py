@@ -616,6 +616,20 @@ def registrar_rotas_djen(
                     )
                 )
 
+            nome_parte = request.args.get("nome_parte")
+            if nome_parte:
+                q = q.filter(
+                    db.or_(
+                        PublicacaoDJEN.polo_ativo.ilike(f"%{nome_parte}%"),
+                        PublicacaoDJEN.polo_passivo.ilike(f"%{nome_parte}%"),
+                        PublicacaoDJEN.texto.ilike(f"%{nome_parte}%"),
+                    )
+                )
+
+            numero_oab = request.args.get("numero_oab")
+            if numero_oab:
+                q = q.filter(PublicacaoDJEN.texto.ilike(f"%{numero_oab}%"))
+
             origem = request.args.get("origem")
             if origem:
                 q = q.filter_by(origem_busca=origem)

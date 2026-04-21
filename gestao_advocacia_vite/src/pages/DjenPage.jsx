@@ -205,6 +205,8 @@ export default function DjenPage() {
     lida: '',
     sigla_tribunal: '',
     numero_processo: searchParams.get('processo') || '',
+    nome_parte: '',
+    numero_oab: '',
     data_inicio: '',
     data_fim: '',
     origem: '',
@@ -252,6 +254,8 @@ export default function DjenPage() {
           lida: filtros.lida !== '' ? filtros.lida : undefined,
           sigla_tribunal: filtros.sigla_tribunal || undefined,
           numero_processo: filtros.numero_processo || undefined,
+          nome_parte: filtros.nome_parte || undefined,
+          numero_oab: filtros.numero_oab || undefined,
           data_inicio: filtros.data_inicio || undefined,
           data_fim: filtros.data_fim || undefined,
           origem: filtros.origem || undefined,
@@ -629,6 +633,8 @@ export default function DjenPage() {
       lida: '',
       sigla_tribunal: '',
       numero_processo: '',
+      nome_parte: '',
+      numero_oab: '',
       data_inicio: '',
       data_fim: '',
       origem: '',
@@ -852,7 +858,29 @@ export default function DjenPage() {
                         <option value="tipo_asc">Tipo (A–Z)</option>
                       </select>
                     </div>
-                    {/* Linha 2: datas + botões */}
+                    {/* Linha 2: OAB, nome parte, datas + botões */}
+                    <div className="col-md-2">
+                      <label className="form-label small mb-1">OAB</label>
+                      <input
+                        className="form-control form-control-sm"
+                        placeholder="Ex: 94297"
+                        value={filtros.numero_oab}
+                        onChange={(e) =>
+                          setFiltros((f) => ({ ...f, numero_oab: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="col-md-3">
+                      <label className="form-label small mb-1">Nome da parte</label>
+                      <input
+                        className="form-control form-control-sm"
+                        placeholder="Parcial ou completo"
+                        value={filtros.nome_parte}
+                        onChange={(e) =>
+                          setFiltros((f) => ({ ...f, nome_parte: e.target.value }))
+                        }
+                      />
+                    </div>
                     <div className="col-md-2">
                       <label className="form-label small mb-1">Data início</label>
                       <input
@@ -961,16 +989,30 @@ export default function DjenPage() {
                               {pub.nome_orgao} · {fmtData(pub.data_disponibilizacao)}
                             </div>
                           </div>
-                          <button
-                            className={`btn btn-sm ${pub.lida ? 'btn-outline-secondary' : 'btn-outline-primary'}`}
-                            title={pub.lida ? 'Marcar como não lida' : 'Marcar como lida'}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              marcarLida(pub, !pub.lida)
-                            }}
-                          >
-                            <i className={`bi ${pub.lida ? 'bi-envelope' : 'bi-envelope-open'}`} />
-                          </button>
+                          <div className="d-flex gap-1">
+                            {pub.hash_comunicacao && (
+                              <button
+                                className="btn btn-sm btn-outline-secondary"
+                                title="Baixar certidão PDF"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  baixarCertidao(pub)
+                                }}
+                              >
+                                <i className="bi bi-file-earmark-text" />
+                              </button>
+                            )}
+                            <button
+                              className={`btn btn-sm ${pub.lida ? 'btn-outline-secondary' : 'btn-outline-primary'}`}
+                              title={pub.lida ? 'Marcar como não lida' : 'Marcar como lida'}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                marcarLida(pub, !pub.lida)
+                              }}
+                            >
+                              <i className={`bi ${pub.lida ? 'bi-envelope' : 'bi-envelope-open'}`} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
