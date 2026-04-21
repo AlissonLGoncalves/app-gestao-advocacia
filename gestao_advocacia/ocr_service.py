@@ -293,6 +293,11 @@ def extract_client_data_from_file(file_stream, filename):
             doc = Document(file_stream)
             for p in doc.paragraphs:
                 text += p.text + "\n"
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = "\t".join(cell.text for cell in row.cells if cell.text.strip())
+                    if row_text.strip():
+                        text += row_text + "\n"
 
         elif ext in ["xlsx", "xls"]:
             wb = openpyxl.load_workbook(file_stream, data_only=True)
@@ -452,6 +457,11 @@ def extract_case_data_from_file(file_stream, filename):
             doc = Document(file_stream)
             for p in doc.paragraphs:
                 text += p.text + "\n"
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = "\t".join(cell.text for cell in row.cells if cell.text.strip())
+                    if row_text.strip():
+                        text += row_text + "\n"
         elif ext in ["png", "jpg", "jpeg"]:
             try:
                 img = Image.open(file_stream)
