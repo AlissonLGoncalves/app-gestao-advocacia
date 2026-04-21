@@ -124,6 +124,7 @@ def consultar_comunicacoes(
     *,
     numero_processo=None,
     numero_oab=None,
+    uf_oab=None,
     sigla_tribunal=None,
     nome_advogado=None,
     nome_parte=None,
@@ -157,6 +158,8 @@ def consultar_comunicacoes(
         params["numeroProcesso"] = numero_processo
     if numero_oab:
         params["numeroOab"] = numero_oab
+    if uf_oab:
+        params["ufOab"] = str(uf_oab).strip().upper()
     if sigla_tribunal:
         params["siglaTribunal"] = sigla_tribunal
     if nome_advogado:

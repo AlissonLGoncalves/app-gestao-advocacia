@@ -224,6 +224,7 @@ def _consultar_com_tentativas(
     logger,
     buscar_todos_tribunais=False,
     siglas_tribunais=None,
+    uf_oab=None,
 ):
     """Executa tentativas de consulta no CNJ.
 
@@ -242,6 +243,7 @@ def _consultar_com_tentativas(
     for t in tentativas:
         payload = consultar_comunicacoes(
             numero_oab=numero_oab,
+            uf_oab=uf_oab,
             numero_processo=numero_processo,
             sigla_tribunal=t["sigla_tribunal"],
             meio="D",
@@ -452,7 +454,9 @@ def _normalizar_numero_oab(numero_oab):
     return somente_digitos or bruto
 
 
-def _consultar_oab_com_fallback(*, numero_oab, sigla_tribunal, data_inicio, data_fim, logger):
+def _consultar_oab_com_fallback(
+    *, numero_oab, sigla_tribunal, data_inicio, data_fim, logger, uf_oab=None
+):
     """Consulta DJEN para OAB com fallback de paginação e tribunal.
 
     Estratégia:
@@ -471,6 +475,7 @@ def _consultar_oab_com_fallback(*, numero_oab, sigla_tribunal, data_inicio, data
         logger=logger,
         buscar_todos_tribunais=False,
         siglas_tribunais=None,
+        uf_oab=uf_oab,
     )
 
 
@@ -619,6 +624,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
                     data_inicio=data_inicio,
                     data_fim=data_fim,
                     logger=logger,
+                    uf_oab=oab_mon.uf_oab or None,
                 )
 
                 total_itens_encontrados += len(items)
