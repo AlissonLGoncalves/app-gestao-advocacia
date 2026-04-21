@@ -12,6 +12,7 @@ from flask_restx import Api, abort
 from app_runtime import (
     configure_cors_origins,
     configure_error_handlers,
+    configure_jwt_error_handlers,
     configure_request_context,
     configure_scheduler,
     register_status_route,
@@ -72,6 +73,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+    configure_jwt_error_handlers(jwt)
     CORS(app, origins=configure_cors_origins())
 
     configure_request_context(app)

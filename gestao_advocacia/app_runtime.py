@@ -57,6 +57,28 @@ def configure_error_handlers(app):
         return jsonify({"message": "Erro interno do servidor."}), 500
 
 
+def configure_jwt_error_handlers(jwt):
+    @jwt.unauthorized_loader
+    def handle_missing_token(reason):
+        return jsonify({"message": reason}), 401
+
+    @jwt.invalid_token_loader
+    def handle_invalid_token(reason):
+        return jsonify({"message": reason}), 422
+
+    @jwt.expired_token_loader
+    def handle_expired_token(jwt_header, jwt_payload):
+        return jsonify({"message": "Token expirado."}), 401
+
+    @jwt.needs_fresh_token_loader
+    def handle_fresh_token_required(jwt_header, jwt_payload):
+        return jsonify({"message": "Token recente obrigatorio."}), 401
+
+    @jwt.revoked_token_loader
+    def handle_revoked_token(jwt_header, jwt_payload):
+        return jsonify({"message": "Token revogado."}), 401
+
+
 def configure_scheduler(app):
     if app.config.get("CNJ_JOB_ENABLED", False):
         if not app.config.get("TESTING", False):
