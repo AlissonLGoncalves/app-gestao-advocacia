@@ -609,26 +609,17 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             )
             try:
                 numero_oab = _normalizar_numero_oab(oab_mon.numero_oab)
-                # Buscas por OAB não filtram por tribunal: a API retorna publicações de todos
-                # os tribunais quando apenas o número da OAB é informado, evitando perder
-                # publicações de cortes diferentes do tribunal de origem da carteira (ex: TRT, STJ).
-                if buscar_todos_tribunais:
-                    data, items = _consultar_oab_em_todos_tribunais(
-                        numero_oab=numero_oab,
-                        sigla_tribunal=None,
-                        data_inicio=data_inicio,
-                        data_fim=data_fim,
-                        logger=logger,
-                        siglas_tribunais=siglas_tribunais,
-                    )
-                else:
-                    data, items = _consultar_oab_com_fallback(
-                        numero_oab=numero_oab,
-                        sigla_tribunal=None,
-                        data_inicio=data_inicio,
-                        data_fim=data_fim,
-                        logger=logger,
-                    )
+                # A ComunicaAPI já agrega publicações de TODOS os tribunais quando
+                # apenas o número da OAB é informado (sigla_tribunal=None).
+                # Não é necessário iterar por cada tribunal individualmente — isso
+                # gera 178+ requests e causa rate limit. Dois requests bastam.
+                data, items = _consultar_oab_com_fallback(
+                    numero_oab=numero_oab,
+                    sigla_tribunal=None,
+                    data_inicio=data_inicio,
+                    data_fim=data_fim,
+                    logger=logger,
+                )
 
                 total_itens_encontrados += len(items)
                 for item in items:
