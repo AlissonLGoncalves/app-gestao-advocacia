@@ -200,11 +200,11 @@ export default function DjenPage() {
   const [autoSyncExecutada, setAutoSyncExecutada] = useState(false)
   const [diasSync, setDiasSync] = useState(30)
 
-  // Filtros
+  // Filtros — inicializa numero_processo a partir de ?processo= na URL
   const [filtros, setFiltros] = useState({
     lida: '',
     sigla_tribunal: '',
-    numero_processo: '',
+    numero_processo: searchParams.get('processo') || '',
     data_inicio: '',
     data_fim: '',
     origem: '',

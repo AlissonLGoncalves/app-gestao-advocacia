@@ -1,6 +1,6 @@
 // src/CasoList.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { API_URL } from './config.js'
 import { deleteCaso, listCasos } from './api/casos.js'
 import {
@@ -20,6 +20,7 @@ import EmptyState from './components/EmptyState.jsx'
 
 function CasoList({ onEditCaso, refreshKey }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const [casos, setCasos] = useState([])
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -436,9 +437,41 @@ function CasoList({ onEditCaso, refreshKey }) {
             )}
             {casos.map((caso) => (
               <tr key={caso.id}>
-                <td className="px-3 py-2">{caso.titulo}</td>
+                <td className="px-3 py-2">
+                  {caso.numero_processo ? (
+                    <span
+                      role="button"
+                      className="text-primary text-decoration-underline"
+                      style={{ cursor: 'pointer' }}
+                      title="Ver publicações DJEN deste processo"
+                      onClick={() =>
+                        navigate(`/djen?processo=${encodeURIComponent(caso.numero_processo)}`)
+                      }
+                    >
+                      {caso.titulo}
+                    </span>
+                  ) : (
+                    caso.titulo
+                  )}
+                </td>
                 <td className="px-3 py-2">{caso.cliente?.nome_razao_social || 'N/A'}</td>
-                <td className="px-3 py-2">{caso.numero_processo || '-'}</td>
+                <td className="px-3 py-2">
+                  {caso.numero_processo ? (
+                    <span
+                      role="button"
+                      className="text-primary text-decoration-underline"
+                      style={{ cursor: 'pointer' }}
+                      title="Ver publicações DJEN deste processo"
+                      onClick={() =>
+                        navigate(`/djen?processo=${encodeURIComponent(caso.numero_processo)}`)
+                      }
+                    >
+                      {caso.numero_processo}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   <span className={`badge fs-xs ${getStatusBadge(caso.status)}`}>
                     {caso.status}
