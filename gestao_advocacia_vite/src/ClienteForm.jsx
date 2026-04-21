@@ -444,9 +444,13 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
         return updates
       })
 
+      if (data.cep && !data.rua) {
+        buscarEnderecoPorCEP(data.cep)
+      }
+
       if (messageExtraida.length > 0) {
         toast.success(
-          `Leitura Mágica (OCR) de PDF concluída! Campos preenchidos: ${messageExtraida.join(', ')}`
+          `Leitura Mágica (IA) concluída! Campos preenchidos: ${messageExtraida.join(', ')}`
         )
       } else {
         toast.info(

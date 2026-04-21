@@ -44,21 +44,52 @@ def _configure_tesseract_binary():
 
 _configure_tesseract_binary()
 
-_GEMINI_PROMPT = """Analise o texto abaixo extraído de um documento jurídico e extraia os dados solicitados.
+_GEMINI_PROMPT = """Você é um extrator preciso de dados de documentos jurídicos brasileiros.
+Analise o texto abaixo e preencha cada campo com APENAS o dado específico.
 
-REGRAS OBRIGATÓRIAS:
-- "nome_razao_social": SOMENTE o nome completo da pessoa física ou razão social da empresa. NÃO inclua nacionalidade, profissão, estado civil, CPF nem qualquer outra informação junto ao nome.
-- Cada campo deve conter APENAS o dado específico, sem contexto ou frases ao redor.
-- "data_nascimento": formato YYYY-MM-DD, ou vazio se não encontrar.
-- "estado": apenas a sigla UF de 2 letras (ex: PR, SP, RJ). Nunca o nome do estado por extenso.
-- "tipo_pessoa_sugerida": "PF" se houver CPF, "PJ" se houver CNPJ, vazio se nenhum.
-- "cpf": com pontuação no formato 000.000.000-00.
-- "cnpj": com pontuação no formato 00.000.000/0000-00.
-- "orgao_emissor": órgão emissor do RG (ex: SSP/PR, DETRAN/SP). Vazio se não encontrar.
-- "estado_civil": um destes valores exatos ou vazio — Solteiro(a), Casado(a), Divorciado(a), Viúvo(a), União Estável.
-- Se não encontrar um campo, deixe exatamente "".
+REGRAS CRÍTICAS — leia com atenção:
 
-Retorne SOMENTE o JSON abaixo preenchido, sem markdown, sem texto antes ou depois:
+1. "nome_razao_social": SOMENTE o nome completo da pessoa ou razão social da empresa.
+   NUNCA inclua CPF, RG, profissão, nacionalidade, estado civil ou qualquer outra informação.
+   Exemplo correto: "Andreia Gonçalves"
+   Exemplo ERRADO: "Andreia Gonçalves, brasileira, técnica de enfermagem, solteira"
+
+2. "cpf": formato exato 000.000.000-00. Se não houver, deixe "".
+
+3. "cnpj": formato exato 00.000.000/0000-00. Se não houver, deixe "".
+
+4. "rg": apenas o número do documento de identidade (ex: 0.000.295-92). Se não houver, deixe "".
+
+5. "orgao_emissor": órgão emissor do RG. O padrão brasileiro é SSP/UF (ex: SSP/PR, SSP/SP).
+   Outros aceitos: DETRAN/UF, PC/UF, SESP/UF, IFP/RJ, IIRGD/RS, MEX, MTE.
+   Se não encontrar, deixe "".
+
+6. "data_nascimento": formato YYYY-MM-DD (ex: 1990-11-27). Se não encontrar, deixe "".
+
+7. "estado_civil": use EXATAMENTE um destes valores ou deixe "":
+   Solteiro(a) | Casado(a) | Divorciado(a) | Viuvo(a) | Uniao Estavel
+
+8. "profissao": nome da profissão apenas (ex: Técnico(a) de Enfermagem, Advogado(a), Médico(a)).
+   NÃO inclua frases como "que exerce a profissão de" — apenas o nome da profissão.
+
+9. "nacionalidade": gentílico (ex: Brasileiro(a), Argentino(a), Italiano(a)).
+   NÃO escreva o nome do país (ex: não escreva "Brasil", escreva "Brasileiro(a)").
+
+10. "cep": formato 00000-000. Se não encontrar, deixe "".
+
+11. "rua": logradouro completo sem o número (ex: Rua das Flores, Avenida Brasil). Se não encontrar, deixe "".
+
+12. "numero": apenas o número do endereço (ex: 92, 1500-A). Se não encontrar, deixe "".
+
+13. "bairro": nome do bairro apenas. Se não encontrar, deixe "".
+
+14. "cidade": nome da cidade apenas. Se não encontrar, deixe "".
+
+15. "estado": sigla UF com 2 letras (ex: PR, SP, RJ). NUNCA o nome por extenso. Se não encontrar, deixe "".
+
+16. "tipo_pessoa_sugerida": "PF" se houver CPF, "PJ" se houver CNPJ, "" se nenhum.
+
+Retorne SOMENTE o JSON abaixo preenchido. Sem markdown, sem texto antes ou depois, sem explicações:
 
 {
   "nome_razao_social": "",
@@ -81,7 +112,7 @@ Retorne SOMENTE o JSON abaixo preenchido, sem markdown, sem texto antes ou depoi
   "tipo_pessoa_sugerida": ""
 }
 
-Texto do documento:
+TEXTO DO DOCUMENTO:
 """
 
 

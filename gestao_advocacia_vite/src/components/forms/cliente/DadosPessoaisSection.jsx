@@ -1,4 +1,5 @@
 import React from 'react'
+import { ORGAOS_EMISSORES, PROFISSOES, NACIONALIDADES } from '../../../constants/clienteOpcoes.js'
 
 function DadosPessoaisSection({
   formData,
@@ -24,11 +25,12 @@ function DadosPessoaisSection({
           className="form-control form-control-sm"
           value={formData.rg || ''}
           onChange={onChange}
+          placeholder="0.000.000-0"
         />
       </div>
       <div className="col-md-6 mb-3">
         <label htmlFor="orgao_emissor" className="form-label form-label-sm">
-          Orgao Emissor
+          Órgão Emissor
         </label>
         <input
           type="text"
@@ -37,7 +39,15 @@ function DadosPessoaisSection({
           className="form-control form-control-sm"
           value={formData.orgao_emissor || ''}
           onChange={onChange}
+          placeholder="Ex: SSP/PR"
+          list="orgaos-emissores-list"
+          autoComplete="off"
         />
+        <datalist id="orgaos-emissores-list">
+          {ORGAOS_EMISSORES.map((o) => (
+            <option key={o} value={o} />
+          ))}
+        </datalist>
       </div>
       <div className="col-md-6 mb-3">
         <label htmlFor="data_nascimento" className="form-label form-label-sm">
@@ -69,14 +79,14 @@ function DadosPessoaisSection({
           <option value="Solteiro(a)">Solteiro(a)</option>
           <option value="Casado(a)">Casado(a)</option>
           <option value="Divorciado(a)">Divorciado(a)</option>
-          <option value="Viuvo(a)">Viuvo(a)</option>
-          <option value="Uniao Estavel">Uniao Estavel</option>
+          <option value="Viuvo(a)">Viúvo(a)</option>
+          <option value="Uniao Estavel">União Estável</option>
           <option value="Outro">Outro</option>
         </select>
       </div>
       <div className="col-md-6 mb-3">
         <label htmlFor="profissao" className="form-label form-label-sm">
-          Profissao
+          Profissão
         </label>
         <input
           type="text"
@@ -85,7 +95,15 @@ function DadosPessoaisSection({
           className="form-control form-control-sm"
           value={formData.profissao || ''}
           onChange={onChange}
+          placeholder="Digite ou selecione..."
+          list="profissoes-list"
+          autoComplete="off"
         />
+        <datalist id="profissoes-list">
+          {PROFISSOES.map((p) => (
+            <option key={p} value={p} />
+          ))}
+        </datalist>
       </div>
       <div className="col-md-6 mb-3">
         <label htmlFor="nacionalidade" className="form-label form-label-sm">
@@ -96,9 +114,17 @@ function DadosPessoaisSection({
           name="nacionalidade"
           id="nacionalidade"
           className="form-control form-control-sm"
-          value={formData.nacionalidade || 'Brasileiro(a)'}
+          value={formData.nacionalidade || ''}
           onChange={onChange}
+          placeholder="Digite ou selecione..."
+          list="nacionalidades-list"
+          autoComplete="off"
         />
+        <datalist id="nacionalidades-list">
+          {NACIONALIDADES.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
       </div>
     </>
   )
@@ -133,7 +159,7 @@ function DadosPessoaisSection({
       </div>
       <div className="col-md-6 mb-3">
         <label htmlFor="inscricao_estadual" className="form-label form-label-sm">
-          Inscricao Estadual
+          Inscrição Estadual
         </label>
         <input
           type="text"
@@ -146,7 +172,7 @@ function DadosPessoaisSection({
       </div>
       <div className="col-md-6 mb-3">
         <label htmlFor="inscricao_municipal" className="form-label form-label-sm">
-          Inscricao Municipal
+          Inscrição Municipal
         </label>
         <input
           type="text"
@@ -199,6 +225,7 @@ function DadosPessoaisSection({
               onBlur={onGenericCnpjBlur}
               disabled={isEditing}
               maxLength={formData.tipo_pessoa === 'PF' ? 14 : 18}
+              placeholder={formData.tipo_pessoa === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'}
             />
             {loadingCnpj && formData.tipo_pessoa === 'PJ' && formData.cpf_cnpj && (
               <span className="input-group-text">
