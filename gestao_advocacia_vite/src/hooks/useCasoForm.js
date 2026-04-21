@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { toast } from 'react-toastify'
 import { API_URL } from '../config.js'
+import { createCaso, updateCaso } from '../api/casos.js'
 
 function useCasoForm({
   formData,
@@ -81,18 +82,10 @@ function useCasoForm({
       }
 
       try {
-        const url = isEditing ? `${API_URL}/casos/${casoParaEditar.id}` : `${API_URL}/casos`
-        const method = isEditing ? 'PUT' : 'POST'
         const token = localStorage.getItem('token')
-        const response = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(dadosParaEnviar),
-        })
-
-        const responseData = await response.json()
-        if (!response.ok)
-          throw new Error(responseData.erro || `Falha ao salvar caso. Status: ${response.status}`)
+        const responseData = isEditing
+          ? await updateCaso(casoParaEditar.id, dadosParaEnviar)
+          : await createCaso(dadosParaEnviar)
 
         toast.success(`Caso ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`)
         if (criarEvento && !isEditing) await criarEventoAgenda(responseData.id, token)

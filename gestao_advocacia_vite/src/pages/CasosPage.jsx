@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import CasoList from '../CasoList.jsx' // Ajuste o caminho se CasoList.jsx não estiver em src/
 import CasoForm from '../CasoForm.jsx' // Ajuste o caminho se CasoForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
-import { API_URL } from '../config.js' // Ajuste o caminho se config.js não estiver em src/
+import { getCaso } from '../api/casos.js'
 
 function CasosPage() {
   const navigate = useNavigate()
@@ -26,22 +26,8 @@ function CasosPage() {
   useEffect(() => {
     if (modoFormulario === 'editar' && params.casoId) {
       setLoadingItem(true)
-      const token = localStorage.getItem('token')
-      fetch(`${API_URL}/casos/${params.casoId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((response) => {
-          if (!response.ok) {
-            console.error(
-              `CasosPage: Falha ao buscar caso ${params.casoId}. Status: ${response.status}`
-            )
-            throw new Error('Falha ao buscar caso para edição.')
-          }
-          return response.json()
-        })
-        .then((data) => {
-          setCasoParaEditar(data)
-        })
+      getCaso(params.casoId)
+        .then((data) => setCasoParaEditar(data))
         .catch((error) => {
           console.error('CasosPage: Erro ao buscar caso:', error)
           // Adicionar feedback para o utilizador, ex: toast

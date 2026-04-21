@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { API_URL } from './config.js'
+import { deleteCaso, listCasos } from './api/casos.js'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -66,33 +67,18 @@ function CasoList({ onEditCaso, refreshKey }) {
     setLoading(true)
     setError('')
 
-    const token = localStorage.getItem('token')
-    if (!token) {
-      setError('Autenticação necessária.')
-      setLoading(false)
-      toast.error('Sessão expirada ou inválida. Por favor, faça login novamente.')
-      return
-    }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-
-    let url = `${API_URL}/casos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}` // Adicionada barra final
-    if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`
-    if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`
-    if (clienteFilter) url += `&cliente_id=${clienteFilter}`
-    if (dataCriacaoInicioFilter) url += `&data_criacao_inicio=${dataCriacaoInicioFilter}`
-    if (dataCriacaoFimFilter) url += `&data_criacao_fim=${dataCriacaoFimFilter}`
-    if (dataAtualizacaoInicioFilter)
-      url += `&data_atualizacao_inicio=${dataAtualizacaoInicioFilter}`
-    if (dataAtualizacaoFimFilter) url += `&data_atualizacao_fim=${dataAtualizacaoFimFilter}`
-
     try {
-      const response = await fetch(url, { headers: authHeaders })
-      if (!response.ok) {
-        const resData = await response.json().catch(() => ({}))
-        console.error('CasoList: Erro da API ao buscar casos:', resData)
-        throw new Error(resData.erro || `Erro HTTP: ${response.status} ao buscar casos`)
-      }
-      const data = await response.json()
+      const data = await listCasos({
+        sort_by: sortConfig.key,
+        sort_order: sortConfig.direction,
+        search: searchTerm,
+        status: statusFilter,
+        cliente_id: clienteFilter,
+        data_criacao_inicio: dataCriacaoInicioFilter,
+        data_criacao_fim: dataCriacaoFimFilter,
+        data_atualizacao_inicio: dataAtualizacaoInicioFilter,
+        data_atualizacao_fim: dataAtualizacaoFimFilter,
+      })
       setCasos(Array.isArray(data) ? data : data.casos || [])
     } catch (err) {
       console.error('CasoList: Erro detalhado ao buscar casos:', err)
@@ -123,13 +109,6 @@ function CasoList({ onEditCaso, refreshKey }) {
   }, [fetchCasos, refreshKey])
 
   const handleDeleteClick = async (id) => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      toast.error('Autenticação expirada. Faça login novamente.')
-      return
-    }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-
     if (
       window.confirm(
         `Tem certeza que deseja excluir o caso ID ${id}? Esta ação pode ser irreversível e afetar registos associados.`
@@ -138,15 +117,7 @@ function CasoList({ onEditCaso, refreshKey }) {
       setDeletingId(id)
       setError(null)
       try {
-        const response = await fetch(`${API_URL}/casos/${id}`, {
-          method: 'DELETE',
-          headers: authHeaders,
-        })
-        if (!response.ok) {
-          const resData = await response.json().catch(() => ({}))
-          console.error('CasoList: Erro da API ao deletar caso:', resData)
-          throw new Error(resData.erro || `Erro HTTP: ${response.status}`)
-        }
+        await deleteCaso(id)
         toast.success(`Caso ID ${id} excluído com sucesso!`)
         fetchCasos()
       } catch (err) {

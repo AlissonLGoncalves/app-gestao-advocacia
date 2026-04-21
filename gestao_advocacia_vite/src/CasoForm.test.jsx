@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import CasoForm from './CasoForm.jsx'
+import { consultaPublicaCnj, createCaso } from './api/casos.js'
 
 const { toastMock } = vi.hoisted(() => ({
   toastMock: {
@@ -16,19 +17,24 @@ vi.mock('react-toastify', () => ({
   toast: toastMock,
 }))
 
+vi.mock('./api/casos.js', () => ({
+  createCaso: vi.fn(),
+  updateCaso: vi.fn(),
+  consultaPublicaCnj: vi.fn(),
+}))
+
 describe('CasoForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.setItem('token', 'token-teste')
+    createCaso.mockResolvedValue({ id: 99 })
+    consultaPublicaCnj.mockResolvedValue({})
     globalThis.fetch = vi.fn((url, options) => {
       if (String(url).includes('/clientes/?sort_by=')) {
         return Promise.resolve({
           ok: true,
           json: async () => [{ id: 1, nome_razao_social: 'Cliente A' }],
         })
-      }
-      if (options?.method === 'POST' && String(url).includes('/casos')) {
-        return Promise.resolve({ ok: true, json: async () => ({ id: 99 }) })
       }
       return Promise.resolve({ ok: true, json: async () => ({}) })
     })
@@ -53,8 +59,7 @@ describe('CasoForm', () => {
       expect(toastMock.error).toHaveBeenCalled()
     })
 
-    const callsCasos = globalThis.fetch.mock.calls.filter(([url]) => String(url).includes('/casos'))
-    expect(callsCasos.length).toBe(0)
+    expect(createCaso).not.toHaveBeenCalled()
   })
 
   it('envia com sucesso quando formulario e valido', async () => {
@@ -74,22 +79,7 @@ describe('CasoForm', () => {
   })
 
   it('exibe erro quando API retorna 4xx/5xx', async () => {
-    globalThis.fetch = vi.fn((url, options) => {
-      if (String(url).includes('/clientes/?sort_by=')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => [{ id: 1, nome_razao_social: 'Cliente A' }],
-        })
-      }
-      if (options?.method === 'POST' && String(url).includes('/casos')) {
-        return Promise.resolve({
-          ok: false,
-          status: 500,
-          json: async () => ({ erro: 'erro ao salvar' }),
-        })
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) })
-    })
+    createCaso.mockRejectedValue(new Error('erro ao salvar'))
 
     render(<CasoForm onCasoChange={vi.fn()} />)
 
