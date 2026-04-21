@@ -1,16 +1,55 @@
 import { api } from './client'
 
-export function listPublicacoes(params = {}) {
-  const query = new URLSearchParams(params).toString()
-  return api.get(`/djen/publicacoes${query ? `?${query}` : ''}`)
+const toQueryString = (params = {}) => {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, String(value))
+    }
+  })
+  const qs = query.toString()
+  return qs ? `?${qs}` : ''
 }
 
-/** @param {number|string} id @param {object} payload */
-export function vincularPublicacao(id, payload) {
-  return api.post(`/djen/publicacoes/${id}/vincular`, payload)
+export const listOabs = () => api.get('/djen/oabs')
+export const createOab = (data) => api.post('/djen/oabs', data)
+export const deleteOab = (id) => api.del(`/djen/oabs/${id}`)
+
+export function listPublicacoes(params = {}) {
+  return api.get(`/djen/publicacoes${toQueryString(params)}`)
 }
+
+export const getPublicacao = (id) => api.get(`/djen/publicacoes/${id}`)
+export const updatePublicacao = (id, payload) => api.patch(`/djen/publicacoes/${id}`, payload)
+
+export const vincularDecisao = (pubId, casoId) =>
+  api.post(`/djen/triagem/${pubId}/vincular-caso`, { caso_id: casoId })
+
+export const vincularPublicacao = (id, payload) =>
+  api.post(`/djen/publicacoes/${id}/vincular`, payload)
 
 /** @param {number|string} id */
 export function ignorarPublicacao(id) {
   return api.post(`/djen/publicacoes/${id}/ignorar`, {})
 }
+
+export const listTriagem = (params = {}) => api.get(`/djen/triagem${toQueryString(params)}`)
+export const ignorarTriagem = (pubId, motivo) =>
+  api.post(`/djen/triagem/${pubId}/ignorar`, { motivo })
+export const processarLoteTriagem = (pubIds = []) =>
+  api.post('/djen/triagem/processar-lote', { pub_ids: pubIds })
+export const criarClienteCasoTriagem = (pubId, payload) =>
+  api.post(`/djen/triagem/${pubId}/criar-cliente-caso`, payload).catch((error) => {
+    if (error?.status === 409) {
+      return error.payload || {}
+    }
+    throw error
+  })
+
+export const syncDjen = (dias) => api.post('/djen/sync', { dias })
+
+export const baixarCertidao = (pubId) => api.getBlob(`/djen/publicacoes/${pubId}/certidao`)
+
+export const getMonitoramentoStatus = () => api.get('/djen/monitoramento/status')
+export const triggerBackfill = (oabId) =>
+  api.post(oabId ? `/djen/oabs/${oabId}/backfill` : '/djen/backfill', {})
