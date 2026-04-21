@@ -1,4 +1,5 @@
 from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended.exceptions import JWTExtendedException, NoAuthorizationError
 from flask_restx import Namespace, fields
 
 from extensions import db
@@ -16,6 +17,14 @@ from .tarefas import register_tarefas_routes
 
 
 def register_api_routes(app, api, finance_access_required):
+    @api.errorhandler(NoAuthorizationError)
+    def handle_no_authorization(error):
+        return {"message": str(error)}, 401
+
+    @api.errorhandler(JWTExtendedException)
+    def handle_jwt_errors(error):
+        return {"message": str(error)}, 422
+
     auth_ns = Namespace("auth", description="Operacoes de Autenticacao")
     clientes_ns = Namespace("clientes", description="Operacoes de Clientes")
     casos_ns = Namespace("casos", description="Operacoes de Casos Juridicos")
