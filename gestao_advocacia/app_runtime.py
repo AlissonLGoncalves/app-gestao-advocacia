@@ -39,7 +39,7 @@ def configure_error_handlers(app):
     @app.errorhandler(Exception)
     def handle_unhandled_exception(error):
         if isinstance(error, HTTPException) and error.code < 500:
-            return error
+            return jsonify({"message": error.description}), error.code
 
         status_code = error.code if isinstance(error, HTTPException) else 500
         app.logger.exception(
@@ -53,7 +53,7 @@ def configure_error_handlers(app):
         )
 
         if isinstance(error, HTTPException):
-            return error
+            return jsonify({"message": error.description}), error.code
         return jsonify({"message": "Erro interno do servidor."}), 500
 
 
