@@ -1,6 +1,5 @@
 ﻿// src/DocumentoList.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { API_URL } from './config.js'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -10,6 +9,8 @@ import {
   ArrowsUpDownIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
+import { api } from './api/client.js'
+import { deleteDocumento, downloadDocumento, listDocumentos } from './api/documentos.js'
 
 function DocumentoList({ onEditDocumento, refreshKey }) {
   const [documentos, setDocumentos] = useState([])
@@ -26,26 +27,14 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
   const [sortConfig, setSortConfig] = useState({ key: 'data_upload', direction: 'desc' })
 
   const fetchClientesECasosParaFiltro = useCallback(async () => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      console.warn('DocumentoList: Token não encontrado para fetchClientesECasosParaFiltro.')
-      return
-    }
-    const authHeaders = { Authorization: `Bearer ${token}` }
     try {
-      const clientesRes = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, {
-        headers: authHeaders,
-      })
-      if (!clientesRes.ok) throw new Error('Falha ao carregar clientes para filtro.')
-      const clientesData = await clientesRes.json()
+      const clientesData = await api.get('/clientes/?sort_by=nome_razao_social&order=asc')
       setClientes(clientesData.clientes || [])
-      let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`
+      let casosUrl = '/casos/?sort_by=titulo&order=asc'
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`
       }
-      const casosRes = await fetch(casosUrl, { headers: authHeaders })
-      if (!casosRes.ok) throw new Error('Falha ao carregar casos para filtro.')
-      const casosData = await casosRes.json()
+      const casosData = await api.get(casosUrl)
       setCasos(casosData.casos || [])
     } catch (err) {
       console.error('DocumentoList: Erro ao buscar clientes/casos para filtro:', err)
@@ -63,29 +52,28 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       toast.error('Sessão expirada ou inválida.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-
-    let url = `${API_URL}/documentos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`
-    if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`
-
-    if (casoFilter) {
-      if (casoFilter === 'DOCUMENTO_GERAL_CLIENTE' && clienteFilter) {
-        url += `&cliente_id=${clienteFilter}&sem_caso=true`
-      } else if (casoFilter !== 'DOCUMENTO_GERAL_CLIENTE') {
-        url += `&caso_id=${casoFilter}`
-      }
-    } else if (clienteFilter) {
-      url += `&cliente_id=${clienteFilter}`
-    }
-
     try {
-      const response = await fetch(url, { headers: authHeaders })
-      if (!response.ok) {
-        const resData = await response.json().catch(() => ({}))
-        console.error('DocumentoList: Erro da API ao buscar documentos:', resData)
-        throw new Error(resData.erro || `Erro HTTP: ${response.status} ao buscar documentos`)
+      const params = {
+        sort_by: sortConfig.key,
+        sort_order: sortConfig.direction,
       }
-      const data = await response.json()
+
+      if (searchTerm) {
+        params.search = searchTerm
+      }
+
+      if (casoFilter) {
+        if (casoFilter === 'DOCUMENTO_GERAL_CLIENTE' && clienteFilter) {
+          params.cliente_id = clienteFilter
+          params.sem_caso = true
+        } else if (casoFilter !== 'DOCUMENTO_GERAL_CLIENTE') {
+          params.caso_id = casoFilter
+        }
+      } else if (clienteFilter) {
+        params.cliente_id = clienteFilter
+      }
+
+      const data = await listDocumentos(null, params)
       setDocumentos(data.documentos || [])
     } catch (err) {
       console.error('DocumentoList: Erro detalhado ao buscar documentos:', err)
@@ -112,7 +100,6 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       toast.error('Autenticação expirada. Faça login novamente.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
 
     if (
       window.confirm(
@@ -122,14 +109,7 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       setDeletingId(id)
       setError(null)
       try {
-        const response = await fetch(`${API_URL}/documentos/${id}`, {
-          method: 'DELETE',
-          headers: authHeaders,
-        })
-        if (!response.ok) {
-          const resData = await response.json().catch(() => ({}))
-          throw new Error(resData.erro || `Erro HTTP: ${response.status}`)
-        }
+        await deleteDocumento(id)
         toast.success(`Documento ID ${id} excluído com sucesso!`)
         fetchDocumentos()
       } catch (err) {
@@ -139,6 +119,22 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       } finally {
         setDeletingId(null)
       }
+    }
+  }
+
+  const handleDownloadClick = async (docId, fileName) => {
+    try {
+      const blob = await downloadDocumento(docId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      toast.error(`Erro ao baixar documento: ${err.message}`)
     }
   }
 
@@ -355,10 +351,8 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
                 </td>
                 <td className="px-3 py-2">{formatBytes(doc.tamanho_bytes)}</td>
                 <td className="px-3 py-2 text-center">
-                  <a
-                    href={`${API_URL}/documentos/download/${doc.id}`} // Alterado para usar ID, API precisa ser ajustada
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => handleDownloadClick(doc.id, doc.nome_original_arquivo)}
                     className="btn btn-sm btn-outline-success me-1 p-1 lh-1"
                     title="Download"
                     style={{
@@ -370,7 +364,7 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
                     }}
                   >
                     <ArrowDownTrayIcon style={{ width: '16px', height: '16px' }} />
-                  </a>
+                  </button>
                   <button
                     onClick={() => onEditDocumento(doc)}
                     className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"

@@ -1,6 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { request } from './client'
+import { api, request } from './client'
+
+const createJsonResponse = ({ ok = true, status = 200, payload = {} } = {}) => ({
+  ok,
+  status,
+  statusText: ok ? 'OK' : 'Error',
+  headers: {
+    get: (name) => (name === 'content-type' ? 'application/json' : null),
+  },
+  json: vi.fn().mockResolvedValue(payload),
+  text: vi.fn().mockResolvedValue(''),
+  blob: vi.fn().mockResolvedValue(new Blob(['x'])),
+})
 
 describe('api/client request', () => {
   beforeEach(() => {
@@ -71,5 +83,42 @@ describe('api/client request', () => {
     })
 
     await expect(request('/auth/logout', { method: 'DELETE' })).resolves.toBeNull()
+  })
+})
+
+describe('api.upload', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.stubGlobal('fetch', vi.fn())
+    localStorage.clear()
+  })
+
+  it('nao envia Content-Type manualmente no multipart', async () => {
+    const formData = new FormData()
+    formData.append('file', new File(['pdf'], 'teste.pdf', { type: 'application/pdf' }))
+
+    globalThis.fetch.mockResolvedValueOnce(createJsonResponse({ payload: { ok: true } }))
+
+    await api.upload('/documentos/upload', formData)
+
+    const [, options] = globalThis.fetch.mock.calls[0]
+    expect(options.method).toBe('POST')
+    expect(options.headers.Authorization).toBeUndefined()
+    expect(options.headers['Content-Type']).toBeUndefined()
+    expect(options.body).toBe(formData)
+  })
+
+  it('limpa token em resposta 401 no upload', async () => {
+    localStorage.setItem('token', 'abc123')
+
+    globalThis.fetch.mockResolvedValueOnce(
+      createJsonResponse({ ok: false, status: 401, payload: { erro: 'nao autorizado' } })
+    )
+
+    await expect(api.upload('/documentos/upload', new FormData())).rejects.toThrow(
+      'Sessão expirada'
+    )
+
+    expect(localStorage.getItem('token')).toBeNull()
   })
 })

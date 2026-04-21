@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import DocumentoList from '../DocumentoList.jsx' // Ajuste o caminho se DocumentoList.jsx não estiver em src/
 import DocumentoForm from '../DocumentoForm.jsx' // Ajuste o caminho se DocumentoForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
-import { API_URL } from '../config.js' // Ajuste o caminho se config.js não estiver em src/
+import { getDocumento } from '../api/documentos.js'
 
 function DocumentosPage() {
   const navigate = useNavigate()
@@ -27,19 +27,7 @@ function DocumentosPage() {
   useEffect(() => {
     if (modoFormulario === 'editar' && params.documentoId) {
       setLoadingItem(true)
-      // Assumindo que sua API tem um endpoint para buscar metadados de um documento por ID.
-      // Se não tiver, o DocumentoForm pode precisar apenas do ID e o DocumentoList já passou os dados.
-      // No entanto, buscar aqui garante dados mais recentes.
-      fetch(`${API_URL}/documentos/${params.documentoId}`) // Crie este endpoint na sua API se não existir
-        .then((response) => {
-          if (!response.ok) {
-            console.error(
-              `DocumentosPage: Falha ao buscar metadados do documento ${params.documentoId}. Status: ${response.status}`
-            )
-            throw new Error('Falha ao buscar metadados do documento para edição.')
-          }
-          return response.json()
-        })
+      getDocumento(params.documentoId)
         .then((data) => {
           setDocumentoParaEditar(data)
         })

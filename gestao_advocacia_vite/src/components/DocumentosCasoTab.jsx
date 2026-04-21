@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
 import { CloudArrowUpIcon, DocumentTextIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
+import { downloadDocumento, listDocumentos, uploadDocumento } from '../api/documentos.js'
 
 const DocumentosCasoTab = ({ casoId }) => {
   const [documentos, setDocumentos] = useState([])
@@ -10,14 +10,8 @@ const DocumentosCasoTab = ({ casoId }) => {
 
   const fetchDocumentos = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${API_URL}/documentos/?caso_id=${casoId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setDocumentos(data)
-      }
+      const data = await listDocumentos(casoId)
+      setDocumentos(Array.isArray(data) ? data : data?.documentos || [])
     } catch (e) {
       console.error('Erro buscar docs:', e)
     }
@@ -43,26 +37,14 @@ const DocumentosCasoTab = ({ casoId }) => {
 
   const subirArquivos = async (files) => {
     setUploading(true)
-    const token = localStorage.getItem('token')
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('caso_id', casoId)
 
       try {
-        const res = await fetch(`${API_URL}/documentos/upload`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        })
-        if (res.ok) {
-          toast.success(`Arquivo ${file.name} salvo na nuvem com sucesso!`)
-        } else {
-          toast.error(`Falha no arquivo ${file.name}`)
-        }
-      } catch (err) {
-        toast.error(`Erro envio ${file.name}`)
+        await uploadDocumento(casoId, file)
+        toast.success(`Arquivo ${file.name} salvo na nuvem com sucesso!`)
+      } catch (error) {
+        toast.error(`Erro envio ${file.name}: ${error.message || 'falha desconhecida'}`)
       }
     }
     setUploading(false)
@@ -70,29 +52,21 @@ const DocumentosCasoTab = ({ casoId }) => {
   }
 
   const handleDownload = async (docId, fileName, viewOnly = false) => {
-    const token = localStorage.getItem('token')
     try {
-      const res = await fetch(`${API_URL}/documentos/download/${docId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) {
-        const blob = await res.blob()
-        const url = window.URL.createObjectURL(blob)
-        if (viewOnly) {
-          window.open(url, '_blank')
-        } else {
-          const a = document.createElement('a')
-          a.href = url
-          a.download = fileName
-          document.body.appendChild(a)
-          a.click()
-          a.remove()
-        }
+      const blob = await downloadDocumento(docId)
+      const url = window.URL.createObjectURL(blob)
+      if (viewOnly) {
+        window.open(url, '_blank')
       } else {
-        toast.error('Arquivo corrompido ou inacessível.')
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
       }
-    } catch (e) {
-      toast.error('Erro de rede ao baixar.')
+    } catch (error) {
+      toast.error(`Erro de rede ao baixar: ${error.message || 'falha desconhecida'}`)
     }
   }
 
