@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { API_URL } from '../../config.js'
 import { toast } from 'react-toastify'
+import { criarClienteCasoTriagem, vincularDecisao } from '../../api/djen.js'
 
 const AI_BADGE = (
   <span className="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-2">
@@ -134,19 +134,7 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
     if (!casoId) return
     setCarregando(true)
     try {
-      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/vincular-caso`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ caso_id: casoId }),
-      })
-      const payload = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(payload.message || payload.mensagem || 'Erro ao vincular caso existente.')
-        return
-      }
+      await vincularDecisao(pub.id, casoId)
       toast.success('Publicação vinculada ao caso existente.')
       onSuccess?.()
     } catch {
@@ -160,24 +148,11 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
     setCarregando(true)
     setErroDuplicata(null)
     try {
-      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/criar-cliente-caso`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(montarPayloadCriacao()),
-      })
-      const payload = await res.json().catch(() => ({}))
+      const payload = await criarClienteCasoTriagem(pub.id, montarPayloadCriacao())
 
-      if (res.status === 409) {
+      if (payload?.caso_existente) {
         setErroDuplicata(payload)
         toast.warn(payload.mensagem || 'Já existe um caso com este número de processo.')
-        return
-      }
-
-      if (!res.ok) {
-        toast.error(payload.message || payload.mensagem || 'Erro ao criar cliente/caso.')
         return
       }
 

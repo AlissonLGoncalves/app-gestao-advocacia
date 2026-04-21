@@ -1,9 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
 import DOMPurify from 'dompurify'
 import ModalCriarClienteCaso from '../components/djen/ModalCriarClienteCaso.jsx'
+import {
+  baixarCertidao as baixarCertidaoApi,
+  createOab,
+  deleteOab,
+  getPublicacao,
+  ignorarTriagem as ignorarTriagemApi,
+  listOabs,
+  listPublicacoes,
+  listTriagem,
+  processarLoteTriagem as processarLoteTriagemApi,
+  syncDjen,
+  updatePublicacao,
+  vincularDecisao,
+} from '../api/djen.js'
+import { listCasos } from '../api/casos.js'
 
 const decodeHtmlEntities = (texto = '') => {
   if (!texto) return ''
@@ -225,37 +239,28 @@ export default function DjenPage() {
   const [casos, setCasos] = useState([])
   const publicacaoAlvo = searchParams.get('publicacao')
 
-  const token = () => localStorage.getItem('token')
-
   // ── Carregar publicações ────────────────────────────────────────────────────
   const carregarPublicacoes = useCallback(
     async (offsetParam = 0, limitParam = itensPorPagina) => {
       setLoadingPubs(true)
       try {
-        const params = new URLSearchParams()
-        params.set('limit', limitParam)
-        params.set('offset', offsetParam)
-        if (filtros.lida !== '') params.set('lida', filtros.lida)
-        if (filtros.sigla_tribunal) params.set('sigla_tribunal', filtros.sigla_tribunal)
-        if (filtros.numero_processo) params.set('numero_processo', filtros.numero_processo)
-        if (filtros.data_inicio) params.set('data_inicio', filtros.data_inicio)
-        if (filtros.data_fim) params.set('data_fim', filtros.data_fim)
-        if (filtros.origem) params.set('origem', filtros.origem)
-        params.set('ordenar', filtros.ordenar || 'data_desc')
-
-        const res = await fetch(`${API_URL}/djen/publicacoes?${params}`, {
-          headers: { Authorization: `Bearer ${token()}` },
+        const data = await listPublicacoes({
+          limit: limitParam,
+          offset: offsetParam,
+          lida: filtros.lida !== '' ? filtros.lida : undefined,
+          sigla_tribunal: filtros.sigla_tribunal || undefined,
+          numero_processo: filtros.numero_processo || undefined,
+          data_inicio: filtros.data_inicio || undefined,
+          data_fim: filtros.data_fim || undefined,
+          origem: filtros.origem || undefined,
+          ordenar: filtros.ordenar || 'data_desc',
         })
-        if (res.ok) {
-          const data = await res.json()
-          setPublicacoes(data.items || [])
-          setTotal(data.total || 0)
-          setNaoLidas(data.nao_lidas || 0)
-        } else {
-          toast.error('Erro ao carregar publicações DJEN.')
-        }
+
+        setPublicacoes(data.items || [])
+        setTotal(data.total || 0)
+        setNaoLidas(data.nao_lidas || 0)
       } catch {
-        toast.error('Erro de conexão.')
+        toast.error('Erro ao carregar publicações DJEN.')
       } finally {
         setLoadingPubs(false)
       }
@@ -267,10 +272,8 @@ export default function DjenPage() {
   const carregarOabs = useCallback(async () => {
     setLoadingOabs(true)
     try {
-      const res = await fetch(`${API_URL}/djen/oabs`, {
-        headers: { Authorization: `Bearer ${token()}` },
-      })
-      if (res.ok) setOabs(await res.json())
+      const data = await listOabs()
+      setOabs(Array.isArray(data) ? data : [])
     } catch {
       /* silencioso */
     } finally {
@@ -281,10 +284,8 @@ export default function DjenPage() {
   // ── Carregar casos para vínculo ─────────────────────────────────────────────
   const carregarCasos = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/casos`, {
-        headers: { Authorization: `Bearer ${token()}` },
-      })
-      if (res.ok) setCasos(await res.json())
+      const data = await listCasos()
+      setCasos(Array.isArray(data) ? data : data?.casos || [])
     } catch {
       /* silencioso */
     }
@@ -294,20 +295,8 @@ export default function DjenPage() {
   const carregarUltimasPublicacoesDjen = useCallback(async () => {
     setLoadingUltimasPublicacoesDjen(true)
     try {
-      const params = new URLSearchParams()
-      params.set('limit', '8')
-      params.set('offset', '0')
-
-      const res = await fetch(`${API_URL}/djen/publicacoes?${params}`, {
-        headers: { Authorization: `Bearer ${token()}` },
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        setUltimasPublicacoesDjen(data.items || [])
-      } else {
-        setUltimasPublicacoesDjen([])
-      }
+      const data = await listPublicacoes({ limit: 8, offset: 0 })
+      setUltimasPublicacoesDjen(data.items || [])
     } catch {
       setUltimasPublicacoesDjen([])
     } finally {
@@ -319,20 +308,14 @@ export default function DjenPage() {
   const carregarTriagem = useCallback(async (offsetParam = 0) => {
     setLoadingTriagem(true)
     try {
-      const res = await fetch(
-        `${API_URL}/djen/triagem?limit=${TRIAGEM_LIMIT}&offset=${offsetParam}&somente_pendentes=true`,
-        {
-          headers: { Authorization: `Bearer ${token()}` },
-        }
-      )
-      if (res.ok) {
-        const data = await res.json()
-        setTriagemItems(data.items || [])
-        setTriagemTotal(data.total || 0)
-        setTriagemSelecionadas([])
-      } else {
-        toast.error('Erro ao carregar fila de triagem DJEN.')
-      }
+      const data = await listTriagem({
+        limit: TRIAGEM_LIMIT,
+        offset: offsetParam,
+        somente_pendentes: true,
+      })
+      setTriagemItems(data.items || [])
+      setTriagemTotal(data.total || 0)
+      setTriagemSelecionadas([])
     } catch {
       toast.error('Erro de conexão na triagem DJEN.')
     } finally {
@@ -358,13 +341,8 @@ export default function DjenPage() {
   const sincronizar = async ({ silencioso = false } = {}) => {
     setSyncing(true)
     try {
-      const res = await fetch(`${API_URL}/djen/sync`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dias: diasSync }),
-      })
-      const payload = await res.json().catch(() => ({}))
-      if (res.ok) {
+      const payload = await syncDjen(diasSync)
+      if (payload) {
         const resumo = payload?.resumo || {}
         const salvas = resumo.publicacoes_salvas ?? 0
         const encontrados = resumo.itens_encontrados ?? 0
@@ -380,10 +358,6 @@ export default function DjenPage() {
         await carregarOabs()
         await carregarTriagem()
         await carregarUltimasPublicacoesDjen()
-      } else {
-        if (!silencioso) {
-          toast.error(payload.message || 'Erro ao sincronizar.')
-        }
       }
     } catch {
       if (!silencioso) {
@@ -411,16 +385,10 @@ export default function DjenPage() {
   const marcarLida = useCallback(
     async (pub, lida) => {
       try {
-        const res = await fetch(`${API_URL}/djen/publicacoes/${pub.id}`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lida }),
-        })
-        if (res.ok) {
-          setPublicacoes((prev) => prev.map((p) => (p.id === pub.id ? { ...p, lida } : p)))
-          setNaoLidas((prev) => (lida ? prev - 1 : prev + 1))
-          if (pubSelecionada?.id === pub.id) setPubSelecionada({ ...pubSelecionada, lida })
-        }
+        await updatePublicacao(pub.id, { lida })
+        setPublicacoes((prev) => prev.map((p) => (p.id === pub.id ? { ...p, lida } : p)))
+        setNaoLidas((prev) => (lida ? prev - 1 : prev + 1))
+        if (pubSelecionada?.id === pub.id) setPubSelecionada({ ...pubSelecionada, lida })
       } catch {
         toast.error('Erro ao atualizar.')
       }
@@ -481,14 +449,7 @@ export default function DjenPage() {
 
     const carregarPublicacaoAlvo = async () => {
       try {
-        const res = await fetch(`${API_URL}/djen/publicacoes/${publicacaoId}`, {
-          headers: { Authorization: `Bearer ${token()}` },
-        })
-        if (!res.ok) {
-          return
-        }
-
-        const data = await res.json()
+        const data = await getPublicacao(publicacaoId)
         if (!ativo) return
 
         setAba('publicacoes')
@@ -512,19 +473,12 @@ export default function DjenPage() {
   // ── Vincular caso ───────────────────────────────────────────────────────────
   const vincularCaso = async (pub, caso_id) => {
     try {
-      const res = await fetch(`${API_URL}/djen/publicacoes/${pub.id}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caso_id: caso_id || null }),
-      })
-      if (res.ok) {
-        const updated = await res.json()
-        setPublicacoes((prev) => prev.map((p) => (p.id === pub.id ? updated : p)))
-        setTriagemItems((prev) => prev.filter((i) => i.publicacao.id !== pub.id))
-        setTriagemTotal((prev) => Math.max(0, prev - 1))
-        if (pubSelecionada?.id === pub.id) setPubSelecionada(updated)
-        toast.success('Vínculo atualizado.')
-      }
+      const updated = await updatePublicacao(pub.id, { caso_id: caso_id || null })
+      setPublicacoes((prev) => prev.map((p) => (p.id === pub.id ? updated : p)))
+      setTriagemItems((prev) => prev.filter((i) => i.publicacao.id !== pub.id))
+      setTriagemTotal((prev) => Math.max(0, prev - 1))
+      if (pubSelecionada?.id === pub.id) setPubSelecionada(updated)
+      toast.success('Vínculo atualizado.')
     } catch {
       toast.error('Erro ao vincular.')
     }
@@ -532,16 +486,7 @@ export default function DjenPage() {
 
   const mesclarTriagemCaso = async (pub, casoId) => {
     try {
-      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/vincular-caso`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caso_id: casoId }),
-      })
-      const payload = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(payload.message || 'Erro ao mesclar publicação.')
-        return
-      }
+      await vincularDecisao(pub.id, casoId)
 
       setTriagemItems((prev) => prev.filter((i) => i.publicacao.id !== pub.id))
       setTriagemTotal((prev) => Math.max(0, prev - 1))
@@ -555,16 +500,7 @@ export default function DjenPage() {
 
   const ignorarTriagem = async (pub) => {
     try {
-      const res = await fetch(`${API_URL}/djen/triagem/${pub.id}/ignorar`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ motivo: 'Sem ação necessária' }),
-      })
-      const payload = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(payload.message || 'Erro ao ignorar publicação.')
-        return
-      }
+      await ignorarTriagemApi(pub.id, 'Sem ação necessária')
 
       setTriagemItems((prev) => prev.filter((i) => i.publicacao.id !== pub.id))
       setTriagemTotal((prev) => Math.max(0, prev - 1))
@@ -615,17 +551,7 @@ export default function DjenPage() {
 
     setProcessandoLoteTriagem(true)
     try {
-      const res = await fetch(`${API_URL}/djen/triagem/processar-lote`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pub_ids: triagemSelecionadas }),
-      })
-
-      const payload = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(payload.message || 'Erro ao processar lote da triagem.')
-        return
-      }
+      const payload = await processarLoteTriagemApi(triagemSelecionadas)
 
       const processadas = payload.processadas ?? 0
       const erros = payload.erros ?? 0
@@ -647,19 +573,10 @@ export default function DjenPage() {
     e.preventDefault()
     setSalvandoOab(true)
     try {
-      const res = await fetch(`${API_URL}/djen/oabs`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(novaOab),
-      })
-      if (res.ok) {
-        toast.success('OAB cadastrada para monitoramento!')
-        setNovaOab({ numero_oab: '', uf_oab: '', nome_advogado: '', sigla_tribunal: '' })
-        carregarOabs()
-      } else {
-        const err = await res.json()
-        toast.error(err.message || 'Erro ao cadastrar OAB.')
-      }
+      await createOab(novaOab)
+      toast.success('OAB cadastrada para monitoramento!')
+      setNovaOab({ numero_oab: '', uf_oab: '', nome_advogado: '', sigla_tribunal: '' })
+      carregarOabs()
     } catch {
       toast.error('Erro de conexão.')
     } finally {
@@ -671,14 +588,9 @@ export default function DjenPage() {
   const removerOab = async (id) => {
     if (!window.confirm('Remover esta OAB do monitoramento?')) return
     try {
-      const res = await fetch(`${API_URL}/djen/oabs/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token()}` },
-      })
-      if (res.status === 204) {
-        toast.success('OAB removida.')
-        setOabs((prev) => prev.filter((o) => o.id !== id))
-      }
+      await deleteOab(id)
+      toast.success('OAB removida.')
+      setOabs((prev) => prev.filter((o) => o.id !== id))
     } catch {
       toast.error('Erro ao remover.')
     }
@@ -691,20 +603,13 @@ export default function DjenPage() {
       return
     }
     try {
-      const res = await fetch(`${API_URL}/djen/publicacoes/${pub.id}/certidao`, {
-        headers: { Authorization: `Bearer ${token()}` },
-      })
-      if (res.ok) {
-        const blob = await res.blob()
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `certidao_djen_${pub.id}.pdf`
-        a.click()
-        URL.revokeObjectURL(url)
-      } else {
-        toast.error('Erro ao baixar certidão.')
-      }
+      const blob = await baixarCertidaoApi(pub.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certidao_djen_${pub.id}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
     } catch {
       toast.error('Erro de conexão.')
     }
