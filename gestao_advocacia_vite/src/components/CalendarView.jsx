@@ -7,7 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction' // Para interatividade
 import listPlugin from '@fullcalendar/list' // Para visualização em lista
 import bootstrap5Plugin from '@fullcalendar/bootstrap5' // Integração com Bootstrap 5
 import ptBrLocale from '@fullcalendar/core/locales/pt-br' // Importa o locale Português Brasil
-import { API_URL } from '../config' // Ajuste o caminho se necessário
+import { listEventos } from '../api/agenda.js'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 
@@ -23,16 +23,8 @@ function CalendarView() {
   const fetchEventsForCalendar = useCallback(async () => {
     setLoadingEvents(true)
     try {
-      // Busca todos os eventos. A API pode precisar de parâmetros para buscar eventos num range de datas visível.
-      // Para simplificar, vamos buscar todos por enquanto.
-      const response = await fetch(`${API_URL}/eventos?sort_by=data_inicio&order=asc`) // Pode adicionar mais filtros se necessário
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('CalendarView: Erro da API ao buscar eventos:', errorData)
-        throw new Error(errorData.erro || `Erro HTTP: ${response.status}`)
-      }
-      const data = await response.json()
-      const formattedEvents = (data.eventos || []).map((evento) => {
+      const eventos = await listEventos({ sort_by: 'data_inicio', order: 'asc' })
+      const formattedEvents = eventos.map((evento) => {
         // O FullCalendar espera datas no formato ISO string ou objetos Date.
         // A sua API já deve estar a retornar datas em formato ISO.
         let allDayEvent = false
@@ -88,7 +80,7 @@ function CalendarView() {
     } finally {
       setLoadingEvents(false)
     }
-  }, []) // API_URL como dependência se vier de contexto/props
+  }, [])
 
   useEffect(() => {
     fetchEventsForCalendar()

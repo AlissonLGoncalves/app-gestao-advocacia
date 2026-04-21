@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import EventoAgendaList from '../EventoAgendaList.jsx' // Ajuste o caminho se EventoAgendaList.jsx não estiver em src/
 import EventoAgendaForm from '../EventoAgendaForm.jsx' // Ajuste o caminho se EventoAgendaForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
-import { API_URL } from '../config.js' // Ajuste o caminho se config.js não estiver em src/
+import { getEvento } from '../api/agenda.js'
 
 function AgendaPage() {
   const navigate = useNavigate()
@@ -27,16 +27,7 @@ function AgendaPage() {
   useEffect(() => {
     if (modoFormulario === 'editar' && params.eventoId) {
       setLoadingItem(true)
-      fetch(`${API_URL}/eventos/${params.eventoId}`)
-        .then((response) => {
-          if (!response.ok) {
-            console.error(
-              `AgendaPage: Falha ao buscar evento ${params.eventoId}. Status: ${response.status}`
-            )
-            throw new Error('Falha ao buscar evento para edição.')
-          }
-          return response.json()
-        })
+      getEvento(params.eventoId)
         .then((data) => {
           setEventoParaEditar(data)
         })
