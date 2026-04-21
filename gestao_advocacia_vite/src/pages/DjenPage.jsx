@@ -1304,7 +1304,7 @@ export default function DjenPage() {
                       <thead className="table-light">
                         <tr>
                           <th className="small">OAB</th>
-                          <th className="small">Tribunal</th>
+                          <th className="small">UF</th>
                           <th className="small">Advogado</th>
                           <th className="small">Última sync</th>
                           <th className="small"></th>
@@ -1316,7 +1316,7 @@ export default function DjenPage() {
                             <td className="fw-semibold small">{o.numero_oab}</td>
                             <td className="small">
                               <span className="badge bg-secondary">
-                                {o.sigla_tribunal || o.uf_oab}
+                                {o.uf_oab || o.sigla_tribunal}
                               </span>
                             </td>
                             <td className="small text-muted">{o.nome_advogado || '—'}</td>
