@@ -598,7 +598,7 @@ class DjenOabMonitoramento(db.Model):
     )
     numero_oab = db.Column(db.String(30), nullable=False)
     uf_oab = db.Column(db.String(2), nullable=True)
-    sigla_tribunal = db.Column(db.String(20), nullable=True)  # ex: TRT9, TJPR, TST
+    sigla_tribunal = db.Column(db.String(120), nullable=True)
     nome_advogado = db.Column(db.String(200), nullable=True)
     ativo = db.Column(db.Boolean, default=True)
     ultima_sincronizacao = db.Column(db.DateTime, nullable=True)
