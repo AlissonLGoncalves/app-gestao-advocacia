@@ -608,16 +608,14 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
                 f"(tenant: {oab_mon.tenant_id})"
             )
             try:
-                sigla_tribunal = (
-                    oab_mon.sigla_tribunal
-                    if getattr(oab_mon, "sigla_tribunal", None)
-                    else _normalizar_sigla_tribunal(oab_mon.uf_oab)
-                )
                 numero_oab = _normalizar_numero_oab(oab_mon.numero_oab)
+                # Buscas por OAB não filtram por tribunal: a API retorna publicações de todos
+                # os tribunais quando apenas o número da OAB é informado, evitando perder
+                # publicações de cortes diferentes do tribunal de origem da carteira (ex: TRT, STJ).
                 if buscar_todos_tribunais:
                     data, items = _consultar_oab_em_todos_tribunais(
                         numero_oab=numero_oab,
-                        sigla_tribunal=sigla_tribunal,
+                        sigla_tribunal=None,
                         data_inicio=data_inicio,
                         data_fim=data_fim,
                         logger=logger,
@@ -626,7 +624,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
                 else:
                     data, items = _consultar_oab_com_fallback(
                         numero_oab=numero_oab,
-                        sigla_tribunal=sigla_tribunal,
+                        sigla_tribunal=None,
                         data_inicio=data_inicio,
                         data_fim=data_fim,
                         logger=logger,
