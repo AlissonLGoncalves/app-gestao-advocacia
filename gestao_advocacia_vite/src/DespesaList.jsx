@@ -1,6 +1,5 @@
 // src/DespesaList.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { API_URL } from './config.js'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -12,6 +11,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
+import { api } from './api/client.js'
+import { deleteDespesa, listDespesas } from './api/financeiro.js'
 
 function DespesaList({ onEditDespesa, refreshKey }) {
   const [despesas, setDespesas] = useState([])
@@ -34,28 +35,24 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   const [sortConfig, setSortConfig] = useState({ key: 'data_vencimento', direction: 'desc' })
 
   const fetchClientesECasosParaFiltro = useCallback(async () => {
-    const token = localStorage.getItem('token')
-    if (!token) {
+    const hasToken =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('auth_token')
+    if (!hasToken) {
       // Não é ideal mostrar toast aqui, pois o fetch principal também verificará
       console.warn('DespesaList: Token não encontrado para fetchClientesECasosParaFiltro.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
 
     try {
-      const clientesRes = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, {
-        headers: authHeaders,
-      })
-      if (!clientesRes.ok) throw new Error('Falha ao carregar clientes para filtro.')
-      const clientesData = await clientesRes.json()
+      const clientesData = await api.get('/clientes/?sort_by=nome_razao_social&order=asc')
       setClientes(clientesData.clientes || [])
-      let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`
+      let casosUrl = '/casos/?sort_by=titulo&order=asc'
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`
       }
-      const casosRes = await fetch(casosUrl, { headers: authHeaders })
-      if (!casosRes.ok) throw new Error('Falha ao carregar casos para filtro.')
-      const casosData = await casosRes.json()
+      const casosData = await api.get(casosUrl)
       setCasos(casosData.casos || [])
     } catch (err) {
       console.error('DespesaList: Erro ao buscar clientes/casos para filtro:', err)
@@ -67,46 +64,35 @@ function DespesaList({ onEditDespesa, refreshKey }) {
     setLoading(true)
     setError('')
 
-    const token = localStorage.getItem('token')
-    if (!token) {
+    const hasToken =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('auth_token')
+    if (!hasToken) {
       setError('Autenticação necessária. Por favor, faça login.')
       setLoading(false)
       toast.error('Sessão expirada ou inválida.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-
-    let url = `${API_URL}/despesas/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`
-    if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`
-
-    if (casoFilter) {
-      if (casoFilter === 'DESPESA_GERAL') {
-        url += `&caso_id=-1`
-      } else {
-        url += `&caso_id=${casoFilter}`
-      }
-    } else if (clienteFilter) {
-      // A filtragem de despesas por cliente é indireta através do caso selecionado.
-      // Se desejar filtrar despesas diretamente por cliente_id (incluindo gerais do cliente),
-      // a API precisaria de um parâmetro como `cliente_id_para_despesas=${clienteFilter}`.
-      // Por ora, o filtro de cliente apenas refina o dropdown de casos.
-    }
-
-    if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`
-    if (dataVencimentoInicio) url += `&data_vencimento_inicio=${dataVencimentoInicio}`
-    if (dataVencimentoFim) url += `&data_vencimento_fim=${dataVencimentoFim}`
-    if (dataDespesaInicio) url += `&data_despesa_inicio=${dataDespesaInicio}`
-    if (dataDespesaFim) url += `&data_despesa_fim=${dataDespesaFim}`
 
     try {
-      const response = await fetch(url, { headers: authHeaders })
-      if (!response.ok) {
-        const resData = await response.json().catch(() => ({}))
-        console.error('DespesaList: Erro da API ao buscar despesas:', resData)
-        throw new Error(resData.erro || `Erro HTTP: ${response.status} ao buscar despesas`)
+      const params = {
+        sort_by: sortConfig.key,
+        sort_order: sortConfig.direction,
+        search: searchTerm,
+        status: statusFilter,
+        data_vencimento_inicio: dataVencimentoInicio,
+        data_vencimento_fim: dataVencimentoFim,
+        data_despesa_inicio: dataDespesaInicio,
+        data_despesa_fim: dataDespesaFim,
       }
-      const data = await response.json()
-      setDespesas(data.despesas || [])
+
+      if (casoFilter) {
+        params.caso_id = casoFilter === 'DESPESA_GERAL' ? -1 : casoFilter
+      }
+
+      const data = await listDespesas(params)
+      setDespesas(data)
     } catch (err) {
       console.error('DespesaList: Erro detalhado ao buscar despesas:', err)
       setError(`Erro ao carregar despesas: ${err.message}`)
@@ -137,25 +123,20 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   }, [fetchDespesas, refreshKey])
 
   const handleDeleteClick = async (id) => {
-    const token = localStorage.getItem('token')
-    if (!token) {
+    const hasToken =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('auth_token')
+    if (!hasToken) {
       toast.error('Autenticação expirada. Faça login novamente.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
 
     if (window.confirm(`Tem certeza que deseja excluir a despesa ID ${id}?`)) {
       setDeletingId(id)
       setError(null)
       try {
-        const response = await fetch(`${API_URL}/despesas/${id}`, {
-          method: 'DELETE',
-          headers: authHeaders,
-        })
-        if (!response.ok) {
-          const resData = await response.json().catch(() => ({}))
-          throw new Error(resData.erro || `Erro HTTP: ${response.status}`)
-        }
+        await deleteDespesa(id)
         toast.success(`Despesa ID ${id} excluída com sucesso!`)
         fetchDespesas()
       } catch (err) {

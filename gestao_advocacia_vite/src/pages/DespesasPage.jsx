@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import DespesaList from '../DespesaList.jsx' // Ajuste o caminho se DespesaList.jsx não estiver em src/
 import DespesaForm from '../DespesaForm.jsx' // Ajuste o caminho se DespesaForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
-import { API_URL } from '../config.js' // Ajuste o caminho se config.js não estiver em src/
+import { getDespesa } from '../api/financeiro.js'
 
 function DespesasPage() {
   const navigate = useNavigate()
@@ -27,16 +27,7 @@ function DespesasPage() {
   useEffect(() => {
     if (modoFormulario === 'editar' && params.despesaId) {
       setLoadingItem(true)
-      fetch(`${API_URL}/despesas/${params.despesaId}`)
-        .then((response) => {
-          if (!response.ok) {
-            console.error(
-              `DespesasPage: Falha ao buscar despesa ${params.despesaId}. Status: ${response.status}`
-            )
-            throw new Error('Falha ao buscar despesa para edição.')
-          }
-          return response.json()
-        })
+      getDespesa(params.despesaId)
         .then((data) => {
           setDespesaParaEditar(data)
         })

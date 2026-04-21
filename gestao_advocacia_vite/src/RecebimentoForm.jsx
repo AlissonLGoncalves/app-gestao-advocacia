@@ -2,8 +2,9 @@
 // Formulário para adicionar e editar recebimentos, utilizando react-toastify.
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { API_URL } from './config.js'
 import { toast } from 'react-toastify'
+import { api } from './api/client.js'
+import { createRecebimento, updateRecebimento } from './api/financeiro.js'
 
 const initialState = {
   cliente_id: '',
@@ -30,9 +31,7 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
 
   const fetchClientes = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/clientes?sort_by=nome_razao_social&order=asc`)
-      if (!response.ok) throw new Error('Falha ao carregar clientes')
-      const data = await response.json()
+      const data = await api.get('/clientes?sort_by=nome_razao_social&order=asc')
       setClientes(Array.isArray(data) ? data : data.clientes || [])
     } catch (error) {
       toast.error(`Erro ao carregar clientes: ${error.message}`)
@@ -40,12 +39,10 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
   }, [])
 
   const fetchCasos = useCallback(async (clienteId = null) => {
-    let url = `${API_URL}/casos?sort_by=titulo&order=asc`
+    let url = '/casos?sort_by=titulo&order=asc'
     if (clienteId) url += `&cliente_id=${clienteId}`
     try {
-      const response = await fetch(url)
-      if (!response.ok) throw new Error('Falha ao carregar casos')
-      const data = await response.json()
+      const data = await api.get(url)
       setCasos(Array.isArray(data) ? data : data.casos || [])
     } catch (error) {
       toast.error(`Erro ao carregar casos: ${error.message}`)
@@ -125,20 +122,11 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
       data_recebimento: formData.data_recebimento || null,
     }
     try {
-      const url = isEditing
-        ? `${API_URL}/recebimentos/${recebimentoParaEditar.id}`
-        : `${API_URL}/recebimentos`
-      const method = isEditing ? 'PUT' : 'POST'
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dadosParaEnviar),
-      })
-      const responseData = await response.json()
-      if (!response.ok)
-        throw new Error(
-          responseData.erro || `Falha ao ${isEditing ? 'atualizar' : 'adicionar'} recebimento`
-        )
+      if (isEditing) {
+        await updateRecebimento(recebimentoParaEditar.id, dadosParaEnviar)
+      } else {
+        await createRecebimento(dadosParaEnviar)
+      }
       toast.success(`Recebimento ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`)
       if (typeof onRecebimentoChange === 'function') onRecebimentoChange()
       if (isEditing && typeof onCancel === 'function') onCancel()
