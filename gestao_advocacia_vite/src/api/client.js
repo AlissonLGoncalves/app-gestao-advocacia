@@ -32,10 +32,10 @@ async function throwIfError(res) {
   if (res.status === 401) handleUnauthorized()
   if (!res.ok) {
     const payload = await res.json().catch(() => ({ message: res.statusText }))
-    throw Object.assign(
-      new Error(payload.message || payload.erro || `HTTP ${res.status}`),
-      { status: res.status, payload },
-    )
+    throw Object.assign(new Error(payload.message || payload.erro || `HTTP ${res.status}`), {
+      status: res.status,
+      payload,
+    })
   }
 }
 
