@@ -1,6 +1,7 @@
 // src/Dashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from './config.js'
+import { listProximos } from './api/agenda.js'
 import MovimentacoesRecentes from './components/MovimentacoesRecentes.jsx'
 
 import {
@@ -164,7 +165,6 @@ function Dashboard({ mudarSecao }) {
         despesasAPagarValor: data.despesas_a_pagar?.valor_total ?? 0,
         despesasAPagarQtd: data.despesas_a_pagar?.quantidade ?? 0,
       })
-      setProximosEventos(data.proximos_eventos || [])
     } catch (error) {
       console.error('Dashboard: Erro ao carregar dados:', error)
       setErro(error.message || 'Ocorreu um erro ao carregar os dados do dashboard.')
@@ -173,9 +173,19 @@ function Dashboard({ mudarSecao }) {
     }
   }, [])
 
+  const fetchProximosEventos = useCallback(async () => {
+    try {
+      const eventos = await listProximos(7)
+      setProximosEventos(eventos)
+    } catch (error) {
+      console.error('Dashboard: Erro ao carregar próximos eventos:', error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchDashboardData()
-  }, [fetchDashboardData])
+    fetchProximosEventos()
+  }, [fetchDashboardData, fetchProximosEventos])
 
   if (loading) {
     return (

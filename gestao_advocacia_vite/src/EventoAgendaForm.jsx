@@ -1,6 +1,7 @@
 // src/EventoAgendaForm.jsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from './config.js'
+import { createEvento, updateEvento } from './api/agenda.js'
 import { toast } from 'react-toastify'
 import { useLocation } from 'react-router-dom'
 
@@ -55,47 +56,50 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
     setValidationErrors({})
   }, [])
 
-  const fetchClientes = useCallback(async () => {
+  const requestJson = useCallback(async (path) => {
     const token = localStorage.getItem('token')
     if (!token) {
-      toast.warn('Sessão não encontrada para carregar clientes.')
-      return
+      throw new Error('Sessão não encontrada. Faça login novamente.')
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
+
+    const response = await fetch(`${API_URL}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(payload?.erro || `Erro HTTP: ${response.status}`)
+    }
+
+    return payload
+  }, [])
+
+  const fetchClientes = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, {
-        headers: authHeaders,
-      })
-      if (!response.ok) throw new Error('Falha ao carregar clientes')
-      const data = await response.json()
+      const data = await requestJson('/clientes/?sort_by=nome_razao_social&order=asc')
       setClientes(Array.isArray(data) ? data : data.clientes || [])
     } catch (error) {
       console.error('EventoAgendaForm: Erro ao buscar clientes:', error)
       toast.error(`Erro ao carregar clientes: ${error.message}`)
     }
-  }, [])
+  }, [requestJson])
 
-  const fetchCasos = useCallback(async (clienteId = null) => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      toast.warn('Sessão não encontrada para carregar casos.')
-      return
-    }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-    let url = `${API_URL}/casos/?sort_by=titulo&order=asc`
-    if (clienteId) {
-      url += `&cliente_id=${clienteId}`
-    }
-    try {
-      const response = await fetch(url, { headers: authHeaders })
-      if (!response.ok) throw new Error('Falha ao carregar casos')
-      const data = await response.json()
-      setCasos(Array.isArray(data) ? data : data.casos || [])
-    } catch (error) {
-      console.error('EventoAgendaForm: Erro ao buscar casos:', error)
-      toast.error(`Erro ao carregar casos: ${error.message}`)
-    }
-  }, [])
+  const fetchCasos = useCallback(
+    async (clienteId = null) => {
+      let url = `${API_URL}/casos/?sort_by=titulo&order=asc`
+      if (clienteId) {
+        url += `&cliente_id=${clienteId}`
+      }
+      try {
+        const data = await requestJson(url.replace(API_URL, ''))
+        setCasos(Array.isArray(data) ? data : data.casos || [])
+      } catch (error) {
+        console.error('EventoAgendaForm: Erro ao buscar casos:', error)
+        toast.error(`Erro ao carregar casos: ${error.message}`)
+      }
+    },
+    [requestJson]
+  )
 
   useEffect(() => {
     fetchClientes()
@@ -117,26 +121,18 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
         if (casoOriginal && casoOriginal.cliente_id) {
           setSelectedClienteId(String(casoOriginal.cliente_id))
         } else {
-          const token = localStorage.getItem('token')
-          if (token) {
-            fetch(`${API_URL}/casos/${dadosEdit.caso_id}`, {
-              headers: { Authorization: `Bearer ${token}` },
+          requestJson(`/casos/${dadosEdit.caso_id}`)
+            .then((casoData) => {
+              if (casoData && casoData.cliente_id) {
+                setSelectedClienteId(String(casoData.cliente_id))
+              }
             })
-              .then((res) =>
-                res.ok ? res.json() : Promise.reject('Caso não encontrado para o evento')
+            .catch((err) =>
+              console.warn(
+                'EventoAgendaForm: Não foi possível determinar o cliente do caso para edição do evento.',
+                err
               )
-              .then((casoData) => {
-                if (casoData && casoData.cliente_id) {
-                  setSelectedClienteId(String(casoData.cliente_id))
-                }
-              })
-              .catch((err) =>
-                console.warn(
-                  'EventoAgendaForm: Não foi possível determinar o cliente do caso para edição do evento.',
-                  err
-                )
-              )
-          }
+            )
         }
       } else {
         setSelectedClienteId('')
@@ -154,7 +150,7 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       setIsEditing(false)
       setSelectedClienteId('')
     }
-  }, [eventoParaEditar, clearValidationErrors, location.state])
+  }, [eventoParaEditar, clearValidationErrors, location.state, requestJson])
 
   useEffect(() => {
     fetchCasos(selectedClienteId || null)
@@ -214,16 +210,6 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       return
     }
     setLoading(true)
-    const token = localStorage.getItem('token')
-    if (!token) {
-      toast.error('Autenticação necessária para salvar. Faça login.')
-      setLoading(false)
-      return
-    }
-    const authHeaders = {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    }
 
     const dataInicioISO = formData.data_inicio ? new Date(formData.data_inicio).toISOString() : null
     const dataFimISO = formData.data_fim ? new Date(formData.data_fim).toISOString() : null
@@ -236,20 +222,10 @@ function EventoAgendaForm({ eventoParaEditar, onEventoChange, onCancel }) {
       concluido: formData.concluido || false,
     }
     try {
-      const url = isEditing ? `${API_URL}/eventos/${eventoParaEditar.id}` : `${API_URL}/eventos/` // Barra final para POST
-      const method = isEditing ? 'PUT' : 'POST'
-      const response = await fetch(url, {
-        method,
-        headers: authHeaders,
-        body: JSON.stringify(dadosParaEnviar),
-      })
-      const responseData = await response.json()
-      if (!response.ok) {
-        console.error('EventoAgendaForm: Erro da API:', responseData)
-        throw new Error(
-          responseData.erro ||
-            `Falha ao ${isEditing ? 'atualizar' : 'adicionar'} evento. Status: ${response.status}`
-        )
+      if (isEditing) {
+        await updateEvento(eventoParaEditar.id, dadosParaEnviar)
+      } else {
+        await createEvento(dadosParaEnviar)
       }
       toast.success(`Evento/Prazo ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`)
       if (typeof onEventoChange === 'function') {

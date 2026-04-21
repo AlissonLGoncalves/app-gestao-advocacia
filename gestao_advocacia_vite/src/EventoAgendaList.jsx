@@ -1,6 +1,7 @@
 ﻿// src/EventoAgendaList.jsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from './config.js'
+import { deleteEvento, listEventos, updateEvento } from './api/agenda.js'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -37,77 +38,66 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
 
   const tipoEventoOptions = ['Prazo', 'Audiência', 'Reunião', 'Lembrete', 'Outro']
 
-  const fetchClientesECasosParaFiltro = useCallback(async () => {
+  const requestJson = useCallback(async (path) => {
     const token = localStorage.getItem('token')
     if (!token) {
-      console.warn('EventoAgendaList: Token não encontrado para fetchClientesECasosParaFiltro.')
-      return
+      throw new Error('Sessão expirada ou inválida.')
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
 
+    const response = await fetch(`${API_URL}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const payload = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(payload?.erro || `Erro HTTP: ${response.status}`)
+    }
+
+    return payload
+  }, [])
+
+  const fetchClientesECasosParaFiltro = useCallback(async () => {
     try {
-      const clientesRes = await fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, {
-        headers: authHeaders,
-      })
-      if (!clientesRes.ok) throw new Error('Falha ao carregar clientes para filtro.')
-      const clientesData = await clientesRes.json()
+      const clientesData = await requestJson('/clientes/?sort_by=nome_razao_social&order=asc')
       setClientes(clientesData.clientes || [])
       let casosUrl = `${API_URL}/casos/?sort_by=titulo&order=asc`
       if (clienteFilter) {
         casosUrl += `&cliente_id=${clienteFilter}`
       }
-      const casosRes = await fetch(casosUrl, { headers: authHeaders })
-      if (!casosRes.ok) throw new Error('Falha ao carregar casos para filtro.')
-      const casosData = await casosRes.json()
+      const casosData = await requestJson(casosUrl.replace(API_URL, ''))
       setCasos(casosData.casos || [])
     } catch (err) {
       console.error('EventoAgendaList: Erro ao buscar clientes/casos para filtro:', err)
       toast.error(`Erro ao carregar dados para filtros da agenda: ${err.message}`)
     }
-  }, [clienteFilter])
+  }, [clienteFilter, requestJson])
 
   const fetchEventos = useCallback(async () => {
     setLoading(true)
     setError('')
 
-    const token = localStorage.getItem('token')
-    if (!token) {
-      setError('Autenticação necessária. Por favor, faça login.')
-      setLoading(false)
-      toast.error('Sessão expirada ou inválida.')
-      return
-    }
-    const authHeaders = { Authorization: `Bearer ${token}` }
-
-    let url = `${API_URL}/eventos/?sort_by=${sortConfig.key}&sort_order=${sortConfig.direction}`
-
-    if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`
-    if (tipoEventoFilter) url += `&tipo_evento=${encodeURIComponent(tipoEventoFilter)}`
-
-    if (casoFilter) {
-      if (casoFilter === 'EVENTO_GERAL') {
-        url += `&caso_id=-1`
-      } else {
-        url += `&caso_id=${casoFilter}`
-      }
-    }
-    // Não há filtro direto por cliente_id para eventos, apenas indireto por caso.
-
-    if (statusConclusaoFilter === 'concluido') url += `&concluido=true`
-    if (statusConclusaoFilter === 'pendente') url += `&concluido=false`
-
-    if (dataInicioRangeStart) url += `&data_inicio_gte=${dataInicioRangeStart}`
-    if (dataInicioRangeEnd) url += `&data_inicio_lte=${dataInicioRangeEnd}`
-
     try {
-      const response = await fetch(url, { headers: authHeaders })
-      if (!response.ok) {
-        const resData = await response.json().catch(() => ({}))
-        console.error('EventoAgendaList: Erro da API ao buscar eventos:', resData)
-        throw new Error(resData.erro || `Erro HTTP: ${response.status} ao buscar eventos`)
+      const params = {
+        sort_by: sortConfig.key,
+        sort_order: sortConfig.direction,
+        search: searchTerm || undefined,
+        tipo_evento: tipoEventoFilter || undefined,
+        concluido:
+          statusConclusaoFilter === 'concluido'
+            ? true
+            : statusConclusaoFilter === 'pendente'
+              ? false
+              : undefined,
+        data_inicio_gte: dataInicioRangeStart || undefined,
+        data_inicio_lte: dataInicioRangeEnd || undefined,
       }
-      const data = await response.json()
-      setEventos(data.eventos || [])
+
+      if (casoFilter) {
+        params.caso_id = casoFilter === 'EVENTO_GERAL' ? -1 : casoFilter
+      }
+
+      const eventosData = await listEventos(params)
+      setEventos(eventosData)
     } catch (err) {
       console.error('EventoAgendaList: Erro detalhado ao buscar eventos:', err)
       setError(`Erro ao carregar eventos: ${err.message}`)
@@ -119,7 +109,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
     }
   }, [
     searchTerm,
-    clienteFilter,
     casoFilter,
     tipoEventoFilter,
     statusConclusaoFilter,
@@ -142,20 +131,12 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       toast.error('Autenticação expirada. Faça login novamente.')
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
 
     if (window.confirm(`Tem certeza que deseja excluir o evento/prazo ID ${id}?`)) {
       setDeletingId(id)
       setError(null)
       try {
-        const response = await fetch(`${API_URL}/eventos/${id}`, {
-          method: 'DELETE',
-          headers: authHeaders,
-        })
-        if (!response.ok) {
-          const resData = await response.json().catch(() => ({}))
-          throw new Error(resData.erro || `Erro HTTP: ${response.status}`)
-        }
+        await deleteEvento(id)
         toast.success(`Evento ID ${id} excluído com sucesso!`)
         fetchEventos()
       } catch (err) {
@@ -174,10 +155,6 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       toast.error('Autenticação expirada. Faça login novamente.')
       return
     }
-    const authHeaders = {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    }
     setTogglingId(evento.id)
     setError(null)
 
@@ -192,16 +169,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       caso_id: evento.caso_id,
     }
     try {
-      const response = await fetch(`${API_URL}/eventos/${evento.id}`, {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify(dadosAtualizados),
-      })
-      if (!response.ok) {
-        const resData = await response.json().catch(() => ({}))
-        console.error('EventoAgendaList: Erro da API ao atualizar status:', resData)
-        throw new Error(resData.erro || `Erro HTTP: ${response.status} ao atualizar status`)
-      }
+      await updateEvento(evento.id, dadosAtualizados)
       toast.success(`Status do evento ID ${evento.id} atualizado!`)
       fetchEventos()
     } catch (err) {
