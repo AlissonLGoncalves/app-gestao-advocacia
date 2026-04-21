@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import ClienteList from '../ClienteList.jsx' // Ajuste o caminho se ClienteList.jsx não estiver em src/
 import ClienteForm from '../ClienteForm.jsx' // Ajuste o caminho se ClienteForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
-import { API_URL } from '../config.js' // Ajuste o caminho se config.js não estiver em src/
+import { getCliente } from '../api/clientes.js'
 
 function ClientesPage() {
   const navigate = useNavigate()
@@ -27,22 +27,8 @@ function ClientesPage() {
   useEffect(() => {
     if (modoFormulario === 'editar' && params.clienteId) {
       setLoadingItem(true)
-      const token = localStorage.getItem('token')
-      fetch(`${API_URL}/clientes/${params.clienteId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((response) => {
-          if (!response.ok) {
-            console.error(
-              `ClientesPage: Falha ao buscar cliente ${params.clienteId}. Status: ${response.status}`
-            )
-            throw new Error('Falha ao buscar cliente para edição.')
-          }
-          return response.json()
-        })
-        .then((data) => {
-          setClienteParaEditar(data)
-        })
+      getCliente(params.clienteId)
+        .then((data) => setClienteParaEditar(data))
         .catch((error) => {
           console.error('ClientesPage: Erro ao buscar cliente:', error)
           // Adicionar feedback para o usuário, ex: toast

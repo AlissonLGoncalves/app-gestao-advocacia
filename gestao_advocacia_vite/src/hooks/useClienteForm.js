@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { toast } from 'react-toastify'
-import { API_URL } from '../config.js'
+import { createCliente, updateCliente } from '../api/clientes.js'
 
 function useClienteForm({ formData, isEditing, clienteParaEditar, onClienteChange, setLoading }) {
   const [validationErrors, setValidationErrors] = useState({})
@@ -103,23 +103,10 @@ function useClienteForm({ formData, isEditing, clienteParaEditar, onClienteChang
       }
 
       try {
-        const url = isEditing
-          ? `${API_URL}/clientes/${clienteParaEditar.id}`
-          : `${API_URL}/clientes`
-        const method = isEditing ? 'PUT' : 'POST'
-        const token = localStorage.getItem('token')
-        const response = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(dadosParaEnviar),
-        })
-
-        const responseData = await response.json()
-        if (!response.ok) {
-          throw new Error(
-            responseData.erro ||
-              `Falha ao ${isEditing ? 'atualizar' : 'adicionar'} cliente. Status: ${response.status}`
-          )
+        if (isEditing) {
+          await updateCliente(clienteParaEditar.id, dadosParaEnviar)
+        } else {
+          await createCliente(dadosParaEnviar)
         }
 
         toast.success(`Cliente ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`)

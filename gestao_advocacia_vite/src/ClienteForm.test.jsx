@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import ClienteForm from './ClienteForm.jsx'
+import { createCliente, extrairDadosDocumentoCliente } from './api/clientes.js'
 
 const { toastMock } = vi.hoisted(() => ({
   toastMock: {
@@ -20,15 +21,19 @@ vi.mock('./components/DocumentosClienteTab.jsx', () => ({
   default: () => <div data-testid="documentos-cliente-tab" />,
 }))
 
+vi.mock('./api/clientes.js', () => ({
+  createCliente: vi.fn(),
+  updateCliente: vi.fn(),
+  extrairDadosDocumentoCliente: vi.fn(),
+  anonimizarCliente: vi.fn(),
+}))
+
 describe('ClienteForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    globalThis.fetch = vi.fn((url) => {
-      if (String(url).includes('/clientes/?sort_by=')) {
-        return Promise.resolve({ ok: true, json: async () => [] })
-      }
-      return Promise.resolve({ ok: true, json: async () => ({ id: 10 }) })
-    })
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({}) }))
+    createCliente.mockResolvedValue({ id: 10 })
+    extrairDadosDocumentoCliente.mockResolvedValue({})
     localStorage.setItem('token', 'token-teste')
   })
 
@@ -51,10 +56,7 @@ describe('ClienteForm', () => {
       expect(toastMock.error).toHaveBeenCalled()
     })
 
-    const calls = globalThis.fetch.mock.calls.filter(
-      ([url]) => !String(url).includes('/clientes/?sort_by=')
-    )
-    expect(calls.length).toBe(0)
+    expect(createCliente).not.toHaveBeenCalled()
   })
 
   it('envia com sucesso quando formulario e valido', async () => {
@@ -74,16 +76,7 @@ describe('ClienteForm', () => {
   })
 
   it('exibe erro quando API retorna falha', async () => {
-    globalThis.fetch = vi.fn((url) => {
-      if (String(url).includes('/clientes/?sort_by=')) {
-        return Promise.resolve({ ok: true, json: async () => [] })
-      }
-      return Promise.resolve({
-        ok: false,
-        status: 500,
-        json: async () => ({ erro: 'falha interna' }),
-      })
-    })
+    createCliente.mockRejectedValue(new Error('falha interna'))
 
     render(<ClienteForm onClienteChange={vi.fn()} />)
 
@@ -99,22 +92,11 @@ describe('ClienteForm', () => {
   })
 
   it('seleciona PJ automaticamente e preenche CNPJ quando OCR retorna CNPJ', async () => {
-    globalThis.fetch = vi.fn((url) => {
-      if (String(url).includes('/clientes/extrair-dados-doc')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            cnpj: '12.345.678/0001-90',
-            documento_principal: '12.345.678/0001-90',
-            tipo_pessoa_sugerida: 'PJ',
-            nome_razao_social: 'Empresa XPTO LTDA',
-          }),
-        })
-      }
-      if (String(url).includes('/clientes/?sort_by=')) {
-        return Promise.resolve({ ok: true, json: async () => [] })
-      }
-      return Promise.resolve({ ok: true, json: async () => ({ id: 10 }) })
+    extrairDadosDocumentoCliente.mockResolvedValue({
+      cnpj: '12.345.678/0001-90',
+      documento_principal: '12.345.678/0001-90',
+      tipo_pessoa_sugerida: 'PJ',
+      nome_razao_social: 'Empresa XPTO LTDA',
     })
 
     const { container } = render(<ClienteForm onClienteChange={vi.fn()} />)
