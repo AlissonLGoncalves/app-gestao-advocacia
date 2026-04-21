@@ -609,7 +609,12 @@ def registrar_rotas_djen(
 
             numero_proc = request.args.get("numero_processo")
             if numero_proc:
-                q = q.filter(PublicacaoDJEN.numero_processo.ilike(f"%{numero_proc}%"))
+                q = q.filter(
+                    db.or_(
+                        PublicacaoDJEN.numero_processo.ilike(f"%{numero_proc}%"),
+                        PublicacaoDJEN.texto.ilike(f"%{numero_proc}%"),
+                    )
+                )
 
             origem = request.args.get("origem")
             if origem:
