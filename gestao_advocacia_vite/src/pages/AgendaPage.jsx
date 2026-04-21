@@ -1,20 +1,22 @@
-﻿// src/pages/AgendaPage.jsx
 import React, { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import EventoAgendaList from '../EventoAgendaList.jsx' // Ajuste o caminho se EventoAgendaList.jsx não estiver em src/
-import EventoAgendaForm from '../EventoAgendaForm.jsx' // Ajuste o caminho se EventoAgendaForm.jsx não estiver em src/
-import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
+import EventoAgendaList from '../EventoAgendaList.jsx'
+import EventoAgendaForm from '../EventoAgendaForm.jsx'
+import CalendarView from '../components/CalendarView.jsx'
 import { getEvento } from '../api/agenda.js'
+import { CalendarDaysIcon, ListBulletIcon, PlusIcon } from '@heroicons/react/24/outline'
 
 function AgendaPage() {
   const navigate = useNavigate()
-  const params = useParams() // Para pegar :eventoId da URL
-  const location = useLocation() // Para verificar a rota atual e determinar o modo
-  const [refreshKey, setRefreshKey] = useState(0) // Para forçar a atualização da lista
+  const params = useParams()
+  const location = useLocation()
+  const [refreshKey, setRefreshKey] = useState(0)
   const [eventoParaEditar, setEventoParaEditar] = useState(null)
-  const [loadingItem, setLoadingItem] = useState(false) // Estado para carregamento do item para edição
+  const [loadingItem, setLoadingItem] = useState(false)
+  const [viewMode, setViewMode] = useState(
+    () => localStorage.getItem('agenda_view') || 'calendario'
+  )
 
-  // Determina se o formulário deve ser mostrado e em qual modo com base na URL
   const urlPath = location.pathname.toLowerCase()
   const mostrarFormulario =
     urlPath.includes('/agenda/novo') || urlPath.startsWith('/agenda/editar/')
@@ -23,48 +25,44 @@ function AgendaPage() {
     : urlPath.startsWith('/agenda/editar/')
       ? 'editar'
       : null
-  // Busca dados do evento para edição se estiver no modo de edição e eventoId estiver presente
+
   useEffect(() => {
     if (modoFormulario === 'editar' && params.eventoId) {
       setLoadingItem(true)
       getEvento(params.eventoId)
-        .then((data) => {
-          setEventoParaEditar(data)
-        })
-        .catch((error) => {
-          console.error('AgendaPage: Erro ao buscar evento:', error)
-          navigate('/agenda') // Volta para a lista em caso de erro
-        })
-        .finally(() => {
-          setLoadingItem(false)
-        })
+        .then((data) => setEventoParaEditar(data))
+        .catch(() => navigate('/agenda'))
+        .finally(() => setLoadingItem(false))
     } else if (modoFormulario === 'novo') {
-      setEventoParaEditar(null) // Garante que não há dados de edição anteriores
+      setEventoParaEditar(null)
     }
   }, [modoFormulario, params.eventoId, navigate])
 
   const handleAdicionarClick = () => {
-    setEventoParaEditar(null) // Limpa qualquer estado de edição anterior
+    setEventoParaEditar(null)
     navigate('/agenda/novo')
   }
 
-  const handleEditarEvento = (evento) => {
-    navigate(`/agenda/editar/${evento.id}`)
-  }
+  const handleEditarEvento = (evento) => navigate(`/agenda/editar/${evento.id}`)
 
   const handleFormularioFechado = useCallback(() => {
-    setRefreshKey((prevKey) => prevKey + 1)
-    setEventoParaEditar(null) // Limpa o estado de edição
-    navigate('/agenda') // Volta para a lista após fechar/salvar o formulário
+    setRefreshKey((k) => k + 1)
+    setEventoParaEditar(null)
+    navigate('/agenda')
   }, [navigate])
+
+  const handleViewChange = (mode) => {
+    setViewMode(mode)
+    localStorage.setItem('agenda_view', mode)
+  }
 
   if (loadingItem && modoFormulario === 'editar') {
     return (
       <div className="d-flex justify-content-center align-items-center p-5">
         <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">A carregar evento...</span>
+          <span className="visually-hidden">Carregando evento...</span>
         </div>
-        <span className="ms-3 text-muted">A carregar dados do evento...</span>
+        <span className="ms-3 text-muted">Carregando dados do evento...</span>
       </div>
     )
   }
@@ -72,7 +70,7 @@ function AgendaPage() {
   if (mostrarFormulario) {
     return (
       <EventoAgendaForm
-        eventoParaEditar={eventoParaEditar} // Se for novo, será null
+        eventoParaEditar={eventoParaEditar}
         onEventoChange={handleFormularioFechado}
         onCancel={() => {
           setEventoParaEditar(null)
@@ -81,11 +79,56 @@ function AgendaPage() {
       />
     )
   }
+
   return (
-    <>
-      <BotaoAdicionar texto="Adicionar Novo Evento" onClick={handleAdicionarClick} />
-      <EventoAgendaList key={refreshKey} onEditEvento={handleEditarEvento} />
-    </>
+    <div className="container-fluid py-3 px-3 px-lg-4">
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <div
+          className="btn-group shadow-sm"
+          role="group"
+          aria-label="Modo de visualização da agenda"
+        >
+          <button
+            type="button"
+            className={`btn btn-sm ${viewMode === 'calendario' ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => handleViewChange('calendario')}
+          >
+            <CalendarDaysIcon
+              style={{ width: 15, height: 15, display: 'inline', marginRight: 5, marginBottom: 2 }}
+            />
+            Calendário
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${viewMode === 'lista' ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => handleViewChange('lista')}
+          >
+            <ListBulletIcon
+              style={{ width: 15, height: 15, display: 'inline', marginRight: 5, marginBottom: 2 }}
+            />
+            Lista
+          </button>
+        </div>
+
+        {viewMode === 'lista' && (
+          <button
+            className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm"
+            onClick={handleAdicionarClick}
+          >
+            <PlusIcon
+              style={{ width: 15, height: 15, display: 'inline', marginRight: 4, marginBottom: 2 }}
+            />
+            Novo Evento
+          </button>
+        )}
+      </div>
+
+      {viewMode === 'calendario' ? (
+        <CalendarView key={refreshKey} />
+      ) : (
+        <EventoAgendaList key={refreshKey} onEditEvento={handleEditarEvento} />
+      )}
+    </div>
   )
 }
 

@@ -8,13 +8,17 @@ import {
   ArrowsUpDownIcon,
   FunnelIcon,
   DocumentArrowDownIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
 import { api } from './api/client.js'
 import { deleteRecebimento, listRecebimentos } from './api/financeiro.js'
+import { useConfirm } from './hooks/useConfirm.jsx'
+import EmptyState from './components/EmptyState.jsx'
 
 function RecebimentoList({ onEditRecebimento, refreshKey }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [recebimentos, setRecebimentos] = useState([])
   const [clientes, setClientes] = useState([])
   const [casos, setCasos] = useState([])
@@ -125,7 +129,11 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
       return
     }
 
-    if (window.confirm(`Tem certeza que deseja excluir o recebimento ID ${id}?`)) {
+    const ok = await confirm(
+      `Tem certeza que deseja excluir o recebimento ID ${id}?`,
+      'Excluir recebimento'
+    )
+    if (ok) {
       setDeletingId(id)
       setError(null)
       try {
@@ -247,6 +255,7 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
 
   return (
     <div className="card shadow-sm">
+      {ConfirmDialog}
       <div className="card-header bg-light p-3">
         <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
           <h6 className="mb-0 text-secondary me-3">Filtros e Busca de Recebimentos</h6>
@@ -464,8 +473,26 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
             )}
             {!loading && recebimentos.length === 0 && !error && (
               <tr>
-                <td colSpan="8" className="text-center text-muted p-4">
-                  Nenhum recebimento encontrado.
+                <td colSpan="8">
+                  <EmptyState
+                    icon={CurrencyDollarIcon}
+                    title="Nenhum recebimento registrado"
+                    description="Registre honorários, parcelas e outros recebimentos do escritório."
+                    actionLabel="Novo Recebimento"
+                    onAction={() => onEditRecebimento(null)}
+                    filtered={
+                      !!(
+                        searchTerm ||
+                        clienteFilter ||
+                        statusFilter ||
+                        dataVencimentoInicio ||
+                        dataVencimentoFim ||
+                        dataRecebimentoInicio ||
+                        dataRecebimentoFim
+                      )
+                    }
+                    onClearFilters={resetFilters}
+                  />
                 </td>
               </tr>
             )}

@@ -29,7 +29,8 @@ function LoginPage() {
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('access_token', data.access_token)
       localStorage.setItem('user', JSON.stringify(data.user))
-      toast.success('Login bem-sucedido! Redirecionando...')
+      const nome = data.user?.nome_completo || data.user?.username || 'advogado'
+      toast.success(`Bem-vindo, ${nome}! ✓`)
       navigate('/dashboard')
     } catch (error) {
       console.error('Erro ao tentar fazer login:', error)

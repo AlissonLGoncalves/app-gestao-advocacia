@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
+import { useConfirm } from '../hooks/useConfirm.jsx'
 import {
   DocumentCurrencyDollarIcon,
   PlusIcon,
@@ -9,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline' // Ajustado o ícone CurrencyDollarIcon no HeroIcons V2 é apenas CurrencyDollarIcon mas deixei Document pro arquivo
 
 function HonorariosCasoCard({ casoId, clienteId }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [contratos, setContratos] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
@@ -122,12 +124,11 @@ function HonorariosCasoCard({ casoId, clienteId }) {
   }
 
   const handleDelete = async (contratoId) => {
-    if (
-      !window.confirm(
-        'Certeza que deseja deletar este contrato? As parcelas baseadas nele nas Despesas permanecerão intactas.'
-      )
+    const ok = await confirm(
+      'Certeza que deseja deletar este contrato? As parcelas baseadas nele nas Despesas permanecerão intactas.',
+      'Excluir contrato'
     )
-      return
+    if (!ok) return
     const token = localStorage.getItem('token')
     try {
       const res = await fetch(`${API_URL}/contratos/${contratoId}`, {
@@ -147,6 +148,7 @@ function HonorariosCasoCard({ casoId, clienteId }) {
 
   return (
     <div className="card shadow-lg mb-4 border-0 rounded-lg">
+      {ConfirmDialog}
       <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center">
         <h5 className="card-title mb-0 text-primary fw-bold">Gestão de Honorários</h5>
         <button className="btn btn-sm btn-primary" onClick={() => setIsCreating(!isCreating)}>

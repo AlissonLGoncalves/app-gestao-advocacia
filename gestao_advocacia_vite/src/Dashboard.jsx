@@ -2,7 +2,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from './config.js'
 import { listProximos } from './api/agenda.js'
+import { syncDjen } from './api/djen.js'
 import MovimentacoesRecentes from './components/MovimentacoesRecentes.jsx'
+import { useNavigate } from 'react-router-dom'
 
 import {
   UsersIcon as UsersIconSolid,
@@ -12,9 +14,21 @@ import {
   ClockIcon as PrazoIconSolid,
   CalendarDaysIcon as EventoIconSolid,
 } from '@heroicons/react/24/solid'
-import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import {
+  ChevronRightIcon,
+  MagnifyingGlassIcon,
+  NewspaperIcon,
+  ExclamationTriangleIcon,
+  CalendarDaysIcon,
+  ArrowPathIcon,
+} from '@heroicons/react/24/outline'
 import { formatCNJ } from './utils/cnj.js'
 import { getResumoFinanceiro } from './api/financeiro.js'
+
+const hojeLocal = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const StatCard = ({
   title,
@@ -126,6 +140,7 @@ const EventListItem = ({ evento, onClick }) => {
 }
 
 function Dashboard({ mudarSecao }) {
+  const navigate = useNavigate()
   const [stats, setStats] = useState({
     totalClientes: undefined,
     casosAtivos: undefined,
@@ -133,12 +148,15 @@ function Dashboard({ mudarSecao }) {
     recebimentosPendentesQtd: 0,
     despesasAPagarValor: 0,
     despesasAPagarQtd: 0,
+    djenPendentesTriagem: 0,
+    djenNaoLidas: 0,
   })
   const [proximosEventos, setProximosEventos] = useState([])
+  const [tarefasAlerta, setTarefasAlerta] = useState({ vencidas: 0, vencendoHoje: 0 })
+  const [syncing, setSyncing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
 
-  // Estados do Widget de Consulta Rápida
   const [consultaCnjInput, setConsultaCnjInput] = useState('')
   const [buscandoConsulta, setBuscandoConsulta] = useState(false)
   const [resultadoConsulta, setResultadoConsulta] = useState(null)
@@ -164,6 +182,8 @@ function Dashboard({ mudarSecao }) {
         recebimentosPendentesQtd: data.recebimentos_pendentes?.quantidade ?? 0,
         despesasAPagarValor: data.despesas_a_pagar?.valor_total ?? 0,
         despesasAPagarQtd: data.despesas_a_pagar?.quantidade ?? 0,
+        djenPendentesTriagem: data.alertas_djen?.pendentes_triagem ?? 0,
+        djenNaoLidas: data.alertas_djen?.nao_lidas ?? 0,
       })
     } catch (error) {
       console.error('Dashboard: Erro ao carregar dados:', error)
@@ -182,10 +202,50 @@ function Dashboard({ mudarSecao }) {
     }
   }, [])
 
+  const fetchTarefasAlerta = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      const res = await fetch(`${API_URL}/tarefas`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) return
+      const tarefas = await res.json()
+      const hoje = hojeLocal()
+      const vencidas = tarefas.filter(
+        (t) => t.data_vencimento && t.data_vencimento < hoje && t.status !== 'Concluído'
+      ).length
+      const vencendoHoje = tarefas.filter(
+        (t) => t.data_vencimento && t.data_vencimento === hoje && t.status !== 'Concluído'
+      ).length
+      setTarefasAlerta({ vencidas, vencendoHoje })
+    } catch {
+      // silently ignore
+    }
+  }, [])
+
+  const triggerDjenSync = useCallback(async () => {
+    const hoje = hojeLocal()
+    if (sessionStorage.getItem('djen_synced_date') === hoje) return
+
+    setSyncing(true)
+    try {
+      await syncDjen(1)
+      sessionStorage.setItem('djen_synced_date', hoje)
+      await fetchDashboardData()
+    } catch {
+      // silently ignore sync failures
+    } finally {
+      setSyncing(false)
+    }
+  }, [fetchDashboardData])
+
   useEffect(() => {
     fetchDashboardData()
     fetchProximosEventos()
-  }, [fetchDashboardData, fetchProximosEventos])
+    fetchTarefasAlerta()
+    triggerDjenSync()
+  }, [fetchDashboardData, fetchProximosEventos, fetchTarefasAlerta, triggerDjenSync])
 
   if (loading) {
     return (
@@ -224,6 +284,18 @@ function Dashboard({ mudarSecao }) {
       mudarSecao(secaoConstante)
     }
   }
+
+  const hoje = hojeLocal()
+  const eventosHoje = proximosEventos.filter(
+    (ev) => ev.data_inicio && ev.data_inicio.startsWith(hoje)
+  )
+
+  const temBriefing =
+    stats.djenPendentesTriagem > 0 ||
+    tarefasAlerta.vencidas > 0 ||
+    tarefasAlerta.vencendoHoje > 0 ||
+    eventosHoje.length > 0 ||
+    syncing
 
   const handleConsultaRapida = async () => {
     const limpo = consultaCnjInput.replace(/\D/g, '')
@@ -275,6 +347,95 @@ function Dashboard({ mudarSecao }) {
 
   return (
     <div className="container-fluid p-0">
+      {/* ── Briefing do Dia ─────────────────────────────────────────────────── */}
+      {temBriefing && (
+        <div className="row mb-4 g-0">
+          <div className="col-12">
+            <div
+              className="card border-0 shadow-sm"
+              style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid #f59e0b' }}
+            >
+              <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                <h6 className="mb-0 fw-bold" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Atenção — Hoje
+                </h6>
+                {syncing && (
+                  <span
+                    className="text-muted small d-flex align-items-center gap-2"
+                    style={{ fontSize: '0.8rem' }}
+                  >
+                    <ArrowPathIcon style={{ width: 14, height: 14 }} className="text-primary" />
+                    Verificando novas publicações no DJEN...
+                  </span>
+                )}
+              </div>
+              <div className="card-body pt-0 pb-3 px-3">
+                <div className="d-flex flex-wrap gap-2">
+                  {stats.djenPendentesTriagem > 0 && (
+                    <button
+                      className="btn btn-sm btn-warning d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm"
+                      onClick={() => navigate('/djen')}
+                    >
+                      <NewspaperIcon style={{ width: 16, height: 16 }} />
+                      <span>
+                        <strong>{stats.djenPendentesTriagem}</strong> publicaç
+                        {stats.djenPendentesTriagem === 1 ? 'ão' : 'ões'} aguardando triagem
+                      </span>
+                      <ChevronRightIcon style={{ width: 14, height: 14 }} />
+                    </button>
+                  )}
+
+                  {tarefasAlerta.vencidas > 0 && (
+                    <button
+                      className="btn btn-sm btn-danger d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm"
+                      onClick={() => navigate('/prazos')}
+                    >
+                      <ExclamationTriangleIcon style={{ width: 16, height: 16 }} />
+                      <span>
+                        <strong>{tarefasAlerta.vencidas}</strong> prazo
+                        {tarefasAlerta.vencidas !== 1 ? 's' : ''} vencido
+                        {tarefasAlerta.vencidas !== 1 ? 's' : ''}
+                      </span>
+                      <ChevronRightIcon style={{ width: 14, height: 14 }} />
+                    </button>
+                  )}
+
+                  {tarefasAlerta.vencendoHoje > 0 && (
+                    <button
+                      className="btn btn-sm btn-outline-danger d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm"
+                      onClick={() => navigate('/prazos')}
+                    >
+                      <PrazoIconSolid style={{ width: 16, height: 16 }} />
+                      <span>
+                        <strong>{tarefasAlerta.vencendoHoje}</strong> prazo
+                        {tarefasAlerta.vencendoHoje !== 1 ? 's' : ''} vence
+                        {tarefasAlerta.vencendoHoje !== 1 ? 'm' : ''} hoje
+                      </span>
+                      <ChevronRightIcon style={{ width: 14, height: 14 }} />
+                    </button>
+                  )}
+
+                  {eventosHoje.length > 0 && (
+                    <button
+                      className="btn btn-sm btn-primary d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm"
+                      onClick={() => navigate('/agenda')}
+                    >
+                      <CalendarDaysIcon style={{ width: 16, height: 16 }} />
+                      <span>
+                        <strong>{eventosHoje.length}</strong> evento
+                        {eventosHoje.length !== 1 ? 's' : ''} hoje
+                      </span>
+                      <ChevronRightIcon style={{ width: 14, height: 14 }} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Stat Cards ──────────────────────────────────────────────────────── */}
       <div className="row g-3">
         <div className="col-sm-6 col-lg-3">
           <StatCard
@@ -317,8 +478,9 @@ function Dashboard({ mudarSecao }) {
           />
         </div>
       </div>
+
+      {/* ── Eventos + Consulta CNJ ───────────────────────────────────────────── */}
       <div className="row mt-4 g-3">
-        {/* Coluna Eventos */}
         <div className="col-lg-6">
           <div className="card shadow-sm h-100">
             <div className="card-header bg-light">
@@ -347,7 +509,6 @@ function Dashboard({ mudarSecao }) {
           </div>
         </div>
 
-        {/* Coluna Widget Consulta Rápida */}
         <div className="col-lg-6">
           <div className="card shadow-sm h-100 border-primary">
             <div className="card-header bg-primary text-white d-flex align-items-center">
@@ -379,7 +540,6 @@ function Dashboard({ mudarSecao }) {
                 </button>
               </div>
 
-              {/* Resultados da Consulta Rápida */}
               {resultadoConsulta && !resultadoConsulta.erro && (
                 <div
                   className="border rounded p-3 bg-light"
@@ -413,12 +573,13 @@ function Dashboard({ mudarSecao }) {
           </div>
         </div>
       </div>
-      {/* Movimentacoes Recentes Widget */}
+
+      {/* ── Movimentações Recentes ───────────────────────────────────────────── */}
       <div className="row mt-4 g-3">
         <div className="col-12">
           <MovimentacoesRecentes />
         </div>
-      </div>{' '}
+      </div>
     </div>
   )
 }

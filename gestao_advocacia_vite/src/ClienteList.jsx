@@ -13,12 +13,16 @@ import {
   BriefcaseIcon,
   ChevronUpIcon,
   DocumentTextIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import GerarDocumentoModal from './components/GerarDocumentoModal.jsx'
+import { useConfirm } from './hooks/useConfirm.jsx'
+import EmptyState from './components/EmptyState.jsx'
 
 function ClienteList({ onEditCliente, refreshKey }) {
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -95,11 +99,11 @@ function ClienteList({ onEditCliente, refreshKey }) {
   }
 
   const handleDeleteClick = async (id) => {
-    if (
-      window.confirm(
-        `Tem certeza que deseja excluir o cliente ID ${id}? Esta ação pode ser irreversível e afetar registos associados (casos, recebimentos, etc.).`
-      )
-    ) {
+    const ok = await confirm(
+      `Tem certeza que deseja excluir o cliente ID ${id}? Esta ação pode ser irreversível e afetar registos associados (casos, recebimentos, etc.).`,
+      'Excluir cliente'
+    )
+    if (ok) {
       setDeletingId(id)
       setError(null)
       try {
@@ -181,6 +185,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
   }
   return (
     <div className="card shadow-sm">
+      {ConfirmDialog}
       <div className="card-header bg-light p-3">
         <div className="row g-2 align-items-end">
           <div className="col-lg-5 col-md-6">
@@ -274,8 +279,16 @@ function ClienteList({ onEditCliente, refreshKey }) {
             )}
             {!loading && clientes.length === 0 && !error && (
               <tr>
-                <td colSpan="6" className="text-center text-muted p-4">
-                  Nenhum cliente encontrado com os filtros aplicados.
+                <td colSpan="6">
+                  <EmptyState
+                    icon={UsersIcon}
+                    title="Nenhum cliente cadastrado"
+                    description="Comece adicionando o primeiro cliente do escritório."
+                    actionLabel="Novo Cliente"
+                    onAction={() => onEditCliente(null)}
+                    filtered={!!(searchTerm || tipoPessoaFilter)}
+                    onClearFilters={resetFilters}
+                  />
                 </td>
               </tr>
             )}

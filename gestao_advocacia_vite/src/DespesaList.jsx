@@ -8,13 +8,17 @@ import {
   ArrowsUpDownIcon,
   FunnelIcon,
   DocumentArrowDownIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
 import { api } from './api/client.js'
 import { deleteDespesa, listDespesas } from './api/financeiro.js'
+import { useConfirm } from './hooks/useConfirm.jsx'
+import EmptyState from './components/EmptyState.jsx'
 
 function DespesaList({ onEditDespesa, refreshKey }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [despesas, setDespesas] = useState([])
   const [clientes, setClientes] = useState([])
   const [casos, setCasos] = useState([])
@@ -132,7 +136,11 @@ function DespesaList({ onEditDespesa, refreshKey }) {
       return
     }
 
-    if (window.confirm(`Tem certeza que deseja excluir a despesa ID ${id}?`)) {
+    const ok = await confirm(
+      `Tem certeza que deseja excluir a despesa ID ${id}?`,
+      'Excluir despesa'
+    )
+    if (ok) {
       setDeletingId(id)
       setError(null)
       try {
@@ -252,6 +260,7 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   }
   return (
     <div className="card shadow-sm">
+      {ConfirmDialog}
       <div className="card-header bg-light p-3">
         <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
           <h6 className="mb-0 text-secondary me-3">Filtros e Busca de Despesas</h6>
@@ -479,8 +488,26 @@ function DespesaList({ onEditDespesa, refreshKey }) {
             )}
             {!loading && despesas.length === 0 && !error && (
               <tr>
-                <td colSpan="7" className="text-center text-muted p-4">
-                  Nenhuma despesa encontrada com os filtros aplicados.
+                <td colSpan="7">
+                  <EmptyState
+                    icon={BanknotesIcon}
+                    title="Nenhuma despesa registrada"
+                    description="Registre despesas operacionais, custas processuais e outros gastos."
+                    actionLabel="Nova Despesa"
+                    onAction={() => onEditDespesa(null)}
+                    filtered={
+                      !!(
+                        searchTerm ||
+                        clienteFilter ||
+                        statusFilter ||
+                        dataVencimentoInicio ||
+                        dataVencimentoFim ||
+                        dataDespesaInicio ||
+                        dataDespesaFim
+                      )
+                    }
+                    onClearFilters={resetFilters}
+                  />
                 </td>
               </tr>
             )}

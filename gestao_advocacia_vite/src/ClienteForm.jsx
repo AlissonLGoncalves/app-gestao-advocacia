@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useConfirm } from './hooks/useConfirm.jsx'
 import { API_URL } from './config.js'
 import { toast } from 'react-toastify'
 import DocumentosClienteTab from './components/DocumentosClienteTab.jsx'
@@ -59,6 +60,8 @@ const initialStatePJ = {
 }
 
 function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
+  const { confirm, ConfirmDialog } = useConfirm()
+
   const getInitialState = () => {
     if (clienteParaEditar && clienteParaEditar.tipo_pessoa === 'PJ') return initialStatePJ
     return initialStatePF
@@ -455,13 +458,11 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
   }
 
   const handleAnonymizar = async () => {
-    if (
-      !window.confirm(
-        'ATENÇÃO: Esta ação anonimiza dados sensíveis e não pode ser desfeita. Deseja continuar?'
-      )
-    ) {
-      return
-    }
+    const ok = await confirm(
+      'ATENÇÃO: Esta ação anonimiza dados sensíveis e não pode ser desfeita. Deseja continuar?',
+      'Anonimizar cliente'
+    )
+    if (!ok) return
 
     setLoading(true)
     try {
@@ -478,6 +479,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
 
   return (
     <div className="card shadow-sm mb-4">
+      {ConfirmDialog}
       <div className="card-header bg-light">
         <h5 className="mb-0">{isEditing ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</h5>
       </div>

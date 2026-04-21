@@ -7,7 +7,7 @@ from flask_restx import Resource
 
 from extensions import db
 from helpers import get_tenant_id
-from models import Caso, Cliente, Despesa, EventoAgenda, PublicacaoDJEN, Recebimento
+from models import Caso, Cliente, Despesa, EventoAgenda, PublicacaoDJEN, Recebimento, TarefaPrazo
 
 
 def register_dashboard_routes(app, dashboard_ns):
@@ -80,6 +80,25 @@ def register_dashboard_routes(app, dashboard_ns):
                 djen_nao_lidas = 0
                 djen_sem_vinculo = 0
 
+            try:
+                hoje = datetime.utcnow().date()
+                tarefas_vencidas = TarefaPrazo.query.filter(
+                    TarefaPrazo.user_id == user_id,
+                    TarefaPrazo.status != "Concluído",
+                    TarefaPrazo.data_vencimento.isnot(None),
+                    db.func.date(TarefaPrazo.data_vencimento) < hoje,
+                ).count()
+                tarefas_vencendo_hoje = TarefaPrazo.query.filter(
+                    TarefaPrazo.user_id == user_id,
+                    TarefaPrazo.status != "Concluído",
+                    TarefaPrazo.data_vencimento.isnot(None),
+                    db.func.date(TarefaPrazo.data_vencimento) == hoje,
+                ).count()
+            except Exception:
+                db.session.rollback()
+                tarefas_vencidas = 0
+                tarefas_vencendo_hoje = 0
+
             return {
                 "total_clientes": total_clientes,
                 "casos_ativos": casos_ativos,
@@ -95,6 +114,10 @@ def register_dashboard_routes(app, dashboard_ns):
                 "alertas_djen": {
                     "nao_lidas": djen_nao_lidas,
                     "pendentes_triagem": djen_sem_vinculo,
+                },
+                "alertas_tarefas": {
+                    "vencidas": tarefas_vencidas,
+                    "vencendo_hoje": tarefas_vencendo_hoje,
                 },
             }, 200
 

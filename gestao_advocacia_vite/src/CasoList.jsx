@@ -11,9 +11,12 @@ import {
   ArrowsUpDownIcon,
   FunnelIcon,
   DocumentArrowDownIcon,
+  BriefcaseIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
+import { useConfirm } from './hooks/useConfirm.jsx'
+import EmptyState from './components/EmptyState.jsx'
 
 function CasoList({ onEditCaso, refreshKey }) {
   const location = useLocation()
@@ -108,12 +111,14 @@ function CasoList({ onEditCaso, refreshKey }) {
     fetchCasos()
   }, [fetchCasos, refreshKey])
 
+  const { confirm, ConfirmDialog } = useConfirm()
+
   const handleDeleteClick = async (id) => {
-    if (
-      window.confirm(
-        `Tem certeza que deseja excluir o caso ID ${id}? Esta ação pode ser irreversível e afetar registos associados.`
-      )
-    ) {
+    const ok = await confirm(
+      `Tem certeza que deseja excluir o caso ID ${id}? Esta ação pode ser irreversível e afetar registos associados.`,
+      'Excluir caso'
+    )
+    if (ok) {
       setDeletingId(id)
       setError(null)
       try {
@@ -218,6 +223,7 @@ function CasoList({ onEditCaso, refreshKey }) {
   }
   return (
     <div className="card shadow-sm">
+      {ConfirmDialog}
       <div className="card-header bg-light p-3">
         <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
           <h6 className="mb-0 text-secondary me-3">Filtros e Busca de Casos</h6>
@@ -405,8 +411,26 @@ function CasoList({ onEditCaso, refreshKey }) {
             )}
             {!loading && casos.length === 0 && !error && (
               <tr>
-                <td colSpan="7" className="text-center text-muted p-4">
-                  Nenhum caso encontrado com os filtros aplicados.
+                <td colSpan="7">
+                  <EmptyState
+                    icon={BriefcaseIcon}
+                    title="Nenhum caso cadastrado"
+                    description="Comece adicionando o primeiro caso do escritório."
+                    actionLabel="Novo Caso"
+                    onAction={() => onEditCaso(null)}
+                    filtered={
+                      !!(
+                        searchTerm ||
+                        statusFilter ||
+                        clienteFilter ||
+                        dataCriacaoInicioFilter ||
+                        dataCriacaoFimFilter ||
+                        dataAtualizacaoInicioFilter ||
+                        dataAtualizacaoFimFilter
+                      )
+                    }
+                    onClearFilters={resetFilters}
+                  />
                 </td>
               </tr>
             )}

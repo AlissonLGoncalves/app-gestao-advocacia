@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import { useConfirm } from '../hooks/useConfirm.jsx'
 import DOMPurify from 'dompurify'
 import ModalCriarClienteCaso from '../components/djen/ModalCriarClienteCaso.jsx'
 import {
@@ -188,6 +189,7 @@ const TRIBUNAIS = [
 ]
 
 export default function DjenPage() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [searchParams, setSearchParams] = useSearchParams()
   const [aba, setAba] = useState('publicacoes')
   const [publicacoes, setPublicacoes] = useState([])
@@ -586,7 +588,8 @@ export default function DjenPage() {
 
   // ── Remover OAB ─────────────────────────────────────────────────────────────
   const removerOab = async (id) => {
-    if (!window.confirm('Remover esta OAB do monitoramento?')) return
+    const ok = await confirm('Remover esta OAB do monitoramento?', 'Remover OAB')
+    if (!ok) return
     try {
       await deleteOab(id)
       toast.success('OAB removida.')
@@ -653,1171 +656,1185 @@ export default function DjenPage() {
   const textoDetalhePlano = extrairTextoPlano(textoDetalheHtmlSeguro)
 
   return (
-    <div className="container-fluid py-4">
-      {/* Cabeçalho */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h2 className="mb-0 fw-bold">
-            <i className="bi bi-newspaper me-2 text-primary"></i>
-            DJEN — Diário de Justiça Eletrônico
-          </h2>
-          <small className="text-muted">ComunicaAPI / CNJ — Resolução nº 455/2022</small>
-        </div>
-        <div className="d-flex align-items-center gap-3">
-          {naoLidas > 0 && (
-            <span className="badge bg-danger fs-6">
-              {naoLidas} não lida{naoLidas !== 1 ? 's' : ''}
-            </span>
-          )}
-          <div className="d-flex align-items-center gap-2">
-            <div className="input-group input-group-sm" style={{ width: 130 }}>
-              <input
-                type="number"
-                className="form-control"
-                min={1}
-                max={365}
-                value={diasSync}
-                onChange={(e) =>
-                  setDiasSync(Math.max(1, Math.min(365, parseInt(e.target.value) || 30)))
-                }
-                disabled={syncing}
-              />
-              <span className="input-group-text">dias</span>
+    <>
+      {ConfirmDialog}
+      <div className="container-fluid py-4">
+        {/* Cabeçalho */}
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h2 className="mb-0 fw-bold">
+              <i className="bi bi-newspaper me-2 text-primary"></i>
+              DJEN — Diário de Justiça Eletrônico
+            </h2>
+            <small className="text-muted">ComunicaAPI / CNJ — Resolução nº 455/2022</small>
+          </div>
+          <div className="d-flex align-items-center gap-3">
+            {naoLidas > 0 && (
+              <span className="badge bg-danger fs-6">
+                {naoLidas} não lida{naoLidas !== 1 ? 's' : ''}
+              </span>
+            )}
+            <div className="d-flex align-items-center gap-2">
+              <div className="input-group input-group-sm" style={{ width: 130 }}>
+                <input
+                  type="number"
+                  className="form-control"
+                  min={1}
+                  max={365}
+                  value={diasSync}
+                  onChange={(e) =>
+                    setDiasSync(Math.max(1, Math.min(365, parseInt(e.target.value) || 30)))
+                  }
+                  disabled={syncing}
+                />
+                <span className="input-group-text">dias</span>
+              </div>
+              <button className="btn btn-primary" onClick={sincronizar} disabled={syncing}>
+                {syncing ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" />
+                    Sincronizando…
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-arrow-clockwise me-2" />
+                    Sincronizar
+                  </>
+                )}
+              </button>
             </div>
-            <button className="btn btn-primary" onClick={sincronizar} disabled={syncing}>
-              {syncing ? (
-                <>
-                  <span className="spinner-border spinner-border-sm me-2" />
-                  Sincronizando…
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-arrow-clockwise me-2" />
-                  Sincronizar
-                </>
+          </div>
+        </div>
+
+        {/* Abas */}
+        <ul className="nav nav-tabs mb-4">
+          <li className="nav-item">
+            <button
+              className={`nav-link ${aba === 'publicacoes' ? 'active fw-semibold' : ''}`}
+              onClick={() => setAba('publicacoes')}
+            >
+              <i className="bi bi-list-ul me-1" />
+              Publicações
+              {naoLidas > 0 && <span className="badge bg-danger ms-2">{naoLidas}</span>}
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              className={`nav-link ${aba === 'oabs' ? 'active fw-semibold' : ''}`}
+              onClick={() => {
+                setAba('oabs')
+                carregarOabs()
+                carregarUltimasPublicacoesDjen()
+              }}
+            >
+              <i className="bi bi-person-badge me-1" />
+              Monitorar OABs
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              className={`nav-link ${aba === 'triagem' ? 'active fw-semibold' : ''}`}
+              onClick={() => {
+                setAba('triagem')
+                carregarTriagem()
+              }}
+            >
+              <i className="bi bi-magic me-1" />
+              Triagem IA
+              {triagemTotal > 0 && (
+                <span className="badge bg-warning text-dark ms-2">{triagemTotal}</span>
               )}
             </button>
-          </div>
-        </div>
-      </div>
+          </li>
+        </ul>
 
-      {/* Abas */}
-      <ul className="nav nav-tabs mb-4">
-        <li className="nav-item">
-          <button
-            className={`nav-link ${aba === 'publicacoes' ? 'active fw-semibold' : ''}`}
-            onClick={() => setAba('publicacoes')}
-          >
-            <i className="bi bi-list-ul me-1" />
-            Publicações
-            {naoLidas > 0 && <span className="badge bg-danger ms-2">{naoLidas}</span>}
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${aba === 'oabs' ? 'active fw-semibold' : ''}`}
-            onClick={() => {
-              setAba('oabs')
-              carregarOabs()
-              carregarUltimasPublicacoesDjen()
-            }}
-          >
-            <i className="bi bi-person-badge me-1" />
-            Monitorar OABs
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${aba === 'triagem' ? 'active fw-semibold' : ''}`}
-            onClick={() => {
-              setAba('triagem')
-              carregarTriagem()
-            }}
-          >
-            <i className="bi bi-magic me-1" />
-            Triagem IA
-            {triagemTotal > 0 && (
-              <span className="badge bg-warning text-dark ms-2">{triagemTotal}</span>
-            )}
-          </button>
-        </li>
-      </ul>
-
-      {/* ── Aba Publicações ────────────────────────────────────────────────── */}
-      {aba === 'publicacoes' && (
-        <div className="row g-4">
-          {/* Filtros */}
-          <div className="col-12">
-            <div className="card shadow-sm border-0">
-              <div className="card-body">
-                <form onSubmit={aplicarFiltros} className="row g-2 align-items-end">
-                  {/* Linha 1: Leitura, Tribunal, Nº processo, Ordenação */}
-                  <div className="col-md-2">
-                    <label className="form-label small mb-1">Leitura</label>
-                    <select
-                      className="form-select form-select-sm"
-                      value={filtros.lida}
-                      onChange={(e) => setFiltros((f) => ({ ...f, lida: e.target.value }))}
-                    >
-                      <option value="">Todas</option>
-                      <option value="false">Não lidas</option>
-                      <option value="true">Lidas</option>
-                    </select>
-                  </div>
-                  <div className="col-md-3">
-                    <label className="form-label small mb-1">Tribunal</label>
-                    <select
-                      className="form-select form-select-sm"
-                      value={filtros.sigla_tribunal}
-                      onChange={(e) =>
-                        setFiltros((f) => ({ ...f, sigla_tribunal: e.target.value }))
-                      }
-                    >
-                      <option value="">Todos os tribunais</option>
-                      <optgroup label="Superiores">
-                        {TRIBUNAIS.filter((t) =>
-                          ['STF', 'STJ', 'TST', 'TSE', 'STM'].includes(t.sigla)
-                        ).map((t) => (
-                          <option key={t.sigla} value={t.sigla}>
-                            {t.sigla} — {t.nome.replace(/^[A-Z]+ – /, '')}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="TRFs – Justiça Federal">
-                        {TRIBUNAIS.filter((t) => t.sigla.startsWith('TRF')).map((t) => (
-                          <option key={t.sigla} value={t.sigla}>
-                            {t.sigla} — {t.nome.replace(/TRF \d+ª Região /, '')}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="TJs – Justiça Estadual">
-                        {TRIBUNAIS.filter(
-                          (t) => t.sigla.startsWith('TJ') && !t.sigla.startsWith('TJM')
-                        ).map((t) => (
-                          <option key={t.sigla} value={t.sigla}>
-                            {t.sigla} — {t.nome.replace(/TJ\w+ – /, '')}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="TRTs – Justiça do Trabalho">
-                        {TRIBUNAIS.filter((t) => t.sigla.startsWith('TRT')).map((t) => (
-                          <option key={t.sigla} value={t.sigla}>
-                            {t.sigla} — {t.nome.replace(/TRT \d+ª Região /, '')}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="TREs – Justiça Eleitoral">
-                        {TRIBUNAIS.filter((t) => t.sigla.startsWith('TRE')).map((t) => (
-                          <option key={t.sigla} value={t.sigla}>
-                            {t.sigla}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="TJMs – Justiça Militar Estadual">
-                        {TRIBUNAIS.filter((t) => t.sigla.startsWith('TJM')).map((t) => (
-                          <option key={t.sigla} value={t.sigla}>
-                            {t.sigla} — {t.nome.replace(/TJM – /, '')}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                  </div>
-                  <div className="col-md-3">
-                    <label className="form-label small mb-1">Nº processo</label>
-                    <input
-                      className="form-control form-control-sm"
-                      placeholder="Parcial ou completo"
-                      value={filtros.numero_processo}
-                      onChange={(e) =>
-                        setFiltros((f) => ({ ...f, numero_processo: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="col-md-2">
-                    <label className="form-label small mb-1">Ordenar por</label>
-                    <select
-                      className="form-select form-select-sm"
-                      value={filtros.ordenar}
-                      onChange={(e) => setFiltros((f) => ({ ...f, ordenar: e.target.value }))}
-                    >
-                      <option value="data_desc">Mais nova primeiro</option>
-                      <option value="data_asc">Mais antiga primeiro</option>
-                      <option value="tribunal_asc">Tribunal (A–Z)</option>
-                      <option value="orgao_asc">Órgão (A–Z)</option>
-                      <option value="tipo_asc">Tipo (A–Z)</option>
-                    </select>
-                  </div>
-                  {/* Linha 2: datas + botões */}
-                  <div className="col-md-2">
-                    <label className="form-label small mb-1">Data início</label>
-                    <input
-                      type="date"
-                      className="form-control form-control-sm"
-                      value={filtros.data_inicio}
-                      onChange={(e) => setFiltros((f) => ({ ...f, data_inicio: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-md-2">
-                    <label className="form-label small mb-1">Data fim</label>
-                    <input
-                      type="date"
-                      className="form-control form-control-sm"
-                      value={filtros.data_fim}
-                      onChange={(e) => setFiltros((f) => ({ ...f, data_fim: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-md-1 d-flex gap-1">
-                    <button type="submit" className="btn btn-primary btn-sm w-100">
-                      <i className="bi bi-search" />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm w-100"
-                      onClick={limparFiltros}
-                      title="Limpar filtros"
-                    >
-                      <i className="bi bi-x-lg" />
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-
-          {/* Lista + Detalhe */}
-          <div className={pubSelecionada ? 'col-md-6' : 'col-12'}>
-            {loadingPubs ? (
-              <div className="text-center py-5">
-                <div className="spinner-border text-primary" />
-              </div>
-            ) : publicacoes.length === 0 ? (
-              <div className="text-center py-5 text-muted">
-                <i className="bi bi-inbox fs-1 d-block mb-2" />
-                Nenhuma publicação encontrada.
-                <br />
-                <small>Cadastre suas OABs e clique em "Sincronizar agora".</small>
-              </div>
-            ) : (
-              <>
-                <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 text-muted small mb-2">
-                  <span>
-                    {total} publicação(ões) · página {Math.floor(offset / itensPorPagina) + 1}
-                  </span>
-                  <div className="d-flex align-items-center gap-2">
-                    <label className="small mb-0">Por página</label>
-                    <select
-                      className="form-select form-select-sm"
-                      style={{ width: 90 }}
-                      value={itensPorPagina}
-                      onChange={(e) => {
-                        const novoLimite = Number(e.target.value)
-                        setItensPorPagina(novoLimite)
-                        setOffset(0)
-                        carregarPublicacoes(0, novoLimite)
-                      }}
-                    >
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
-                </div>
-                {publicacoes.map((pub) => (
-                  <div
-                    key={pub.id}
-                    className={`card mb-2 border-0 shadow-sm cursor-pointer ${!pub.lida ? 'border-start border-4 border-primary' : ''} ${pubSelecionada?.id === pub.id ? 'bg-light' : ''}`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => abrirDetalhePublicacao(pub)}
-                  >
-                    <div className="card-body py-2 px-3">
-                      <div className="d-flex justify-content-between align-items-start">
-                        <div className="flex-grow-1 me-2" style={{ minWidth: 0 }}>
-                          <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                            {!pub.lida && <span className="badge bg-primary">Nova</span>}
-                            <span className="badge bg-secondary">{pub.sigla_tribunal || '—'}</span>
-                            <span className="badge bg-light text-dark border">
-                              {pub.tipo_comunicacao || 'Comunicação'}
-                            </span>
-                            {pub.origem_busca === 'oab' && (
-                              <span className="badge bg-info text-dark">via OAB</span>
-                            )}
-                            {pub.origem_busca === 'processo' && (
-                              <span className="badge bg-warning text-dark">via Processo</span>
-                            )}
-                          </div>
-                          <div className="fw-semibold text-truncate small">
-                            {pub.numero_processo_mascara ||
-                              pub.numero_processo ||
-                              'Sem nº processo'}
-                          </div>
-                          <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                            {pub.nome_orgao} · {fmtData(pub.data_disponibilizacao)}
-                          </div>
-                        </div>
-                        <button
-                          className={`btn btn-sm ${pub.lida ? 'btn-outline-secondary' : 'btn-outline-primary'}`}
-                          title={pub.lida ? 'Marcar como não lida' : 'Marcar como lida'}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            marcarLida(pub, !pub.lida)
-                          }}
-                        >
-                          <i className={`bi ${pub.lida ? 'bi-envelope' : 'bi-envelope-open'}`} />
-                        </button>
-                      </div>
+        {/* ── Aba Publicações ────────────────────────────────────────────────── */}
+        {aba === 'publicacoes' && (
+          <div className="row g-4">
+            {/* Filtros */}
+            <div className="col-12">
+              <div className="card shadow-sm border-0">
+                <div className="card-body">
+                  <form onSubmit={aplicarFiltros} className="row g-2 align-items-end">
+                    {/* Linha 1: Leitura, Tribunal, Nº processo, Ordenação */}
+                    <div className="col-md-2">
+                      <label className="form-label small mb-1">Leitura</label>
+                      <select
+                        className="form-select form-select-sm"
+                        value={filtros.lida}
+                        onChange={(e) => setFiltros((f) => ({ ...f, lida: e.target.value }))}
+                      >
+                        <option value="">Todas</option>
+                        <option value="false">Não lidas</option>
+                        <option value="true">Lidas</option>
+                      </select>
                     </div>
-                  </div>
-                ))}
-                {/* Paginação */}
-                <div className="d-flex gap-2 mt-3">
-                  <button
-                    className="btn btn-outline-secondary btn-sm"
-                    disabled={offset === 0}
-                    onClick={() => {
-                      const o = Math.max(0, offset - itensPorPagina)
-                      setOffset(o)
-                      carregarPublicacoes(o)
-                    }}
-                  >
-                    ← Anterior
-                  </button>
-                  <button
-                    className="btn btn-outline-secondary btn-sm"
-                    disabled={offset + itensPorPagina >= total}
-                    onClick={() => {
-                      const o = offset + itensPorPagina
-                      setOffset(o)
-                      carregarPublicacoes(o)
-                    }}
-                  >
-                    Próxima →
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Painel de detalhe */}
-          {pubSelecionada && (
-            <div className="col-md-6">
-              <div className="card shadow-sm border-0 h-100">
-                <div className="card-header bg-white d-flex justify-content-between align-items-center">
-                  <strong className="small">Detalhe da Publicação</strong>
-                  <button className="btn-close btn-sm" onClick={fecharDetalhePublicacao} />
-                </div>
-                <div className="card-body overflow-auto" style={{ maxHeight: '75vh' }}>
-                  <table className="table table-sm table-borderless mb-3">
-                    <tbody>
-                      <tr>
-                        <td className="text-muted small fw-semibold" style={{ width: 130 }}>
-                          Tribunal
-                        </td>
-                        <td className="small">
-                          {pubSelecionada.sigla_tribunal} — {pubSelecionada.nome_orgao}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="text-muted small fw-semibold">Processo</td>
-                        <td className="small">
-                          {pubSelecionada.numero_processo_mascara ||
-                            pubSelecionada.numero_processo ||
-                            '—'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="text-muted small fw-semibold">Tipo</td>
-                        <td className="small">
-                          {pubSelecionada.tipo_comunicacao} / {pubSelecionada.tipo_documento}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="text-muted small fw-semibold">Classe</td>
-                        <td className="small">{pubSelecionada.nome_classe || '—'}</td>
-                      </tr>
-                      <tr>
-                        <td className="text-muted small fw-semibold">Disponibilizado</td>
-                        <td className="small">{fmtData(pubSelecionada.data_disponibilizacao)}</td>
-                      </tr>
-                      <tr>
-                        <td className="text-muted small fw-semibold">Meio</td>
-                        <td className="small">
-                          {pubSelecionada.meio === 'D'
-                            ? 'Diário Eletrônico'
-                            : pubSelecionada.meio === 'E'
-                              ? 'Edital'
-                              : '—'}
-                        </td>
-                      </tr>
-                      {pubSelecionada.nome_juiz && (
-                        <tr>
-                          <td className="text-muted small fw-semibold">Magistrado</td>
-                          <td className="small">{pubSelecionada.nome_juiz}</td>
-                        </tr>
-                      )}
-                      {pubSelecionada.polo_ativo && (
-                        <tr>
-                          <td className="text-muted small fw-semibold">Polo Ativo</td>
-                          <td className="small">{pubSelecionada.polo_ativo}</td>
-                        </tr>
-                      )}
-                      {pubSelecionada.polo_passivo && (
-                        <tr>
-                          <td className="text-muted small fw-semibold">Polo Passivo</td>
-                          <td className="small">{pubSelecionada.polo_passivo}</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-
-                  {/* Texto da publicação */}
-                  <div className="mb-3">
-                    <div className="text-muted small fw-semibold mb-1">Texto da Publicação</div>
-                    {textoDetalhePlano ? (
-                      <div
-                        className="p-2 bg-light rounded border small"
-                        style={{
-                          maxHeight: 260,
-                          overflowY: 'auto',
-                          overflowX: 'auto',
-                          wordBreak: 'break-word',
-                        }}
-                        dangerouslySetInnerHTML={{ __html: textoDetalheHtmlSeguro }}
-                      />
-                    ) : (
-                      <div className="p-2 bg-light rounded border small text-muted">
-                        Sem texto disponível.
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Vincular ao caso */}
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold">
-                      Vincular ao processo cadastrado
-                    </label>
-                    <select
-                      className="form-select form-select-sm"
-                      value={pubSelecionada.caso_id || ''}
-                      onChange={(e) =>
-                        vincularCaso(
-                          pubSelecionada,
-                          e.target.value ? parseInt(e.target.value) : null
-                        )
-                      }
-                    >
-                      <option value="">— Nenhum —</option>
-                      {casos.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.numero_processo ? `${c.numero_processo} — ` : ''}
-                          {c.titulo}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Ações */}
-                  <div className="d-flex gap-2 flex-wrap">
-                    {pubSelecionada.link && (
-                      <a
-                        href={pubSelecionada.link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-outline-primary btn-sm"
+                    <div className="col-md-3">
+                      <label className="form-label small mb-1">Tribunal</label>
+                      <select
+                        className="form-select form-select-sm"
+                        value={filtros.sigla_tribunal}
+                        onChange={(e) =>
+                          setFiltros((f) => ({ ...f, sigla_tribunal: e.target.value }))
+                        }
                       >
-                        <i className="bi bi-box-arrow-up-right me-1" />
-                        Ver original
-                      </a>
-                    )}
-                    <button
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => baixarCertidao(pubSelecionada)}
-                    >
-                      <i className="bi bi-file-earmark-pdf me-1" />
-                      Baixar certidão
-                    </button>
-                    <button
-                      className={`btn btn-sm ${pubSelecionada.lida ? 'btn-outline-secondary' : 'btn-outline-success'}`}
-                      onClick={() => marcarLida(pubSelecionada, !pubSelecionada.lida)}
-                    >
-                      <i
-                        className={`bi ${pubSelecionada.lida ? 'bi-envelope me-1' : 'bi-envelope-open me-1'}`}
+                        <option value="">Todos os tribunais</option>
+                        <optgroup label="Superiores">
+                          {TRIBUNAIS.filter((t) =>
+                            ['STF', 'STJ', 'TST', 'TSE', 'STM'].includes(t.sigla)
+                          ).map((t) => (
+                            <option key={t.sigla} value={t.sigla}>
+                              {t.sigla} — {t.nome.replace(/^[A-Z]+ – /, '')}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="TRFs – Justiça Federal">
+                          {TRIBUNAIS.filter((t) => t.sigla.startsWith('TRF')).map((t) => (
+                            <option key={t.sigla} value={t.sigla}>
+                              {t.sigla} — {t.nome.replace(/TRF \d+ª Região /, '')}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="TJs – Justiça Estadual">
+                          {TRIBUNAIS.filter(
+                            (t) => t.sigla.startsWith('TJ') && !t.sigla.startsWith('TJM')
+                          ).map((t) => (
+                            <option key={t.sigla} value={t.sigla}>
+                              {t.sigla} — {t.nome.replace(/TJ\w+ – /, '')}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="TRTs – Justiça do Trabalho">
+                          {TRIBUNAIS.filter((t) => t.sigla.startsWith('TRT')).map((t) => (
+                            <option key={t.sigla} value={t.sigla}>
+                              {t.sigla} — {t.nome.replace(/TRT \d+ª Região /, '')}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="TREs – Justiça Eleitoral">
+                          {TRIBUNAIS.filter((t) => t.sigla.startsWith('TRE')).map((t) => (
+                            <option key={t.sigla} value={t.sigla}>
+                              {t.sigla}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="TJMs – Justiça Militar Estadual">
+                          {TRIBUNAIS.filter((t) => t.sigla.startsWith('TJM')).map((t) => (
+                            <option key={t.sigla} value={t.sigla}>
+                              {t.sigla} — {t.nome.replace(/TJM – /, '')}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </div>
+                    <div className="col-md-3">
+                      <label className="form-label small mb-1">Nº processo</label>
+                      <input
+                        className="form-control form-control-sm"
+                        placeholder="Parcial ou completo"
+                        value={filtros.numero_processo}
+                        onChange={(e) =>
+                          setFiltros((f) => ({ ...f, numero_processo: e.target.value }))
+                        }
                       />
-                      {pubSelecionada.lida ? 'Marcar como não lida' : 'Marcar como lida'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Aba OABs ──────────────────────────────────────────────────────── */}
-      {aba === 'oabs' && (
-        <div className="row g-4">
-          <div className="col-md-5">
-            <div className="card shadow-sm border-0">
-              <div className="card-header bg-white fw-semibold">
-                <i className="bi bi-plus-circle me-2 text-success" />
-                Cadastrar OAB para monitoramento
-              </div>
-              <div className="card-body">
-                <form onSubmit={salvarOab}>
-                  <div className="mb-3">
-                    <label className="form-label small">
-                      Número da OAB <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      className="form-control"
-                      placeholder="Ex: 123456"
-                      required
-                      value={novaOab.numero_oab}
-                      onChange={(e) => setNovaOab((o) => ({ ...o, numero_oab: e.target.value }))}
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small">
-                      UF da OAB <span className="text-danger">*</span>
-                    </label>
-                    <select
-                      className="form-select"
-                      required
-                      value={novaOab.uf_oab}
-                      onChange={(e) => setNovaOab((o) => ({ ...o, uf_oab: e.target.value }))}
-                    >
-                      <option value="">Selecione a UF</option>
-                      {[
-                        'AC',
-                        'AL',
-                        'AP',
-                        'AM',
-                        'BA',
-                        'CE',
-                        'DF',
-                        'ES',
-                        'GO',
-                        'MA',
-                        'MT',
-                        'MS',
-                        'MG',
-                        'PA',
-                        'PB',
-                        'PR',
-                        'PE',
-                        'PI',
-                        'RJ',
-                        'RN',
-                        'RS',
-                        'RO',
-                        'RR',
-                        'SC',
-                        'SP',
-                        'SE',
-                        'TO',
-                      ].map((uf) => (
-                        <option key={uf} value={uf}>
-                          {uf}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small">
-                      Tribunal (sigla){' '}
-                      <span className="text-muted fw-normal">— opcional, ex: TRT9, TJPR, TST</span>
-                    </label>
-                    <input
-                      className="form-control"
-                      placeholder="Deixe em branco para usar a UF (ex: TJPR)"
-                      value={novaOab.sigla_tribunal}
-                      onChange={(e) =>
-                        setNovaOab((o) => ({ ...o, sigla_tribunal: e.target.value.toUpperCase() }))
-                      }
-                    />
-                    <div className="form-text">Use quando a OAB atua em TRTs, TST, STJ, etc.</div>
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small">Nome do advogado (opcional)</label>
-                    <input
-                      className="form-control"
-                      placeholder="Para identificação interna"
-                      value={novaOab.nome_advogado}
-                      onChange={(e) => setNovaOab((o) => ({ ...o, nome_advogado: e.target.value }))}
-                    />
-                  </div>
-                  <button type="submit" className="btn btn-success w-100" disabled={salvandoOab}>
-                    {salvandoOab ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" />
-                        Salvando…
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-check-lg me-2" />
-                        Cadastrar OAB
-                      </>
-                    )}
-                  </button>
-                </form>
-                <div className="alert alert-info mt-3 small mb-0">
-                  <i className="bi bi-info-circle me-1" />
-                  Após cadastrar, clique em <strong>"Sincronizar agora"</strong> para buscar
-                  publicações imediatamente. O job automático roda diariamente às 04:00 e considera
-                  os últimos 30 dias.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-md-7">
-            <div className="card shadow-sm border-0">
-              <div className="card-header bg-white fw-semibold">
-                <i className="bi bi-list-check me-2" />
-                OABs monitoradas
-              </div>
-              <div className="card-body p-0">
-                {loadingOabs ? (
-                  <div className="text-center py-4">
-                    <div className="spinner-border text-primary" />
-                  </div>
-                ) : oabs.length === 0 ? (
-                  <div className="text-center py-4 text-muted">
-                    <i className="bi bi-person-badge fs-2 d-block mb-2" />
-                    Nenhuma OAB cadastrada ainda.
-                  </div>
-                ) : (
-                  <table className="table table-hover mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th className="small">OAB</th>
-                        <th className="small">Tribunal</th>
-                        <th className="small">Advogado</th>
-                        <th className="small">Última sync</th>
-                        <th className="small"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {oabs.map((o) => (
-                        <tr key={o.id}>
-                          <td className="fw-semibold small">{o.numero_oab}</td>
-                          <td className="small">
-                            <span className="badge bg-secondary">
-                              {o.sigla_tribunal || o.uf_oab}
-                            </span>
-                          </td>
-                          <td className="small text-muted">{o.nome_advogado || '—'}</td>
-                          <td className="small text-muted">
-                            {o.ultima_sincronizacao
-                              ? fmtData(o.ultima_sincronizacao, true)
-                              : o.data_criacao
-                                ? `Aguardando 1ª sync (cadastro em ${fmtData(o.data_criacao, true)})`
-                                : 'Nunca'}
-                          </td>
-                          <td>
-                            <button
-                              className="btn btn-outline-danger btn-sm"
-                              onClick={() => removerOab(o.id)}
-                              title="Remover"
-                            >
-                              <i className="bi bi-trash" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-
-            <div className="card shadow-sm border-0 mt-3">
-              <div className="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-                <span>
-                  <i className="bi bi-journal-text me-2" />
-                  Últimas publicações capturadas
-                </span>
-                <button
-                  className="btn btn-outline-primary btn-sm"
-                  onClick={carregarUltimasPublicacoesDjen}
-                >
-                  <i className="bi bi-arrow-repeat me-1" />
-                  Atualizar
-                </button>
-              </div>
-              <div className="card-body p-0">
-                {loadingUltimasPublicacoesDjen ? (
-                  <div className="text-center py-4">
-                    <div className="spinner-border text-primary" />
-                  </div>
-                ) : ultimasPublicacoesDjen.length === 0 ? (
-                  <div className="p-3 text-muted small">
-                    Nenhuma publicação foi capturada ainda. Clique em{' '}
-                    <strong>Sincronizar agora</strong> para buscar no DJEN.
-                  </div>
-                ) : (
-                  <div className="list-group list-group-flush">
-                    {ultimasPublicacoesDjen.map((pub) => (
-                      <button
-                        key={pub.id}
-                        type="button"
-                        className="list-group-item list-group-item-action"
-                        onClick={() => abrirDetalhePublicacao(pub)}
+                    </div>
+                    <div className="col-md-2">
+                      <label className="form-label small mb-1">Ordenar por</label>
+                      <select
+                        className="form-select form-select-sm"
+                        value={filtros.ordenar}
+                        onChange={(e) => setFiltros((f) => ({ ...f, ordenar: e.target.value }))}
                       >
-                        <div className="d-flex justify-content-between align-items-start gap-2">
-                          <div className="small" style={{ minWidth: 0 }}>
-                            <div className="fw-semibold text-truncate">
-                              {pub.numero_processo_mascara ||
-                                pub.numero_processo ||
-                                'Sem número de processo'}
-                            </div>
-                            <div className="text-muted text-truncate">
-                              {pub.sigla_tribunal || '—'} · {pub.tipo_comunicacao || 'Comunicação'}
-                            </div>
-                          </div>
-                          <span className={`badge ${pub.lida ? 'bg-secondary' : 'bg-primary'}`}>
-                            {pub.lida ? 'Lida' : 'Nova'}
-                          </span>
-                        </div>
+                        <option value="data_desc">Mais nova primeiro</option>
+                        <option value="data_asc">Mais antiga primeiro</option>
+                        <option value="tribunal_asc">Tribunal (A–Z)</option>
+                        <option value="orgao_asc">Órgão (A–Z)</option>
+                        <option value="tipo_asc">Tipo (A–Z)</option>
+                      </select>
+                    </div>
+                    {/* Linha 2: datas + botões */}
+                    <div className="col-md-2">
+                      <label className="form-label small mb-1">Data início</label>
+                      <input
+                        type="date"
+                        className="form-control form-control-sm"
+                        value={filtros.data_inicio}
+                        onChange={(e) => setFiltros((f) => ({ ...f, data_inicio: e.target.value }))}
+                      />
+                    </div>
+                    <div className="col-md-2">
+                      <label className="form-label small mb-1">Data fim</label>
+                      <input
+                        type="date"
+                        className="form-control form-control-sm"
+                        value={filtros.data_fim}
+                        onChange={(e) => setFiltros((f) => ({ ...f, data_fim: e.target.value }))}
+                      />
+                    </div>
+                    <div className="col-md-1 d-flex gap-1">
+                      <button type="submit" className="btn btn-primary btn-sm w-100">
+                        <i className="bi bi-search" />
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Aba Triagem ───────────────────────────────────────────────────── */}
-      {aba === 'triagem' &&
-        (() => {
-          // filtro local por busca de texto
-          const triagemFiltrados = triagemBusca.trim()
-            ? triagemItems.filter((item) => {
-                const pub = item.publicacao
-                const analise = item.analise || {}
-                const textoNormalizado = extrairTextoPlano(
-                  sanitizarHtmlTribunal(decodeHtmlEntities(pub.texto || ''))
-                )
-                const haystack = [
-                  pub.numero_processo,
-                  pub.numero_processo_mascara,
-                  pub.nome_orgao,
-                  pub.sigla_tribunal,
-                  analise.tribunal,
-                  textoNormalizado,
-                  ...(analise.partes_autoras || []),
-                  ...(analise.partes_reus || []),
-                  ...(analise.representantes || []),
-                ]
-                  .join(' ')
-                  .toLowerCase()
-                return haystack.includes(triagemBusca.toLowerCase())
-              })
-            : triagemItems
-
-          const badgeConfianca = (v) => {
-            const pct = Math.round((v || 0) * 100)
-            const cls = pct >= 70 ? 'bg-success' : pct >= 40 ? 'bg-warning text-dark' : 'bg-danger'
-            return (
-              <span className={`badge ${cls} ms-2`} style={{ fontSize: '0.7rem' }}>
-                {pct}% confiança
-              </span>
-            )
-          }
-
-          const toggleExpandido = (id) =>
-            setTriagemExpandido((prev) => ({ ...prev, [id]: !prev[id] }))
-
-          return (
-            <div className="row g-3">
-              {/* Barra de controles */}
-              <div className="col-12">
-                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
-                  <div className="d-flex align-items-center gap-2 flex-wrap">
-                    <span className="badge bg-secondary fs-6 px-3 py-2">
-                      {triagemTotal} pendente(s)
-                    </span>
-                    <input
-                      type="search"
-                      className="form-control form-control-sm"
-                      style={{ width: 260 }}
-                      placeholder="Buscar por processo, parte, órgão..."
-                      value={triagemBusca}
-                      onChange={(e) => setTriagemBusca(e.target.value)}
-                    />
-                  </div>
-                  <div className="d-flex gap-2 flex-wrap">
-                    <button
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={selecionarTodasTriagem}
-                    >
-                      <i className="bi bi-check2-all me-1" />
-                      Selecionar todas
-                    </button>
-                    <button
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={limparSelecaoTriagem}
-                    >
-                      Limpar seleção
-                    </button>
-                    <button
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={() => {
-                        setTriagemOffset(0)
-                        carregarTriagem(0)
-                      }}
-                    >
-                      <i className="bi bi-arrow-repeat me-1" />
-                      Atualizar
-                    </button>
-                    <button
-                      className="btn btn-success btn-sm"
-                      onClick={processarLoteTriagem}
-                      disabled={processandoLoteTriagem || triagemSelecionadas.length === 0}
-                    >
-                      <i className="bi bi-robot me-1" />
-                      {processandoLoteTriagem
-                        ? 'Processando...'
-                        : `Processar selecionadas (${triagemSelecionadas.length})`}
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm w-100"
+                        onClick={limparFiltros}
+                        title="Limpar filtros"
+                      >
+                        <i className="bi bi-x-lg" />
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
+            </div>
 
-              {loadingTriagem ? (
-                <div className="col-12 text-center py-5">
+            {/* Lista + Detalhe */}
+            <div className={pubSelecionada ? 'col-md-6' : 'col-12'}>
+              {loadingPubs ? (
+                <div className="text-center py-5">
                   <div className="spinner-border text-primary" />
                 </div>
-              ) : triagemFiltrados.length === 0 ? (
-                <div className="col-12">
-                  <div className="alert alert-success mb-0">
-                    {triagemBusca
-                      ? 'Nenhuma publicação encontrada para esse filtro.'
-                      : 'Nenhuma pendência na fila de triagem. As publicações novas aparecerão aqui após a sincronização.'}
-                  </div>
+              ) : publicacoes.length === 0 ? (
+                <div className="text-center py-5 text-muted">
+                  <i className="bi bi-inbox fs-1 d-block mb-2" />
+                  Nenhuma publicação encontrada.
+                  <br />
+                  <small>Cadastre suas OABs e clique em "Sincronizar agora".</small>
                 </div>
               ) : (
                 <>
-                  {triagemFiltrados.map((item) => {
-                    const pub = item.publicacao
-                    const analise = item.analise || {}
-                    const sugestoes = item.sugestoes_vinculo || item.sugestoes || {}
-                    const tribunal = analise.tribunal || pub.sigla_tribunal || ''
-                    const dataFormatada = pub.data_disponibilizacao
-                      ? new Date(pub.data_disponibilizacao).toLocaleDateString('pt-BR')
-                      : null
-                    const textoOriginal = (pub.texto || '').trim()
-                    const textoDecodificado = decodeHtmlEntities(textoOriginal)
-                    const textoHtmlSeguro = sanitizarHtmlTribunal(textoDecodificado)
-                    const textoPreview = extrairTextoPlano(textoHtmlSeguro)
-                    const expandido = !!triagemExpandido[pub.id]
-                    const temPartes =
-                      (analise.partes_autoras || []).length > 0 ||
-                      (analise.partes_reus || []).length > 0
-                    const temRepresentantes = (analise.representantes || []).length > 0
-                    const temDocumentos = (analise.documentos_extraidos || []).length > 0
-                    const temSugestoesCasos = (sugestoes.casos || []).length > 0
-                    const temSugestoesClientes = (sugestoes.clientes || []).length > 0
-                    const confianca = analise.confianca || 0
-                    const borderColor =
-                      confianca >= 0.7 ? '#198754' : confianca >= 0.4 ? '#ffc107' : '#dc3545'
+                  <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 text-muted small mb-2">
+                    <span>
+                      {total} publicação(ões) · página {Math.floor(offset / itensPorPagina) + 1}
+                    </span>
+                    <div className="d-flex align-items-center gap-2">
+                      <label className="small mb-0">Por página</label>
+                      <select
+                        className="form-select form-select-sm"
+                        style={{ width: 90 }}
+                        value={itensPorPagina}
+                        onChange={(e) => {
+                          const novoLimite = Number(e.target.value)
+                          setItensPorPagina(novoLimite)
+                          setOffset(0)
+                          carregarPublicacoes(0, novoLimite)
+                        }}
+                      >
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
+                  </div>
+                  {publicacoes.map((pub) => (
+                    <div
+                      key={pub.id}
+                      className={`card mb-2 border-0 shadow-sm cursor-pointer ${!pub.lida ? 'border-start border-4 border-primary' : ''} ${pubSelecionada?.id === pub.id ? 'bg-light' : ''}`}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => abrirDetalhePublicacao(pub)}
+                    >
+                      <div className="card-body py-2 px-3">
+                        <div className="d-flex justify-content-between align-items-start">
+                          <div className="flex-grow-1 me-2" style={{ minWidth: 0 }}>
+                            <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                              {!pub.lida && <span className="badge bg-primary">Nova</span>}
+                              <span className="badge bg-secondary">
+                                {pub.sigla_tribunal || '—'}
+                              </span>
+                              <span className="badge bg-light text-dark border">
+                                {pub.tipo_comunicacao || 'Comunicação'}
+                              </span>
+                              {pub.origem_busca === 'oab' && (
+                                <span className="badge bg-info text-dark">via OAB</span>
+                              )}
+                              {pub.origem_busca === 'processo' && (
+                                <span className="badge bg-warning text-dark">via Processo</span>
+                              )}
+                            </div>
+                            <div className="fw-semibold text-truncate small">
+                              {pub.numero_processo_mascara ||
+                                pub.numero_processo ||
+                                'Sem nº processo'}
+                            </div>
+                            <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                              {pub.nome_orgao} · {fmtData(pub.data_disponibilizacao)}
+                            </div>
+                          </div>
+                          <button
+                            className={`btn btn-sm ${pub.lida ? 'btn-outline-secondary' : 'btn-outline-primary'}`}
+                            title={pub.lida ? 'Marcar como não lida' : 'Marcar como lida'}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              marcarLida(pub, !pub.lida)
+                            }}
+                          >
+                            <i className={`bi ${pub.lida ? 'bi-envelope' : 'bi-envelope-open'}`} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Paginação */}
+                  <div className="d-flex gap-2 mt-3">
+                    <button
+                      className="btn btn-outline-secondary btn-sm"
+                      disabled={offset === 0}
+                      onClick={() => {
+                        const o = Math.max(0, offset - itensPorPagina)
+                        setOffset(o)
+                        carregarPublicacoes(o)
+                      }}
+                    >
+                      ← Anterior
+                    </button>
+                    <button
+                      className="btn btn-outline-secondary btn-sm"
+                      disabled={offset + itensPorPagina >= total}
+                      onClick={() => {
+                        const o = offset + itensPorPagina
+                        setOffset(o)
+                        carregarPublicacoes(o)
+                      }}
+                    >
+                      Próxima →
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
 
-                    return (
-                      <div className="col-12" key={pub.id}>
+            {/* Painel de detalhe */}
+            {pubSelecionada && (
+              <div className="col-md-6">
+                <div className="card shadow-sm border-0 h-100">
+                  <div className="card-header bg-white d-flex justify-content-between align-items-center">
+                    <strong className="small">Detalhe da Publicação</strong>
+                    <button className="btn-close btn-sm" onClick={fecharDetalhePublicacao} />
+                  </div>
+                  <div className="card-body overflow-auto" style={{ maxHeight: '75vh' }}>
+                    <table className="table table-sm table-borderless mb-3">
+                      <tbody>
+                        <tr>
+                          <td className="text-muted small fw-semibold" style={{ width: 130 }}>
+                            Tribunal
+                          </td>
+                          <td className="small">
+                            {pubSelecionada.sigla_tribunal} — {pubSelecionada.nome_orgao}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-muted small fw-semibold">Processo</td>
+                          <td className="small">
+                            {pubSelecionada.numero_processo_mascara ||
+                              pubSelecionada.numero_processo ||
+                              '—'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-muted small fw-semibold">Tipo</td>
+                          <td className="small">
+                            {pubSelecionada.tipo_comunicacao} / {pubSelecionada.tipo_documento}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-muted small fw-semibold">Classe</td>
+                          <td className="small">{pubSelecionada.nome_classe || '—'}</td>
+                        </tr>
+                        <tr>
+                          <td className="text-muted small fw-semibold">Disponibilizado</td>
+                          <td className="small">{fmtData(pubSelecionada.data_disponibilizacao)}</td>
+                        </tr>
+                        <tr>
+                          <td className="text-muted small fw-semibold">Meio</td>
+                          <td className="small">
+                            {pubSelecionada.meio === 'D'
+                              ? 'Diário Eletrônico'
+                              : pubSelecionada.meio === 'E'
+                                ? 'Edital'
+                                : '—'}
+                          </td>
+                        </tr>
+                        {pubSelecionada.nome_juiz && (
+                          <tr>
+                            <td className="text-muted small fw-semibold">Magistrado</td>
+                            <td className="small">{pubSelecionada.nome_juiz}</td>
+                          </tr>
+                        )}
+                        {pubSelecionada.polo_ativo && (
+                          <tr>
+                            <td className="text-muted small fw-semibold">Polo Ativo</td>
+                            <td className="small">{pubSelecionada.polo_ativo}</td>
+                          </tr>
+                        )}
+                        {pubSelecionada.polo_passivo && (
+                          <tr>
+                            <td className="text-muted small fw-semibold">Polo Passivo</td>
+                            <td className="small">{pubSelecionada.polo_passivo}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+
+                    {/* Texto da publicação */}
+                    <div className="mb-3">
+                      <div className="text-muted small fw-semibold mb-1">Texto da Publicação</div>
+                      {textoDetalhePlano ? (
                         <div
-                          className="card shadow-sm"
-                          style={{ borderLeft: `4px solid ${borderColor}` }}
+                          className="p-2 bg-light rounded border small"
+                          style={{
+                            maxHeight: 260,
+                            overflowY: 'auto',
+                            overflowX: 'auto',
+                            wordBreak: 'break-word',
+                          }}
+                          dangerouslySetInnerHTML={{ __html: textoDetalheHtmlSeguro }}
+                        />
+                      ) : (
+                        <div className="p-2 bg-light rounded border small text-muted">
+                          Sem texto disponível.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Vincular ao caso */}
+                    <div className="mb-3">
+                      <label className="form-label small fw-semibold">
+                        Vincular ao processo cadastrado
+                      </label>
+                      <select
+                        className="form-select form-select-sm"
+                        value={pubSelecionada.caso_id || ''}
+                        onChange={(e) =>
+                          vincularCaso(
+                            pubSelecionada,
+                            e.target.value ? parseInt(e.target.value) : null
+                          )
+                        }
+                      >
+                        <option value="">— Nenhum —</option>
+                        {casos.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.numero_processo ? `${c.numero_processo} — ` : ''}
+                            {c.titulo}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="d-flex gap-2 flex-wrap">
+                      {pubSelecionada.link && (
+                        <a
+                          href={pubSelecionada.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-outline-primary btn-sm"
                         >
-                          {/* Cabeçalho do card */}
-                          <div className="card-header bg-white py-2 px-3 d-flex align-items-center gap-2 flex-wrap">
-                            <input
-                              className="form-check-input mt-0 flex-shrink-0"
-                              type="checkbox"
-                              title="Selecionar para lote"
-                              id={`triagem-check-${pub.id}`}
-                              checked={triagemSelecionadas.includes(pub.id)}
-                              onChange={() => toggleSelecaoTriagem(pub.id)}
-                            />
-                            <div className="fw-semibold me-1" style={{ fontSize: '0.95rem' }}>
-                              {pub.numero_processo_mascara || pub.numero_processo || (
-                                <span className="text-muted fst-italic">
-                                  Sem número de processo
+                          <i className="bi bi-box-arrow-up-right me-1" />
+                          Ver original
+                        </a>
+                      )}
+                      <button
+                        className="btn btn-outline-secondary btn-sm"
+                        onClick={() => baixarCertidao(pubSelecionada)}
+                      >
+                        <i className="bi bi-file-earmark-pdf me-1" />
+                        Baixar certidão
+                      </button>
+                      <button
+                        className={`btn btn-sm ${pubSelecionada.lida ? 'btn-outline-secondary' : 'btn-outline-success'}`}
+                        onClick={() => marcarLida(pubSelecionada, !pubSelecionada.lida)}
+                      >
+                        <i
+                          className={`bi ${pubSelecionada.lida ? 'bi-envelope me-1' : 'bi-envelope-open me-1'}`}
+                        />
+                        {pubSelecionada.lida ? 'Marcar como não lida' : 'Marcar como lida'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Aba OABs ──────────────────────────────────────────────────────── */}
+        {aba === 'oabs' && (
+          <div className="row g-4">
+            <div className="col-md-5">
+              <div className="card shadow-sm border-0">
+                <div className="card-header bg-white fw-semibold">
+                  <i className="bi bi-plus-circle me-2 text-success" />
+                  Cadastrar OAB para monitoramento
+                </div>
+                <div className="card-body">
+                  <form onSubmit={salvarOab}>
+                    <div className="mb-3">
+                      <label className="form-label small">
+                        Número da OAB <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        className="form-control"
+                        placeholder="Ex: 123456"
+                        required
+                        value={novaOab.numero_oab}
+                        onChange={(e) => setNovaOab((o) => ({ ...o, numero_oab: e.target.value }))}
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label small">
+                        UF da OAB <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        className="form-select"
+                        required
+                        value={novaOab.uf_oab}
+                        onChange={(e) => setNovaOab((o) => ({ ...o, uf_oab: e.target.value }))}
+                      >
+                        <option value="">Selecione a UF</option>
+                        {[
+                          'AC',
+                          'AL',
+                          'AP',
+                          'AM',
+                          'BA',
+                          'CE',
+                          'DF',
+                          'ES',
+                          'GO',
+                          'MA',
+                          'MT',
+                          'MS',
+                          'MG',
+                          'PA',
+                          'PB',
+                          'PR',
+                          'PE',
+                          'PI',
+                          'RJ',
+                          'RN',
+                          'RS',
+                          'RO',
+                          'RR',
+                          'SC',
+                          'SP',
+                          'SE',
+                          'TO',
+                        ].map((uf) => (
+                          <option key={uf} value={uf}>
+                            {uf}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label small">
+                        Tribunal (sigla){' '}
+                        <span className="text-muted fw-normal">
+                          — opcional, ex: TRT9, TJPR, TST
+                        </span>
+                      </label>
+                      <input
+                        className="form-control"
+                        placeholder="Deixe em branco para usar a UF (ex: TJPR)"
+                        value={novaOab.sigla_tribunal}
+                        onChange={(e) =>
+                          setNovaOab((o) => ({
+                            ...o,
+                            sigla_tribunal: e.target.value.toUpperCase(),
+                          }))
+                        }
+                      />
+                      <div className="form-text">Use quando a OAB atua em TRTs, TST, STJ, etc.</div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label small">Nome do advogado (opcional)</label>
+                      <input
+                        className="form-control"
+                        placeholder="Para identificação interna"
+                        value={novaOab.nome_advogado}
+                        onChange={(e) =>
+                          setNovaOab((o) => ({ ...o, nome_advogado: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <button type="submit" className="btn btn-success w-100" disabled={salvandoOab}>
+                      {salvandoOab ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" />
+                          Salvando…
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check-lg me-2" />
+                          Cadastrar OAB
+                        </>
+                      )}
+                    </button>
+                  </form>
+                  <div className="alert alert-info mt-3 small mb-0">
+                    <i className="bi bi-info-circle me-1" />
+                    Após cadastrar, clique em <strong>"Sincronizar agora"</strong> para buscar
+                    publicações imediatamente. O job automático roda diariamente às 04:00 e
+                    considera os últimos 30 dias.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-md-7">
+              <div className="card shadow-sm border-0">
+                <div className="card-header bg-white fw-semibold">
+                  <i className="bi bi-list-check me-2" />
+                  OABs monitoradas
+                </div>
+                <div className="card-body p-0">
+                  {loadingOabs ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border text-primary" />
+                    </div>
+                  ) : oabs.length === 0 ? (
+                    <div className="text-center py-4 text-muted">
+                      <i className="bi bi-person-badge fs-2 d-block mb-2" />
+                      Nenhuma OAB cadastrada ainda.
+                    </div>
+                  ) : (
+                    <table className="table table-hover mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th className="small">OAB</th>
+                          <th className="small">Tribunal</th>
+                          <th className="small">Advogado</th>
+                          <th className="small">Última sync</th>
+                          <th className="small"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {oabs.map((o) => (
+                          <tr key={o.id}>
+                            <td className="fw-semibold small">{o.numero_oab}</td>
+                            <td className="small">
+                              <span className="badge bg-secondary">
+                                {o.sigla_tribunal || o.uf_oab}
+                              </span>
+                            </td>
+                            <td className="small text-muted">{o.nome_advogado || '—'}</td>
+                            <td className="small text-muted">
+                              {o.ultima_sincronizacao
+                                ? fmtData(o.ultima_sincronizacao, true)
+                                : o.data_criacao
+                                  ? `Aguardando 1ª sync (cadastro em ${fmtData(o.data_criacao, true)})`
+                                  : 'Nunca'}
+                            </td>
+                            <td>
+                              <button
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={() => removerOab(o.id)}
+                                title="Remover"
+                              >
+                                <i className="bi bi-trash" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+
+              <div className="card shadow-sm border-0 mt-3">
+                <div className="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                  <span>
+                    <i className="bi bi-journal-text me-2" />
+                    Últimas publicações capturadas
+                  </span>
+                  <button
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={carregarUltimasPublicacoesDjen}
+                  >
+                    <i className="bi bi-arrow-repeat me-1" />
+                    Atualizar
+                  </button>
+                </div>
+                <div className="card-body p-0">
+                  {loadingUltimasPublicacoesDjen ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border text-primary" />
+                    </div>
+                  ) : ultimasPublicacoesDjen.length === 0 ? (
+                    <div className="p-3 text-muted small">
+                      Nenhuma publicação foi capturada ainda. Clique em{' '}
+                      <strong>Sincronizar agora</strong> para buscar no DJEN.
+                    </div>
+                  ) : (
+                    <div className="list-group list-group-flush">
+                      {ultimasPublicacoesDjen.map((pub) => (
+                        <button
+                          key={pub.id}
+                          type="button"
+                          className="list-group-item list-group-item-action"
+                          onClick={() => abrirDetalhePublicacao(pub)}
+                        >
+                          <div className="d-flex justify-content-between align-items-start gap-2">
+                            <div className="small" style={{ minWidth: 0 }}>
+                              <div className="fw-semibold text-truncate">
+                                {pub.numero_processo_mascara ||
+                                  pub.numero_processo ||
+                                  'Sem número de processo'}
+                              </div>
+                              <div className="text-muted text-truncate">
+                                {pub.sigla_tribunal || '—'} ·{' '}
+                                {pub.tipo_comunicacao || 'Comunicação'}
+                              </div>
+                            </div>
+                            <span className={`badge ${pub.lida ? 'bg-secondary' : 'bg-primary'}`}>
+                              {pub.lida ? 'Lida' : 'Nova'}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Aba Triagem ───────────────────────────────────────────────────── */}
+        {aba === 'triagem' &&
+          (() => {
+            // filtro local por busca de texto
+            const triagemFiltrados = triagemBusca.trim()
+              ? triagemItems.filter((item) => {
+                  const pub = item.publicacao
+                  const analise = item.analise || {}
+                  const textoNormalizado = extrairTextoPlano(
+                    sanitizarHtmlTribunal(decodeHtmlEntities(pub.texto || ''))
+                  )
+                  const haystack = [
+                    pub.numero_processo,
+                    pub.numero_processo_mascara,
+                    pub.nome_orgao,
+                    pub.sigla_tribunal,
+                    analise.tribunal,
+                    textoNormalizado,
+                    ...(analise.partes_autoras || []),
+                    ...(analise.partes_reus || []),
+                    ...(analise.representantes || []),
+                  ]
+                    .join(' ')
+                    .toLowerCase()
+                  return haystack.includes(triagemBusca.toLowerCase())
+                })
+              : triagemItems
+
+            const badgeConfianca = (v) => {
+              const pct = Math.round((v || 0) * 100)
+              const cls =
+                pct >= 70 ? 'bg-success' : pct >= 40 ? 'bg-warning text-dark' : 'bg-danger'
+              return (
+                <span className={`badge ${cls} ms-2`} style={{ fontSize: '0.7rem' }}>
+                  {pct}% confiança
+                </span>
+              )
+            }
+
+            const toggleExpandido = (id) =>
+              setTriagemExpandido((prev) => ({ ...prev, [id]: !prev[id] }))
+
+            return (
+              <div className="row g-3">
+                {/* Barra de controles */}
+                <div className="col-12">
+                  <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                      <span className="badge bg-secondary fs-6 px-3 py-2">
+                        {triagemTotal} pendente(s)
+                      </span>
+                      <input
+                        type="search"
+                        className="form-control form-control-sm"
+                        style={{ width: 260 }}
+                        placeholder="Buscar por processo, parte, órgão..."
+                        value={triagemBusca}
+                        onChange={(e) => setTriagemBusca(e.target.value)}
+                      />
+                    </div>
+                    <div className="d-flex gap-2 flex-wrap">
+                      <button
+                        className="btn btn-outline-secondary btn-sm"
+                        onClick={selecionarTodasTriagem}
+                      >
+                        <i className="bi bi-check2-all me-1" />
+                        Selecionar todas
+                      </button>
+                      <button
+                        className="btn btn-outline-secondary btn-sm"
+                        onClick={limparSelecaoTriagem}
+                      >
+                        Limpar seleção
+                      </button>
+                      <button
+                        className="btn btn-outline-primary btn-sm"
+                        onClick={() => {
+                          setTriagemOffset(0)
+                          carregarTriagem(0)
+                        }}
+                      >
+                        <i className="bi bi-arrow-repeat me-1" />
+                        Atualizar
+                      </button>
+                      <button
+                        className="btn btn-success btn-sm"
+                        onClick={processarLoteTriagem}
+                        disabled={processandoLoteTriagem || triagemSelecionadas.length === 0}
+                      >
+                        <i className="bi bi-robot me-1" />
+                        {processandoLoteTriagem
+                          ? 'Processando...'
+                          : `Processar selecionadas (${triagemSelecionadas.length})`}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {loadingTriagem ? (
+                  <div className="col-12 text-center py-5">
+                    <div className="spinner-border text-primary" />
+                  </div>
+                ) : triagemFiltrados.length === 0 ? (
+                  <div className="col-12">
+                    <div className="alert alert-success mb-0">
+                      {triagemBusca
+                        ? 'Nenhuma publicação encontrada para esse filtro.'
+                        : 'Nenhuma pendência na fila de triagem. As publicações novas aparecerão aqui após a sincronização.'}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {triagemFiltrados.map((item) => {
+                      const pub = item.publicacao
+                      const analise = item.analise || {}
+                      const sugestoes = item.sugestoes_vinculo || item.sugestoes || {}
+                      const tribunal = analise.tribunal || pub.sigla_tribunal || ''
+                      const dataFormatada = pub.data_disponibilizacao
+                        ? new Date(pub.data_disponibilizacao).toLocaleDateString('pt-BR')
+                        : null
+                      const textoOriginal = (pub.texto || '').trim()
+                      const textoDecodificado = decodeHtmlEntities(textoOriginal)
+                      const textoHtmlSeguro = sanitizarHtmlTribunal(textoDecodificado)
+                      const textoPreview = extrairTextoPlano(textoHtmlSeguro)
+                      const expandido = !!triagemExpandido[pub.id]
+                      const temPartes =
+                        (analise.partes_autoras || []).length > 0 ||
+                        (analise.partes_reus || []).length > 0
+                      const temRepresentantes = (analise.representantes || []).length > 0
+                      const temDocumentos = (analise.documentos_extraidos || []).length > 0
+                      const temSugestoesCasos = (sugestoes.casos || []).length > 0
+                      const temSugestoesClientes = (sugestoes.clientes || []).length > 0
+                      const confianca = analise.confianca || 0
+                      const borderColor =
+                        confianca >= 0.7 ? '#198754' : confianca >= 0.4 ? '#ffc107' : '#dc3545'
+
+                      return (
+                        <div className="col-12" key={pub.id}>
+                          <div
+                            className="card shadow-sm"
+                            style={{ borderLeft: `4px solid ${borderColor}` }}
+                          >
+                            {/* Cabeçalho do card */}
+                            <div className="card-header bg-white py-2 px-3 d-flex align-items-center gap-2 flex-wrap">
+                              <input
+                                className="form-check-input mt-0 flex-shrink-0"
+                                type="checkbox"
+                                title="Selecionar para lote"
+                                id={`triagem-check-${pub.id}`}
+                                checked={triagemSelecionadas.includes(pub.id)}
+                                onChange={() => toggleSelecaoTriagem(pub.id)}
+                              />
+                              <div className="fw-semibold me-1" style={{ fontSize: '0.95rem' }}>
+                                {pub.numero_processo_mascara || pub.numero_processo || (
+                                  <span className="text-muted fst-italic">
+                                    Sem número de processo
+                                  </span>
+                                )}
+                              </div>
+                              {tribunal && (
+                                <span
+                                  className="badge bg-primary bg-opacity-10 text-primary border border-primary"
+                                  style={{ fontSize: '0.72rem' }}
+                                >
+                                  {tribunal}
+                                </span>
+                              )}
+                              {pub.tipo_comunicacao && (
+                                <span
+                                  className="badge bg-light text-secondary border"
+                                  style={{ fontSize: '0.72rem' }}
+                                >
+                                  {pub.tipo_comunicacao}
+                                </span>
+                              )}
+                              {dataFormatada && (
+                                <span className="text-muted ms-auto small">
+                                  <i className="bi bi-calendar3 me-1" />
+                                  {dataFormatada}
+                                </span>
+                              )}
+                              {badgeConfianca(confianca)}
+                              {analise.revisao_manual_recomendada && (
+                                <span
+                                  className="badge bg-warning text-dark ms-1"
+                                  style={{ fontSize: '0.7rem' }}
+                                >
+                                  <i className="bi bi-exclamation-triangle me-1" />
+                                  Revisão manual
                                 </span>
                               )}
                             </div>
-                            {tribunal && (
-                              <span
-                                className="badge bg-primary bg-opacity-10 text-primary border border-primary"
-                                style={{ fontSize: '0.72rem' }}
-                              >
-                                {tribunal}
-                              </span>
-                            )}
-                            {pub.tipo_comunicacao && (
-                              <span
-                                className="badge bg-light text-secondary border"
-                                style={{ fontSize: '0.72rem' }}
-                              >
-                                {pub.tipo_comunicacao}
-                              </span>
-                            )}
-                            {dataFormatada && (
-                              <span className="text-muted ms-auto small">
-                                <i className="bi bi-calendar3 me-1" />
-                                {dataFormatada}
-                              </span>
-                            )}
-                            {badgeConfianca(confianca)}
-                            {analise.revisao_manual_recomendada && (
-                              <span
-                                className="badge bg-warning text-dark ms-1"
-                                style={{ fontSize: '0.7rem' }}
-                              >
-                                <i className="bi bi-exclamation-triangle me-1" />
-                                Revisão manual
-                              </span>
-                            )}
-                          </div>
 
-                          <div className="card-body py-2 px-3">
-                            {/* Órgão */}
-                            {pub.nome_orgao && (
-                              <div className="small text-muted mb-2">
-                                <i className="bi bi-building me-1" />
-                                {pub.nome_orgao}
-                              </div>
-                            )}
+                            <div className="card-body py-2 px-3">
+                              {/* Órgão */}
+                              {pub.nome_orgao && (
+                                <div className="small text-muted mb-2">
+                                  <i className="bi bi-building me-1" />
+                                  {pub.nome_orgao}
+                                </div>
+                              )}
 
-                            {/* Preview do texto */}
-                            {textoPreview && (
-                              <div className="mb-3">
-                                {expandido ? (
-                                  <div
-                                    className="small text-secondary p-2 rounded"
-                                    style={{
-                                      background: '#f8f9fa',
-                                      borderLeft: '3px solid #dee2e6',
-                                      wordBreak: 'break-word',
-                                      overflowX: 'auto',
-                                    }}
-                                    dangerouslySetInnerHTML={{ __html: textoHtmlSeguro }}
-                                  />
-                                ) : (
-                                  <div
-                                    className="small text-secondary p-2 rounded"
-                                    style={{
-                                      background: '#f8f9fa',
-                                      borderLeft: '3px solid #dee2e6',
-                                      whiteSpace: 'pre-wrap',
-                                      wordBreak: 'break-word',
-                                    }}
-                                  >
-                                    {textoPreview.slice(0, 320) +
-                                      (textoPreview.length > 320 ? '…' : '')}
-                                  </div>
-                                )}
-                                {textoPreview.length > 320 && (
+                              {/* Preview do texto */}
+                              {textoPreview && (
+                                <div className="mb-3">
+                                  {expandido ? (
+                                    <div
+                                      className="small text-secondary p-2 rounded"
+                                      style={{
+                                        background: '#f8f9fa',
+                                        borderLeft: '3px solid #dee2e6',
+                                        wordBreak: 'break-word',
+                                        overflowX: 'auto',
+                                      }}
+                                      dangerouslySetInnerHTML={{ __html: textoHtmlSeguro }}
+                                    />
+                                  ) : (
+                                    <div
+                                      className="small text-secondary p-2 rounded"
+                                      style={{
+                                        background: '#f8f9fa',
+                                        borderLeft: '3px solid #dee2e6',
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                      }}
+                                    >
+                                      {textoPreview.slice(0, 320) +
+                                        (textoPreview.length > 320 ? '…' : '')}
+                                    </div>
+                                  )}
+                                  {textoPreview.length > 320 && (
+                                    <button
+                                      className="btn btn-link btn-sm p-0 mt-1"
+                                      style={{ fontSize: '0.75rem' }}
+                                      onClick={() => toggleExpandido(pub.id)}
+                                    >
+                                      {expandido ? 'Ver menos ▲' : 'Ver texto completo ▼'}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Partes + Representantes */}
+                              {(temPartes || temRepresentantes) && (
+                                <div className="row g-2 small mb-2">
+                                  {(analise.partes_autoras || []).length > 0 && (
+                                    <div className="col-md-4">
+                                      <div className="text-muted fw-semibold mb-1">
+                                        <i className="bi bi-person me-1" />
+                                        Polo ativo
+                                      </div>
+                                      {analise.partes_autoras.map((p, idx) => (
+                                        <div key={`a-${idx}`} className="text-truncate" title={p}>
+                                          {p}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {(analise.partes_reus || []).length > 0 && (
+                                    <div className="col-md-4">
+                                      <div className="text-muted fw-semibold mb-1">
+                                        <i className="bi bi-person-x me-1" />
+                                        Polo passivo
+                                      </div>
+                                      {analise.partes_reus.map((p, idx) => (
+                                        <div key={`r-${idx}`} className="text-truncate" title={p}>
+                                          {p}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {temRepresentantes && (
+                                    <div className="col-md-4">
+                                      <div className="text-muted fw-semibold mb-1">
+                                        <i className="bi bi-briefcase me-1" />
+                                        Advogado(s)
+                                      </div>
+                                      {analise.representantes.map((p, idx) => (
+                                        <div key={`rep-${idx}`} className="text-truncate" title={p}>
+                                          {p}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Documentos + Sugestões */}
+                              {(temDocumentos || temSugestoesCasos || temSugestoesClientes) && (
+                                <div className="row g-2 small mb-2">
+                                  {temDocumentos && (
+                                    <div className="col-md-4">
+                                      <div className="text-muted fw-semibold mb-1">
+                                        <i className="bi bi-file-earmark-text me-1" />
+                                        CPF/CNPJ
+                                      </div>
+                                      {analise.documentos_extraidos.map((d, idx) => (
+                                        <div key={`doc-${idx}`}>{d}</div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {temSugestoesCasos && (
+                                    <div className="col-md-4">
+                                      <div className="text-muted fw-semibold mb-1">
+                                        <i className="bi bi-folder2-open me-1" />
+                                        Casos sugeridos
+                                      </div>
+                                      <div className="d-flex flex-wrap gap-1">
+                                        {sugestoes.casos.slice(0, 3).map((s) => (
+                                          <button
+                                            key={`caso-${s.id}`}
+                                            className="btn btn-outline-primary btn-sm py-0 px-2"
+                                            style={{ fontSize: '0.72rem' }}
+                                            onClick={() => mesclarTriagemCaso(pub, s.id)}
+                                            title={`Mesclar com caso #${s.id}`}
+                                          >
+                                            #{s.id} {s.numero_processo || s.titulo} ·{' '}
+                                            {Math.round((s.score || 0) * 100)}%
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {temSugestoesClientes && (
+                                    <div className="col-md-4">
+                                      <div className="text-muted fw-semibold mb-1">
+                                        <i className="bi bi-people me-1" />
+                                        Clientes sugeridos
+                                      </div>
+                                      <div className="d-flex flex-wrap gap-1">
+                                        {sugestoes.clientes.slice(0, 3).map((s) => (
+                                          <span
+                                            key={`cli-${s.id}`}
+                                            className="badge bg-light text-dark border"
+                                            style={{ fontSize: '0.72rem' }}
+                                          >
+                                            {s.nome_razao_social} ·{' '}
+                                            {Math.round((s.score || 0) * 100)}%
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Ações */}
+                              <div className="d-flex gap-2 flex-wrap mt-2 pt-2 border-top">
+                                <button
+                                  className="btn btn-success btn-sm"
+                                  onClick={() => criarClienteECasoTriagem(pub)}
+                                >
+                                  <i className="bi bi-plus-circle me-1" />
+                                  Criar cliente e caso
+                                </button>
+                                {temSugestoesCasos && (
                                   <button
-                                    className="btn btn-link btn-sm p-0 mt-1"
-                                    style={{ fontSize: '0.75rem' }}
-                                    onClick={() => toggleExpandido(pub.id)}
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() => mesclarTriagemCaso(pub, sugestoes.casos[0].id)}
                                   >
-                                    {expandido ? 'Ver menos ▲' : 'Ver texto completo ▼'}
+                                    <i className="bi bi-arrow-left-right me-1" />
+                                    Mesclar com #{sugestoes.casos[0].id}
                                   </button>
                                 )}
-                              </div>
-                            )}
-
-                            {/* Partes + Representantes */}
-                            {(temPartes || temRepresentantes) && (
-                              <div className="row g-2 small mb-2">
-                                {(analise.partes_autoras || []).length > 0 && (
-                                  <div className="col-md-4">
-                                    <div className="text-muted fw-semibold mb-1">
-                                      <i className="bi bi-person me-1" />
-                                      Polo ativo
-                                    </div>
-                                    {analise.partes_autoras.map((p, idx) => (
-                                      <div key={`a-${idx}`} className="text-truncate" title={p}>
-                                        {p}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {(analise.partes_reus || []).length > 0 && (
-                                  <div className="col-md-4">
-                                    <div className="text-muted fw-semibold mb-1">
-                                      <i className="bi bi-person-x me-1" />
-                                      Polo passivo
-                                    </div>
-                                    {analise.partes_reus.map((p, idx) => (
-                                      <div key={`r-${idx}`} className="text-truncate" title={p}>
-                                        {p}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {temRepresentantes && (
-                                  <div className="col-md-4">
-                                    <div className="text-muted fw-semibold mb-1">
-                                      <i className="bi bi-briefcase me-1" />
-                                      Advogado(s)
-                                    </div>
-                                    {analise.representantes.map((p, idx) => (
-                                      <div key={`rep-${idx}`} className="text-truncate" title={p}>
-                                        {p}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Documentos + Sugestões */}
-                            {(temDocumentos || temSugestoesCasos || temSugestoesClientes) && (
-                              <div className="row g-2 small mb-2">
-                                {temDocumentos && (
-                                  <div className="col-md-4">
-                                    <div className="text-muted fw-semibold mb-1">
-                                      <i className="bi bi-file-earmark-text me-1" />
-                                      CPF/CNPJ
-                                    </div>
-                                    {analise.documentos_extraidos.map((d, idx) => (
-                                      <div key={`doc-${idx}`}>{d}</div>
-                                    ))}
-                                  </div>
-                                )}
-                                {temSugestoesCasos && (
-                                  <div className="col-md-4">
-                                    <div className="text-muted fw-semibold mb-1">
-                                      <i className="bi bi-folder2-open me-1" />
-                                      Casos sugeridos
-                                    </div>
-                                    <div className="d-flex flex-wrap gap-1">
-                                      {sugestoes.casos.slice(0, 3).map((s) => (
-                                        <button
-                                          key={`caso-${s.id}`}
-                                          className="btn btn-outline-primary btn-sm py-0 px-2"
-                                          style={{ fontSize: '0.72rem' }}
-                                          onClick={() => mesclarTriagemCaso(pub, s.id)}
-                                          title={`Mesclar com caso #${s.id}`}
-                                        >
-                                          #{s.id} {s.numero_processo || s.titulo} ·{' '}
-                                          {Math.round((s.score || 0) * 100)}%
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                {temSugestoesClientes && (
-                                  <div className="col-md-4">
-                                    <div className="text-muted fw-semibold mb-1">
-                                      <i className="bi bi-people me-1" />
-                                      Clientes sugeridos
-                                    </div>
-                                    <div className="d-flex flex-wrap gap-1">
-                                      {sugestoes.clientes.slice(0, 3).map((s) => (
-                                        <span
-                                          key={`cli-${s.id}`}
-                                          className="badge bg-light text-dark border"
-                                          style={{ fontSize: '0.72rem' }}
-                                        >
-                                          {s.nome_razao_social} · {Math.round((s.score || 0) * 100)}
-                                          %
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Ações */}
-                            <div className="d-flex gap-2 flex-wrap mt-2 pt-2 border-top">
-                              <button
-                                className="btn btn-success btn-sm"
-                                onClick={() => criarClienteECasoTriagem(pub)}
-                              >
-                                <i className="bi bi-plus-circle me-1" />
-                                Criar cliente e caso
-                              </button>
-                              {temSugestoesCasos && (
                                 <button
-                                  className="btn btn-primary btn-sm"
-                                  onClick={() => mesclarTriagemCaso(pub, sugestoes.casos[0].id)}
+                                  className="btn btn-outline-secondary btn-sm"
+                                  onClick={() => marcarLida(pub, true)}
                                 >
-                                  <i className="bi bi-arrow-left-right me-1" />
-                                  Mesclar com #{sugestoes.casos[0].id}
+                                  <i className="bi bi-check2 me-1" />
+                                  Marcar lida
                                 </button>
-                              )}
-                              <button
-                                className="btn btn-outline-secondary btn-sm"
-                                onClick={() => marcarLida(pub, true)}
-                              >
-                                <i className="bi bi-check2 me-1" />
-                                Marcar lida
-                              </button>
-                              <button
-                                className="btn btn-outline-danger btn-sm ms-auto"
-                                onClick={() => ignorarTriagem(pub)}
-                              >
-                                <i className="bi bi-x-circle me-1" />
-                                Ignorar
-                              </button>
+                                <button
+                                  className="btn btn-outline-danger btn-sm ms-auto"
+                                  onClick={() => ignorarTriagem(pub)}
+                                >
+                                  <i className="bi bi-x-circle me-1" />
+                                  Ignorar
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
 
-                  {/* Paginação */}
-                  {triagemTotal > TRIAGEM_LIMIT && !triagemBusca && (
-                    <div className="col-12 d-flex justify-content-between align-items-center mt-1">
-                      <small className="text-muted">
-                        Exibindo {triagemOffset + 1}–
-                        {Math.min(triagemOffset + TRIAGEM_LIMIT, triagemTotal)} de {triagemTotal}
-                      </small>
-                      <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-outline-secondary btn-sm"
-                          disabled={triagemOffset === 0}
-                          onClick={() => {
-                            const o = Math.max(0, triagemOffset - TRIAGEM_LIMIT)
-                            setTriagemOffset(o)
-                            carregarTriagem(o)
-                          }}
-                        >
-                          <i className="bi bi-chevron-left" /> Anterior
-                        </button>
-                        <button
-                          className="btn btn-outline-secondary btn-sm"
-                          disabled={triagemOffset + TRIAGEM_LIMIT >= triagemTotal}
-                          onClick={() => {
-                            const o = triagemOffset + TRIAGEM_LIMIT
-                            setTriagemOffset(o)
-                            carregarTriagem(o)
-                          }}
-                        >
-                          Próxima <i className="bi bi-chevron-right" />
-                        </button>
+                    {/* Paginação */}
+                    {triagemTotal > TRIAGEM_LIMIT && !triagemBusca && (
+                      <div className="col-12 d-flex justify-content-between align-items-center mt-1">
+                        <small className="text-muted">
+                          Exibindo {triagemOffset + 1}–
+                          {Math.min(triagemOffset + TRIAGEM_LIMIT, triagemTotal)} de {triagemTotal}
+                        </small>
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-outline-secondary btn-sm"
+                            disabled={triagemOffset === 0}
+                            onClick={() => {
+                              const o = Math.max(0, triagemOffset - TRIAGEM_LIMIT)
+                              setTriagemOffset(o)
+                              carregarTriagem(o)
+                            }}
+                          >
+                            <i className="bi bi-chevron-left" /> Anterior
+                          </button>
+                          <button
+                            className="btn btn-outline-secondary btn-sm"
+                            disabled={triagemOffset + TRIAGEM_LIMIT >= triagemTotal}
+                            onClick={() => {
+                              const o = triagemOffset + TRIAGEM_LIMIT
+                              setTriagemOffset(o)
+                              carregarTriagem(o)
+                            }}
+                          >
+                            Próxima <i className="bi bi-chevron-right" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )
-        })()}
+                    )}
+                  </>
+                )}
+              </div>
+            )
+          })()}
 
-      {itemModalCriar && (
-        <ModalCriarClienteCaso
-          publicacao={itemModalCriar}
-          onClose={() => setItemModalCriar(null)}
-          onSuccess={onSucessoModalCriar}
-        />
-      )}
-    </div>
+        {itemModalCriar && (
+          <ModalCriarClienteCaso
+            publicacao={itemModalCriar}
+            onClose={() => setItemModalCriar(null)}
+            onSuccess={onSucessoModalCriar}
+          />
+        )}
+      </div>
+    </>
   )
 }

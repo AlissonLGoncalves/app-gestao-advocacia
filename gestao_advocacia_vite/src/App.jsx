@@ -1,10 +1,11 @@
 // src/App.jsx
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Routes, Route, NavLink, Outlet, useLocation, Navigate } from 'react-router-dom'
 import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 import { useNavigate } from 'react-router-dom'
+import { api } from './api/client.js'
 
 // Importação dos componentes de página
 import DashboardPage from './pages/DashboardPage.jsx'
@@ -24,6 +25,7 @@ import TermsPage from './pages/auth/TermsPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
 import { APP_VERSION } from './version.js'
+import GlobalSearch from './components/GlobalSearch.jsx'
 
 // Importação dos ícones
 import {
@@ -56,6 +58,24 @@ const MainLayout = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCounts, setSidebarCounts] = useState({ djenPendentes: 0, tarefasAlerta: 0 })
+
+  const fetchSidebarCounts = useCallback(async () => {
+    try {
+      const data = await api.get('/dashboard/stats')
+      setSidebarCounts({
+        djenPendentes: data.alertas_djen?.pendentes_triagem ?? 0,
+        tarefasAlerta:
+          (data.alertas_tarefas?.vencidas ?? 0) + (data.alertas_tarefas?.vencendo_hoje ?? 0),
+      })
+    } catch {
+      // sidebar badges são não-críticos, ignorar falhas silenciosamente
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchSidebarCounts()
+  }, [fetchSidebarCounts, location.pathname])
   const dataAtual = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'short',
     day: '2-digit',
@@ -141,7 +161,7 @@ const MainLayout = () => {
     return finalTitle.charAt(0).toUpperCase() + finalTitle.slice(1)
   }
 
-  const SidebarLink = ({ to, icon: IconComponent, children }) => (
+  const SidebarLink = ({ to, icon: IconComponent, children, badge }) => (
     <NavLink
       to={to}
       onClick={() => setSidebarOpen(false)}
@@ -149,7 +169,24 @@ const MainLayout = () => {
       title={children}
     >
       <IconComponent className="sidebar-link-icon" />
-      <span>{children}</span>
+      <span style={{ flex: 1 }}>{children}</span>
+      {badge > 0 && (
+        <span
+          style={{
+            backgroundColor: '#ef4444',
+            color: '#fff',
+            borderRadius: '10px',
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            minWidth: '18px',
+            padding: '1px 5px',
+            textAlign: 'center',
+            lineHeight: '16px',
+          }}
+        >
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </NavLink>
   )
 
@@ -183,7 +220,11 @@ const MainLayout = () => {
           <SidebarLink to="/casos" icon={BriefcaseIcon}>
             Casos
           </SidebarLink>
-          <SidebarLink to="/prazos" icon={ClipboardDocumentListIcon}>
+          <SidebarLink
+            to="/prazos"
+            icon={ClipboardDocumentListIcon}
+            badge={sidebarCounts.tarefasAlerta}
+          >
             Prazos (Kanban)
           </SidebarLink>
           {userRole !== 'assistente' && (
@@ -202,7 +243,7 @@ const MainLayout = () => {
           <SidebarLink to="/documentos" icon={DocumentTextIcon}>
             Documentos
           </SidebarLink>
-          <SidebarLink to="/djen" icon={NewspaperIcon}>
+          <SidebarLink to="/djen" icon={NewspaperIcon} badge={sidebarCounts.djenPendentes}>
             DJEN — Publicações
           </SidebarLink>
           <SidebarLink to="/relatorios" icon={ChartBarIcon}>
@@ -247,7 +288,8 @@ const MainLayout = () => {
               </small>
             </div>
           </div>
-          <div className="app-header-date text-capitalize">{dataAtual}</div>
+          <GlobalSearch />
+          <div className="app-header-date text-capitalize d-none d-lg-block">{dataAtual}</div>
         </header>
         <main className="app-main">
           <Outlet />

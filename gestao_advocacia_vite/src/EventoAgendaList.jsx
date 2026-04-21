@@ -15,8 +15,11 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
+import { useConfirm } from './hooks/useConfirm.jsx'
+import EmptyState from './components/EmptyState.jsx'
 
 function EventoAgendaList({ onEditEvento, refreshKey }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [eventos, setEventos] = useState([])
   const [clientes, setClientes] = useState([])
   const [casos, setCasos] = useState([])
@@ -132,7 +135,11 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
       return
     }
 
-    if (window.confirm(`Tem certeza que deseja excluir o evento/prazo ID ${id}?`)) {
+    const ok = await confirm(
+      `Tem certeza que deseja excluir o evento/prazo ID ${id}?`,
+      'Excluir evento'
+    )
+    if (ok) {
       setDeletingId(id)
       setError(null)
       try {
@@ -234,6 +241,7 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
   }
   return (
     <div className="card shadow-sm">
+      {ConfirmDialog}
       <div className="card-header bg-light p-3">
         <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap">
           <h6 className="mb-0 text-secondary me-3">Filtros e Busca na Agenda</h6>
@@ -447,8 +455,25 @@ function EventoAgendaList({ onEditEvento, refreshKey }) {
             )}
             {!loading && eventos.length === 0 && !error && (
               <tr>
-                <td colSpan="6" className="text-center text-muted p-4">
-                  Nenhum evento/prazo encontrado com os filtros aplicados.
+                <td colSpan="6">
+                  <EmptyState
+                    icon={CalendarDaysIcon}
+                    title="Nenhum evento agendado"
+                    description="Adicione compromissos, audiências e prazos ao seu calendário."
+                    actionLabel="Novo Evento"
+                    onAction={() => onEditEvento(null)}
+                    filtered={
+                      !!(
+                        searchTerm ||
+                        clienteFilter ||
+                        tipoEventoFilter ||
+                        statusConclusaoFilter ||
+                        dataInicioRangeStart ||
+                        dataInicioRangeEnd
+                      )
+                    }
+                    onClearFilters={resetFilters}
+                  />
                 </td>
               </tr>
             )}
