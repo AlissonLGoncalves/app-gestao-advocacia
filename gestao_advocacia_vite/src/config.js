@@ -18,10 +18,23 @@ function ensureV1Prefix(url) {
   return normalized
 }
 
+function replaceDeprecatedApiHost(url) {
+  const normalized = normalizeBaseUrl(url)
+
+  if (/^https?:\/\/app-gestao-advocacia\.fly\.dev(\/|$)/i.test(normalized)) {
+    return normalized.replace(
+      /^https?:\/\/app-gestao-advocacia\.fly\.dev/i,
+      'https://app-gestao-advocacia.onrender.com'
+    )
+  }
+
+  return normalized
+}
+
 function resolveApiUrl() {
   const envUrl = import.meta.env.VITE_API_URL
   if (envUrl) {
-    return ensureV1Prefix(envUrl)
+    return ensureV1Prefix(replaceDeprecatedApiHost(envUrl))
   }
 
   const host = typeof window !== 'undefined' ? window.location.hostname : ''
