@@ -3,6 +3,7 @@ import re
 import uuid
 
 from flask import g, jsonify, request
+from flask_jwt_extended.exceptions import JWTExtendedException, NoAuthorizationError
 from werkzeug.exceptions import HTTPException
 
 from extensions import scheduler
@@ -38,6 +39,12 @@ def configure_request_context(app):
 def configure_error_handlers(app):
     @app.errorhandler(Exception)
     def handle_unhandled_exception(error):
+        if isinstance(error, NoAuthorizationError):
+            return jsonify({"message": str(error)}), 401
+
+        if isinstance(error, JWTExtendedException):
+            return jsonify({"message": str(error)}), 422
+
         if isinstance(error, HTTPException) and error.code < 500:
             return jsonify({"message": error.description}), error.code
 
