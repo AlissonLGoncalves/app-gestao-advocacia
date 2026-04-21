@@ -239,7 +239,7 @@ def register_auth_routes(
     @auth_ns.route("/login")
     class UserLogin(Resource):
         @auth_ns.expect(login_model_dto)
-        @auth_ns.marshal_with(token_model_dto)
+        @auth_ns.response(200, "Login bem-sucedido.", token_model_dto)
         @auth_ns.response(401, "Credenciais inválidas.")
         def post(self):
             data = request.get_json()

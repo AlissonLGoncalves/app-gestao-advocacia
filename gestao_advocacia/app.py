@@ -110,6 +110,11 @@ def create_app(config_class=Config):
         if request.method == "OPTIONS":
             return make_response("", 204)
 
+        # Evita loop infinito: /api/v1/... já está no prefixo correto.
+        if subpath.startswith("v1/") or subpath == "v1":
+            from flask import abort as flask_abort
+            flask_abort(404)
+
         target = f"/api/v1/{subpath}"
         qs = request.query_string.decode("utf-8")
         if qs:
