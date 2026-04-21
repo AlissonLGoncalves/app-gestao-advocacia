@@ -18,13 +18,13 @@ function ensureV1Prefix(url) {
   return normalized
 }
 
-function replaceDeprecatedApiHost(url) {
+function replaceLegacyApiHost(url) {
   const normalized = normalizeBaseUrl(url)
 
-  if (/^https?:\/\/app-gestao-advocacia\.fly\.dev(\/|$)/i.test(normalized)) {
+  if (/^https?:\/\/app-gestao-advocacia\.onrender\.com(\/|$)/i.test(normalized)) {
     return normalized.replace(
-      /^https?:\/\/app-gestao-advocacia\.fly\.dev/i,
-      'https://app-gestao-advocacia.onrender.com'
+      /^https?:\/\/app-gestao-advocacia\.onrender\.com/i,
+      'https://app-gestao-advocacia.fly.dev'
     )
   }
 
@@ -34,7 +34,7 @@ function replaceDeprecatedApiHost(url) {
 function resolveApiUrl() {
   const envUrl = import.meta.env.VITE_API_URL
   if (envUrl) {
-    return ensureV1Prefix(replaceDeprecatedApiHost(envUrl))
+    return ensureV1Prefix(replaceLegacyApiHost(envUrl))
   }
 
   const host = typeof window !== 'undefined' ? window.location.hostname : ''
@@ -46,7 +46,7 @@ function resolveApiUrl() {
   }
 
   // Fallback de produção quando VITE_API_URL não foi definida no deploy do frontend.
-  return 'https://app-gestao-advocacia.onrender.com/api/v1'
+  return 'https://app-gestao-advocacia.fly.dev/api/v1'
 }
 
 export const API_URL = resolveApiUrl()
