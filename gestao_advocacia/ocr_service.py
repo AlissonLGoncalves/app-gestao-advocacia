@@ -10,6 +10,13 @@ from PIL import Image
 from pypdf import PdfReader
 
 try:
+    import google.generativeai as _genai
+
+    _GENAI_AVAILABLE = True
+except Exception:
+    _GENAI_AVAILABLE = False
+
+try:
     import pypdfium2
 except Exception:  # pragma: no cover
     pypdfium2 = None
@@ -36,6 +43,96 @@ def _configure_tesseract_binary():
 
 
 _configure_tesseract_binary()
+
+_GEMINI_PROMPT = """Analise o texto abaixo extraído de um documento jurídico (procuração, contrato, RG, CNH ou similar) e extraia os dados de identificação pessoal.
+
+Retorne SOMENTE um JSON válido, sem markdown, sem explicações, com exatamente estes campos (deixe "" quando não encontrar):
+
+{
+  "nome_razao_social": "",
+  "cpf": "",
+  "cnpj": "",
+  "rg": "",
+  "orgao_emissor": "",
+  "data_nascimento": "",
+  "estado_civil": "",
+  "profissao": "",
+  "nacionalidade": "",
+  "email": "",
+  "telefone": "",
+  "cep": "",
+  "rua": "",
+  "numero": "",
+  "bairro": "",
+  "cidade": "",
+  "estado": "",
+  "tipo_pessoa_sugerida": ""
+}
+
+Regras:
+- data_nascimento: formato YYYY-MM-DD ou vazio
+- estado: apenas sigla UF (ex: PR, SP)
+- tipo_pessoa_sugerida: "PF" se CPF, "PJ" se CNPJ, vazio se nenhum
+- cpf: com pontuação (000.000.000-00)
+- cnpj: com pontuação (00.000.000/0000-00)
+
+Texto do documento:
+"""
+
+
+def _extract_with_gemini(text):
+    """Usa Gemini Flash para extrair dados estruturados do texto do documento."""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not _GENAI_AVAILABLE or not api_key:
+        return None
+
+    try:
+        _genai.configure(api_key=api_key)
+        model = _genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(_GEMINI_PROMPT + text[:8000])
+        raw = response.text.strip()
+        raw = re.sub(r"^```(?:json)?\s*", "", raw)
+        raw = re.sub(r"\s*```$", "", raw).strip()
+        data = json.loads(raw)
+
+        cpf_digits = re.sub(r"\D", "", data.get("cpf") or "")
+        cnpj_digits = re.sub(r"\D", "", data.get("cnpj") or "")
+        if len(cnpj_digits) == 14:
+            documento_principal = data.get("cnpj", "")
+            tipo_pessoa = "PJ"
+        elif len(cpf_digits) == 11:
+            documento_principal = data.get("cpf", "")
+            tipo_pessoa = "PF"
+        else:
+            documento_principal = ""
+            tipo_pessoa = data.get("tipo_pessoa_sugerida", "")
+
+        return {
+            "cpf": data.get("cpf", ""),
+            "cnpj": data.get("cnpj", ""),
+            "documento_principal": documento_principal,
+            "tipo_pessoa_sugerida": tipo_pessoa,
+            "rg": data.get("rg", ""),
+            "orgao_emissor": data.get("orgao_emissor", ""),
+            "nome_razao_social": data.get("nome_razao_social", ""),
+            "nome_fantasia": "",
+            "data_nascimento": data.get("data_nascimento", ""),
+            "nome_mae": "",
+            "email": data.get("email", ""),
+            "telefone": data.get("telefone", ""),
+            "cep": data.get("cep", ""),
+            "rua": data.get("rua", ""),
+            "numero": data.get("numero", ""),
+            "bairro": data.get("bairro", ""),
+            "cidade": data.get("cidade", ""),
+            "estado": data.get("estado", ""),
+            "nacionalidade": data.get("nacionalidade", ""),
+            "estado_civil": data.get("estado_civil", ""),
+            "profissao": data.get("profissao", ""),
+        }
+    except Exception as e:
+        print(f"[GEMINI_ERROR] {e}")
+        return None
 
 
 def _extract_text_from_pdf_bytes(pdf_bytes, max_pages=10):
@@ -333,6 +430,10 @@ def extract_client_data_from_file(file_stream, filename):
 
         if not text.strip():
             return {"error": "Nenhum texto legível foi abstraído do documento."}
+
+        gemini_result = _extract_with_gemini(text)
+        if gemini_result:
+            return gemini_result
 
         return _extract_biometria_from_text(text)
 
