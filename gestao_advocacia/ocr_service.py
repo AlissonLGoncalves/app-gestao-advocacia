@@ -44,9 +44,21 @@ def _configure_tesseract_binary():
 
 _configure_tesseract_binary()
 
-_GEMINI_PROMPT = """Analise o texto abaixo extraído de um documento jurídico (procuração, contrato, RG, CNH ou similar) e extraia os dados de identificação pessoal.
+_GEMINI_PROMPT = """Analise o texto abaixo extraído de um documento jurídico e extraia os dados solicitados.
 
-Retorne SOMENTE um JSON válido, sem markdown, sem explicações, com exatamente estes campos (deixe "" quando não encontrar):
+REGRAS OBRIGATÓRIAS:
+- "nome_razao_social": SOMENTE o nome completo da pessoa física ou razão social da empresa. NÃO inclua nacionalidade, profissão, estado civil, CPF nem qualquer outra informação junto ao nome.
+- Cada campo deve conter APENAS o dado específico, sem contexto ou frases ao redor.
+- "data_nascimento": formato YYYY-MM-DD, ou vazio se não encontrar.
+- "estado": apenas a sigla UF de 2 letras (ex: PR, SP, RJ). Nunca o nome do estado por extenso.
+- "tipo_pessoa_sugerida": "PF" se houver CPF, "PJ" se houver CNPJ, vazio se nenhum.
+- "cpf": com pontuação no formato 000.000.000-00.
+- "cnpj": com pontuação no formato 00.000.000/0000-00.
+- "orgao_emissor": órgão emissor do RG (ex: SSP/PR, DETRAN/SP). Vazio se não encontrar.
+- "estado_civil": um destes valores exatos ou vazio — Solteiro(a), Casado(a), Divorciado(a), Viúvo(a), União Estável.
+- Se não encontrar um campo, deixe exatamente "".
+
+Retorne SOMENTE o JSON abaixo preenchido, sem markdown, sem texto antes ou depois:
 
 {
   "nome_razao_social": "",
@@ -68,13 +80,6 @@ Retorne SOMENTE um JSON válido, sem markdown, sem explicações, com exatamente
   "estado": "",
   "tipo_pessoa_sugerida": ""
 }
-
-Regras:
-- data_nascimento: formato YYYY-MM-DD ou vazio
-- estado: apenas sigla UF (ex: PR, SP)
-- tipo_pessoa_sugerida: "PF" se CPF, "PJ" se CNPJ, vazio se nenhum
-- cpf: com pontuação (000.000.000-00)
-- cnpj: com pontuação (00.000.000/0000-00)
 
 Texto do documento:
 """

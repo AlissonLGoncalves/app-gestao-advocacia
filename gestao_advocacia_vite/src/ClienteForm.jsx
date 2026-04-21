@@ -382,6 +382,10 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
           updates.rg = data.rg
           messageExtraida.push('RG')
         }
+        if (data.orgao_emissor) {
+          updates.orgao_emissor = data.orgao_emissor
+          messageExtraida.push('Órgão Emissor')
+        }
         if (data.data_nascimento) {
           updates.data_nascimento = data.data_nascimento
           messageExtraida.push('Data Nasc.')
