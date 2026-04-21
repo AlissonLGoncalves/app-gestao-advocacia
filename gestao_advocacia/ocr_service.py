@@ -10,7 +10,7 @@ from PIL import Image
 from pypdf import PdfReader
 
 try:
-    import google.generativeai as _genai
+    from google import genai as _genai
 
     _GENAI_AVAILABLE = True
 except Exception:
@@ -123,9 +123,11 @@ def _extract_with_gemini(text):
         return None
 
     try:
-        _genai.configure(api_key=api_key)
-        model = _genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(_GEMINI_PROMPT + text[:8000])
+        client = _genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=_GEMINI_PROMPT + text[:8000],
+        )
         raw = response.text.strip()
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw).strip()
@@ -468,7 +470,7 @@ def extract_client_data_from_file(file_stream, filename):
             return {"error": "Nenhum texto legível foi abstraído do documento."}
 
         gemini_result = _extract_with_gemini(text)
-        if gemini_result:
+        if gemini_result and any(v for v in gemini_result.values() if v):
             return gemini_result
 
         return _extract_biometria_from_text(text)
