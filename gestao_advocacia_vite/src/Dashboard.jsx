@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from './config.js'
 import { listProximos } from './api/agenda.js'
-import { syncDjen } from './api/djen.js'
+import { syncDjen, listOabs } from './api/djen.js'
 import MovimentacoesRecentes from './components/MovimentacoesRecentes.jsx'
 import { useNavigate } from 'react-router-dom'
 
@@ -153,6 +153,7 @@ function Dashboard({ mudarSecao }) {
   })
   const [proximosEventos, setProximosEventos] = useState([])
   const [tarefasAlerta, setTarefasAlerta] = useState({ vencidas: 0, vencendoHoje: 0 })
+  const [oabsMonitoradas, setOabsMonitoradas] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
@@ -245,6 +246,9 @@ function Dashboard({ mudarSecao }) {
     fetchProximosEventos()
     fetchTarefasAlerta()
     triggerDjenSync()
+    listOabs()
+      .then((data) => setOabsMonitoradas(Array.isArray(data) ? data : []))
+      .catch(() => setOabsMonitoradas([]))
   }, [fetchDashboardData, fetchProximosEventos, fetchTarefasAlerta, triggerDjenSync])
 
   if (loading) {
@@ -430,6 +434,34 @@ function Dashboard({ mudarSecao }) {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Banner onboarding DJEN ──────────────────────────────────────────── */}
+      {oabsMonitoradas !== null && oabsMonitoradas.length === 0 && (
+        <div className="row mb-4 g-0">
+          <div className="col-12">
+            <div
+              className="alert alert-info d-flex align-items-center justify-content-between mb-0 shadow-sm gap-3"
+              role="alert"
+              style={{ borderRadius: 'var(--radius-lg)' }}
+            >
+              <div className="d-flex align-items-center gap-3">
+                <NewspaperIcon style={{ width: 24, height: 24, flexShrink: 0 }} />
+                <div>
+                  <p className="fw-bold mb-0 small">Monitoramento DJEN não configurado</p>
+                  <p className="mb-0 small">
+                    Cadastre sua OAB para receber publicações dos diários de justiça
+                    automaticamente.
+                  </p>
+                </div>
+              </div>
+              <button className="btn btn-info btn-sm text-nowrap" onClick={() => navigate('/djen')}>
+                Configurar agora
+                <ChevronRightIcon style={{ width: 14, height: 14 }} className="ms-1" />
+              </button>
             </div>
           </div>
         </div>
