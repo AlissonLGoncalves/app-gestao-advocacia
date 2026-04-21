@@ -3,7 +3,8 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Blueprint, Flask, abort as flask_abort, make_response, redirect, request
+from flask import Blueprint, Flask, make_response, redirect, request
+from flask import abort as flask_abort
 from flask_cors import CORS
 from flask_jwt_extended import get_jwt
 from flask_restx import Api, abort
