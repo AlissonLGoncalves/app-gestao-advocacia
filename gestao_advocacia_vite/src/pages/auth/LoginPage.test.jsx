@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import LoginPage from './LoginPage.jsx'
+import { login as loginRequest } from '../../api/auth'
 
 const { navigateMock, toastMock } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
@@ -26,11 +27,14 @@ vi.mock('react-toastify', () => ({
   toast: toastMock,
 }))
 
+vi.mock('../../api/auth', () => ({
+  login: vi.fn(),
+}))
+
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
-    globalThis.fetch = vi.fn()
   })
 
   it('renderiza campos e botao de login', () => {
@@ -58,14 +62,11 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(toastMock.error).toHaveBeenCalled()
     })
-    expect(globalThis.fetch).not.toHaveBeenCalled()
+    expect(loginRequest).not.toHaveBeenCalled()
   })
 
   it('faz submit com sucesso e redireciona', async () => {
-    globalThis.fetch.mockResolvedValueOnce({
-      ok: true,
-      text: async () => JSON.stringify({ access_token: 'token-123', user: { id: 1 } }),
-    })
+    loginRequest.mockResolvedValueOnce({ access_token: 'token-123', user: { id: 1 } })
 
     render(
       <MemoryRouter>
@@ -78,20 +79,17 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
     await waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+      expect(loginRequest).toHaveBeenCalledTimes(1)
       expect(toastMock.success).toHaveBeenCalled()
       expect(navigateMock).toHaveBeenCalledWith('/dashboard')
     })
 
     expect(localStorage.getItem('token')).toBe('token-123')
+    expect(localStorage.getItem('access_token')).toBe('token-123')
   })
 
   it('exibe erro em resposta 4xx/5xx', async () => {
-    globalThis.fetch.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      text: async () => JSON.stringify({ message: 'Credenciais invalidas' }),
-    })
+    loginRequest.mockRejectedValueOnce(new Error('Credenciais invalidas'))
 
     render(
       <MemoryRouter>
