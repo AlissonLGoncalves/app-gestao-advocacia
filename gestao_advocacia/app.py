@@ -18,7 +18,7 @@ from app_runtime import (
     register_status_route,
 )
 from config import Config
-from extensions import db, jwt, migrate
+from extensions import db, jwt, limiter, migrate
 from logging_config import configure_json_logging
 from openapi_docs import register_openapi_docs
 from routes.api_registry import register_api_routes
@@ -74,6 +74,7 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     jwt.init_app(app)
     configure_jwt_error_handlers(jwt)
+    limiter.init_app(app)
     CORS(app, origins=configure_cors_origins())
 
     configure_request_context(app)
@@ -134,6 +135,25 @@ def create_app(config_class=Config):
     configure_scheduler(app)
     register_status_route(app)
     register_openapi_docs(app)
+
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        return {
+            "message": "Muitas tentativas. Aguarde e tente novamente.",
+            "retry_after": e.description,
+        }, 429
+
+    # Flask-RESTX tem sua propria cadeia de error handlers que pode
+    # interceptar 429 antes do @app.errorhandler acima.
+    # Registramos tambem no objeto `api` para garantir a mensagem customizada.
+    from werkzeug.exceptions import TooManyRequests
+
+    @api.errorhandler(TooManyRequests)
+    def api_ratelimit_handler(e):
+        return {
+            "message": "Muitas tentativas. Aguarde e tente novamente.",
+            "retry_after": getattr(e, "description", None),
+        }, 429
 
     return app
 
