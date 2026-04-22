@@ -7,6 +7,7 @@ import pytest
 from werkzeug.exceptions import NotFound
 
 from app import PublicacaoDJEN, Tenant, User, db, get_item_or_404
+from utils.log_sanitizer import mask_user_id
 
 
 def _register_and_login(client, suffix):
@@ -534,7 +535,7 @@ def test_log_warning_quando_cross_tenant_bloqueado(app, caplog):
     )
     assert record is not None
     assert getattr(record, "event", None) == "cross_tenant_access_blocked"
-    assert getattr(record, "user_id", None) == 123
+    assert getattr(record, "user_id_hash", None) == mask_user_id(123)
     assert getattr(record, "current_tenant", None) == 1
     assert getattr(record, "target_tenant", None) == 999
     assert getattr(record, "endpoint", None) == "/api/v1/fake/99"
