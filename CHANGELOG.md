@@ -3,6 +3,76 @@
 Todos os releases significativos do Sistema de Gestao para Advocacia.
 Segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.4.0] - 2026-04-21
+
+Ciclo de consolidação da camada de API no frontend (refatoração S8) +
+correção de 4 bugs críticos de produção que estavam impedindo login.
+Documentação técnica detalhada em
+[`docs/sessao-2026-04-21-s8-e-fixes-producao.md`](docs/sessao-2026-04-21-s8-e-fixes-producao.md).
+
+### Added
+
+- **S8** `src/api/client.js` canônico no frontend — cliente HTTP único com
+  `get`, `post`, `postForm`, `put`, `patch`, `del`, `upload`, `getBlob`.
+  Headers `X-Terms-Version`/`X-LGPD-Version` obrigatórios. Handler global
+  de `401` que limpa `localStorage` e redireciona pra `/login`.
+- **S8.x** Módulos `src/api/<recurso>.js` para cada domínio (clientes,
+  casos, documentos, financeiro, agenda, DJEN, procurações) — todas as
+  chamadas `fetch` diretas em componentes/páginas foram migradas.
+- Documento de handoff `.github/tasks/S8-handoff-rebase.md` com
+  procedimento de rebase + regras de conflito (`--ours client.js`,
+  `--theirs <recurso>.js`).
+
+### Changed
+
+- `fly.toml` — `[http_service.concurrency]` elevado de 25/20 para 50/40
+  (`hard_limit`/`soft_limit`) para lidar com DJEN auto-sync simultâneo.
+- Backend CORS/CSP — frontend aponta exclusivamente para
+  `app-gestao-advocacia.fly.dev`; shim legado `onrender.com` removido de
+  `config.js` e do `connect-src` do `vercel.json`.
+
+### Fixed
+
+- **Login quebrado em produção** (PR #68): `@auth_ns.marshal_with(...)`
+  em `routes/auth.py` interceptava tuplas `({"message": ...}, 401)` e
+  serializava como sucesso (retornando 200 com `access_token: null`).
+  Substituído por `@auth_ns.response(200, "...", token_model_dto)`.
+- **Handler global de erro HTTP** (`app_runtime.py`): retornava objeto
+  Werkzeug cru (HTML) em vez de JSON. Agora usa
+  `jsonify({"message": error.description}), error.code`.
+- **Loop de redirect em `/api/v1/...`** (`app.py`): o blueprint legacy
+  `/api/*` redirecionava requests que já começavam com `v1/` causando
+  308 infinito. Adicionado guard `if subpath.startswith("v1/"): abort(404)`.
+- **CVE-2026-28684**: `python-dotenv` bumpado de 1.1.0 para 1.2.2
+  (regeneração de `requirements.lock` com hashes).
+- **DJEN search**: requests por keystroke eliminados via `filtrosRef`
+  (ref em vez de state para comparação), reduzindo carga no Fly em ~90%.
+- **Pool de conexões Postgres resiliente** (commit `d338332`):
+  `SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "pool_recycle": 280}`.
+  Elimina `psycopg2.OperationalError: SSL connection has been closed
+  unexpectedly` quando a máquina Fly dorme (auto-stop) e as conexões
+  do pool morrem no servidor Postgres.
+- **Migration DJEN out-of-order** (commit `fc01012`): a migration
+  `add_djen_tables` tinha dependência anterior a `add_tenant_module`,
+  quebrando `flask db upgrade` em schema vazio. Corrigida a ordem
+  `down_revision`.
+
+### Infra
+
+- **Postgres migrado para Fly `gru`** — o banco de produção estava no
+  Render (`oregon-postgres.render.com`) apesar da API estar no Fly. Após
+  a deleção do Render, foi criado um Postgres gerenciado no Fly na mesma
+  região da API (`gru`), eliminando latência cross-region e isolando
+  toda a stack numa única plataforma. Dados anteriores perdidos
+  (ambiente de desenvolvimento, não comercializado). Detalhes em
+  [`docs/sessao-2026-04-21-s8-e-fixes-producao.md`](docs/sessao-2026-04-21-s8-e-fixes-producao.md#c1-incidente).
+
+### Removed
+
+- **Render.com** como alternativa ativa de backend — o deploy no Render
+  é zumbi; Fly é a única plataforma oficial. Menções ativas a
+  `onrender.com` em código foram removidas; docs históricos preservados.
+
 ## [1.3.0] - 2026-04-21
 
 Ciclo focado em usabilidade e produtividade no uso diário. Todas as melhorias
@@ -74,6 +144,7 @@ roadmap `.github/tasks/` (C1-C4, N1-N5, T1-T5) foram concluidas e mergeadas.
 
 Versao base do ciclo atual. Historico anterior nao formalizado neste CHANGELOG.
 
+[1.4.0]: https://github.com/AlissonLGoncalves/app-gestao-advocacia/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/AlissonLGoncalves/app-gestao-advocacia/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/AlissonLGoncalves/app-gestao-advocacia/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/AlissonLGoncalves/app-gestao-advocacia/releases/tag/v1.1.1
