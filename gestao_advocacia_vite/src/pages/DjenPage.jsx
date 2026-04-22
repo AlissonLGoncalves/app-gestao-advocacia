@@ -349,39 +349,12 @@ export default function DjenPage() {
   ])
 
   // ── Sincronizar ─────────────────────────────────────────────────────────────
-<<<<<<< HEAD
-  const sincronizar = async ({ silencioso = false } = {}) => {
-    setSyncing(true)
-    try {
-      const payload = await syncDjen(diasSync)
-      if (payload) {
-        const resumo = payload?.resumo || {}
-        const salvas = resumo.publicacoes_salvas ?? 0
-        const encontrados = resumo.itens_encontrados ?? 0
-        const oabsProc = resumo.oabs_processadas ?? 0
-        const casosProc = resumo.casos_processados ?? 0
-        if (!silencioso) {
-          toast.success(
-            `Sync DJEN concluído: ${salvas} nova(s), ${encontrados} encontrada(s), OABs ${oabsProc}, casos ${casosProc}.`
-          )
-        }
-        setOffset(0)
-        await carregarPublicacoes(0)
-        await carregarOabs()
-        await carregarTriagem()
-        await carregarUltimasPublicacoesDjen()
-=======
   const sincronizar = useCallback(
     async ({ silencioso = false } = {}) => {
       setSyncing(true)
       try {
-        const res = await fetch(`${API_URL}/djen/sync`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dias: diasSync }),
-        })
-        const payload = await res.json().catch(() => ({}))
-        if (res.ok) {
+        const payload = await syncDjen(diasSync)
+        if (payload) {
           const resumo = payload?.resumo || {}
           const salvas = resumo.publicacoes_salvas ?? 0
           const encontrados = resumo.itens_encontrados ?? 0
@@ -398,7 +371,7 @@ export default function DjenPage() {
           await carregarTriagem()
           await carregarUltimasPublicacoesDjen()
         } else if (!silencioso) {
-          toast.error(payload.message || 'Erro ao sincronizar.')
+          toast.error('Erro ao sincronizar.')
         }
       } catch {
         if (!silencioso) {
@@ -406,7 +379,6 @@ export default function DjenPage() {
         }
       } finally {
         setSyncing(false)
->>>>>>> 94b5776 (refactor: lint and validation cleanup for C3)
       }
     },
     [carregarOabs, carregarPublicacoes, carregarTriagem, carregarUltimasPublicacoesDjen, diasSync]

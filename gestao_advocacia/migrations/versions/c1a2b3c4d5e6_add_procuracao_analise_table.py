@@ -1,6 +1,6 @@
 """add procuracao analise table
 
-Revision ID: e6f7a8b9c0d1
+Revision ID: c1a2b3c4d5e6
 Revises: d3e4f5a6b7c8
 Create Date: 2026-04-20 10:00:00.000000
 """
@@ -8,7 +8,7 @@ Create Date: 2026-04-20 10:00:00.000000
 import sqlalchemy as sa
 from alembic import op
 
-revision = "e6f7a8b9c0d1"
+revision = "c1a2b3c4d5e6"
 down_revision = "d3e4f5a6b7c8"
 branch_labels = None
 depends_on = None
