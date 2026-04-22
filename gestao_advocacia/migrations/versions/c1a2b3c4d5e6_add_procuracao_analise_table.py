@@ -18,6 +18,16 @@ procuracao_status_enum = sa.Enum(
     "pending", "processing", "done", "failed", name="procuracao_analise_status"
 )
 
+# Versão para uso nas Colunas que NÃO tenta criar/dropar o tipo (já criado manualmente abaixo)
+procuracao_status_enum_col = sa.Enum(
+    "pending",
+    "processing",
+    "done",
+    "failed",
+    name="procuracao_analise_status",
+    create_type=False,
+)
+
 
 def upgrade():
     bind = op.get_bind()
@@ -29,7 +39,7 @@ def upgrade():
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("arquivo_path", sa.String(length=500), nullable=False),
         sa.Column("arquivo_hash", sa.String(length=64), nullable=False),
-        sa.Column("status", procuracao_status_enum, nullable=False),
+        sa.Column("status", procuracao_status_enum_col, nullable=False),
         sa.Column("dados_extraidos", sa.JSON(), nullable=True),
         sa.Column("erro", sa.Text(), nullable=True),
         sa.Column("criado_em", sa.DateTime(), nullable=False),
