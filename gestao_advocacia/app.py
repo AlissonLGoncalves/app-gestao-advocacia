@@ -47,6 +47,7 @@ from models import (  # noqa: E402, F401
     Despesa,
     DjenOabMonitoramento,
     DjenVinculoDecisao,
+    ProcuracaoAnalise,
     PublicacaoDJEN,
     Recebimento,
     Tenant,

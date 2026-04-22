@@ -168,6 +168,9 @@ Deploy automático a cada push em `main`. Plano Hobby não aceita `Co-Authored-B
 
 > **Nota sobre o Render.com**: existiu um deploy em `app-gestao-advocacia.onrender.com` que hoje está zumbi. A plataforma oficial é exclusivamente o Fly.io. As menções a `onrender.com` em [`docs/roteiro-fly-producao.md`](docs/roteiro-fly-producao.md) são históricas (registro da migração).
 
+Documentação complementar relevante para o chain Gemini:
+- [`docs/compliance/gemini-setup.md`](docs/compliance/gemini-setup.md) — setup seguro da GEMINI_API_KEY no backend e no Fly.
+
 ---
 
 ## Arquitetura resumida

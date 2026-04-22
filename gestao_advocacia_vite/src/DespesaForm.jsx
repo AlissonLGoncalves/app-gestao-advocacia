@@ -68,7 +68,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
     if (!despesaParaEditar) {
       fetchCasos(selectedClienteId || null)
     }
-  }, [fetchClientes, despesaParaEditar, selectedClienteId])
+  }, [fetchClientes, fetchCasos, despesaParaEditar, selectedClienteId])
 
   useEffect(() => {
     clearValidationErrors()

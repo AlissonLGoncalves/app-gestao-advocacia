@@ -46,14 +46,6 @@ function RegisterPage() {
   const [lgpdHash, setLgpdHash] = useState('')
 
   // Algoritmo que detecta quando a barra de rolagem atinge o fundo
-  const handleScrollTerms = (e) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.target
-    // Se a barra estiver a 10px ou menos do fim, libera.
-    if (scrollHeight - scrollTop <= clientHeight + 10) {
-      setScrolledToBottom(true)
-    }
-  }
-
   const aceitarNoModal = () => {
     setAceiteTermos(true)
     setShowTermsModal(false)
@@ -530,7 +522,6 @@ function RegisterPage() {
                 backgroundColor: '#fcfcfc',
                 textAlign: 'justify',
               }}
-              onScroll={handleScrollTerms}
             >
               <div className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
                 <ReactMarkdown>{stripFrontMatter(termosConteudo)}</ReactMarkdown>

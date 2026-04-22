@@ -349,35 +349,40 @@ export default function DjenPage() {
   ])
 
   // ── Sincronizar ─────────────────────────────────────────────────────────────
-  const sincronizar = async ({ silencioso = false } = {}) => {
-    setSyncing(true)
-    try {
-      const payload = await syncDjen(diasSync)
-      if (payload) {
-        const resumo = payload?.resumo || {}
-        const salvas = resumo.publicacoes_salvas ?? 0
-        const encontrados = resumo.itens_encontrados ?? 0
-        const oabsProc = resumo.oabs_processadas ?? 0
-        const casosProc = resumo.casos_processados ?? 0
-        if (!silencioso) {
-          toast.success(
-            `Sync DJEN concluído: ${salvas} nova(s), ${encontrados} encontrada(s), OABs ${oabsProc}, casos ${casosProc}.`
-          )
+  const sincronizar = useCallback(
+    async ({ silencioso = false } = {}) => {
+      setSyncing(true)
+      try {
+        const payload = await syncDjen(diasSync)
+        if (payload) {
+          const resumo = payload?.resumo || {}
+          const salvas = resumo.publicacoes_salvas ?? 0
+          const encontrados = resumo.itens_encontrados ?? 0
+          const oabsProc = resumo.oabs_processadas ?? 0
+          const casosProc = resumo.casos_processados ?? 0
+          if (!silencioso) {
+            toast.success(
+              `Sync DJEN concluído: ${salvas} nova(s), ${encontrados} encontrada(s), OABs ${oabsProc}, casos ${casosProc}.`
+            )
+          }
+          setOffset(0)
+          await carregarPublicacoes(0)
+          await carregarOabs()
+          await carregarTriagem()
+          await carregarUltimasPublicacoesDjen()
+        } else if (!silencioso) {
+          toast.error('Erro ao sincronizar.')
         }
-        setOffset(0)
-        await carregarPublicacoes(0)
-        await carregarOabs()
-        await carregarTriagem()
-        await carregarUltimasPublicacoesDjen()
+      } catch {
+        if (!silencioso) {
+          toast.error('Erro de conexão.')
+        }
+      } finally {
+        setSyncing(false)
       }
-    } catch {
-      if (!silencioso) {
-        toast.error('Erro de conexão.')
-      }
-    } finally {
-      setSyncing(false)
-    }
-  }
+    },
+    [carregarOabs, carregarPublicacoes, carregarTriagem, carregarUltimasPublicacoesDjen, diasSync]
+  )
 
   useEffect(() => {
     if (autoSyncExecutada || loadingOabs || syncing) return
@@ -390,7 +395,7 @@ export default function DjenPage() {
 
     setAutoSyncExecutada(true)
     sincronizar({ silencioso: true })
-  }, [autoSyncExecutada, loadingOabs, syncing, oabs])
+  }, [autoSyncExecutada, loadingOabs, syncing, oabs, sincronizar])
 
   // ── Marcar publicação como lida ─────────────────────────────────────────────
   const marcarLida = useCallback(

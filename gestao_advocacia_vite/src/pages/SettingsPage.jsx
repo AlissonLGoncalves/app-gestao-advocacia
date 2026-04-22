@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   BuildingOfficeIcon,
   UserGroupIcon,
@@ -44,7 +44,7 @@ function SettingsPage() {
     toast.success('Informações do Escritório salvas com sucesso!')
   }
 
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = useCallback(async () => {
     if (userRole !== 'admin') return
     setLoadingLogs(true)
     try {
@@ -61,13 +61,13 @@ function SettingsPage() {
     } finally {
       setLoadingLogs(false)
     }
-  }
+  }, [userRole])
 
   useEffect(() => {
     if (activeTab === 'auditoria') {
       fetchAuditLogs()
     }
-  }, [activeTab])
+  }, [activeTab, fetchAuditLogs])
 
   const handleInvite = async (e) => {
     e.preventDefault()

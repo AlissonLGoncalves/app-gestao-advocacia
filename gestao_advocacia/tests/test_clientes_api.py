@@ -4,7 +4,7 @@
 import io
 import json
 
-from app import Cliente
+from app import Caso, Cliente, User, db
 
 CLIENTE_PF = {
     "nome_razao_social": "Cliente Teste PF Pytest",
@@ -168,3 +168,61 @@ def test_extrair_dados_doc_sugere_pj_por_cnpj(auth_client, db):
     assert payload["cnpj"] == "12.345.678/0001-90"
     assert payload["documento_principal"] == "12.345.678/0001-90"
     assert payload["tipo_pessoa_sugerida"] == "PJ"
+
+
+def test_post_cliente_com_processo_cnj_existente_retorna_caso_existente_true(auth_client):
+    r1 = auth_client.post(
+        "/api/v1/clientes",
+        json={
+            "nome_razao_social": "Cliente Base CNJ",
+            "cpf_cnpj": "45645645645",
+            "tipo_pessoa": "PF",
+        },
+    )
+    assert r1.status_code == 201
+    cliente_base_id = json.loads(r1.data)["id"]
+
+    with auth_client._client.application.app_context():
+        user = db.session.get(User, auth_client.user["id"])
+        caso = Caso(
+            titulo="Caso já existente",
+            numero_processo="0001234-12.2026.8.16.0001",
+            cliente_id=cliente_base_id,
+            user_id=user.id,
+            tenant_id=user.tenant_id,
+        )
+        db.session.add(caso)
+        db.session.commit()
+        caso_id = caso.id
+
+    response = auth_client.post(
+        "/api/v1/clientes",
+        json={
+            "nome_razao_social": "Novo Cliente Vinculado",
+            "cpf_cnpj": "78978978978",
+            "tipo_pessoa": "PF",
+            "processo_cnj": "0001234-12.2026.8.16.0001",
+        },
+    )
+    assert response.status_code == 201, response.data
+    payload = json.loads(response.data)
+    assert payload["caso_existente"] is True
+    assert payload["caso_id"] == caso_id
+    assert payload["cliente"]["nome_razao_social"] == "Novo Cliente Vinculado"
+
+
+def test_post_cliente_com_processo_cnj_novo_retorna_sugestao(auth_client):
+    response = auth_client.post(
+        "/api/v1/clientes",
+        json={
+            "nome_razao_social": "Cliente CNJ Novo",
+            "cpf_cnpj": "96396396311",
+            "tipo_pessoa": "PF",
+            "processo_cnj": "0009999-12.2026.8.16.0001",
+        },
+    )
+    assert response.status_code == 201, response.data
+    payload = json.loads(response.data)
+    assert payload["caso_existente"] is False
+    assert payload["numero_cnj_sugerido"] == "0009999-12.2026.8.16.0001"
+    assert payload["cliente"]["nome_razao_social"] == "Cliente CNJ Novo"

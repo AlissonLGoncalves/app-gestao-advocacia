@@ -13,6 +13,7 @@ from .dashboard import register_dashboard_routes
 from .documentos import register_documentos_routes
 from .eventos import register_eventos_routes
 from .financeiro_registry import register_financeiro_api
+from .procuracoes import register_procuracoes_routes
 from .tarefas import register_tarefas_routes
 
 
@@ -34,6 +35,7 @@ def register_api_routes(app, api, finance_access_required):
     audit_ns = Namespace("auditoria", description="Trilhas de Auditoria e Logs (LGPD)")
     tarefas_ns = Namespace("tarefas", description="Operacoes de Prazos e Tarefas")
     djen_ns = Namespace("djen", description="Publicacoes DJEN")
+    procuracoes_ns = Namespace("procuracoes", description="Analise de procuracoes via Gemini")
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -44,6 +46,7 @@ def register_api_routes(app, api, finance_access_required):
     api.add_namespace(audit_ns)
     api.add_namespace(tarefas_ns)
     api.add_namespace(djen_ns)
+    api.add_namespace(procuracoes_ns)
 
     user_model_dto = auth_ns.model(
         "UserRegistration",
@@ -161,6 +164,9 @@ def register_api_routes(app, api, finance_access_required):
             ),
             "cpf_cnpj": fields.String(required=True, description="CPF ou CNPJ principal"),
             "tipo_pessoa": fields.String(required=True, description="PF ou PJ", enum=["PF", "PJ"]),
+            "processo_cnj": fields.String(
+                description="Número CNJ opcional para sugestão/vinculação de caso"
+            ),
             "email": fields.String(description="Email do cliente"),
             "telefone": fields.String(description="Telefone do cliente"),
             "rg": fields.String(description="RG (PF)"),
@@ -337,6 +343,20 @@ def register_api_routes(app, api, finance_access_required):
         },
     )
 
+    procuracao_model_dto = procuracoes_ns.model(
+        "ProcuracaoAnaliseOutput",
+        {
+            "id": fields.Integer(readonly=True),
+            "status": fields.String(description="pending|processing|done|failed"),
+            "dados_extraidos": fields.Raw(description="JSON estruturado extraído via Gemini"),
+            "avisos_validacao": fields.List(fields.String, description="Avisos de validação"),
+            "erro": fields.String(description="Mensagem de erro quando status=failed"),
+            "arquivo_hash": fields.String(description="SHA256 do arquivo"),
+            "criado_em": fields.DateTime(dt_format="iso8601"),
+            "processado_em": fields.DateTime(dt_format="iso8601", nullable=True),
+        },
+    )
+
     tarefa_input_model_dto = tarefas_ns.model(
         "TarefaInput",
         {
@@ -379,6 +399,7 @@ def register_api_routes(app, api, finance_access_required):
     register_dashboard_routes(app, dashboard_ns)
     register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_model_dto)
     register_documentos_routes(app, documentos_ns, documento_model_dto)
+    register_procuracoes_routes(app, procuracoes_ns, procuracao_model_dto)
     register_financeiro_api(app, api, finance_access_required)
 
     try:

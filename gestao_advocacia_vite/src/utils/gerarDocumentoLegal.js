@@ -490,7 +490,7 @@ function gerarContratoRevisao(doc, cliente, opcoes) {
     `${opcoes.nomeAdvogado || 'Advogado(a)'}\nCONTRATADO(A)`,
   ])
   y = espaco(y, 5)
-  y = linhaAssinatura(doc, y, ['1ª Testemunha', '2ª Testemunha'])
+  linhaAssinatura(doc, y, ['1ª Testemunha', '2ª Testemunha'])
 
   rodape(doc)
 }
@@ -568,7 +568,7 @@ function gerarContratoAposentadoria(doc, cliente, opcoes) {
     `${opcoes.nomeAdvogado || 'Advogado(a)'}\nCONTRATADO(A)`,
   ])
   y = espaco(y, 5)
-  y = linhaAssinatura(doc, y, ['1ª Testemunha', '2ª Testemunha'])
+  linhaAssinatura(doc, y, ['1ª Testemunha', '2ª Testemunha'])
 
   rodape(doc)
 }
@@ -616,7 +616,7 @@ function gerarContratoGeral(doc, cliente, opcoes) {
     `${opcoes.nomeAdvogado || 'Advogado(a)'}\nCONTRATADO(A)`,
   ])
   y = espaco(y, 5)
-  y = linhaAssinatura(doc, y, ['1ª Testemunha', '2ª Testemunha'])
+  linhaAssinatura(doc, y, ['1ª Testemunha', '2ª Testemunha'])
 
   rodape(doc)
 }
@@ -693,7 +693,7 @@ function gerarContratoMensal(doc, cliente, opcoes) {
     `${opcoes.nomeAdvogado || 'Advogado(a)'}\nCONTRATADO(A)`,
   ])
   y = espaco(y, 5)
-  y = linhaAssinatura(doc, y, ['1ª Testemunha', '2ª Testemunha'])
+  linhaAssinatura(doc, y, ['1ª Testemunha', '2ª Testemunha'])
 
   rodape(doc)
 }
@@ -748,7 +748,7 @@ function gerarDeclaracaoHipossuficiencia(doc, cliente, opcoes) {
 
   y = espaco(y, 10)
   y = bloco(doc, fmtCidadeData(opcoes), y, { fontSize: 10.5, center: true, extra: 12 })
-  y = linhaAssinatura(doc, y, [`${cliente.nome_razao_social}\nDeclarante`])
+  linhaAssinatura(doc, y, [`${cliente.nome_razao_social}\nDeclarante`])
 
   rodape(doc)
 }
@@ -788,7 +788,7 @@ function gerarDeclaracaoResidencia(doc, cliente, opcoes) {
 
   y = espaco(y, 10)
   y = bloco(doc, fmtCidadeData(opcoes), y, { fontSize: 10.5, center: true, extra: 12 })
-  y = linhaAssinatura(doc, y, [`${cliente.nome_razao_social}\nDeclarante`])
+  linhaAssinatura(doc, y, [`${cliente.nome_razao_social}\nDeclarante`])
 
   rodape(doc)
 }
