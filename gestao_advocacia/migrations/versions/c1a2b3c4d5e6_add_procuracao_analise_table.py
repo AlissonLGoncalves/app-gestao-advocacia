@@ -7,6 +7,7 @@ Create Date: 2026-04-20 10:00:00.000000
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "c1a2b3c4d5e6"
 down_revision = "d3e4f5a6b7c8"
@@ -18,8 +19,9 @@ procuracao_status_enum = sa.Enum(
     "pending", "processing", "done", "failed", name="procuracao_analise_status"
 )
 
-# Versão para uso nas Colunas que NÃO tenta criar/dropar o tipo (já criado manualmente abaixo)
-procuracao_status_enum_col = sa.Enum(
+# Versão para uso nas Colunas que NÃO tenta criar/dropar o tipo (já criado manualmente abaixo).
+# Usamos o ENUM do dialeto postgresql, que suporta create_type=False.
+procuracao_status_enum_col = postgresql.ENUM(
     "pending",
     "processing",
     "done",
