@@ -336,6 +336,34 @@ class AuditLog(db.Model):
         }
 
 
+class LoginAudit(db.Model):
+    __tablename__ = "login_audit"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("user.id", name="fk_login_audit_user_id"), nullable=True
+    )
+    email_tentativa = db.Column(db.String(120), nullable=False)
+    sucesso = db.Column(db.Boolean, nullable=False, default=False)
+    ip = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(500), nullable=True)
+    motivo_falha = db.Column(db.String(50), nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    usuario = db.relationship("User", foreign_keys=[user_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "email_tentativa": self.email_tentativa,
+            "sucesso": self.sucesso,
+            "ip": self.ip,
+            "user_agent": self.user_agent,
+            "motivo_falha": self.motivo_falha,
+            "criado_em": self.criado_em.isoformat() if self.criado_em else None,
+        }
+
+
 def log_audit(acao, tabela_afetada, registro_id=None, detalhes=""):
     """
     Registra silenciosamente na tabela de auditoria a ação executada por quem está logado.

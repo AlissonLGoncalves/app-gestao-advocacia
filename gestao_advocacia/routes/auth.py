@@ -10,7 +10,7 @@ from jwt.exceptions import DecodeError, ExpiredSignatureError
 
 from extensions import db, limiter
 from mail_service import enviar_alerta_email
-from models import ConsentimentoUsuario, Tenant, User
+from models import ConsentimentoUsuario, LoginAudit, Tenant, User
 from utils.log_sanitizer import mask_email, mask_user_id
 from utils.password_policy import validar_forca_senha
 
@@ -42,6 +42,28 @@ def _carregar_documento_legal(tipo):
     return {"versao": versao, "hash": hash_sha256, "conteudo": conteudo}
 
 
+def _ip_request_atual(req):
+    return req.headers.get("X-Forwarded-For", req.remote_addr or "").split(",")[0].strip()
+
+
+def _user_agent_request_atual(req):
+    return (req.headers.get("User-Agent") or "")[:500]
+
+
+def _registrar_login_audit(*, user_id, email_tentativa, sucesso, motivo_falha=None):
+    db.session.add(
+        LoginAudit(
+            user_id=user_id,
+            email_tentativa=(email_tentativa or "")[:120],
+            sucesso=sucesso,
+            ip=_ip_request_atual(request),
+            user_agent=_user_agent_request_atual(request),
+            motivo_falha=motivo_falha,
+        )
+    )
+    db.session.commit()
+
+
 def _registrar_consentimentos(user, data):
     """Valida aceites e persiste ConsentimentoUsuario. Retorna (ok, error_response_tuple)."""
     if not data.get("aceite_termos"):
@@ -55,8 +77,8 @@ def _registrar_consentimentos(user, data):
 
     from flask import request as _req
 
-    ip = _req.headers.get("X-Forwarded-For", _req.remote_addr or "").split(",")[0].strip()
-    ua = (_req.headers.get("User-Agent") or "")[:500]
+    ip = _ip_request_atual(_req)
+    ua = _user_agent_request_atual(_req)
 
     db.session.add(
         ConsentimentoUsuario(
@@ -304,6 +326,12 @@ def register_auth_routes(
                     additional_claims={"role": user.role},
                     expires_delta=expires,
                 )
+                _registrar_login_audit(
+                    user_id=user.id,
+                    email_tentativa=username_or_email,
+                    sucesso=True,
+                    motivo_falha=None,
+                )
                 app.logger.info(
                     "login_success",
                     extra={
@@ -313,12 +341,20 @@ def register_auth_routes(
                     },
                 )
                 return {"access_token": access_token, "user": user.to_dict()}, 200
+
+            motivo = "user_not_found" if not user else "invalid_credentials"
+            _registrar_login_audit(
+                user_id=user.id if user else None,
+                email_tentativa=username_or_email,
+                sucesso=False,
+                motivo_falha=motivo,
+            )
             app.logger.warning(
                 "login_failed",
                 extra={
                     "event": "login_failed",
                     "email": mask_email(username_or_email),
-                    "reason": "invalid_credentials",
+                    "reason": motivo,
                 },
             )
             return {"message": "Nome de usuário/email ou senha inválidos."}, 401
@@ -366,3 +402,24 @@ def register_auth_routes(
                 }
                 for c in itens
             ], 200
+
+    @auth_ns.route("/me/historico-login")
+    class MeHistoricoLogin(Resource):
+        @jwt_required()
+        @auth_ns.doc(
+            security="jsonWebToken",
+            description="Lista os últimos acessos de login do usuário autenticado.",
+        )
+        def get(self):
+            user_id = get_jwt_identity()
+            limit_arg = request.args.get("limit", default=50, type=int)
+            limit = max(1, min(limit_arg or 50, 200))
+
+            registros = (
+                LoginAudit.query.filter_by(user_id=user_id)
+                .order_by(LoginAudit.criado_em.desc())
+                .limit(limit)
+                .all()
+            )
+
+            return [r.to_dict() for r in registros], 200
