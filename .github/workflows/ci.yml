@@ -85,6 +85,54 @@ jobs:
           path: gestao_advocacia/coverage.xml
           if-no-files-found: warn
 
+  backend-postgres-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: gestao_advocacia
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app_gestao_advocacia_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/app_gestao_advocacia_ci
+      FLASK_APP: app.py
+      FLASK_ENV: test
+      CNJ_JOB_ENABLED: "false"
+      DJEN_JOB_ENABLED: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            gestao_advocacia/requirements.txt
+            gestao_advocacia/requirements.lock
+
+      - name: Install backend dependencies
+        run: pip install --require-hashes -r requirements.lock
+
+      - name: Run database migrations on PostgreSQL
+        run: python -m flask db upgrade
+
+      - name: Verify current migration head
+        run: python -m flask db current
+
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 20

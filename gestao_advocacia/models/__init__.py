@@ -277,6 +277,9 @@ class MovimentacaoCNJ(db.Model):
     descricao = db.Column(db.Text, nullable=False)
     dados_integra_cnj = db.Column(db.JSON, nullable=True)
     data_registro_sistema = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        db.Index("ix_movimentacao_cnj_tenant_created", "caso_id", "data_registro_sistema"),
+    )
 
     def __repr__(self):
         return f'<MovimentacaoCNJ id={self.id} caso_id={self.caso_id} data="{self.data_movimentacao.strftime("%Y-%m-%d %H:%M")}">'
@@ -313,6 +316,9 @@ class AuditLog(db.Model):
     registro_id = db.Column(db.Integer, nullable=True)
     detalhes = db.Column(db.Text, nullable=True)
     data_hora = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    __table_args__ = (
+        db.Index("ix_audit_log_tenant_created", "tenant_id", "data_hora"),
+    )
 
     usuario = db.relationship("User", foreign_keys=[user_id])
 
@@ -389,6 +395,9 @@ class EventoAgenda(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_evento_user_id"), nullable=False
     )
+    __table_args__ = (
+        db.Index("ix_evento_agenda_tenant_created", "tenant_id", "data_inicio"),
+    )
 
     def to_dict(self):
         return {
@@ -419,6 +428,9 @@ class Documento(db.Model):
     )
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_documento_user_id"), nullable=False
+    )
+    __table_args__ = (
+        db.Index("ix_documento_tenant_created", "tenant_id", "data_upload"),
     )
 
     def to_dict(self):
@@ -493,6 +505,9 @@ class Despesa(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_despesa_user_id"), nullable=False
     )
+    __table_args__ = (
+        db.Index("ix_despesa_tenant_created", "tenant_id", "data_despesa"),
+    )
 
     def to_dict(self):
         return {
@@ -526,6 +541,9 @@ class Recebimento(db.Model):
         db.Integer,
         db.ForeignKey("contrato_honorario.id", name="fk_recebimento_contrato_id"),
         nullable=True,
+    )
+    __table_args__ = (
+        db.Index("ix_recebimento_tenant_created", "tenant_id", "data_recebimento"),
     )
 
     def to_dict(self):
@@ -567,6 +585,9 @@ class TarefaPrazo(db.Model):
     )
     caso_id = db.Column(
         db.Integer, db.ForeignKey("caso.id", name="fk_tarefaprazo_caso_id"), nullable=True
+    )
+    __table_args__ = (
+        db.Index("ix_tarefa_prazo_tenant_created", "tenant_id", "data_criacao"),
     )
 
     def to_dict(self):
@@ -667,6 +688,7 @@ class PublicacaoDJEN(db.Model):
     data_captura = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (
         db.UniqueConstraint("tenant_id", "djen_id", name="uq_pub_djen_tenant_djenid"),
+        db.Index("ix_publicacao_djen_tenant_created", "tenant_id", "data_captura"),
     )
 
     def to_dict(self):
