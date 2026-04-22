@@ -138,8 +138,13 @@ def create_app(config_class=Config):
     return app
 
 
+# Instancia de modulo para gunicorn (app:app). A S7 (scheduler isolado) so
+# inicia o APScheduler quando FLY_PROCESS_GROUP == "scheduler" (ver
+# configure_scheduler), entao e seguro criar o app aqui em ambos process groups.
+app = create_app()
+
+
 if __name__ == "__main__":
-    app = create_app()
     app.run(
         debug=(os.environ.get("FLASK_ENV") == "development"),
         use_reloader=(
