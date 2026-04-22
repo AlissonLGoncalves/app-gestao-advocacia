@@ -92,3 +92,11 @@ export function downloadRelatorioContasAReceber(params = {}) {
 export function downloadRelatorioContasAPagar(params = {}) {
   return api.getBlob(`/relatorios/contas-a-pagar${toQueryString(params)}`)
 }
+
+export function getRelatorioFluxoCaixa(ano) {
+  return api.get(`/relatorios/fluxo-caixa${toQueryString({ ano })}`)
+}
+
+export function getRelatorioCasosStatus() {
+  return api.get('/relatorios/casos-status')
+}

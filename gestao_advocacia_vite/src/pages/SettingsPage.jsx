@@ -8,13 +8,21 @@ import {
   ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
+import { getTenant, updateTenant } from '../api/tenant'
 
 function SettingsPage() {
   const [activeTab, setActiveTab] = useState('escritorio')
   const [userRole, setUserRole] = useState('admin')
+  const [loadingEscritorio, setLoadingEscritorio] = useState(true)
+  const [savingEscritorio, setSavingEscritorio] = useState(false)
   const [escritorioInfo, setEscritorioInfo] = useState({
-    nome: '',
-    email: '',
+    nome_escritorio: '',
+    documento: '',
+    email_contato: '',
+    telefone: '',
+    numero_oab_escritorio: '',
+    sigla_oab_escritorio: '',
+    endereco: '',
   })
 
   const [showInviteForm, setShowInviteForm] = useState(false)
@@ -22,26 +30,55 @@ function SettingsPage() {
   const [inviteRole, setInviteRole] = useState('advogado')
   const [isInviting, setIsInviting] = useState(false)
 
-  // Auditoria LGPD
   const [auditLogs, setAuditLogs] = useState([])
   const [loadingLogs, setLoadingLogs] = useState(false)
 
+  const [loggedUser, setLoggedUser] = useState({ username: '', email: '' })
+
   useEffect(() => {
-    // Busca informações básicas do usuário local para popular o Form
     const userString = localStorage.getItem('user')
     if (userString) {
       const user = JSON.parse(userString)
       setUserRole(user.role || 'advogado')
-      setEscritorioInfo({
-        nome: user.username,
-        email: user.email,
-      })
+      setLoggedUser({ username: user.username || '', email: user.email || '' })
     }
+
+    const carregarTenant = async () => {
+      setLoadingEscritorio(true)
+      try {
+        const data = await getTenant()
+        setEscritorioInfo({
+          nome_escritorio: data.nome_escritorio || '',
+          documento: data.documento || '',
+          email_contato: data.email_contato || '',
+          telefone: data.telefone || '',
+          numero_oab_escritorio: data.numero_oab_escritorio || '',
+          sigla_oab_escritorio: data.sigla_oab_escritorio || '',
+          endereco: data.endereco || '',
+        })
+      } catch (err) {
+        console.error(err)
+        toast.error('Erro ao carregar dados do escritório.')
+      } finally {
+        setLoadingEscritorio(false)
+      }
+    }
+
+    carregarTenant()
   }, [])
 
-  const handleSalvarEscritorio = (e) => {
+  const handleSalvarEscritorio = async (e) => {
     e.preventDefault()
-    toast.success('Informações do Escritório salvas com sucesso!')
+    setSavingEscritorio(true)
+    try {
+      await updateTenant(escritorioInfo)
+      toast.success('Dados do escritório salvos com sucesso!')
+    } catch (err) {
+      console.error(err)
+      toast.error(err.message || 'Erro ao salvar dados do escritório.')
+    } finally {
+      setSavingEscritorio(false)
+    }
   }
 
   const fetchAuditLogs = useCallback(async () => {
@@ -155,65 +192,132 @@ function SettingsPage() {
                 </p>
               </div>
               <div className="card-body p-4">
-                <form onSubmit={handleSalvarEscritorio}>
-                  <div className="row g-3 mb-4">
-                    <div className="col-md-6">
-                      <label className="form-label text-secondary small fw-bold">
-                        Nome do Escritório / Razão Social
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={escritorioInfo.nome}
-                        onChange={(e) =>
-                          setEscritorioInfo({ ...escritorioInfo, nome: e.target.value })
-                        }
-                      />
+                {loadingEscritorio ? (
+                  <div className="text-center py-5 text-muted">Carregando dados do escritório...</div>
+                ) : (
+                  <form onSubmit={handleSalvarEscritorio}>
+                    <div className="row g-3 mb-3">
+                      <div className="col-md-6">
+                        <label className="form-label text-secondary small fw-bold">
+                          Nome do Escritório / Razão Social
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={escritorioInfo.nome_escritorio}
+                          onChange={(e) =>
+                            setEscritorioInfo({ ...escritorioInfo, nome_escritorio: e.target.value })
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label text-secondary small fw-bold">
+                          CNPJ / CPF
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={escritorioInfo.documento}
+                          onChange={(e) =>
+                            setEscritorioInfo({ ...escritorioInfo, documento: e.target.value })
+                          }
+                          placeholder="00.000.000/0001-00"
+                        />
+                      </div>
                     </div>
-                    <div className="col-md-6">
-                      <label className="form-label text-secondary small fw-bold">
-                        ID do Tenant (Sistema)
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control bg-light"
-                        value="TENANT-P-9021"
-                        disabled
-                      />
+
+                    <div className="row g-3 mb-3">
+                      <div className="col-md-6">
+                        <label className="form-label text-secondary small fw-bold">
+                          E-mail de Contato
+                        </label>
+                        <input
+                          type="email"
+                          className="form-control"
+                          value={escritorioInfo.email_contato}
+                          onChange={(e) =>
+                            setEscritorioInfo({ ...escritorioInfo, email_contato: e.target.value })
+                          }
+                          placeholder="contato@escritorio.com.br"
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label text-secondary small fw-bold">
+                          Telefone
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={escritorioInfo.telefone}
+                          onChange={(e) =>
+                            setEscritorioInfo({ ...escritorioInfo, telefone: e.target.value })
+                          }
+                          placeholder="(11) 3000-0000"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="row g-3 mb-4">
-                    <div className="col-md-6">
-                      <label className="form-label text-secondary small fw-bold">
-                        E-mail Administrativo do Cofre
-                      </label>
-                      <input
-                        type="email"
-                        className="form-control"
-                        value={escritorioInfo.email}
-                        onChange={(e) =>
-                          setEscritorioInfo({ ...escritorioInfo, email: e.target.value })
-                        }
-                      />
+
+                    <div className="row g-3 mb-3">
+                      <div className="col-md-6">
+                        <label className="form-label text-secondary small fw-bold">
+                          Número OAB do Escritório
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={escritorioInfo.numero_oab_escritorio}
+                          onChange={(e) =>
+                            setEscritorioInfo({ ...escritorioInfo, numero_oab_escritorio: e.target.value })
+                          }
+                          placeholder="12345"
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label text-secondary small fw-bold">
+                          UF da OAB
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={escritorioInfo.sigla_oab_escritorio}
+                          onChange={(e) =>
+                            setEscritorioInfo({ ...escritorioInfo, sigla_oab_escritorio: e.target.value.toUpperCase() })
+                          }
+                          placeholder="SP"
+                          maxLength={2}
+                        />
+                      </div>
                     </div>
-                    <div className="col-md-6">
-                      <label className="form-label text-secondary small fw-bold">
-                        Documento (CPF/CNPJ)
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control bg-light"
-                        value="•••.•••.•••-•• (Visualização Ofuscada)"
-                        disabled
-                      />
+
+                    <div className="row g-3 mb-4">
+                      <div className="col-12">
+                        <label className="form-label text-secondary small fw-bold">
+                          Endereço Completo
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={escritorioInfo.endereco}
+                          onChange={(e) =>
+                            setEscritorioInfo({ ...escritorioInfo, endereco: e.target.value })
+                          }
+                          placeholder="Rua das Letras, 100, Sala 5 — Jardim Jurídico, São Paulo/SP — CEP 01001-000"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="d-flex justify-content-end border-top pt-4">
-                    <button type="submit" className="btn btn-primary px-4 fw-bold shadow-sm">
-                      Salvar Alterações Globais
-                    </button>
-                  </div>
-                </form>
+
+                    <div className="d-flex justify-content-end border-top pt-4">
+                      <button
+                        type="submit"
+                        className="btn btn-primary px-4 fw-bold shadow-sm"
+                        disabled={savingEscritorio}
+                      >
+                        {savingEscritorio ? 'Salvando...' : 'Salvar Alterações Globais'}
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             </div>
           )}
@@ -298,11 +402,11 @@ function SettingsPage() {
                               className="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center fw-bold me-3"
                               style={{ width: '40px', height: '40px' }}
                             >
-                              {escritorioInfo.nome.charAt(0).toUpperCase() || 'A'}
+                              {loggedUser.username.charAt(0).toUpperCase() || 'A'}
                             </div>
                             <div>
-                              <p className="mb-0 fw-bold">{escritorioInfo.nome}</p>
-                              <span className="text-muted small">{escritorioInfo.email}</span>
+                              <p className="mb-0 fw-bold">{loggedUser.username}</p>
+                              <span className="text-muted small">{loggedUser.email}</span>
                             </div>
                           </div>
                         </td>
@@ -342,7 +446,6 @@ function SettingsPage() {
           {/* ABA: ASSINATURA */}
           {activeTab === 'assinatura' && (
             <div className="card shadow-sm border-0 rounded-4 overflow-hidden">
-              {/* BANNER PREMIUM */}
               <div
                 className="p-5 text-white position-relative"
                 style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }}
@@ -369,8 +472,6 @@ function SettingsPage() {
                     </small>
                   </div>
                 </div>
-
-                {/* Circulos de Design */}
                 <div
                   className="position-absolute rounded-circle shadow"
                   style={{
@@ -393,20 +494,13 @@ function SettingsPage() {
                 ></div>
               </div>
 
-              {/* DETALHES FATURAMENTO */}
               <div className="card-body p-5">
                 <h5 className="fw-bold text-dark border-bottom pb-3 mb-4">Método de Pagamento</h5>
-
                 <div className="d-flex align-items-center justify-content-between p-4 border rounded-4 bg-light mb-4 shadow-sm">
                   <div className="d-flex align-items-center">
                     <div
                       className="bg-dark text-white rounded d-flex justify-content-center align-items-center me-4 shadow"
-                      style={{
-                        width: '60px',
-                        height: '40px',
-                        fontWeight: '900',
-                        fontStyle: 'italic',
-                      }}
+                      style={{ width: '60px', height: '40px', fontWeight: '900', fontStyle: 'italic' }}
                     >
                       VISA
                     </div>
@@ -425,10 +519,7 @@ function SettingsPage() {
 
                 <div className="row g-4 mt-2">
                   <div className="col-md-6">
-                    <div
-                      className="p-4 border rounded-4 bg-white border-primary shadow-sm"
-                      style={{ borderWidth: '2px !important' }}
-                    >
+                    <div className="p-4 border rounded-4 bg-white border-primary shadow-sm">
                       <h6 className="fw-bold d-flex text-primary">
                         Plano Escritório{' '}
                         <CheckBadgeIcon style={{ width: '18px' }} className="ms-2" />

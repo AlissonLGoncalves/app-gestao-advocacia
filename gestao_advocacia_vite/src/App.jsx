@@ -26,6 +26,8 @@ import SettingsPage from './pages/SettingsPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
 import PerfilPage from './pages/PerfilPage.jsx'
 import NovoClientePorProcuracao from './pages/clientes/NovoClientePorProcuracao.jsx'
+import PortalPage from './pages/portal/PortalPage.jsx'
+import PortalRegisterPage from './pages/portal/PortalRegisterPage.jsx'
 import { APP_VERSION } from './version.js'
 import GlobalSearch from './components/GlobalSearch.jsx'
 
@@ -54,6 +56,16 @@ const ProtectedRoute = ({ children }) => {
   if (!token) {
     return <Navigate to="/login" replace />
   }
+  return children
+}
+
+const PortalRoute = ({ children }) => {
+  const token = localStorage.getItem('token')
+  if (!token) return <Navigate to="/login" replace />
+  const userStr = localStorage.getItem('user')
+  let role = ''
+  try { role = userStr ? JSON.parse(userStr).role : '' } catch { /* */ }
+  if (role !== 'cliente') return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -326,6 +338,15 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/termos" element={<TermsPage />} />
+        <Route path="/portal/registro" element={<PortalRegisterPage />} />
+        <Route
+          path="/portal"
+          element={
+            <PortalRoute>
+              <PortalPage />
+            </PortalRoute>
+          }
+        />
         <Route
           path="/"
           element={

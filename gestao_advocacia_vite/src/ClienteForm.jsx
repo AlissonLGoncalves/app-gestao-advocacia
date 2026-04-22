@@ -8,6 +8,7 @@ import EnderecoSection from './components/forms/cliente/EnderecoSection.jsx'
 import ContatoSection from './components/forms/cliente/ContatoSection.jsx'
 import useClienteForm from './hooks/useClienteForm.js'
 import { anonimizarCliente, extrairDadosDocumentoCliente } from './api/clientes.js'
+import { api } from './api/client.js'
 
 const initialStatePF = {
   nome_razao_social: '',
@@ -76,6 +77,29 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
 
   const { validationErrors, setValidationErrors, clearValidationErrors, handleSubmit } =
     useClienteForm({ formData, isEditing, clienteParaEditar, onClienteChange, setLoading })
+
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteLink, setInviteLink] = useState(null)
+
+  const handleConvidarPortal = async () => {
+    if (!clienteParaEditar?.id) return
+    if (!clienteParaEditar?.email) {
+      toast.warning('O cliente precisa ter e-mail cadastrado para receber o convite.')
+      return
+    }
+    setInviteLoading(true)
+    try {
+      const data = await api.post('/auth/invite-cliente', {
+        cliente_id: clienteParaEditar.id,
+        email: clienteParaEditar.email,
+      })
+      setInviteLink(data.link_simulado)
+    } catch (err) {
+      toast.error(err.message || 'Erro ao gerar convite.')
+    } finally {
+      setInviteLoading(false)
+    }
+  }
 
   const formatDataParaExibicao = (data) => {
     if (!data) return ''
@@ -558,6 +582,49 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
           />
 
           <hr className="my-4" />
+
+          {/* Portal do Cliente — convite */}
+          {isEditing && clienteParaEditar && (
+            <div className="mb-4">
+              {!inviteLink ? (
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm d-flex align-items-center gap-2"
+                  onClick={handleConvidarPortal}
+                  disabled={inviteLoading}
+                >
+                  {inviteLoading
+                    ? <span className="spinner-border spinner-border-sm" />
+                    : <i className="bi bi-person-badge" />}
+                  Convidar para o Portal do Cliente
+                </button>
+              ) : (
+                <div className="alert alert-success border-0 py-2 px-3 small mb-0 d-flex align-items-center gap-2">
+                  <i className="bi bi-check-circle-fill" />
+                  <span className="flex-grow-1 text-truncate font-monospace">{inviteLink}</span>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-success"
+                    onClick={() => {
+                      navigator.clipboard.writeText(inviteLink)
+                      toast.success('Link copiado!')
+                    }}
+                  >
+                    <i className="bi bi-clipboard" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => setInviteLink(null)}
+                    title="Fechar"
+                  >
+                    <i className="bi bi-x" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="d-flex justify-content-end">
             {typeof onCancel === 'function' && (
               <button

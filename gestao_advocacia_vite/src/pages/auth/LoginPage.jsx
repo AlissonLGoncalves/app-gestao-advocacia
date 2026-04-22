@@ -31,7 +31,11 @@ function LoginPage() {
       localStorage.setItem('user', JSON.stringify(data.user))
       const nome = data.user?.nome_completo || data.user?.username || 'advogado'
       toast.success(`Bem-vindo, ${nome}! ✓`)
-      navigate('/dashboard')
+      if (data.user?.role === 'cliente') {
+        navigate('/portal')
+      } else {
+        navigate('/dashboard')
+      }
     } catch (error) {
       console.error('Erro ao tentar fazer login:', error)
       toast.error(error.message || 'Falha no login. Verifique suas credenciais.')

@@ -1,7 +1,8 @@
 // src/components/GerarDocumentoModal.jsx
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import { MODELOS, gerarDocumento } from '../utils/gerarDocumentoLegal.js'
+import { api } from '../api/client.js'
 
 const TIPOS = Object.entries(MODELOS).map(([id, v]) => ({ id, ...v }))
 
@@ -13,6 +14,15 @@ function GerarDocumentoModal({ cliente, onClose }) {
   const [estadoOAB, setEstadoOAB] = useState('')
   const [cidade, setCidade] = useState('')
   const [gerando, setGerando] = useState(false)
+
+  useEffect(() => {
+    if (cliente?.cidade) setCidade(cliente.cidade)
+    api.get('/auth/me').then((perfil) => {
+      if (perfil.nome_completo) setNomeAdvogado(perfil.nome_completo)
+      if (perfil.numero_oab) setOab(perfil.numero_oab)
+      if (perfil.sigla_oab_tribunal) setEstadoOAB(perfil.sigla_oab_tribunal)
+    }).catch(() => {})
+  }, [cliente?.cidade])
 
   const templatesDeTipo = MODELOS[tipo]?.templates ?? []
 
