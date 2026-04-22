@@ -21,7 +21,7 @@ SaaS multi-tenant para gestão de escritórios de advocacia — clientes, casos,
 Para padronizar atualizações de versão, use o guia oficial:
 **[GUIA_VERSIONAMENTO.md](GUIA_VERSIONAMENTO.md)**
 
-Versão atual: **v1.2.0**.
+Versão atual: **v1.4.0**.
 
 ---
 
@@ -38,6 +38,10 @@ Versão atual: **v1.2.0**.
 - **DATAJUD/CNJ**: consulta de movimentações via API pública (respeitando [Termo de Uso v1.2](docs/compliance/datajud-termo-uso-v1.2.md) e rate-limit de 120 req/min).
 - **API documentada**: Swagger UI em `/api/v1/docs` (disponível fora de produção).
 - **Observabilidade**: logs estruturados JSON, events específicos para login, alertas e DJEN.
+- **Camada de API centralizada** (frontend): todo `fetch` passa por
+  `src/api/client.js` com autenticação JWT automática, headers LGPD/Termos
+  obrigatórios e handler global de `401`. Ver
+  [`docs/sessao-2026-04-21-s8-e-fixes-producao.md`](docs/sessao-2026-04-21-s8-e-fixes-producao.md).
 
 ---
 
@@ -162,6 +166,8 @@ Secrets obrigatórios em produção: `SECRET_KEY`, `JWT_SECRET_KEY`, `DATABASE_U
 ### Frontend — Vercel
 Deploy automático a cada push em `main`. Plano Hobby não aceita `Co-Authored-By` em commits de repositórios privados — **nunca** adicione essa linha. Ver `memory/feedback_commits.md`.
 
+> **Nota sobre o Render.com**: existiu um deploy em `app-gestao-advocacia.onrender.com` que hoje está zumbi. A plataforma oficial é exclusivamente o Fly.io. As menções a `onrender.com` em [`docs/roteiro-fly-producao.md`](docs/roteiro-fly-producao.md) são históricas (registro da migração).
+
 ---
 
 ## Arquitetura resumida
@@ -216,6 +222,19 @@ Em andamento:
 | D3 | Direito ao esquecimento (LGPD art. 18) | Pendente |
 
 Detalhes em `.github/tasks/ROADMAP-2026-Q2.md` (quando PR #37 for mergeada).
+
+---
+
+## Documentação complementar
+
+- [`CHANGELOG.md`](CHANGELOG.md) — histórico de releases.
+- [`GUIA_VERSIONAMENTO.md`](GUIA_VERSIONAMENTO.md) — como bumpar versão.
+- [`docs/sessao-2026-04-21-s8-e-fixes-producao.md`](docs/sessao-2026-04-21-s8-e-fixes-producao.md) — sessão v1.4.0 (refatoração S8 + fixes de produção).
+- [`docs/roteiro-fly-producao.md`](docs/roteiro-fly-producao.md) — roteiro operacional do Fly.io.
+- [`docs/logging.md`](docs/logging.md) — logs estruturados JSON + request IDs.
+- [`docs/tenant-isolation.md`](docs/tenant-isolation.md) — invariantes multi-tenant.
+- [`docs/compliance/`](docs/compliance/) — DATAJUD v1.2, CNJ MTD v1.2.
+- [`.github/tasks/S8-handoff-rebase.md`](.github/tasks/S8-handoff-rebase.md) — procedimento de rebase da refatoração S8.
 
 ---
 
