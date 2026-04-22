@@ -87,6 +87,13 @@ def configure_jwt_error_handlers(jwt):
 
 
 def configure_scheduler(app):
+    process_group = os.environ.get("FLY_PROCESS_GROUP", "")
+    if process_group != "scheduler":
+        app.logger.info(
+            "APScheduler nao iniciado (FLY_PROCESS_GROUP != scheduler).",
+        )
+        return
+
     if app.config.get("CNJ_JOB_ENABLED", False):
         if not app.config.get("TESTING", False):
             scheduler.init_app(app)

@@ -7,6 +7,10 @@ primary_region = "gru"
 
 [build]
 
+[processes]
+  app = "gunicorn -b 0.0.0.0:8080 app:app"
+  scheduler = "python -m scheduler_runner"
+
 [deploy]
   release_command = "flask db upgrade"
 
