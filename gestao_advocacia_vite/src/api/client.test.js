@@ -57,6 +57,35 @@ describe('api/client request', () => {
     window.location = originalLocation
   })
 
+  it('401 em /auth/login NAO limpa token nem redireciona (credencial invalida)', async () => {
+    localStorage.setItem('access_token', 'token-de-outra-sessao')
+
+    const originalLocation = window.location
+    delete window.location
+    window.location = { href: 'http://localhost/login', pathname: '/login' }
+
+    globalThis.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      json: async () => ({ message: 'Nome de usuário/email ou senha inválidos.' }),
+    })
+
+    await expect(
+      request('/auth/login', {
+        method: 'POST',
+        body: { username_or_email: 'x', password: 'y' },
+      })
+    ).rejects.toThrow('Nome de usuário/email ou senha inválidos.')
+
+    // token da sessao anterior NAO deve ser limpo
+    expect(localStorage.getItem('access_token')).toBe('token-de-outra-sessao')
+    // nao deve ter redirecionado pra /login
+    expect(window.location.href).toBe('http://localhost/login')
+
+    window.location = originalLocation
+  })
+
   it('test_request_erro_throw_com_status_e_payload', async () => {
     globalThis.fetch.mockResolvedValueOnce({
       ok: false,

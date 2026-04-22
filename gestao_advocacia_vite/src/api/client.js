@@ -28,10 +28,26 @@ function handleUnauthorized() {
   throw new Error('Sessão expirada')
 }
 
-async function throwIfError(res) {
-  if (res.status === 401) handleUnauthorized()
+// Endpoints onde um 401 significa "credencial invalida" (nao "sessao expirada"):
+// nao devemos limpar localStorage nem redirecionar pra /login nesses casos.
+const AUTH_ENDPOINTS_401_IS_CREDENTIAL_ERROR = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+]
+
+function is401CredentialError(path) {
+  return AUTH_ENDPOINTS_401_IS_CREDENTIAL_ERROR.some((p) => path.startsWith(p))
+}
+
+async function throwIfError(res, path) {
   if (!res.ok) {
     const payload = await res.json().catch(() => ({ message: res.statusText }))
+    if (res.status === 401 && !is401CredentialError(path)) {
+      // Sessao expirada / token invalido em endpoint autenticado
+      handleUnauthorized()
+    }
     throw Object.assign(new Error(payload.message || payload.erro || `HTTP ${res.status}`), {
       status: res.status,
       payload,
@@ -52,7 +68,7 @@ export async function request(path, { method = 'GET', body, headers, signal, aut
         : undefined,
     signal,
   })
-  await throwIfError(res)
+  await throwIfError(res, path)
   if (res.status === 204) return null
   return res.json()
 }
@@ -61,7 +77,7 @@ export async function getBlob(path, { headers, signal, auth = true } = {}) {
   const finalHeaders = buildHeaders({ headers, isFormData: true, auth })
   delete finalHeaders['Content-Type']
   const res = await fetch(`${BASE}${path}`, { method: 'GET', headers: finalHeaders, signal })
-  await throwIfError(res)
+  await throwIfError(res, path)
   return res.blob()
 }
 
