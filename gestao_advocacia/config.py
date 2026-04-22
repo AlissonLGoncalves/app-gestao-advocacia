@@ -70,8 +70,12 @@ class Config:
     SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False  # Mude para True para logar queries SQL em desenvolvimento, se útil
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,  # testa conexão antes de usar (evita SSL closed após sleep)
+        "pool_recycle": 280,    # recicla antes do timeout server-side (~5 min)
+    }
 
-    # Em produção (Render), defina UPLOAD_FOLDER como /mnt/data/uploads (Persistent Disk)
+    # UPLOAD_FOLDER: em produção usa volume persistente do Fly (/data/uploads)
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER") or os.path.join(
         os.path.abspath(os.path.dirname(__file__)), "uploads"
     )
