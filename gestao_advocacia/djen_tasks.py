@@ -13,10 +13,32 @@ import re
 import time
 from datetime import datetime, timedelta
 
+from flask import current_app
+
 from djen_service import DjenAPIError, DjenRateLimitError, consultar_comunicacoes, listar_tribunais
 
 RATE_LIMIT_SLEEP = 65  # segundos a aguardar após HTTP 429
 DELAY_ENTRE_REQUISICOES = 3  # segundos entre cada requisição
+
+# Paginação: a ComunicaAPI só aceita itensPorPagina ∈ {5, 100}; o job usa 100
+# por padrão e percorre páginas até que o servidor retorne um lote incompleto
+# (< itens_por_pagina) ou o cap ``DJEN_MAX_PAGINAS_POR_CONSULTA`` seja atingido.
+DJEN_ITENS_POR_PAGINA_PADRAO = 100
+DJEN_MAX_PAGINAS_POR_CONSULTA_PADRAO = 50
+
+
+def _get_config_int(chave, default):
+    try:
+        return int(current_app.config.get(chave, default))
+    except (RuntimeError, TypeError, ValueError):
+        return default
+
+
+def _get_config_float(chave, default):
+    try:
+        return float(current_app.config.get(chave, default))
+    except (RuntimeError, TypeError, ValueError):
+        return default
 
 
 _CNJ_REGEX = re.compile(r"^(\d{7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})$")
@@ -88,45 +110,59 @@ def _inferir_sigla_tribunal_por_numero_processo(numero_processo):
 def _consultar_processo_com_fallback(
     *, numero_processo, sigla_tribunal, data_inicio, data_fim, logger
 ):
-    """Consulta DJEN por processo com fallback de tribunal e paginação."""
-    tentativas = []
+    """Consulta DJEN por processo com fallback de tribunal e paginação completa.
+
+    Para cada sigla (com e sem filtro de tribunal) percorre páginas
+    incrementando até a API devolver um lote incompleto ou o cap de páginas
+    ser atingido. Retorna no primeiro bloco não-vazio encontrado.
+    """
+    siglas_a_tentar = []
     if sigla_tribunal:
-        tentativas.extend(
-            [
-                {"sigla_tribunal": sigla_tribunal, "pagina": 1},
-                {"sigla_tribunal": sigla_tribunal, "pagina": 0},
-            ]
-        )
-    tentativas.extend(
-        [
-            {"sigla_tribunal": None, "pagina": 1},
-            {"sigla_tribunal": None, "pagina": 0},
-        ]
+        siglas_a_tentar.append(sigla_tribunal)
+    siglas_a_tentar.append(None)
+
+    itens_por_pagina = _get_config_int("DJEN_ITENS_POR_PAGINA", DJEN_ITENS_POR_PAGINA_PADRAO)
+    max_paginas = _get_config_int(
+        "DJEN_MAX_PAGINAS_POR_CONSULTA", DJEN_MAX_PAGINAS_POR_CONSULTA_PADRAO
     )
+    delay = _get_config_float("DJEN_REQUEST_DELAY_SECONDS", 1.5)
 
     ultimo_payload = {}
     ultimo_items = []
-    for t in tentativas:
-        payload = consultar_comunicacoes(
-            numero_processo=numero_processo,
-            sigla_tribunal=t["sigla_tribunal"],
-            meio="D",
-            data_inicio=data_inicio,
-            data_fim=data_fim,
-            pagina=t["pagina"],
-        )
-        items = _extrair_items(payload)
-        logger.info(
-            "JOB DJEN: tentativa processo %s (sigla=%s, pagina=%s) retornou %s item(ns).",
-            numero_processo,
-            t["sigla_tribunal"] or "sem_filtro",
-            t["pagina"],
-            len(items),
-        )
-        ultimo_payload = payload
-        ultimo_items = items
-        if items:
-            return payload, items
+
+    for sigla in siglas_a_tentar:
+        acumulado_sigla = []
+        pagina = 1
+        while pagina <= max_paginas:
+            payload = consultar_comunicacoes(
+                numero_processo=numero_processo,
+                sigla_tribunal=sigla,
+                meio="D",
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+                pagina=pagina,
+                itens_por_pagina=itens_por_pagina,
+            )
+            items = _extrair_items(payload)
+            logger.info(
+                "JOB DJEN: tentativa processo %s (sigla=%s, pagina=%s) retornou %s item(ns).",
+                numero_processo,
+                sigla or "sem_filtro",
+                pagina,
+                len(items),
+            )
+            ultimo_payload = payload
+            ultimo_items = items
+            acumulado_sigla.extend(items)
+            if len(items) < itens_por_pagina:
+                break
+            pagina += 1
+            if delay > 0:
+                time.sleep(delay)
+
+        if acumulado_sigla:
+            dedup = _dedupe_items_djen(acumulado_sigla)
+            return {"items": dedup}, dedup
 
     return ultimo_payload, ultimo_items
 
@@ -188,28 +224,30 @@ def _dedupe_items_djen(items):
 
 
 def _build_tentativas_consulta(*, sigla_tribunal, siglas_tribunais=None):
-    """Monta sequência de tentativas por sigla/paginação com ordem estável e sem repetição."""
+    """Monta sequência de tentativas por sigla com ordem estável e sem repetição.
+
+    Cada tentativa começa na pagina=1; a paginação completa é feita dentro
+    de ``_consultar_com_tentativas`` incrementando a página até a API
+    retornar uma página incompleta (< itens_por_pagina) ou até o cap de
+    segurança ``DJEN_MAX_PAGINAS_POR_CONSULTA``.
+    """
     tentativas = []
     visitados = set()
 
-    def _append(sigla, pagina):
-        chave = (sigla, pagina)
-        if chave in visitados:
+    def _append(sigla):
+        if sigla in visitados:
             return
-        visitados.add(chave)
-        tentativas.append({"sigla_tribunal": sigla, "pagina": pagina})
+        visitados.add(sigla)
+        tentativas.append({"sigla_tribunal": sigla, "pagina": 1})
 
     if sigla_tribunal:
-        _append(sigla_tribunal, 1)
-        _append(sigla_tribunal, 0)
+        _append(sigla_tribunal)
 
     for sigla in siglas_tribunais or []:
         if sigla:
-            _append(sigla, 1)
-            _append(sigla, 0)
+            _append(sigla)
 
-    _append(None, 1)
-    _append(None, 0)
+    _append(None)
     return tentativas
 
 
@@ -236,42 +274,60 @@ def _consultar_com_tentativas(
         siglas_tribunais=siglas_tribunais if buscar_todos_tribunais else None,
     )
 
+    itens_por_pagina = _get_config_int("DJEN_ITENS_POR_PAGINA", DJEN_ITENS_POR_PAGINA_PADRAO)
+    max_paginas = _get_config_int(
+        "DJEN_MAX_PAGINAS_POR_CONSULTA", DJEN_MAX_PAGINAS_POR_CONSULTA_PADRAO
+    )
+    delay = _get_config_float("DJEN_REQUEST_DELAY_SECONDS", 1.5)
+
     ultimo_payload = {}
     ultimo_items = []
     acumulado = []
 
     for t in tentativas:
-        payload = consultar_comunicacoes(
-            numero_oab=numero_oab,
-            uf_oab=uf_oab,
-            numero_processo=numero_processo,
-            sigla_tribunal=t["sigla_tribunal"],
-            meio="D",
-            data_inicio=data_inicio,
-            data_fim=data_fim,
-            pagina=t["pagina"],
-        )
-        items = _extrair_items(payload)
-        logger.info(
-            "JOB DJEN: tentativa %s %s (sigla=%s, pagina=%s) retornou %s item(ns).",
-            tipo,
-            numero_oab or numero_processo,
-            t["sigla_tribunal"] or "sem_filtro",
-            t["pagina"],
-            len(items),
-        )
-        ultimo_payload = payload
-        ultimo_items = items
+        acumulado_tentativa = []
+        pagina = max(1, int(t.get("pagina") or 1))
+        while pagina <= max_paginas:
+            payload = consultar_comunicacoes(
+                numero_oab=numero_oab,
+                uf_oab=uf_oab,
+                numero_processo=numero_processo,
+                sigla_tribunal=t["sigla_tribunal"],
+                meio="D",
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+                pagina=pagina,
+                itens_por_pagina=itens_por_pagina,
+            )
+            items = _extrair_items(payload)
+            logger.info(
+                "JOB DJEN: tentativa %s %s (sigla=%s, pagina=%s) retornou %s item(ns).",
+                tipo,
+                numero_oab or numero_processo,
+                t["sigla_tribunal"] or "sem_filtro",
+                pagina,
+                len(items),
+            )
+            ultimo_payload = payload
+            ultimo_items = items
+            acumulado_tentativa.extend(items)
+            if len(items) < itens_por_pagina:
+                break
+            pagina += 1
+            if delay > 0:
+                time.sleep(delay)
 
         if buscar_todos_tribunais:
-            acumulado.extend(items)
+            acumulado.extend(acumulado_tentativa)
             continue
 
-        if items:
-            return payload, items
+        if acumulado_tentativa:
+            dedup = _dedupe_items_djen(acumulado_tentativa)
+            return {"items": dedup}, dedup
 
     if buscar_todos_tribunais:
-        return {"items": _dedupe_items_djen(acumulado)}, _dedupe_items_djen(acumulado)
+        dedup = _dedupe_items_djen(acumulado)
+        return {"items": dedup}, dedup
     return ultimo_payload, ultimo_items
 
 
