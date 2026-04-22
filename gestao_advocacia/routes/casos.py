@@ -545,13 +545,11 @@ def register_casos_routes(
         @casos_ns.doc("listar_movimentacoes_cnj_registradas_caso_endpoint", security="jsonWebToken")
         @casos_ns.marshal_list_with(movimentacao_cnj_output_model_dto)
         @jwt_required()
+        @tenant_scoped
         def get(self, caso_id):
-            user_id_atual = get_jwt_identity()
-            caso_db = db.session.get(Caso, caso_id)
+            caso_db = query_for_tenant(Caso).filter_by(id=caso_id).first()
             if not caso_db:
                 casos_ns.abort(404, message=f"Caso com ID {caso_id} não foi encontrado.")
-            if caso_db.user_id != user_id_atual:
-                casos_ns.abort(403, message="Acesso não autorizado.")
             movimentacoes = (
                 MovimentacaoCNJ.query.filter_by(caso_id=caso_db.id)
                 .order_by(MovimentacaoCNJ.data_movimentacao.desc(), MovimentacaoCNJ.id.desc())
