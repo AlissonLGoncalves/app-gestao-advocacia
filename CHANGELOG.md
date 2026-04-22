@@ -3,6 +3,46 @@
 Todos os releases significativos do Sistema de Gestao para Advocacia.
 Segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.6.0] - 2026-04-22
+
+### Added
+
+- **Portal do Cliente**: novo papel `cliente` com acesso restrito ao portal.
+  Endpoint `GET /portal/situacao` retorna casos, próximos eventos, documentos
+  e pendências financeiras do cliente vinculado. Frontend: `PortalPage` e
+  `PortalRegisterPage` (registro via token de convite).
+- **Convite para Portal do Cliente**: endpoint `POST /auth/invite-cliente`
+  (admin) gera token de convite; `POST /auth/register-invite` aceita
+  `invite_portal_cliente_id` para criar usuário com role `cliente` vinculado
+  ao cliente.
+- **Relatórios Gerenciais**: quatro endpoints em `/relatorios/`:
+  `contas-a-receber`, `contas-a-pagar`, `fluxo-caixa` (mensal por ano) e
+  `casos-status` (agrupamento por status). Frontend `RelatoriosPage`
+  completamente reescrita com cards e gráficos.
+- **Configurações do Escritório**: endpoints `GET/PUT /tenant/` para dados
+  de contato do escritório (`email_contato`, `telefone`, `numero_oab_escritorio`,
+  `sigla_oab_escritorio`, `endereco`). Frontend `SettingsPage` passa a salvar
+  via API em vez de `localStorage`.
+- **API client `tenant.js`**: `getTenant()` e `updateTenant()` centralizando
+  acesso ao endpoint de tenant no frontend.
+
+### Fixed
+
+- **403 em `/casos/:id/movimentacoes-cnj`**: `get_jwt_identity()` retorna
+  `str`, `caso.user_id` é `int`; comparação `int != str` sempre `True` causava
+  403. Corrigido substituindo comparação manual por `@tenant_scoped` +
+  `query_for_tenant()`.
+- **Migration idempotente `285cafac`**: `DuplicateTable: login_audit` em
+  produção. Reescrito `upgrade()` com `has_table()`, `CREATE INDEX IF NOT
+  EXISTS` e checagem de colunas existentes.
+- **Ruff F401** em `relatorios.py`: import `date` não utilizado removido.
+
+### Changed
+
+- Login redireciona `role === 'cliente'` para `/portal` em vez de `/dashboard`.
+- `APP_VERSION` atualizado de `1.2.0` para `1.6.0` em `config.py`.
+- `package.json` (frontend) atualizado de `1.4.0` para `1.6.0`.
+
 ## [1.5.0] - 2026-04-22
 
 Drenagem do backlog de 8 PRs empilhados (S1-S4, A2, A3, B1, C0-C3), todos

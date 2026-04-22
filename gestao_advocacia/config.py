@@ -84,7 +84,7 @@ class Config:
 
     CNJ_API_KEY = os.environ.get("CNJ_API_KEY", "")
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-    APP_VERSION = os.environ.get("APP_VERSION") or "1.2.0"
+    APP_VERSION = os.environ.get("APP_VERSION") or "1.6.0"
 
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
