@@ -114,3 +114,6 @@ class Config:
     )
     DJEN_ENABLED_TENANTS = os.environ.get("DJEN_ENABLED_TENANTS", "")  # CSV: 1,2,3
     DJEN_ROLLOUT_PERCENT = int(os.environ.get("DJEN_ROLLOUT_PERCENT", 100))  # 10, 50, 100
+
+    # Token de convite: padrão 48h. Ajuste com INVITE_TOKEN_HOURS env var.
+    INVITE_TOKEN_HOURS = int(os.environ.get("INVITE_TOKEN_HOURS", "48"))

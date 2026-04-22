@@ -10,6 +10,7 @@ from extensions import db, limiter
 from mail_service import enviar_alerta_email
 from models import ConsentimentoUsuario, Tenant, User
 from utils.log_sanitizer import mask_email, mask_user_id
+from utils.password_policy import validar_forca_senha
 
 TIPOS_CONSENTIMENTO_OBRIGATORIOS = ("termos_uso", "lgpd")
 
@@ -85,8 +86,9 @@ def register_auth_routes(
                 return {
                     "message": "Todos os campos (username, email, password) são obrigatórios."
                 }, 400
-            if len(password) < 6:
-                return {"message": "A senha deve ter no mínimo 6 caracteres."}, 400
+            ok, motivo = validar_forca_senha(password)
+            if not ok:
+                return {"message": motivo}, 400
 
             if User.query.filter_by(username=username).first():
                 return {"message": "Nome de usuário já cadastrado."}, 409
@@ -152,7 +154,7 @@ def register_auth_routes(
                     "invite_tenant_id": user.tenant_id,
                     "escritorio_nome": user.tenant.nome_escritorio if user.tenant else "Escritório",
                 },
-                expires_delta=timedelta(days=7),  # 7 dias pra expirar
+                expires_delta=timedelta(hours=app.config.get("INVITE_TOKEN_HOURS", 48)),
             )
 
             base_url = request.host_url
@@ -195,6 +197,10 @@ def register_auth_routes(
 
             if not token or not username or not password:
                 return {"message": "Dados incompletos."}, 400
+
+            ok, motivo = validar_forca_senha(password)
+            if not ok:
+                return {"message": motivo}, 400
 
             try:
                 decoded = decode_token(token)
