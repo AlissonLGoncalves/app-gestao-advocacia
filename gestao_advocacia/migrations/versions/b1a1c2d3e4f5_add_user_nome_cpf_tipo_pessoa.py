@@ -1,6 +1,6 @@
 """add_user_nome_cpf_tipo_pessoa
 
-Revision ID: e4f5a6b7c8d9
+Revision ID: b1a1c2d3e4f5
 Revises: d3e4f5a6b7c8
 Create Date: 2026-04-19 12:00:00.000000
 """
@@ -8,7 +8,7 @@ Create Date: 2026-04-19 12:00:00.000000
 import sqlalchemy as sa
 from alembic import op
 
-revision = "e4f5a6b7c8d9"
+revision = "b1a1c2d3e4f5"
 down_revision = "d3e4f5a6b7c8"
 branch_labels = None
 depends_on = None
