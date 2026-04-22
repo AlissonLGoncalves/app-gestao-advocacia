@@ -3,6 +3,55 @@
 Todos os releases significativos do Sistema de Gestao para Advocacia.
 Segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.5.0] - 2026-04-22
+
+Drenagem do backlog de 8 PRs empilhados (S1-S4, A2, A3, B1, C0-C3), todos
+rebasados sobre `main` pós-v1.4.0 (pós-S8 e pós-migração para Fly). Narrativa
+completa do "como chegamos nas soluções" em
+[`docs/sessao-2026-04-22-backlog-pipeline.md`](docs/sessao-2026-04-22-backlog-pipeline.md).
+
+### Security
+
+- **[S1]** IDOR fix de tenant em contratos e vínculos DJEN (404 em vez de 403
+  para evitar enumeração) — PR #75.
+- **[S2]** Rate limiting em `/login` (5/min), `/register` (3/min),
+  `/register-invite` (10/min) via Flask-Limiter memory storage — PR #76.
+- **[S3]** Política de senha forte (≥10, upper, digit, special) + invite
+  48h configurável via `INVITE_TOKEN_HOURS` — PR #77.
+- **[S4]** Validação de MIME real via `python-magic` em uploads (não confia
+  mais no header do cliente) + whitelist explícita de CORS — PR #78.
+
+### Added
+
+- **[A2]** Versionamento de Termos de Uso e Política LGPD como markdown
+  hasheado (SHA-256). Servidor envia `X-Terms-Version`/`X-LGPD-Version`;
+  cliente força re-aceite quando muda — PR #79.
+- **[A3]** Auditoria persistente de login em tabela `login_audit`
+  (user_id, ip mascarado, user_agent, success, motivo, timestamp). Exposta
+  na PerfilPage — PR #80.
+- **[B1]** Cadastro completo do advogado (nome, CPF com lock após primeiro
+  save, tipo_pessoa, OAB split em número + sigla+tribunal) + `PerfilPage`
+  unificada com formulário + histórico de login — PR #81.
+- **[C0-C3]** Chain Gemini: `GEMINI_API_KEY` como secret, extração de
+  procuração via Gemini (`procuracao_analise` + worker), UI de upload +
+  revisão, auto-vinculação de processo extraído ao criar cliente — PR #82.
+
+### Fixed
+
+- **Migration ENUM `procuracao_analise_status`**: `DuplicateObject` em
+  `release_command` do Fly. Solução final: `postgresql.ENUM(...,
+  create_type=False)` na Column (não `sa.Enum`, que ignora o flag) +
+  checagem explícita em `pg_type` antes do `.create()`. Três commits de
+  deploy iterativo (`5a4481d`, `63e10f4`, `1655fdf`).
+- **Colisão de migration IDs**: dois PRs antigos usavam IDs que já existiam
+  em main (B1 `e4f5a6b7c8d9`, C1 `e6f7a8b9c0d1`). Renomeados para
+  `b1a1c2d3e4f5` e `c1a2b3c4d5e6`; `flask db merge heads` gerou
+  `37428aed96da` e `80366d78be69`.
+- **Conflict markers órfãos em `PrazosPage.jsx` e `DjenPage.jsx`**:
+  cherry-pick do C3 deixou `<<<<<<< HEAD` no arquivo; pytest passou mas
+  `npm run build` falhou. Lição incorporada: `npm run build` é obrigatório
+  antes de considerar um rebase pronto.
+
 ## [1.4.0] - 2026-04-21
 
 Ciclo de consolidação da camada de API no frontend (refatoração S8) +
@@ -150,6 +199,7 @@ roadmap `.github/tasks/` (C1-C4, N1-N5, T1-T5) foram concluidas e mergeadas.
 
 Versao base do ciclo atual. Historico anterior nao formalizado neste CHANGELOG.
 
+[1.5.0]: https://github.com/AlissonLGoncalves/app-gestao-advocacia/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/AlissonLGoncalves/app-gestao-advocacia/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/AlissonLGoncalves/app-gestao-advocacia/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/AlissonLGoncalves/app-gestao-advocacia/compare/v1.1.1...v1.2.0
