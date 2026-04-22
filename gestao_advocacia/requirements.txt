@@ -11,6 +11,10 @@ flask-restx==1.3.2
 Flask-SQLAlchemy==3.1.1
 Flask-Limiter>=3.5.0
 gunicorn==25.3.0
+# python-magic requer libmagic. Em Linux/Docker: apt-get install libmagic1
+# Em Windows (dev): python-magic-bin inclui os binarios nativos
+python-magic==0.4.27; sys_platform != "win32"
+python-magic-bin==0.4.14; sys_platform == "win32"
 openpyxl==3.1.5
 Pillow==12.2.0
 psycopg2-binary==2.9.12
