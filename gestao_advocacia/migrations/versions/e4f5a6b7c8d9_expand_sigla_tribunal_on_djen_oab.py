@@ -18,20 +18,20 @@ depends_on = None
 
 
 def upgrade():
-    op.alter_column(
-        "djen_oab_monitoramento",
-        "sigla_tribunal",
-        existing_type=sa.String(length=20),
-        type_=sa.String(length=120),
-        existing_nullable=True,
-    )
+    with op.batch_alter_table("djen_oab_monitoramento") as batch_op:
+        batch_op.alter_column(
+            "sigla_tribunal",
+            existing_type=sa.String(length=20),
+            type_=sa.String(length=120),
+            existing_nullable=True,
+        )
 
 
 def downgrade():
-    op.alter_column(
-        "djen_oab_monitoramento",
-        "sigla_tribunal",
-        existing_type=sa.String(length=120),
-        type_=sa.String(length=20),
-        existing_nullable=True,
-    )
+    with op.batch_alter_table("djen_oab_monitoramento") as batch_op:
+        batch_op.alter_column(
+            "sigla_tribunal",
+            existing_type=sa.String(length=120),
+            type_=sa.String(length=20),
+            existing_nullable=True,
+        )

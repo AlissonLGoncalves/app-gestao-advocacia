@@ -276,6 +276,73 @@ def register_auth_routes(
                 "lgpd": _carregar_documento_legal("lgpd"),
             }, 200
 
+    @auth_ns.route("/invite-cliente")
+    class ClientePortalInvite(Resource):
+        @limiter.limit("20 per hour")
+        @jwt_required()
+        @auth_ns.doc(
+            security="jsonWebToken",
+            description="Convida um cliente para acessar o Portal do Cliente. Apenas admins.",
+        )
+        def post(self):
+            user_id = get_jwt_identity()
+            user = db.session.get(User, user_id)
+            if not user or user.role != "admin":
+                return {"message": "Apenas o Admin do escritório pode convidar clientes."}, 403
+
+            data = request.get_json() or {}
+            email_cliente = data.get("email")
+            cliente_id = data.get("cliente_id")
+
+            if not email_cliente or not cliente_id:
+                return {"message": "email e cliente_id são obrigatórios."}, 400
+
+            from models import Cliente
+            cliente = db.session.get(Cliente, cliente_id)
+            if not cliente or cliente.user_id != user.id:
+                return {"message": "Cliente não encontrado ou sem permissão."}, 404
+
+            invite_token = create_access_token(
+                identity="invite",
+                additional_claims={
+                    "is_invite": True,
+                    "invite_email": email_cliente,
+                    "invite_role": "cliente",
+                    "invite_tenant_id": user.tenant_id,
+                    "invite_portal_cliente_id": cliente_id,
+                    "nome_cliente": cliente.nome_razao_social,
+                    "escritorio_nome": user.tenant.nome_escritorio if user.tenant else "Escritório",
+                },
+                expires_delta=timedelta(days=7),
+            )
+
+            base_url = os.environ.get("FRONTEND_URL", "https://app-gestao-advocacia.vercel.app/")
+            if "localhost" in (request.host_url or ""):
+                base_url = "http://localhost:5173/"
+
+            link = f"{base_url.rstrip('/')}/portal/registro?invite_token={invite_token}"
+
+            corpo_email = f"""
+            <h3>Seu acesso ao Portal do Cliente foi criado!</h3>
+            <p>O escritório <strong>{user.tenant.nome_escritorio if user.tenant else 'Jurídico'}</strong>
+            disponibilizou um portal exclusivo para você acompanhar seu processo.</p>
+            <br>
+            <p><a href='{link}' style='padding: 10px 20px; background-color: #1e40af; color: white;
+            text-decoration: none; border-radius: 6px;'>Ativar Meu Acesso ao Portal</a></p>
+            <br>
+            <p style='color:#666; font-size:13px'>Se o botão não funcionar, acesse: {link}</p>
+            <p style='color:#999; font-size:12px'>Este link expira em 7 dias.</p>
+            """
+
+            enviar_alerta_email(
+                current_app,
+                email_cliente,
+                f"Acesso ao Portal do Cliente — {user.tenant.nome_escritorio if user.tenant else 'Escritório'}",
+                corpo_email,
+            )
+
+            return {"message": "Convite enviado para o cliente!", "link_simulado": link}, 200
+
     @auth_ns.route("/invite")
     class UserInvite(Resource):
         @limiter.limit("10 per hour")
@@ -359,6 +426,7 @@ def register_auth_routes(
                 invite_email = decoded.get("invite_email")
                 invite_role = decoded.get("invite_role")
                 invite_tenant_id = decoded.get("invite_tenant_id")
+                invite_portal_cliente_id = decoded.get("invite_portal_cliente_id")
 
                 if (
                     User.query.filter_by(email=invite_email).first()
@@ -371,6 +439,7 @@ def register_auth_routes(
                     email=invite_email,
                     role=invite_role,
                     tenant_id=invite_tenant_id,
+                    portal_cliente_id=invite_portal_cliente_id,
                 )
                 new_user.set_password(password)
                 db.session.add(new_user)

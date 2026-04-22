@@ -10,8 +10,25 @@ class Tenant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome_escritorio = db.Column(db.String(250), nullable=False)
     documento = db.Column(db.String(20), nullable=True)  # CNPJ ou CPF
+    email_contato = db.Column(db.String(120), nullable=True)
+    telefone = db.Column(db.String(30), nullable=True)
+    numero_oab_escritorio = db.Column(db.String(30), nullable=True)
+    sigla_oab_escritorio = db.Column(db.String(10), nullable=True)
+    endereco = db.Column(db.String(300), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     users = db.relationship("User", backref="tenant", lazy="dynamic")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "nome_escritorio": self.nome_escritorio,
+            "documento": self.documento,
+            "email_contato": self.email_contato,
+            "telefone": self.telefone,
+            "numero_oab_escritorio": self.numero_oab_escritorio,
+            "sigla_oab_escritorio": self.sigla_oab_escritorio,
+            "endereco": self.endereco,
+        }
 
 
 class User(db.Model):
@@ -23,13 +40,16 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    role = db.Column(db.String(20), nullable=False, default="admin")  # admin, advogado, assistente
+    role = db.Column(db.String(20), nullable=False, default="admin")  # admin, advogado, assistente, cliente
     nome_completo = db.Column(db.String(200), nullable=True)
     cpf = db.Column(db.String(14), nullable=True)
     tipo_pessoa = db.Column(db.String(2), nullable=True)
     numero_oab = db.Column(db.String(30), nullable=True)
     sigla_oab_tribunal = db.Column(db.String(10), nullable=True)
     djen_monitoramento_ativo = db.Column(db.Boolean, nullable=True, default=True)
+    portal_cliente_id = db.Column(
+        db.Integer, db.ForeignKey("cliente.id", name="fk_user_portal_cliente_id"), nullable=True
+    )
 
     casos = db.relationship(
         "Caso", backref="responsavel_user", lazy="dynamic", foreign_keys="Caso.user_id"
@@ -85,6 +105,7 @@ class User(db.Model):
             "sigla_oab_tribunal": self.sigla_oab_tribunal,
             "tipo_pessoa": self.tipo_pessoa,
             "cpf": self.cpf,
+            "portal_cliente_id": self.portal_cliente_id,
         }
 
 

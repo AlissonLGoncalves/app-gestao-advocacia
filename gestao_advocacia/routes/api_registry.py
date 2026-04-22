@@ -14,7 +14,10 @@ from .documentos import register_documentos_routes
 from .eventos import register_eventos_routes
 from .financeiro_registry import register_financeiro_api
 from .procuracoes import register_procuracoes_routes
+from .portal import register_portal_routes
+from .relatorios import register_relatorios_routes
 from .tarefas import register_tarefas_routes
+from .tenant import register_tenant_routes
 
 
 def register_api_routes(app, api, finance_access_required):
@@ -36,6 +39,9 @@ def register_api_routes(app, api, finance_access_required):
     tarefas_ns = Namespace("tarefas", description="Operacoes de Prazos e Tarefas")
     djen_ns = Namespace("djen", description="Publicacoes DJEN")
     procuracoes_ns = Namespace("procuracoes", description="Analise de procuracoes via Gemini")
+    tenant_ns = Namespace("tenant", description="Dados do Escritorio (Tenant)")
+    relatorios_ns = Namespace("relatorios", description="Relatorios Gerenciais")
+    portal_ns = Namespace("portal", description="Portal do Cliente (acesso simplificado)")
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -47,6 +53,9 @@ def register_api_routes(app, api, finance_access_required):
     api.add_namespace(tarefas_ns)
     api.add_namespace(djen_ns)
     api.add_namespace(procuracoes_ns)
+    api.add_namespace(tenant_ns)
+    api.add_namespace(relatorios_ns)
+    api.add_namespace(portal_ns)
 
     user_model_dto = auth_ns.model(
         "UserRegistration",
@@ -93,6 +102,7 @@ def register_api_routes(app, api, finance_access_required):
             "sigla_oab_tribunal": fields.String(description="UF da OAB"),
             "tipo_pessoa": fields.String(description="Tipo de pessoa"),
             "cpf": fields.String(description="CPF"),
+            "portal_cliente_id": fields.Integer(description="ID do cliente vinculado ao portal", nullable=True),
         },
     )
 
@@ -420,3 +430,6 @@ def register_api_routes(app, api, finance_access_required):
 
     register_auditoria_routes(audit_ns, audit_log_model_dto)
     register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto)
+    register_tenant_routes(tenant_ns)
+    register_relatorios_routes(relatorios_ns, finance_access_required)
+    register_portal_routes(portal_ns)
