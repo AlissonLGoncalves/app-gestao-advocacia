@@ -72,7 +72,7 @@ class Config:
     SQLALCHEMY_ECHO = False  # Mude para True para logar queries SQL em desenvolvimento, se útil
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,  # testa conexão antes de usar (evita SSL closed após sleep)
-        "pool_recycle": 280,    # recicla antes do timeout server-side (~5 min)
+        "pool_recycle": 280,  # recicla antes do timeout server-side (~5 min)
     }
 
     # UPLOAD_FOLDER: em produção usa volume persistente do Fly (/data/uploads)
@@ -104,6 +104,10 @@ class Config:
     DJEN_JOB_MINUTE = int(os.environ.get("DJEN_JOB_MINUTE", 0))
     DJEN_LOOKBACK_DAYS = int(os.environ.get("DJEN_LOOKBACK_DAYS", 30))
     DJEN_ITENS_POR_PAGINA = int(os.environ.get("DJEN_ITENS_POR_PAGINA", 100))
+    # Máximo de páginas a percorrer por tentativa (cap de segurança). Como a
+    # ComunicaAPI limita itensPorPagina a 100, 50 páginas = até 5.000 itens por
+    # sigla/OAB/processo. Ajuste para cima se necessário em escritórios grandes.
+    DJEN_MAX_PAGINAS_POR_CONSULTA = int(os.environ.get("DJEN_MAX_PAGINAS_POR_CONSULTA", 50))
     DJEN_REQUEST_DELAY_SECONDS = float(os.environ.get("DJEN_REQUEST_DELAY_SECONDS", 1.5))
     DJEN_BUSCAR_TODOS_TRIBUNAIS = (
         os.environ.get("DJEN_BUSCAR_TODOS_TRIBUNAIS", "True").lower() == "true"

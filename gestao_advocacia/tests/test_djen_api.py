@@ -418,10 +418,11 @@ class TestDjenPayloadCompat:
             def info(self, *args, **kwargs):
                 return None
 
+        # Nova paginacao: cada sigla consome 1 request quando a primeira
+        # pagina retorna menos que DJEN_ITENS_POR_PAGINA (sinal de fim).
         side_effect = [
-            {"items": []},  # com sigla, pagina 1
-            {"items": []},  # com sigla, pagina 0
-            {"items": [{"id": 7}]},  # sem sigla, pagina 1
+            {"items": []},  # com sigla=TJPR, pagina 1 (< 100 -> para)
+            {"items": [{"id": 7}]},  # sem sigla, pagina 1 (< 100 -> para)
         ]
         with patch("djen_tasks.consultar_comunicacoes", side_effect=side_effect) as mocked:
             payload, items = _consultar_oab_com_fallback(
@@ -434,7 +435,7 @@ class TestDjenPayloadCompat:
 
             assert len(items) == 1
             assert payload.get("items")[0]["id"] == 7
-            assert mocked.call_count == 3
+            assert mocked.call_count == 2
 
     def test_inferir_sigla_tribunal_por_numero_processo(self):
         """Infere sigla do tribunal corretamente para CNJs de diferentes segmentos."""
@@ -532,13 +533,12 @@ class TestDjenPayloadCompat:
             def info(self, *args, **kwargs):
                 return None
 
+        # Com paginacao completa: cada sigla gasta 1 request quando retorna < 100 itens.
+        # Duplicata (hash="dup") vem em TJPR e TJSP; deve ser deduplicada no final.
         side_effect = [
-            {"items": [{"id": 1, "hash": "dup"}]},  # sigla inicial, pagina 1
-            {"items": []},  # sigla inicial, pagina 0
-            {"items": [{"id": 2, "hash": "h2"}]},  # TJSP, pagina 1
-            {"items": [{"id": 1, "hash": "dup"}]},  # TJSP, pagina 0 (duplicado)
+            {"items": [{"id": 1, "hash": "dup"}]},  # sigla=TJPR, pagina 1
+            {"items": [{"id": 2, "hash": "h2"}, {"id": 1, "hash": "dup"}]},  # TJSP, pagina 1
             {"items": []},  # sem filtro, pagina 1
-            {"items": []},  # sem filtro, pagina 0
         ]
 
         with patch("djen_tasks.consultar_comunicacoes", side_effect=side_effect) as mocked:
@@ -555,7 +555,7 @@ class TestDjenPayloadCompat:
             hashes = sorted([i.get("hash") for i in items])
             assert hashes == ["dup", "h2"]
             assert len(payload.get("items", [])) == 2
-            assert mocked.call_count == 6
+            assert mocked.call_count == 3
 
 
 # ---------------------------------------------------------------------------
