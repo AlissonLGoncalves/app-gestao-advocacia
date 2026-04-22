@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { useConfirm } from '../hooks/useConfirm.jsx'
@@ -214,6 +214,10 @@ export default function DjenPage() {
   })
   const [offset, setOffset] = useState(0)
   const [itensPorPagina, setItensPorPagina] = useState(20)
+  const filtrosRef = useRef(filtros)
+  useEffect(() => {
+    filtrosRef.current = filtros
+  }, [filtros])
 
   // OABs monitoradas
   const [oabs, setOabs] = useState([])
@@ -246,20 +250,21 @@ export default function DjenPage() {
   // ── Carregar publicações ────────────────────────────────────────────────────
   const carregarPublicacoes = useCallback(
     async (offsetParam = 0, limitParam = itensPorPagina) => {
+      const f = filtrosRef.current
       setLoadingPubs(true)
       try {
         const data = await listPublicacoes({
           limit: limitParam,
           offset: offsetParam,
-          lida: filtros.lida !== '' ? filtros.lida : undefined,
-          sigla_tribunal: filtros.sigla_tribunal || undefined,
-          numero_processo: filtros.numero_processo || undefined,
-          nome_parte: filtros.nome_parte || undefined,
-          numero_oab: filtros.numero_oab || undefined,
-          data_inicio: filtros.data_inicio || undefined,
-          data_fim: filtros.data_fim || undefined,
-          origem: filtros.origem || undefined,
-          ordenar: filtros.ordenar || 'data_desc',
+          lida: f.lida !== '' ? f.lida : undefined,
+          sigla_tribunal: f.sigla_tribunal || undefined,
+          numero_processo: f.numero_processo || undefined,
+          nome_parte: f.nome_parte || undefined,
+          numero_oab: f.numero_oab || undefined,
+          data_inicio: f.data_inicio || undefined,
+          data_fim: f.data_fim || undefined,
+          origem: f.origem || undefined,
+          ordenar: f.ordenar || 'data_desc',
         })
 
         setPublicacoes(data.items || [])
@@ -271,7 +276,7 @@ export default function DjenPage() {
         setLoadingPubs(false)
       }
     },
-    [filtros, itensPorPagina]
+    [itensPorPagina]
   )
 
   // ── Carregar OABs ───────────────────────────────────────────────────────────
