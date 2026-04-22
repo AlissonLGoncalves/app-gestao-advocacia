@@ -6,6 +6,7 @@ import termosV10Md from '../../legal/termos-v1.0.md?raw'
 import lgpdV10Md from '../../legal/lgpd-v1.0.md?raw'
 import { toast } from 'react-toastify'
 import { register as registerRequest, registerInvite } from '../../api/auth'
+import { API_URL } from '../../config'
 import {
   LockClosedIcon,
   UserIcon,
