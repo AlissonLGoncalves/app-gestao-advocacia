@@ -1,8 +1,12 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { LGPD_VERSION, TERMS_VERSION } from '../../constants/legal'
+import ReactMarkdown from 'react-markdown'
+import termosV10Md from '../../legal/termos-v1.0.md?raw'
+import lgpdV10Md from '../../legal/lgpd-v1.0.md?raw'
 import { toast } from 'react-toastify'
 import { register as registerRequest, registerInvite } from '../../api/auth'
+import { API_URL } from '../../config'
 import {
   LockClosedIcon,
   UserIcon,
@@ -11,6 +15,13 @@ import {
   IdentificationIcon,
   CheckCircleIcon,
 } from '@heroicons/react/24/outline'
+
+function stripFrontMatter(markdown) {
+  if (!markdown?.startsWith('---\n')) return markdown || ''
+  const end = markdown.indexOf('\n---\n', 4)
+  if (end === -1) return markdown
+  return markdown.slice(end + 5)
+}
 
 function RegisterPage() {
   const [tipoPessoa, setTipoPessoa] = useState('PF')
@@ -27,6 +38,12 @@ function RegisterPage() {
   // Gatekeeper de Scroll Obrigatório (Termos)
   const [showTermsModal, setShowTermsModal] = useState(false)
   const [scrolledToBottom, setScrolledToBottom] = useState(false)
+  const [termosConteudo, setTermosConteudo] = useState(termosV10Md)
+  const [lgpdConteudo, setLgpdConteudo] = useState(lgpdV10Md)
+  const [termosVersao, setTermosVersao] = useState(TERMS_VERSION)
+  const [lgpdVersao, setLgpdVersao] = useState(LGPD_VERSION)
+  const [termosHash, setTermosHash] = useState('')
+  const [lgpdHash, setLgpdHash] = useState('')
 
   // Algoritmo que detecta quando a barra de rolagem atinge o fundo
   const handleScrollTerms = (e) => {
@@ -47,6 +64,36 @@ function RegisterPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const inviteToken = searchParams.get('invite_token')
+
+  useEffect(() => {
+    let ativo = true
+
+    async function carregarTermosVigentes() {
+      try {
+        const response = await fetch(`${API_URL}/auth/termos-vigentes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        if (!response.ok) return
+        const data = await response.json()
+        if (!ativo) return
+
+        if (data?.termos?.conteudo) setTermosConteudo(data.termos.conteudo)
+        if (data?.lgpd?.conteudo) setLgpdConteudo(data.lgpd.conteudo)
+        if (data?.termos?.versao) setTermosVersao(data.termos.versao)
+        if (data?.lgpd?.versao) setLgpdVersao(data.lgpd.versao)
+        if (data?.termos?.hash) setTermosHash(data.termos.hash)
+        if (data?.lgpd?.hash) setLgpdHash(data.lgpd.hash)
+      } catch {
+        // Fallback silencioso para os arquivos locais versionados.
+      }
+    }
+
+    carregarTermosVigentes()
+    return () => {
+      ativo = false
+    }
+  }, [])
 
   // Função para aplicar máscara dinâmica no CPF ou CNPJ
   const handleDocumentChange = (e) => {
@@ -123,6 +170,8 @@ function RegisterPage() {
           aceite_lgpd: true,
           versao_termos: TERMS_VERSION,
           versao_lgpd: LGPD_VERSION,
+          hash_termos_uso: termosHash || null,
+          hash_lgpd: lgpdHash || null,
         })
         toast.success(data.message || 'Conta ativada com sucesso no ambiente corporativo!')
         navigate('/login')
@@ -160,6 +209,8 @@ function RegisterPage() {
         aceite_lgpd: true,
         versao_termos: TERMS_VERSION,
         versao_lgpd: LGPD_VERSION,
+        hash_termos_uso: termosHash || null,
+        hash_lgpd: lgpdHash || null,
       })
 
       toast.success(data.message || 'Conta Criada! Seu Escritório Mestre foi gerado.')
@@ -458,7 +509,7 @@ function RegisterPage() {
             }}
           >
             <div className="p-4 border-bottom bg-light d-flex justify-content-between align-items-center">
-              <h5 className="mb-0 fw-bolder text-dark">📜 Termos de Serviço e EULA</h5>
+              <h5 className="mb-0 fw-bolder text-dark">Termos de Serviço e Política LGPD</h5>
               <button className="btn-close" onClick={() => setShowTermsModal(false)}></button>
             </div>
 
@@ -473,141 +524,17 @@ function RegisterPage() {
               }}
               onScroll={handleScrollTerms}
             >
-              <h5 className="fw-bold mb-3 text-dark border-bottom pb-2">
-                1. ACEITAÇÃO DOS TERMOS E CONDIÇÕES
-              </h5>
-              <p className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
-                Ao criar uma conta, utilizar os softwares, acessar as APIs ou usufruir de qualquer
-                serviço disponibilizado por este <strong>Software as a Service (SaaS)</strong>,
-                doravante denominado <strong>Patronus</strong>, o USUÁRIO (Advogado, Sociedade de
-                Advogados ou preposto autorizado) declara sua concordância plena, expressa,
-                incondicional e irrevogável com os presentes Termos de Uso e Contrato de
-                Licenciamento de Usuário Final (EULA), bem como com a Política de Privacidade e
-                Tratamento de Dados (LGPD). Caso não concorde com qualquer disposição enumerada, o
-                USUÁRIO deverá abster-se imediatamente de utilizar a plataforma.
-              </p>
-
-              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">
-                2. OBJETO E LICENCIAMENTO DO SOFTWARE
-              </h5>
-              <p className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
-                O Patronus consiste em uma solução de computação em nuvem destinada à gestão de
-                atividades inerentes ao exercício da advocacia (controle processual, financeiro,
-                captura OCR de documentos e agenda). A PLATAFORMA concede ao USUÁRIO, de forma não
-                exclusiva, intransferível, temporária e onerosa (mediante planos de assinatura), o
-                direito de uso remoto das funcionalidades sistêmicas. Fica terminantemente vedado,
-                sob pena de infração à Lei nº 9.609/98 (Proteção da Propriedade Intelectual de
-                Softwares):
-              </p>
-              <ul className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
-                <li>
-                  Proceder com qualquer modalidade de engenharia reversa, descompilação ou
-                  desestruturação do código-fonte e algoritmos (Machine Learning e OCR) embarcados
-                  na infraestrutura.
-                </li>
-                <li>
-                  Comercializar, sublicenciar, ceder, transferir, alugar ou compartilhar as
-                  credenciais de acesso com terceiros estranhos ao Escritório (Tenant) cadastrado.
-                </li>
-              </ul>
-
-              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">
-                3. ANS, SLA DE DISPONIBILIDADE E RESPONSABILIDADES
-              </h5>
-              <p className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
-                A Plataforma assume o compromisso de envidar seus melhores esforços para manter a
-                disponibilidade transacional através da infraestrutura distribuída na AWS/Render,
-                visando um Acordo de Nível de Serviço (SLA) de 99,8% de "Uptime" mensal,
-                excetuando-se as janelas de manutenção programadas previamente comunicadas. Contudo,
-                em virtude da complexidade intrínseca da infraestrutura mundial de internet:
-              </p>
-              <div className="bg-white p-3 rounded border border-danger mb-4 shadow-sm">
-                <h6 className="fw-bold text-danger">
-                  3.1 Cláusula de Isenção (Safe Harbor) - Perda de Prazos
-                </h6>
-                <p className="mb-0 text-dark" style={{ lineHeight: '1.6', fontSize: '0.85rem' }}>
-                  O Patronus opera de forma a prover avisos automatizados através de tarefas ativas
-                  na nuvem ("Cron Jobs") para notificar o USUÁRIO sobre prazos e audiências
-                  processuais.{' '}
-                  <strong>
-                    Em hipótese alguma a Plataforma, seus diretores, programadores ou sócios poderão
-                    ser responsabilizados cível, moral ou materialmente por eventuais intempéries
-                    judiciais, incluindo perda de prazos cabais (preclusão). Eventual atraso no
-                    envio do email SMTP por latência, bloqueios de antispam das provedoras globais
-                    (Google/Microsoft), quedas de instâncias virtuais ou lapsos de sincronicidade
-                    não constituem falha de prestação de serviço garantidor. A verificação
-                    rotineira, manual e fidedigna dos autos junto aos Diários de Justiça Eletrônicos
-                    (DJe) e Tribunais permanece como encargo único, inalienável e soberano do
-                    Advogado constituído.
-                  </strong>
-                </p>
+              <div className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
+                <ReactMarkdown>{stripFrontMatter(termosConteudo)}</ReactMarkdown>
+                <hr className="my-4" />
+                <ReactMarkdown>{stripFrontMatter(lgpdConteudo)}</ReactMarkdown>
               </div>
-
-              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">
-                4. COMPLIANCE LGPD E SEGURANÇA DA INFORMAÇÃO
-              </h5>
-              <p className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
-                As Partes declaram conformidade perene com as diretrizes e determinações da Lei nº
-                13.709/2018 (Lei Geral de Proteção de Dados Pessoais). Para tal, os papéis
-                processuais enquadram-se na seguinte tipificação rigorosa:
-              </p>
-              <ul className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
-                <li>
-                  O USUÁRIO (Escritório) figura de maneira explícita como{' '}
-                  <strong>Controlador dos Dados</strong> dos seus respectivos clientes e partes
-                  processuais, determinando as bases legais de processamento e assegurando possuir
-                  os consentimentos ou procurações necessárias para a inserção de dados estritamente
-                  confidenciais nos bancos do software.
-                </li>
-                <li>
-                  O Patronus atua única e exclusivamente sob a égide jurídica de{' '}
-                  <strong>Operador dos Dados</strong>, restringindo-se à guarda de backups
-                  imutáveis, provisão de túneis encriptados (SSL/TLS v1.3), hash de senhas de acesso
-                  e custódia segura do banco de dados (PostgreSQL isolado por arquitetura
-                  Multi-Tenant).
-                </li>
-                <li>
-                  Em caso de solicitação de "Eliminação dos Dados" (Direito ao Esquecimento) por
-                  parte do jurisdicionado, o Controlador (USUÁRIO) obriga-se a operacionalizar o
-                  protocolo sistêmico de Exclusão Definitiva no Painel de Adminstração, de forma
-                  autônoma e imediata.
-                </li>
-              </ul>
-
-              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">
-                5. PROPRIEDADE INTELECTUAL E VIGÊNCIA
-              </h5>
-              <p className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
-                Os códigos, layouts estruturais, bancos de dados integrados, domínios, arquitetura
-                UX/UI, logomarca oficial e sistemas operantes permanecem de plena e única
-                propriedade intelectual da operadora original do sistema Patrimônio Tecnológico
-                Patronus, sem que o acesso irrestrito fornecido configure aquisição de ações
-                corporativas.
-              </p>
-              <p className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
-                Este instrumento surtirá efeitos imediatos e ostentará validade sistêmica duradoura,
-                ressalvado o direito do Patronus de atualizar, retificar ou encorpar ditames
-                judiciais neste EULA, com notificação prévia de 05 (cinco) dias úteis por via de
-                comunicação massiva no balcão de avisos do painel.
-              </p>
-
-              <h5 className="fw-bold mt-4 mb-3 text-dark border-bottom pb-2">
-                6. FORO E LEGISLAÇÃO APLICÁVEL
-              </h5>
-              <p className="text-secondary" style={{ lineHeight: '1.7', fontSize: '0.9rem' }}>
-                O Contrato será regido e parametrizado pelas normas vigentes no ordenamento jurídico
-                da República Federativa do Brasil, elegendo-se o foro da Comarca na qual o
-                Desenvolvedor Primário mantêm as operações societárias como único competente para
-                pacificar embargos ou controvérsias originárias, renunciando aos patronos outras
-                instâncias territoriais mais acessíveis.
-              </p>
-
-              <br />
-              <br />
             </div>
 
             <div className="p-3 border-top d-flex justify-content-between align-items-center bg-white">
-              <span className="text-muted small fw-semibold">Obrigado por ler os termos.</span>
+              <span className="text-muted small fw-semibold">
+                Termos {termosVersao} • LGPD {lgpdVersao}
+              </span>
               <button
                 type="button"
                 className={`btn fw-bold px-4 btn-primary`}

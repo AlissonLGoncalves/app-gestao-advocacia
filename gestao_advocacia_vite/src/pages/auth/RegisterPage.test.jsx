@@ -8,6 +8,16 @@ vi.mock('../../api/auth', () => ({
   register: vi.fn(),
   registerInvite: vi.fn(),
 }))
+vi.mock('../../legal/termos-v1.0.md?raw', () => ({
+  default: '---\nversao: v1.0\n---\n\n# Mock Termos\nConteudo mock dos termos.',
+}))
+vi.mock('../../legal/lgpd-v1.0.md?raw', () => ({
+  default: '---\nversao: v1.0\n---\n\n# Mock LGPD\nConteudo mock da LGPD.',
+}))
+
+// Mock fetch globalmente (para /auth/termos-vigentes e BrasilAPI)
+const fetchMock = vi.fn()
+globalThis.fetch = fetchMock
 
 // Mock react-toastify
 vi.mock('react-toastify', () => ({
@@ -24,11 +34,35 @@ function renderPage(initialEntries = ['/register']) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  fetchMock.mockImplementation(async (url) => {
+    if (String(url).includes('/auth/termos-vigentes')) {
+      return {
+        ok: true,
+        json: async () => ({
+          termos: {
+            versao: 'v1.0',
+            hash: 'hash-termos',
+            conteudo: '---\nversao: v1.0\n---\n\n# Termos Via API\nTexto termos.',
+          },
+          lgpd: {
+            versao: 'v1.0',
+            hash: 'hash-lgpd',
+            conteudo: '---\nversao: v1.0\n---\n\n# LGPD Via API\nTexto lgpd.',
+          },
+        }),
+      }
+    }
+
+    return {
+      ok: true,
+      json: async () => ({ message: 'ok' }),
+    }
+  })
 })
 
 describe('RegisterPage — aceite LGPD', () => {
   it('botão de submit fica desabilitado enquanto os dois checkboxes não estão marcados', () => {
-    const { container } = renderPage()
+    renderPage()
     const submitBtn = screen.getByRole('button', { name: /criar conta/i })
     // Ambos desmarcados → desabilitado
     expect(submitBtn).toBeDisabled()
@@ -82,5 +116,16 @@ describe('RegisterPage — aceite LGPD', () => {
     expect(body.aceite_lgpd).toBe(true)
     expect(body.versao_termos).toBe('v1.0')
     expect(body.versao_lgpd).toBe('v1.0')
+  })
+
+  it('carrega markdown no modal de termos', async () => {
+    renderPage()
+
+    fireEvent.click(screen.getByText(/termos de serviço/i))
+
+    await waitFor(() => {
+      expect(screen.getByText(/termos via api/i)).toBeInTheDocument()
+      expect(screen.getByText(/lgpd via api/i)).toBeInTheDocument()
+    })
   })
 })

@@ -1,5 +1,7 @@
+import hashlib
 import os
 from datetime import timedelta
+from pathlib import Path
 
 from flask import current_app, request
 from flask_jwt_extended import create_access_token, decode_token, get_jwt_identity, jwt_required
@@ -13,6 +15,31 @@ from utils.log_sanitizer import mask_email, mask_user_id
 from utils.password_policy import validar_forca_senha
 
 TIPOS_CONSENTIMENTO_OBRIGATORIOS = ("termos_uso", "lgpd")
+LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
+LEGAL_FILES = {
+    "termos": LEGAL_DIR / "termos-v1.0.md",
+    "lgpd": LEGAL_DIR / "lgpd-v1.0.md",
+}
+
+
+def _extrair_versao_front_matter(conteudo):
+    lines = conteudo.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if line.lower().startswith("versao:"):
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+def _carregar_documento_legal(tipo):
+    path = LEGAL_FILES[tipo]
+    conteudo = path.read_text(encoding="utf-8")
+    hash_sha256 = hashlib.sha256(conteudo.encode("utf-8")).hexdigest()
+    versao = _extrair_versao_front_matter(conteudo) or "v1.0"
+    return {"versao": versao, "hash": hash_sha256, "conteudo": conteudo}
 
 
 def _registrar_consentimentos(user, data):
@@ -126,6 +153,15 @@ def register_auth_routes(
             return {
                 "message": "Ambiente de Escritório criado com sucesso! Faça login para gerenciar sua assinatura."
             }, 201
+
+    @auth_ns.route("/termos-vigentes")
+    class TermosVigentes(Resource):
+        @auth_ns.doc(description="Retorna os documentos legais vigentes com versão e hash.")
+        def post(self):
+            return {
+                "termos": _carregar_documento_legal("termos"),
+                "lgpd": _carregar_documento_legal("lgpd"),
+            }, 200
 
     @auth_ns.route("/invite")
     class UserInvite(Resource):
