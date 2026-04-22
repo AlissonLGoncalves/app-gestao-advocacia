@@ -31,7 +31,16 @@ procuracao_status_enum_col = sa.Enum(
 
 def upgrade():
     bind = op.get_bind()
-    procuracao_status_enum.create(bind, checkfirst=True)
+    # Cria o ENUM apenas se ainda não existe (idempotente via pg_type).
+    # Alguns deploys falhos anteriores podem ter deixado o tipo criado; checkfirst=True
+    # às vezes não é confiável dentro de transações abortadas, então usamos uma checagem explícita.
+    existe = bind.execute(
+        sa.text(
+            "SELECT 1 FROM pg_type WHERE typname = 'procuracao_analise_status'"
+        )
+    ).scalar()
+    if not existe:
+        procuracao_status_enum.create(bind, checkfirst=False)
     op.create_table(
         "procuracao_analise",
         sa.Column("id", sa.Integer(), nullable=False),
