@@ -26,7 +26,7 @@ function stripFrontMatter(markdown) {
 function RegisterPage() {
   const [tipoPessoa, setTipoPessoa] = useState('PF')
   const [documento, setDocumento] = useState('')
-  const [nomeOuRazao, setNomeOuRazao] = useState('')
+  const [nomeCadastro, setNomeCadastro] = useState('')
   const [oab, setOab] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -124,7 +124,7 @@ function RegisterPage() {
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`)
       if (response.ok) {
         const data = await response.json()
-        setNomeOuRazao(data.razao_social || data.nome_fantasia || '')
+        setNomeCadastro(data.razao_social || data.nome_fantasia || '')
         toast.success('Empresa localizada pela Receita Federal!')
       } else {
         toast.warning('CNPJ não encontrado. Preencha manualmente.')
@@ -156,7 +156,7 @@ function RegisterPage() {
 
     // Fluxo 1: Convite Mágico (Associado)
     if (inviteToken) {
-      if (!nomeOuRazao || !password) {
+      if (!nomeCadastro || !password) {
         toast.error('Por favor, preencha seu nome e escolha uma senha.')
         setLoading(false)
         return
@@ -164,7 +164,7 @@ function RegisterPage() {
       try {
         const data = await registerInvite({
           invite_token: inviteToken,
-          username: nomeOuRazao,
+          username: nomeCadastro,
           password,
           aceite_termos: true,
           aceite_lgpd: true,
@@ -184,7 +184,7 @@ function RegisterPage() {
     }
 
     // Fluxo 2: Criação de Novo Tenant (Admin / Dono)
-    if (!nomeOuRazao || !email || !password || !documento) {
+    if (!nomeCadastro || !email || !password || !documento) {
       toast.error('Por favor, preencha todos os campos obrigatórios.')
       setLoading(false)
       return
@@ -197,14 +197,22 @@ function RegisterPage() {
     }
 
     try {
+      const oabSanitizada = (oab || '').replace(/\s/g, '').toUpperCase()
+      const oabMatch = oabSanitizada.match(/^([A-Z]{2})?(\d{4,12}[A-Z]?)$/)
+      const usernameBase = (email.split('@')[0] || '').replace(/[^a-zA-Z0-9_.-]/g, '')
+
       const data = await registerRequest({
-        username: nomeOuRazao,
+        username: usernameBase || `user${Date.now()}`,
         email,
         password,
         role: 'admin', // Quem cria o escritório é o Admin do escritório dele
-        documento_identificacao: documento,
+        nome_completo: tipoPessoa === 'PF' ? nomeCadastro : null,
+        razao_social: tipoPessoa === 'PJ' ? nomeCadastro : null,
+        documento_identificacao: tipoPessoa === 'PJ' ? documento : null,
+        cpf: tipoPessoa === 'PF' ? documento : null,
         tipo_pessoa: tipoPessoa,
-        oab: oab || null,
+        oab: oabSanitizada ? (oabMatch ? oabMatch[2] : oabSanitizada) : null,
+        sigla_oab_tribunal: oabSanitizada ? (oabMatch?.[1] || null) : null,
         aceite_termos: true,
         aceite_lgpd: true,
         versao_termos: TERMS_VERSION,
@@ -294,7 +302,7 @@ function RegisterPage() {
                       onClick={() => {
                         setTipoPessoa('PF')
                         setDocumento('')
-                        setNomeOuRazao('')
+                        setNomeCadastro('')
                         setOab('')
                       }}
                     >
@@ -307,7 +315,7 @@ function RegisterPage() {
                       onClick={() => {
                         setTipoPessoa('PJ')
                         setDocumento('')
-                        setNomeOuRazao('')
+                        setNomeCadastro('')
                         setOab('')
                       }}
                     >
@@ -370,8 +378,8 @@ function RegisterPage() {
                 <input
                   type="text"
                   className="form-control"
-                  value={nomeOuRazao}
-                  onChange={(e) => setNomeOuRazao(e.target.value)}
+                  value={nomeCadastro}
+                  onChange={(e) => setNomeCadastro(e.target.value)}
                   placeholder={
                     inviteToken
                       ? 'Nome Sobrenome'
