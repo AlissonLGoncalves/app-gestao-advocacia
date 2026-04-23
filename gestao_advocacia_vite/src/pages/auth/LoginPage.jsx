@@ -83,16 +83,9 @@ function LoginPage() {
                 />
                 Senha
               </label>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault()
-                  toast.info('Link de recuperação enviado para o email (simulado)!')
-                }}
-                className="small text-decoration-none fw-semibold"
-              >
+              <Link to="/forgot-password" className="small text-decoration-none fw-semibold">
                 Esqueceu a senha?
-              </a>
+              </Link>
             </div>
             <input
               type="password"

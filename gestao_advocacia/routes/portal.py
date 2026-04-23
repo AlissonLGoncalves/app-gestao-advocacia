@@ -41,7 +41,9 @@ def register_portal_routes(portal_ns):
                     "area_direito": c.area_direito,
                     "fase_processual": c.fase_processual,
                     "vara_juizo": c.vara_juizo,
-                    "data_atualizacao": c.data_atualizacao.isoformat() if c.data_atualizacao else None,
+                    "data_atualizacao": (
+                        c.data_atualizacao.isoformat() if c.data_atualizacao else None
+                    ),
                 }
                 for c in casos
             ]
@@ -93,7 +95,9 @@ def register_portal_routes(portal_ns):
                     "id": r.id,
                     "descricao": r.descricao,
                     "valor": str(r.valor),
-                    "data_vencimento": r.data_recebimento.isoformat() if r.data_recebimento else None,
+                    "data_vencimento": (
+                        r.data_recebimento.isoformat() if r.data_recebimento else None
+                    ),
                 }
                 for r in recebimentos_raw
             ]

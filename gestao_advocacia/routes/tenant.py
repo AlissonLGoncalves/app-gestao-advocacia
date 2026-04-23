@@ -35,7 +35,9 @@ def register_tenant_routes(tenant_ns):
             user_id = get_jwt_identity()
             user = db.session.get(User, user_id)
             if not user or user.role != "admin":
-                return {"message": "Apenas administradores podem editar os dados do escritório."}, 403
+                return {
+                    "message": "Apenas administradores podem editar os dados do escritório."
+                }, 403
 
             tenant_id = get_tenant_id()
             if not tenant_id:
@@ -52,8 +54,13 @@ def register_tenant_routes(tenant_ns):
                     return {"message": "Nome do escritório não pode ser vazio."}, 400
                 tenant.nome_escritorio = nome
 
-            for campo in ("email_contato", "telefone", "numero_oab_escritorio",
-                          "sigla_oab_escritorio", "endereco"):
+            for campo in (
+                "email_contato",
+                "telefone",
+                "numero_oab_escritorio",
+                "sigla_oab_escritorio",
+                "endereco",
+            ):
                 if campo in data:
                     valor = data[campo]
                     setattr(tenant, campo, str(valor).strip() if valor else None)

@@ -66,16 +66,18 @@ def register_relatorios_routes(relatorios_ns, finance_access_required):
                 if not r.recebido:
                     total_pendente += valor
 
-                items.append({
-                    "id": r.id,
-                    "descricao": r.descricao,
-                    "cliente_nome": _cliente_nome(r.caso_id),
-                    "caso_titulo": _caso_titulo(r.caso_id),
-                    "valor": str(r.valor),
-                    "data_vencimento": vencimento.isoformat() if vencimento else None,
-                    "status": status,
-                    "recebido": r.recebido,
-                })
+                items.append(
+                    {
+                        "id": r.id,
+                        "descricao": r.descricao,
+                        "cliente_nome": _cliente_nome(r.caso_id),
+                        "caso_titulo": _caso_titulo(r.caso_id),
+                        "valor": str(r.valor),
+                        "data_vencimento": vencimento.isoformat() if vencimento else None,
+                        "status": status,
+                        "recebido": r.recebido,
+                    }
+                )
 
             pendentes = [i for i in items if i["status"] in ("Pendente", "Vencido")]
             return {
@@ -98,9 +100,7 @@ def register_relatorios_routes(relatorios_ns, finance_access_required):
 
             hoje = _hoje()
             despesas = (
-                Despesa.query.filter_by(user_id=user_id)
-                .order_by(Despesa.data_despesa.asc())
-                .all()
+                Despesa.query.filter_by(user_id=user_id).order_by(Despesa.data_despesa.asc()).all()
             )
 
             items = []
@@ -118,15 +118,17 @@ def register_relatorios_routes(relatorios_ns, finance_access_required):
                 if not d.pago:
                     total_pendente += valor
 
-                items.append({
-                    "id": d.id,
-                    "descricao": d.descricao,
-                    "caso_titulo": _caso_titulo(d.caso_id),
-                    "valor": str(d.valor),
-                    "data_vencimento": vencimento.isoformat() if vencimento else None,
-                    "status": status,
-                    "pago": d.pago,
-                })
+                items.append(
+                    {
+                        "id": d.id,
+                        "descricao": d.descricao,
+                        "caso_titulo": _caso_titulo(d.caso_id),
+                        "valor": str(d.valor),
+                        "data_vencimento": vencimento.isoformat() if vencimento else None,
+                        "status": status,
+                        "pago": d.pago,
+                    }
+                )
 
             pendentes = [i for i in items if i["status"] in ("A Pagar", "Vencida")]
             return {
@@ -175,8 +177,18 @@ def register_relatorios_routes(relatorios_ns, finance_access_required):
                     despesas_mes[d.data_despesa.month] += float(d.valor)
 
             MESES_PT = [
-                "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-                "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+                "Jan",
+                "Fev",
+                "Mar",
+                "Abr",
+                "Mai",
+                "Jun",
+                "Jul",
+                "Ago",
+                "Set",
+                "Out",
+                "Nov",
+                "Dez",
             ]
             meses = []
             saldo_acumulado = 0.0
@@ -185,14 +197,16 @@ def register_relatorios_routes(relatorios_ns, finance_access_required):
                 despesa = round(despesas_mes[m], 2)
                 saldo = round(receita - despesa, 2)
                 saldo_acumulado = round(saldo_acumulado + saldo, 2)
-                meses.append({
-                    "mes": m,
-                    "mes_nome": MESES_PT[m - 1],
-                    "receitas": receita,
-                    "despesas": despesa,
-                    "saldo": saldo,
-                    "saldo_acumulado": saldo_acumulado,
-                })
+                meses.append(
+                    {
+                        "mes": m,
+                        "mes_nome": MESES_PT[m - 1],
+                        "receitas": receita,
+                        "despesas": despesa,
+                        "saldo": saldo,
+                        "saldo_acumulado": saldo_acumulado,
+                    }
+                )
 
             total_receitas = round(sum(receitas_mes.values()), 2)
             total_despesas = round(sum(despesas_mes.values()), 2)

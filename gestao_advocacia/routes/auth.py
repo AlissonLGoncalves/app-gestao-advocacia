@@ -1,7 +1,9 @@
 import hashlib
+import hmac
 import os
 import re
-from datetime import timedelta
+import secrets
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from flask import current_app, request
@@ -10,10 +12,103 @@ from flask_restx import Resource
 from jwt.exceptions import DecodeError, ExpiredSignatureError
 
 from extensions import db, limiter
-from mail_service import enviar_alerta_email
-from models import ConsentimentoUsuario, LoginAudit, Tenant, User
+from mail_service import enviar_alerta_email, enviar_email
+from models import ConsentimentoUsuario, LoginAudit, PasswordResetToken, Tenant, User
 from utils.log_sanitizer import mask_email, mask_user_id
 from utils.password_policy import validar_forca_senha
+
+PASSWORD_RESET_TTL_MINUTES = 60
+PASSWORD_RESET_TOKEN_BYTES = 32
+
+
+def _hash_reset_token(token_plaintext: str) -> str:
+    return hashlib.sha256(token_plaintext.encode("utf-8")).hexdigest()
+
+
+def _frontend_base_url():
+    """Resolve a URL base do frontend para montar o link de reset.
+
+    Em dev (request vindo de localhost) usa o Vite (5173). Em prod usa
+    FRONTEND_URL ou o fallback Vercel.
+    """
+    host = (request.host_url or "") if request else ""
+    if "localhost" in host or "127.0.0.1" in host:
+        return "http://localhost:5173/"
+    return os.environ.get("FRONTEND_URL", "https://app-gestao-advocacia.vercel.app/")
+
+
+def _montar_email_reset(nome_destinatario: str, link_reset: str, ttl_min: int):
+    assunto = "Patronus — Redefinição de senha"
+    nome = (nome_destinatario or "").strip() or "Olá"
+
+    texto = (
+        f"{nome},\n\n"
+        f"Recebemos um pedido para redefinir a senha da sua conta no Patronus.\n\n"
+        f"Para criar uma nova senha, acesse o link abaixo (válido por {ttl_min} minutos):\n"
+        f"{link_reset}\n\n"
+        f"Se você não solicitou essa alteração, pode ignorar este email com segurança — "
+        f"sua senha atual continua valendo.\n\n"
+        f"Por motivos de segurança, este link só pode ser usado uma vez.\n\n"
+        f"— Equipe Patronus"
+    )
+
+    html = f"""<!doctype html>
+<html lang="pt-BR">
+  <body style="margin:0;padding:0;background-color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f5f7fb;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,42,0.08);overflow:hidden;">
+            <tr>
+              <td style="padding:28px 32px;border-bottom:1px solid #e5e7eb;">
+                <h1 style="margin:0;font-size:20px;font-weight:700;color:#0f172a;">Patronus</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <h2 style="margin:0 0 12px;font-size:18px;color:#0f172a;">Redefinição de senha</h2>
+                <p style="margin:0 0 16px;line-height:1.55;color:#374151;">
+                  {nome}, recebemos um pedido para redefinir a senha da sua conta.
+                </p>
+                <p style="margin:0 0 24px;line-height:1.55;color:#374151;">
+                  Para criar uma nova senha, clique no botão abaixo. Este link é válido por
+                  <strong>{ttl_min} minutos</strong> e só pode ser usado uma vez.
+                </p>
+                <p style="margin:0 0 28px;text-align:center;">
+                  <a href="{link_reset}"
+                     style="display:inline-block;padding:12px 28px;background-color:#1e40af;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">
+                    Redefinir minha senha
+                  </a>
+                </p>
+                <p style="margin:0 0 8px;font-size:13px;color:#6b7280;">
+                  Se o botão não funcionar, copie e cole este endereço no seu navegador:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#1e40af;word-break:break-all;">
+                  {link_reset}
+                </p>
+                <hr style="border:0;border-top:1px solid #e5e7eb;margin:24px 0;" />
+                <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.55;">
+                  Se você não solicitou essa alteração, ignore este email — sua senha atual
+                  continua valendo. Nenhuma ação é necessária.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px;background-color:#f9fafb;border-top:1px solid #e5e7eb;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
+                  Este é um email automático. Não responda esta mensagem.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>"""
+
+    return assunto, texto, html
+
 
 TIPOS_CONSENTIMENTO_OBRIGATORIOS = ("termos_uso", "lgpd")
 LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
@@ -298,6 +393,7 @@ def register_auth_routes(
                 return {"message": "email e cliente_id são obrigatórios."}, 400
 
             from models import Cliente
+
             cliente = db.session.get(Cliente, cliente_id)
             if not cliente or cliente.user_id != user.id:
                 return {"message": "Cliente não encontrado ou sem permissão."}, 404
@@ -518,6 +614,154 @@ def register_auth_routes(
                 },
             )
             return {"message": "Nome de usuário/email ou senha inválidos."}, 401
+
+    @auth_ns.route("/forgot-password")
+    class ForgotPassword(Resource):
+        @limiter.limit("5 per hour; 20 per day")
+        @auth_ns.doc(
+            description=(
+                "Solicita link de redefinicao de senha. Resposta sempre 200 generica para "
+                "nao vazar quais emails existem na base."
+            )
+        )
+        def post(self):
+            data = request.get_json(silent=True) or {}
+            email = (data.get("email") or "").strip().lower()
+
+            generic_response = (
+                {
+                    "message": (
+                        "Se este email estiver cadastrado, você receberá em instantes "
+                        "as instruções para redefinir sua senha."
+                    )
+                },
+                200,
+            )
+
+            if not email or "@" not in email:
+                return generic_response
+
+            user = User.query.filter(db.func.lower(User.email) == email).first()
+            if not user:
+                app.logger.info(
+                    "password_reset_requested_unknown_email",
+                    extra={"event": "password_reset_unknown_email", "email": mask_email(email)},
+                )
+                return generic_response
+
+            try:
+                # Invalida tokens anteriores ainda nao usados desse usuario
+                PasswordResetToken.query.filter_by(user_id=user.id, used_at=None).update(
+                    {PasswordResetToken.used_at: datetime.utcnow()}, synchronize_session=False
+                )
+
+                token_plaintext = secrets.token_urlsafe(PASSWORD_RESET_TOKEN_BYTES)
+                novo = PasswordResetToken(
+                    user_id=user.id,
+                    token_hash=_hash_reset_token(token_plaintext),
+                    expires_at=datetime.utcnow() + timedelta(minutes=PASSWORD_RESET_TTL_MINUTES),
+                    requested_ip=_ip_request_atual(request),
+                    requested_user_agent=_user_agent_request_atual(request),
+                )
+                db.session.add(novo)
+                db.session.commit()
+
+                base = _frontend_base_url().rstrip("/")
+                link = f"{base}/reset-password?token={token_plaintext}"
+
+                assunto, texto, html = _montar_email_reset(
+                    user.nome_completo or user.username,
+                    link,
+                    PASSWORD_RESET_TTL_MINUTES,
+                )
+                enviar_email(current_app, user.email, assunto, html, corpo_texto=texto)
+
+                app.logger.info(
+                    "password_reset_requested",
+                    extra={
+                        "event": "password_reset_requested",
+                        "user_id_hash": mask_user_id(user.id),
+                    },
+                )
+            except Exception as exc:
+                db.session.rollback()
+                app.logger.error(f"Falha ao gerar token de reset de senha: {exc}")
+
+            return generic_response
+
+    @auth_ns.route("/reset-password")
+    class ResetPassword(Resource):
+        @limiter.limit("10 per hour")
+        @auth_ns.doc(description="Confirma redefinicao de senha com token recebido por email.")
+        def post(self):
+            data = request.get_json(silent=True) or {}
+            token_plaintext = (data.get("token") or "").strip()
+            nova_senha = data.get("password") or ""
+
+            if not token_plaintext or not nova_senha:
+                return {"message": "Token e nova senha são obrigatórios."}, 400
+
+            ok, motivo = validar_forca_senha(nova_senha)
+            if not ok:
+                return {"message": motivo}, 400
+
+            token_hash = _hash_reset_token(token_plaintext)
+            registro = PasswordResetToken.query.filter_by(token_hash=token_hash).first()
+
+            # Comparacao em tempo constante como defesa em profundidade,
+            # alem do filtro indexado acima.
+            if (
+                not registro
+                or not hmac.compare_digest(registro.token_hash, token_hash)
+                or registro.used_at is not None
+                or registro.expires_at < datetime.utcnow()
+            ):
+                app.logger.warning(
+                    "password_reset_invalid_token",
+                    extra={"event": "password_reset_invalid_token"},
+                )
+                return {"message": "Link inválido ou expirado. Solicite uma nova redefinição."}, 400
+
+            user = db.session.get(User, registro.user_id)
+            if not user:
+                return {"message": "Link inválido ou expirado. Solicite uma nova redefinição."}, 400
+
+            try:
+                user.set_password(nova_senha)
+                registro.used_at = datetime.utcnow()
+                # Invalida quaisquer outros tokens pendentes desse usuario
+                PasswordResetToken.query.filter(
+                    PasswordResetToken.user_id == user.id,
+                    PasswordResetToken.id != registro.id,
+                    PasswordResetToken.used_at.is_(None),
+                ).update(
+                    {PasswordResetToken.used_at: datetime.utcnow()},
+                    synchronize_session=False,
+                )
+                db.session.add(
+                    LoginAudit(
+                        user_id=user.id,
+                        email_tentativa=(user.email or "")[:120],
+                        sucesso=True,
+                        ip=_ip_request_atual(request),
+                        user_agent=_user_agent_request_atual(request),
+                        motivo_falha="password_reset",
+                    )
+                )
+                db.session.commit()
+
+                app.logger.info(
+                    "password_reset_success",
+                    extra={
+                        "event": "password_reset_success",
+                        "user_id_hash": mask_user_id(user.id),
+                    },
+                )
+                return {"message": "Senha redefinida com sucesso. Você já pode fazer login."}, 200
+            except Exception as exc:
+                db.session.rollback()
+                app.logger.error(f"Falha ao confirmar reset de senha: {exc}")
+                return {"message": "Falha ao redefinir senha. Tente novamente."}, 500
 
     @auth_ns.route("/me")
     class UserMe(Resource):

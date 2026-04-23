@@ -20,19 +20,12 @@ export default defineConfig({
       ],
     },
   },
-  // Adicione aqui outras configurações do Vite, se necessário.
-  // Por exemplo, se você precisar de um proxy para a sua API Flask:
-  /*
   server: {
     proxy: {
-      // Exemplo: Redireciona requisições de /api do frontend para o backend Flask
       '/api': {
-        target: 'http://127.0.0.1:5000', // A URL do seu servidor Flask
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
-        // Não é necessário rewrite se o prefixo /api já existe no backend
-        // rewrite: (path) => path.replace(/^\/api/, '') 
-      }
-    }
-  }
-  */
+      },
+    },
+  },
 })

@@ -3,44 +3,67 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 
 logger = logging.getLogger(__name__)
 
 
-def enviar_alerta_email(app, para_email, assunto, corpo_html):
-    """
-    Envia um email de alerta com o corpo fornecido em HTML.
-    Utiliza credenciais do .env (SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD).
-    Se as credenciais não existirem, simula o envio no Logger.
-    """
-    smtp_server = os.environ.get("SMTP_SERVER")
-    smtp_port = os.environ.get("SMTP_PORT", 587)
-    smtp_user = os.environ.get("SMTP_USER")
-    smtp_password = os.environ.get("SMTP_PASSWORD")
+def _credenciais_smtp():
+    return {
+        "server": os.environ.get("SMTP_SERVER"),
+        "port": int(os.environ.get("SMTP_PORT", 587)),
+        "user": os.environ.get("SMTP_USER"),
+        "password": os.environ.get("SMTP_PASSWORD"),
+        "from_email": os.environ.get("SMTP_FROM_EMAIL") or os.environ.get("SMTP_USER"),
+        "from_name": os.environ.get("SMTP_FROM_NAME", "Patronus"),
+        "use_ssl": os.environ.get("SMTP_USE_SSL", "false").lower() in ("true", "1", "yes"),
+    }
 
-    if not all([smtp_server, smtp_user, smtp_password]):
+
+def enviar_email(app, para_email, assunto, corpo_html, corpo_texto=None, headers=None):
+    """Envia email multipart (text + html) com From amigável.
+
+    Em ausência de credenciais SMTP, simula no logger (modo dev).
+    Retorna True/False conforme sucesso.
+    """
+    cfg = _credenciais_smtp()
+
+    if not all([cfg["server"], cfg["user"], cfg["password"]]):
         app.logger.info(
-            f"[SIMULAÇÃO e-mail] Para: {para_email} | Assunto: {assunto} | Corpo: {corpo_html[:100]}..."
+            f"[SIMULACAO email] Para: {para_email} | Assunto: {assunto} | "
+            f"HTML: {corpo_html[:120]}..."
         )
         return True
 
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = assunto
-        msg["From"] = smtp_user
+        msg["From"] = formataddr((cfg["from_name"], cfg["from_email"]))
         msg["To"] = para_email
+        if headers:
+            for k, v in headers.items():
+                msg[k] = v
 
-        parte_html = MIMEText(corpo_html, "html")
-        msg.attach(parte_html)
+        if corpo_texto:
+            msg.attach(MIMEText(corpo_texto, "plain", "utf-8"))
+        msg.attach(MIMEText(corpo_html, "html", "utf-8"))
 
-        server = smtplib.SMTP(smtp_server, int(smtp_port))
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, para_email, msg.as_string())
+        if cfg["use_ssl"]:
+            server = smtplib.SMTP_SSL(cfg["server"], cfg["port"])
+        else:
+            server = smtplib.SMTP(cfg["server"], cfg["port"])
+            server.starttls()
+        server.login(cfg["user"], cfg["password"])
+        server.sendmail(cfg["from_email"], para_email, msg.as_string())
         server.quit()
 
-        app.logger.info(f"E-mail eviado para {para_email} com sucesso via SMTP.")
+        app.logger.info(f"Email enviado para {para_email} via SMTP.")
         return True
     except Exception as e:
-        app.logger.error(f"Falha ao enviar e-mail via SMTP para {para_email}: {str(e)}")
+        app.logger.error(f"Falha ao enviar email via SMTP para {para_email}: {str(e)}")
         return False
+
+
+def enviar_alerta_email(app, para_email, assunto, corpo_html):
+    """Wrapper retrocompatível usado por convites/alertas legados."""
+    return enviar_email(app, para_email, assunto, corpo_html)

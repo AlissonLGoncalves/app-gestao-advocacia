@@ -22,6 +22,8 @@ import NotFoundPage from './pages/NotFoundPage.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
 import RegisterPage from './pages/auth/RegisterPage.jsx'
 import TermsPage from './pages/auth/TermsPage.jsx'
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
 import PerfilPage from './pages/PerfilPage.jsx'
@@ -64,7 +66,11 @@ const PortalRoute = ({ children }) => {
   if (!token) return <Navigate to="/login" replace />
   const userStr = localStorage.getItem('user')
   let role = ''
-  try { role = userStr ? JSON.parse(userStr).role : '' } catch { /* */ }
+  try {
+    role = userStr ? JSON.parse(userStr).role : ''
+  } catch {
+    /* */
+  }
   if (role !== 'cliente') return <Navigate to="/dashboard" replace />
   return children
 }
@@ -337,6 +343,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/termos" element={<TermsPage />} />
         <Route path="/portal/registro" element={<PortalRegisterPage />} />
         <Route

@@ -40,7 +40,9 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    role = db.Column(db.String(20), nullable=False, default="admin")  # admin, advogado, assistente, cliente
+    role = db.Column(
+        db.String(20), nullable=False, default="admin"
+    )  # admin, advogado, assistente, cliente
     nome_completo = db.Column(db.String(200), nullable=True)
     cpf = db.Column(db.String(14), nullable=True)
     tipo_pessoa = db.Column(db.String(2), nullable=True)
@@ -350,9 +352,7 @@ class AuditLog(db.Model):
     registro_id = db.Column(db.Integer, nullable=True)
     detalhes = db.Column(db.Text, nullable=True)
     data_hora = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    __table_args__ = (
-        db.Index("ix_audit_log_tenant_created", "tenant_id", "data_hora"),
-    )
+    __table_args__ = (db.Index("ix_audit_log_tenant_created", "tenant_id", "data_hora"),)
 
     usuario = db.relationship("User", foreign_keys=[user_id])
 
@@ -457,9 +457,7 @@ class EventoAgenda(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_evento_user_id"), nullable=False
     )
-    __table_args__ = (
-        db.Index("ix_evento_agenda_tenant_created", "tenant_id", "data_inicio"),
-    )
+    __table_args__ = (db.Index("ix_evento_agenda_tenant_created", "tenant_id", "data_inicio"),)
 
     def to_dict(self):
         return {
@@ -491,9 +489,7 @@ class Documento(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_documento_user_id"), nullable=False
     )
-    __table_args__ = (
-        db.Index("ix_documento_tenant_created", "tenant_id", "data_upload"),
-    )
+    __table_args__ = (db.Index("ix_documento_tenant_created", "tenant_id", "data_upload"),)
 
     def to_dict(self):
         return {
@@ -610,9 +606,7 @@ class Despesa(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_despesa_user_id"), nullable=False
     )
-    __table_args__ = (
-        db.Index("ix_despesa_tenant_created", "tenant_id", "data_despesa"),
-    )
+    __table_args__ = (db.Index("ix_despesa_tenant_created", "tenant_id", "data_despesa"),)
 
     def to_dict(self):
         return {
@@ -647,9 +641,7 @@ class Recebimento(db.Model):
         db.ForeignKey("contrato_honorario.id", name="fk_recebimento_contrato_id"),
         nullable=True,
     )
-    __table_args__ = (
-        db.Index("ix_recebimento_tenant_created", "tenant_id", "data_recebimento"),
-    )
+    __table_args__ = (db.Index("ix_recebimento_tenant_created", "tenant_id", "data_recebimento"),)
 
     def to_dict(self):
         return {
@@ -691,9 +683,7 @@ class TarefaPrazo(db.Model):
     caso_id = db.Column(
         db.Integer, db.ForeignKey("caso.id", name="fk_tarefaprazo_caso_id"), nullable=True
     )
-    __table_args__ = (
-        db.Index("ix_tarefa_prazo_tenant_created", "tenant_id", "data_criacao"),
-    )
+    __table_args__ = (db.Index("ix_tarefa_prazo_tenant_created", "tenant_id", "data_criacao"),)
 
     def to_dict(self):
         return {
@@ -881,6 +871,32 @@ class DjenVinculoDecisao(db.Model):
             "payload": self.payload,
             "data_decisao": self.data_decisao.isoformat() if self.data_decisao else None,
         }
+
+
+class PasswordResetToken(db.Model):
+    """Token de uso único para recuperação de senha.
+
+    Armazenamos apenas o SHA-256 do token (nunca o plaintext) para que um
+    eventual vazamento do banco não permita reset imediato. O token plaintext
+    só existe no email enviado ao usuário.
+    """
+
+    __tablename__ = "password_reset_token"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_password_reset_user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
+    requested_ip = db.Column(db.String(45), nullable=True)
+    requested_user_agent = db.Column(db.String(500), nullable=True)
+    criado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    user = db.relationship("User", foreign_keys=[user_id])
 
 
 class ConsentimentoUsuario(db.Model):

@@ -13,8 +13,8 @@ from .dashboard import register_dashboard_routes
 from .documentos import register_documentos_routes
 from .eventos import register_eventos_routes
 from .financeiro_registry import register_financeiro_api
-from .procuracoes import register_procuracoes_routes
 from .portal import register_portal_routes
+from .procuracoes import register_procuracoes_routes
 from .relatorios import register_relatorios_routes
 from .tarefas import register_tarefas_routes
 from .tenant import register_tenant_routes
@@ -102,7 +102,9 @@ def register_api_routes(app, api, finance_access_required):
             "sigla_oab_tribunal": fields.String(description="UF da OAB"),
             "tipo_pessoa": fields.String(description="Tipo de pessoa"),
             "cpf": fields.String(description="CPF"),
-            "portal_cliente_id": fields.Integer(description="ID do cliente vinculado ao portal", nullable=True),
+            "portal_cliente_id": fields.Integer(
+                description="ID do cliente vinculado ao portal", nullable=True
+            ),
         },
     )
 
@@ -152,6 +154,18 @@ def register_api_routes(app, api, finance_access_required):
             "user": fields.Nested(
                 user_output_model_dto, description="Dados do usuario", skip_none=True
             ),
+        },
+    )
+
+    auth_ns.model(
+        "ForgotPasswordRequest",
+        {"email": fields.String(required=True, description="Email cadastrado", format="email")},
+    )
+    auth_ns.model(
+        "ResetPasswordRequest",
+        {
+            "token": fields.String(required=True, description="Token recebido por email"),
+            "password": fields.String(required=True, description="Nova senha (min 10 chars)"),
         },
     )
 
