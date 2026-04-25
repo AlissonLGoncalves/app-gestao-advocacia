@@ -72,13 +72,22 @@ def test_admin_sem_token_retorna_401_nao_500(client, db):
     assert "negado" in (payload.get("message") or "").lower()
 
 
-def test_admin_token_malformado_nao_retorna_500(client, db):
-    # Token mal-formado: 422 Unprocessable (consistente com /api/v1).
-    # Token ausente:    401 Acesso negado.
-    # Importante: nao pode ser 500 (que era o bug original).
+def test_admin_token_malformado_retorna_401(client, db):
+    # Token mal-formado deve cair em 401 generico, nao 500 e nao 422.
+    # Cobre escape de excecao da PyJWT subjacente (handler PyJWTError no admin_api).
     resp = client.get(f"{ADMIN_BASE}/me", headers={"Authorization": "Bearer not.a.real.jwt"})
-    assert resp.status_code in (401, 422)
-    assert resp.status_code != 500
+    assert resp.status_code == 401
+    payload = json.loads(resp.data)
+    assert "negado" in (payload.get("message") or "").lower()
+
+
+def test_admin_token_assinado_com_chave_errada_retorna_401(client, db):
+    # JWT bem-formado mas assinado com outra chave -> InvalidSignatureError (PyJWT).
+    # Deve cair em 401 tambem.
+    import jwt as _pyjwt
+    fake_token = _pyjwt.encode({"sub": "1", "role": "superadmin"}, "wrong-key", algorithm="HS256")
+    resp = client.get(f"{ADMIN_BASE}/me", headers={"Authorization": f"Bearer {fake_token}"})
+    assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
