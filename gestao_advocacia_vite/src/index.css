@@ -723,3 +723,71 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Painel flutuante arrastavel (nao-modal) — usado em ModalCriarClienteCaso */
+.painel-flutuante {
+  position: fixed;
+  width: min(800px, calc(100vw - 32px));
+  max-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line, rgba(17, 24, 39, 0.09));
+  border-radius: var(--radius-md, 14px);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+  z-index: 1055;
+}
+
+.painel-header {
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--line, rgba(17, 24, 39, 0.09));
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+.painel-header:focus-visible {
+  outline: 2px solid var(--primary, #007aff);
+  outline-offset: -2px;
+}
+
+.painel-header.dragging {
+  cursor: grabbing;
+}
+
+.painel-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.painel-footer {
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--line, rgba(17, 24, 39, 0.09));
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@media (max-width: 600px) {
+  /* Em mobile: painel ocupa praticamente full-width e nao e arrastavel */
+  .painel-flutuante {
+    left: 8px !important;
+    top: 8px !important;
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+  .painel-header {
+    cursor: default;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .painel-flutuante {
+    transition: none;
+  }
+}
