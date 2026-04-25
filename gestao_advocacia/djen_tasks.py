@@ -41,7 +41,8 @@ def _get_config_float(chave, default):
         return default
 
 
-_CNJ_REGEX = re.compile(r"^(\d{7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})$")
+# enriquecimento-cnj: consolidacao — regex unico no utilitario compartilhado
+from utils.cnj import CNJ_REGEX_STRICT as _CNJ_REGEX  # noqa: E402
 
 
 def _inferir_sigla_tribunal_por_numero_processo(numero_processo):
@@ -358,12 +359,27 @@ def _item_get(item, *keys):
 
 def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, origem):
     """Persiste uma publicação se ainda não existir no banco."""
+    # enriquecimento-cnj: hot-path
+    from utils.cnj import extrair_primeiro_cnj_valido  # noqa: PLC0415
+
     hash_com = _item_get(item, "hash", "id", "codigo")
     numero_proc = (
         _item_get(item, "numeroProcesso", "numeroprocesso")
         or (item.get("processo") or {}).get("numero")
         or ""
     )
+    cnj_extraido_do_texto = False
+    if not numero_proc:
+        try:
+            texto_para_busca = _item_get(item, "texto", "conteudo") or ""
+            candidato = extrair_primeiro_cnj_valido(texto_para_busca)
+            if candidato:
+                numero_proc = candidato
+                cnj_extraido_do_texto = True
+        except Exception:
+            # enriquecimento-cnj: nunca derrubar a ingestao por causa do enriquecimento
+            cnj_extraido_do_texto = False
+
     data_disp = _item_get(item, "dataDisponibilizacao", "datadisponibilizacao", "data")
     data_disp_dt = _parse_data_disponibilizacao(data_disp)
 
@@ -418,6 +434,27 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
     polo_ativo_str = " | ".join(polo_ativo_list) or None
     polo_passivo_str = " | ".join(polo_passivo_list) or None
     nome_juiz = str(_item_get(item, "nomeJuiz", "juiz", "magistrado") or "")[:200] or None
+
+    # enriquecimento-cnj: hot-path — preencher mascara com canonico extraido
+    if cnj_extraido_do_texto and not numero_proc_masc:
+        numero_proc_masc = numero_proc
+
+    # enriquecimento-cnj: hot-path — log estruturado quando preenchido pelo texto
+    if cnj_extraido_do_texto:
+        try:
+            from flask import current_app  # noqa: PLC0415
+
+            current_app.logger.info(
+                "djen_cnj_extraido_do_texto",
+                extra={
+                    "event": "djen_cnj_extraido_do_texto",
+                    "tenant_id": tenant_id,
+                    "djen_id": djen_id,
+                    "numero_processo": numero_proc,
+                },
+            )
+        except Exception:
+            pass
 
     pub = PublicacaoDJEN(
         user_id=user_id,

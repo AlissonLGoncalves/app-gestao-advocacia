@@ -1,7 +1,9 @@
 import re
 import unicodedata
 
-CNJ_REGEX = re.compile(r"(?<!\d)\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}(?!\d)")
+# enriquecimento-cnj: consolidacao — regex unico no utilitario compartilhado
+from utils.cnj import CNJ_REGEX_TEXTO as CNJ_REGEX  # noqa: F401  (reexport para callers)
+
 OAB_REGEX = re.compile(r"\b(?:OAB\/?[A-Z]{2}\s*)?\d{4,10}\b", re.IGNORECASE)
 CPF_CNPJ_REGEX = re.compile(
     r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b|\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b|\b\d{11}\b|\b\d{14}\b"
