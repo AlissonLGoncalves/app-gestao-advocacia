@@ -456,6 +456,42 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
         except Exception:
             pass
 
+    # enriquecimento-cnj: hot-path — auto-vincular a Caso do MESMO tenant.
+    # Caller pode ter passado caso_id explicitamente (ex.: busca por processo);
+    # so vinculamos automaticamente quando caso_id veio None E temos numero_proc.
+    auto_vinculou_caso = False
+    status_origem_default = "pendente"
+    if caso_id is None and numero_proc:
+        try:
+            from models import Caso  # noqa: PLC0415
+
+            caso_match = Caso.query.filter_by(
+                tenant_id=tenant_id,
+                numero_processo=numero_proc,
+            ).first()
+            if caso_match:
+                caso_id = caso_match.id
+                auto_vinculou_caso = True
+                status_origem_default = "criado_automaticamente"
+                try:
+                    from flask import current_app  # noqa: PLC0415
+
+                    current_app.logger.info(
+                        "djen_auto_vinculado_a_caso",
+                        extra={
+                            "event": "djen_auto_vinculado_a_caso",
+                            "tenant_id": tenant_id,
+                            "djen_id": djen_id,
+                            "caso_id": caso_id,
+                            "numero_processo": numero_proc,
+                        },
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            # enriquecimento-cnj: nunca derrubar a ingestao por causa do enriquecimento
+            auto_vinculou_caso = False
+
     pub = PublicacaoDJEN(
         user_id=user_id,
         tenant_id=tenant_id,
@@ -479,7 +515,8 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
         nome_juiz=nome_juiz,
         raw_json=item,
         origem_busca=origem,
-        status_origem="pendente",
+        # enriquecimento-cnj: hot-path — 'criado_automaticamente' quando auto-vinculado
+        status_origem=status_origem_default,
         triagem_ignorada=False,
     )
     db.session.add(pub)

@@ -1,10 +1,10 @@
 """enriquecimento-cnj: testes do hot-path em _salvar_publicacao."""
 
-from datetime import datetime
+from datetime import date, datetime
 
 from djen_tasks import _salvar_publicacao
 from extensions import db as _db
-from models import PublicacaoDJEN, Tenant, User
+from models import Caso, Cliente, PublicacaoDJEN, Tenant, User
 
 CNJ_VALIDO = "0000472-75.2025.8.16.0075"
 CNJ_VALIDO_2 = "5001234-80.2024.4.04.7100"
@@ -139,6 +139,139 @@ def test_salvar_publicacao_nao_sobrescreve_mascara_existente(app, db):
         assert pub.numero_processo == CNJ_VALIDO
         # Mascara que ja vinha do payload nao e sobrescrita
         assert pub.numero_processo_mascara == mascara_pre_existente
+
+
+def _criar_caso(*, tenant, user, numero_processo, titulo="Caso Teste"):
+    cliente = Cliente(
+        tenant_id=tenant.id,
+        nome_razao_social=f"Cliente {titulo}",
+        cpf_cnpj="00000000000",
+        tipo_pessoa="PF",
+        user_id=user.id,
+    )
+    _db.session.add(cliente)
+    _db.session.commit()
+    caso = Caso(
+        tenant_id=tenant.id,
+        titulo=titulo,
+        numero_processo=numero_processo,
+        cliente_id=cliente.id,
+        user_id=user.id,
+    )
+    _db.session.add(caso)
+    _db.session.commit()
+    return caso
+
+
+def test_salvar_publicacao_auto_vincula_caso_quando_cnj_extraido(app, db):
+    """Hot-path: numero CNJ extraido do texto + Caso existente -> auto-vincula."""
+    with app.app_context():
+        t, u = _criar_tenant_e_user(suffix="autovinc")
+        caso = _criar_caso(tenant=t, user=u, numero_processo=CNJ_VALIDO, titulo="Caso A")
+
+        item = _item_base(
+            id=11001,
+            hash="hash_autovinc",
+            texto=f"Intimacao referente aos autos no {CNJ_VALIDO}.",
+        )
+        ok = _salvar_publicacao(_db, PublicacaoDJEN, u.id, t.id, None, item, origem="oab")
+        assert ok is True
+        _db.session.commit()
+
+        pub = PublicacaoDJEN.query.filter_by(tenant_id=t.id, djen_id=11001).first()
+        assert pub is not None
+        assert pub.numero_processo == CNJ_VALIDO
+        assert pub.caso_id == caso.id
+        assert pub.status_origem == "criado_automaticamente"
+
+
+def test_salvar_publicacao_auto_vincula_caso_top_level(app, db):
+    """Hot-path: numero CNJ veio top-level + Caso existe -> auto-vincula."""
+    with app.app_context():
+        t, u = _criar_tenant_e_user(suffix="autovinctop")
+        caso = _criar_caso(tenant=t, user=u, numero_processo=CNJ_VALIDO, titulo="Caso B")
+
+        item = _item_base(
+            id=11002,
+            hash="hash_autovinc_top",
+            numeroProcesso=CNJ_VALIDO,
+            texto="texto qualquer",
+        )
+        ok = _salvar_publicacao(_db, PublicacaoDJEN, u.id, t.id, None, item, origem="oab")
+        assert ok is True
+        _db.session.commit()
+
+        pub = PublicacaoDJEN.query.filter_by(tenant_id=t.id, djen_id=11002).first()
+        assert pub is not None
+        assert pub.caso_id == caso.id
+
+
+def test_salvar_publicacao_nao_auto_vincula_caso_de_outro_tenant(app, db):
+    """Hot-path: Caso com mesmo numero em OUTRO tenant nao deve ser usado."""
+    with app.app_context():
+        t1, u1 = _criar_tenant_e_user(suffix="t1_isolado")
+        t2, u2 = _criar_tenant_e_user(suffix="t2_isolado")
+        # Caso esta no tenant 2; publicacao chega no tenant 1
+        _criar_caso(tenant=t2, user=u2, numero_processo=CNJ_VALIDO, titulo="Caso T2")
+
+        item = _item_base(
+            id=11003,
+            hash="hash_iso",
+            texto=f"Autos no {CNJ_VALIDO}.",
+        )
+        ok = _salvar_publicacao(_db, PublicacaoDJEN, u1.id, t1.id, None, item, origem="oab")
+        assert ok is True
+        _db.session.commit()
+
+        pub = PublicacaoDJEN.query.filter_by(tenant_id=t1.id, djen_id=11003).first()
+        assert pub is not None
+        assert pub.numero_processo == CNJ_VALIDO
+        # Sem vinculo cross-tenant
+        assert pub.caso_id is None
+        assert pub.status_origem == "pendente"
+
+
+def test_salvar_publicacao_respeita_caso_id_passado_pelo_caller(app, db):
+    """Quando caller ja passa caso_id, hot-path nao deve sobrescrever."""
+    with app.app_context():
+        t, u = _criar_tenant_e_user(suffix="caller")
+        caso_caller = _criar_caso(tenant=t, user=u, numero_processo="9999999-99.2024.8.16.0001", titulo="Caso Caller")
+        caso_match = _criar_caso(tenant=t, user=u, numero_processo=CNJ_VALIDO, titulo="Caso Match")
+
+        item = _item_base(
+            id=11004,
+            hash="hash_caller",
+            numeroProcesso=CNJ_VALIDO,
+            texto="texto",
+        )
+        # Caller passa caso_caller.id explicitamente
+        ok = _salvar_publicacao(_db, PublicacaoDJEN, u.id, t.id, caso_caller.id, item, origem="oab")
+        assert ok is True
+        _db.session.commit()
+
+        pub = PublicacaoDJEN.query.filter_by(tenant_id=t.id, djen_id=11004).first()
+        assert pub.caso_id == caso_caller.id
+        # status_origem permanece o default 'pendente' pois nao houve auto-vinculacao
+        assert pub.status_origem == "pendente"
+
+
+def test_salvar_publicacao_sem_caso_correspondente_mantem_caso_id_none(app, db):
+    """Numero CNJ valido extraido, mas nao ha Caso correspondente -> caso_id=None."""
+    with app.app_context():
+        t, u = _criar_tenant_e_user(suffix="nocaso")
+        item = _item_base(
+            id=11005,
+            hash="hash_nocaso",
+            texto=f"Autos no {CNJ_VALIDO}.",
+        )
+        ok = _salvar_publicacao(_db, PublicacaoDJEN, u.id, t.id, None, item, origem="oab")
+        assert ok is True
+        _db.session.commit()
+
+        pub = PublicacaoDJEN.query.filter_by(tenant_id=t.id, djen_id=11005).first()
+        assert pub.numero_processo == CNJ_VALIDO
+        assert pub.caso_id is None
+        assert pub.status_origem == "pendente"
 
 
 def test_salvar_publicacao_texto_sem_cnj_mantem_numero_proc_vazio(app, db):
