@@ -132,6 +132,19 @@ def create_app(config_class=Config):
     )
     admin_ns = _Namespace("admin", description="Backoffice (super-admin)", path="/")
     admin_api.add_namespace(admin_ns)
+
+    # admin-fase0: error handlers especificos do admin_api (espelha api_registry).
+    # Sem isto, requests sem token caem em 500 generico em vez de 401.
+    from flask_jwt_extended.exceptions import JWTExtendedException, NoAuthorizationError
+
+    @admin_api.errorhandler(NoAuthorizationError)
+    def _admin_handle_no_auth(error):
+        return {"message": "Acesso negado."}, 401
+
+    @admin_api.errorhandler(JWTExtendedException)
+    def _admin_handle_jwt(error):
+        return {"message": "Acesso negado."}, 401
+
     register_admin_routes(admin_ns)
     app.register_blueprint(admin_bp)
 

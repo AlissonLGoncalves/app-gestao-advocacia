@@ -63,6 +63,25 @@ def _auth_headers(token):
 
 
 # ---------------------------------------------------------------------------
+# 0) Sem token JWT recebe 401 (nao 500). Mensagem generica.
+# ---------------------------------------------------------------------------
+def test_admin_sem_token_retorna_401_nao_500(client, db):
+    resp = client.get(f"{ADMIN_BASE}/me")
+    assert resp.status_code == 401
+    payload = json.loads(resp.data)
+    assert "negado" in (payload.get("message") or "").lower()
+
+
+def test_admin_token_malformado_nao_retorna_500(client, db):
+    # Token mal-formado: 422 Unprocessable (consistente com /api/v1).
+    # Token ausente:    401 Acesso negado.
+    # Importante: nao pode ser 500 (que era o bug original).
+    resp = client.get(f"{ADMIN_BASE}/me", headers={"Authorization": "Bearer not.a.real.jwt"})
+    assert resp.status_code in (401, 422)
+    assert resp.status_code != 500
+
+
+# ---------------------------------------------------------------------------
 # 1) Role admin normal recebe 403
 # ---------------------------------------------------------------------------
 def test_superadmin_acesso_negado_para_admin_normal(app, client, db):
