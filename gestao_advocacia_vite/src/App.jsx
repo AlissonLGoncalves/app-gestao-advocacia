@@ -30,6 +30,10 @@ import PerfilPage from './pages/PerfilPage.jsx'
 import NovoClientePorProcuracao from './pages/clientes/NovoClientePorProcuracao.jsx'
 import PortalPage from './pages/portal/PortalPage.jsx'
 import PortalRegisterPage from './pages/portal/PortalRegisterPage.jsx'
+// admin-fase0: paginas do backoffice super-admin
+import AdminTenantsPage from './pages/admin/AdminTenantsPage.jsx'
+import AdminTenantDetailPage from './pages/admin/AdminTenantDetailPage.jsx'
+import { adminApi } from './api/admin.js'
 import { APP_VERSION } from './version.js'
 import GlobalSearch from './components/GlobalSearch.jsx'
 
@@ -51,6 +55,7 @@ import {
   ClipboardDocumentListIcon,
   NewspaperIcon,
   UserCircleIcon,
+  BuildingOffice2Icon,
 } from '@heroicons/react/24/outline'
 
 const ProtectedRoute = ({ children }) => {
@@ -72,6 +77,51 @@ const PortalRoute = ({ children }) => {
     /* */
   }
   if (role !== 'cliente') return <Navigate to="/dashboard" replace />
+  return children
+}
+
+// admin-fase0: gate do backoffice super-admin.
+// Frontend gating e somente UX — fazemos GET /admin/v1/me no mount para confirmar role server-side.
+const SuperAdminRoute = ({ children }) => {
+  const token = localStorage.getItem('token')
+  const userStr = localStorage.getItem('user')
+  let role = ''
+  try {
+    role = userStr ? JSON.parse(userStr).role : ''
+  } catch {
+    /* */
+  }
+  const navigate = useNavigate()
+  const [confirmed, setConfirmed] = useState(false)
+
+  useEffect(() => {
+    if (!token || role !== 'superadmin') return
+    let active = true
+    adminApi
+      .me()
+      .then((data) => {
+        if (active && data?.role === 'superadmin') setConfirmed(true)
+      })
+      .catch(() => {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        toast.error('Acesso negado')
+        navigate('/login')
+      })
+    return () => {
+      active = false
+    }
+  }, [token, role, navigate])
+
+  if (!token) return <Navigate to="/login" replace />
+  if (role !== 'superadmin') return <Navigate to="/dashboard" replace />
+  if (!confirmed) {
+    return (
+      <div className="text-center py-5 text-muted">
+        <div className="spinner-border" role="status" aria-label="Validando acesso" />
+      </div>
+    )
+  }
   return children
 }
 
@@ -278,6 +328,12 @@ const MainLayout = () => {
           <SidebarLink to="/perfil" icon={UserCircleIcon}>
             Meu Perfil
           </SidebarLink>
+          {/* admin-fase0: item visivel apenas para superadmin */}
+          {userRole === 'superadmin' && (
+            <SidebarLink to="/admin/tenants" icon={BuildingOffice2Icon}>
+              Backoffice
+            </SidebarLink>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -401,6 +457,25 @@ function App() {
 
           <Route path="configuracoes" element={<SettingsPage />} />
           <Route path="perfil" element={<PerfilPage />} />
+
+          {/* admin-fase0: rotas do backoffice (gated por SuperAdminRoute) */}
+          <Route path="admin" element={<Navigate to="/admin/tenants" replace />} />
+          <Route
+            path="admin/tenants"
+            element={
+              <SuperAdminRoute>
+                <AdminTenantsPage />
+              </SuperAdminRoute>
+            }
+          />
+          <Route
+            path="admin/tenants/:id"
+            element={
+              <SuperAdminRoute>
+                <AdminTenantDetailPage />
+              </SuperAdminRoute>
+            }
+          />
 
           <Route path="*" element={<NotFoundPage />} />
         </Route>

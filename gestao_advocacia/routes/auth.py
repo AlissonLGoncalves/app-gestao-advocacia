@@ -576,6 +576,28 @@ def register_auth_routes(
             ).first()
 
             if user and user.check_password(password):
+                # admin-fase0: bloqueio de login para tenants suspensos/cancelados.
+                # Superadmin nunca e bloqueado (pode operar com tenant suspenso).
+                if user.role != "superadmin" and user.tenant_id:
+                    tenant = db.session.get(Tenant, user.tenant_id)
+                    if tenant and tenant.status in ("suspenso", "cancelado"):
+                        _registrar_login_audit(
+                            user_id=user.id,
+                            email_tentativa=username_or_email,
+                            sucesso=False,
+                            motivo_falha="tenant_suspenso",
+                        )
+                        app.logger.warning(
+                            "login_blocked_tenant_suspended",
+                            extra={
+                                "event": "login_blocked_tenant_suspended",
+                                "user_id_hash": mask_user_id(user.id),
+                                "tenant_id": user.tenant_id,
+                                "tenant_status": tenant.status,
+                            },
+                        )
+                        return {"message": "Conta suspensa. Contate o suporte."}, 403
+
                 expires = timedelta(days=app.config.get("JWT_ACCESS_TOKEN_EXPIRES_DAYS", 1))
                 access_token = create_access_token(
                     identity=str(user.id),

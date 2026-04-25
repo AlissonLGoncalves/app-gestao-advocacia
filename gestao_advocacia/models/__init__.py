@@ -15,6 +15,8 @@ class Tenant(db.Model):
     numero_oab_escritorio = db.Column(db.String(30), nullable=True)
     sigla_oab_escritorio = db.Column(db.String(10), nullable=True)
     endereco = db.Column(db.String(300), nullable=True)
+    # admin-fase0: status do tenant para suspensao via backoffice (ativo|suspenso|cancelado)
+    status = db.Column(db.String(20), nullable=False, default="ativo", server_default="ativo")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     users = db.relationship("User", backref="tenant", lazy="dynamic")
 
@@ -28,6 +30,8 @@ class Tenant(db.Model):
             "numero_oab_escritorio": self.numero_oab_escritorio,
             "sigla_oab_escritorio": self.sigla_oab_escritorio,
             "endereco": self.endereco,
+            "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 
@@ -42,7 +46,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     role = db.Column(
         db.String(20), nullable=False, default="admin"
-    )  # admin, advogado, assistente, cliente
+    )  # admin, advogado, assistente, cliente, superadmin (admin-fase0)
     nome_completo = db.Column(db.String(200), nullable=True)
     cpf = db.Column(db.String(14), nullable=True)
     tipo_pessoa = db.Column(db.String(2), nullable=True)
@@ -897,6 +901,84 @@ class PasswordResetToken(db.Model):
     criado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     user = db.relationship("User", foreign_keys=[user_id])
+
+
+# admin-fase0: auditoria das acoes do super-admin (across tenants)
+class AdminAuditLog(db.Model):
+    __tablename__ = "admin_audit_log"
+    id = db.Column(db.Integer, primary_key=True)
+    admin_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_admin_audit_user_id"),
+        nullable=False,
+        index=True,
+    )
+    action = db.Column(db.String(60), nullable=False, index=True)
+    target_type = db.Column(db.String(40), nullable=False)
+    target_id = db.Column(db.Integer, nullable=True)
+    target_tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_admin_audit_target_tenant_id"),
+        nullable=True,
+        index=True,
+    )
+    before_json = db.Column(db.Text, nullable=True)
+    after_json = db.Column(db.Text, nullable=True)
+    ip = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    __table_args__ = (
+        db.Index("ix_admin_audit_target_tenant_created", "target_tenant_id", "created_at"),
+    )
+
+    admin_user = db.relationship("User", foreign_keys=[admin_user_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "admin_user_id": self.admin_user_id,
+            "admin_username": self.admin_user.username if self.admin_user else None,
+            "action": self.action,
+            "target_type": self.target_type,
+            "target_id": self.target_id,
+            "target_tenant_id": self.target_tenant_id,
+            "before_json": self.before_json,
+            "after_json": self.after_json,
+            "ip": self.ip,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# admin-fase0: anotacoes internas do super-admin sobre tenants
+class TenantAnotacao(db.Model):
+    __tablename__ = "tenant_anotacao"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_tenant_anotacao_tenant_id"),
+        nullable=False,
+        index=True,
+    )
+    admin_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_tenant_anotacao_admin_user_id"),
+        nullable=False,
+    )
+    texto = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    admin_user = db.relationship("User", foreign_keys=[admin_user_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "admin_user_id": self.admin_user_id,
+            "admin_username": self.admin_user.username if self.admin_user else None,
+            "texto": self.texto,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
 
 
 class ConsentimentoUsuario(db.Model):

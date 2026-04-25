@@ -23,6 +23,9 @@ from logging_config import configure_json_logging
 from openapi_docs import register_openapi_docs
 from routes.api_registry import register_api_routes
 
+# admin-fase0: namespace isolado do backoffice super-admin
+from routes.admin import register_admin_routes  # noqa: E402
+
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads_documentos")
@@ -102,6 +105,35 @@ def create_app(config_class=Config):
 
     register_api_routes(app, api, finance_access_required)
     app.register_blueprint(api_bp)
+
+    # admin-fase0: blueprint + Api separados para o backoffice super-admin.
+    # NUNCA reusa os namespaces de /api/v1 — isolamento explicito.
+    from flask_restx import Namespace as _Namespace
+
+    admin_bp = Blueprint("admin_api", __name__, url_prefix="/admin/v1")
+    admin_swagger_doc = (
+        "/admin/v1/docs" if os.environ.get("FLASK_ENV") != "production" else False
+    )
+    admin_api = Api(
+        admin_bp,
+        version="1.0",
+        title="API Backoffice (Super-Admin)",
+        description="Endpoints restritos ao dono da plataforma SaaS. Role superadmin obrigatoria.",
+        doc=admin_swagger_doc,
+        authorizations={
+            "jsonWebToken": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "Authorization",
+                "description": "Token JWT no formato 'Bearer <token>'.",
+            }
+        },
+        security="jsonWebToken",
+    )
+    admin_ns = _Namespace("admin", description="Backoffice (super-admin)", path="/")
+    admin_api.add_namespace(admin_ns)
+    register_admin_routes(admin_ns)
+    app.register_blueprint(admin_bp)
 
     # Mantem compatibilidade temporaria com clientes antigos em /api.
     legacy_api_bp = Blueprint("legacy_api", __name__, url_prefix="/api")

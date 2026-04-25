@@ -125,6 +125,50 @@ App React: `http://127.0.0.1:5173`
 
 ---
 
+## Backoffice super-admin (Fase 0)
+
+Namespace isolado em `/admin/v1` para o dono da plataforma SaaS gerenciar tenants
+(escritórios clientes). Detalhes da arquitetura no comentário `admin-fase0:` em
+`routes/admin.py`, `helpers/admin_security.py` e modelos `AdminAuditLog` /
+`TenantAnotacao`.
+
+### Promovendo um usuário a `superadmin`
+
+Não há endpoint público — promoção é manual no banco. Em desenvolvimento:
+
+```sql
+-- substitua o email pelo seu
+UPDATE "user" SET role = 'superadmin' WHERE email = 'voce@dominio.com';
+```
+
+> ⚠️ **Em produção**, faça via psql conectado ao banco gerenciado e use uma
+> transação. Audit a operação no canal interno do time. Não exponha esse SQL em
+> nenhum endpoint.
+
+### Variáveis de ambiente
+
+- `ADMIN_IP_ALLOWLIST` (opcional): CSV de IPs ou CIDRs com permissão para
+  `/admin/v1/*`. Se vazio, allowlist desativada (apenas role JWT é validada).
+  Exemplo: `203.0.113.10,198.51.100.0/24`.
+
+### Como testar localmente
+
+1. Aplicar a migration: `cd gestao_advocacia && flask db upgrade`
+2. Promover um usuário existente para `superadmin` (SQL acima).
+3. Fazer login normalmente — o token JWT vai conter `role=superadmin`.
+4. Acessar `/admin/tenants` no frontend — o item "Backoffice" aparece na sidebar
+   apenas para superadmin. Endpoints documentados em `/admin/v1/docs` (fora de
+   produção).
+
+### Testes
+
+```bash
+cd gestao_advocacia
+pytest tests/test_admin_api.py -v
+```
+
+---
+
 ## Testes e qualidade
 
 ### Backend
