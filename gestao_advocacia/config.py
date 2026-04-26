@@ -7,6 +7,12 @@ import os
 
 from dotenv import load_dotenv
 
+
+def _normalize_sqlalchemy_db_url(db_url: str) -> str:
+    if db_url.startswith("postgres://"):
+        return db_url.replace("postgres://", "postgresql://", 1)
+    return db_url
+
 # Determina o diretório base do projeto (um nível acima de 'gestao_advocacia')
 # Isso garante que o .env seja encontrado corretamente, mesmo que config.py esteja em uma subpasta.
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -62,13 +68,19 @@ class Config:
             stacklevel=2,
         )
 
-    _db_url = os.environ.get("DATABASE_URL") or "sqlite:///" + os.path.join(
+    _runtime_db_url = os.environ.get("DATABASE_URL") or "sqlite:///" + os.path.join(
         os.path.abspath(os.path.dirname(__file__)), "app.db"
     )
-    # Render fornece URLs com prefixo "postgres://" (deprecated). SQLAlchemy 2.x exige "postgresql://"
-    if _db_url.startswith("postgres://"):
-        _db_url = _db_url.replace("postgres://", "postgresql://", 1)
-    SQLALCHEMY_DATABASE_URI = _db_url
+    _admin_db_url = os.environ.get("DATABASE_URL_ADMIN") or _runtime_db_url
+    USE_DATABASE_URL_ADMIN = os.environ.get("USE_DATABASE_URL_ADMIN", "false").lower() == "true"
+
+    SQLALCHEMY_DATABASE_URI_RUNTIME = _normalize_sqlalchemy_db_url(_runtime_db_url)
+    SQLALCHEMY_DATABASE_URI_ADMIN = _normalize_sqlalchemy_db_url(_admin_db_url)
+    SQLALCHEMY_DATABASE_URI = (
+        SQLALCHEMY_DATABASE_URI_ADMIN
+        if USE_DATABASE_URL_ADMIN
+        else SQLALCHEMY_DATABASE_URI_RUNTIME
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False  # Mude para True para logar queries SQL em desenvolvimento, se útil
     SQLALCHEMY_ENGINE_OPTIONS = {
