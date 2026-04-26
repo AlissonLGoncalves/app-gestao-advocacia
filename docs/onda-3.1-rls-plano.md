@@ -484,6 +484,45 @@ que Alembic acha que existe.
   conferindo que não toca policies. Adicionar checklist no PR template
   de migration.
 
+### 7.8 ENABLE RLS exige ownership da tabela (não basta GRANT ALL)
+
+**Causa**: `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` e
+`CREATE/DROP/ALTER POLICY` exigem que o role executor seja **owner**
+da tabela. `GRANT ALL` não cobre — ownership é privilégio binário
+separado em Postgres.
+
+Em ambientes onde tabelas multi-tenant foram criadas originalmente
+pelo `postgres` superuser (caso do Patronus pré-Fase 1), o role
+`app_admin` que roda migrations a partir da Fase 1 tem `BYPASSRLS` +
+`GRANT ALL` mas **não é owner**. Resultado: a primeira migration que
+tenta `ENABLE RLS` (Fase 2) falha com `must be owner of table <X>`.
+
+**Manifestação real**: o release_command da Fase 2 (PR #101 / migration
+`f2a1b2c3d4e5`) falhou em prod em 2026-04-26 com exatamente esse erro.
+
+**Mitigação aplicada em prod**: transferência manual de ownership das
+17 tabelas categoria A via peer authentication (`su postgres -c psql`
+no container do Postgres usando socket Unix), conforme
+[`docs/ops/onda-3.1-fase2-rollout.md`](ops/onda-3.1-fase2-rollout.md) e
+[`docs/ops/transfer_rls_ownership.sql`](ops/transfer_rls_ownership.sql).
+
+**Por que peer auth resolve**: a senha do `postgres` superuser não
+está em nenhum Fly secret após a rotação de Fase 0 — só existe no
+próprio Postgres. Conexão via socket Unix dentro do container usa
+`peer` authentication (Linux user → Postgres user), bypassando senha.
+
+**Mitigação para ambientes futuros**: rodar
+`docs/ops/transfer_rls_ownership.sql` via peer auth **antes** do
+primeiro deploy que aplique migration de RLS (Fase 2 em diante),
+em qualquer ambiente onde tabelas pré-existem ao role `app_admin`.
+
+**Não afeta tabelas novas**: tabelas criadas após Fase 1 são created
+pelo `release_command` rodando como `app_admin`, então `app_admin` é
+o owner naturalmente. Migration `CREATE TABLE` + `ENABLE RLS` numa
+mesma operação funciona sem ajuste.
+
+**Refs**: issue #102.
+
 ---
 
 ## 8. Checklist de pronto por fase
