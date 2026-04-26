@@ -7,7 +7,7 @@ from flask_restx import Resource
 from cnj_service import consultar_processo_cnj
 from extensions import db
 from helpers import get_item_or_404, get_tenant_id, query_for_tenant, tenant_scoped
-from models import Caso, Cliente, MovimentacaoCNJ, log_audit
+from models import Caso, Cliente, Documento, MovimentacaoCNJ, PublicacaoDJEN, TarefaPrazo, log_audit
 
 
 def register_casos_routes(
@@ -556,3 +556,106 @@ def register_casos_routes(
                 .all()
             )
             return movimentacoes, 200
+
+    @casos_ns.route("/<int:caso_id>/timeline")
+    @casos_ns.param("caso_id", "ID do caso")
+    class CasoTimelineAPI(Resource):
+        """Linha do Tempo: agrega 4 fontes (movimentacoes CNJ, publicacoes DJEN,
+        documentos e tarefas/prazos) ordenado por data desc para visualizacao
+        unificada do andamento do caso. Eventos da Agenda nao aparecem porque
+        EventoAgenda atualmente nao tem caso_id (ver TODO em models)."""
+
+        @casos_ns.doc("listar_timeline_caso_endpoint", security="jsonWebToken")
+        @jwt_required()
+        @tenant_scoped
+        def get(self, caso_id):
+            tenant_id = get_tenant_id()
+            caso_db = query_for_tenant(Caso).filter_by(id=caso_id).first()
+            if not caso_db:
+                casos_ns.abort(404, message=f"Caso com ID {caso_id} não foi encontrado.")
+
+            eventos = []
+
+            for mov in MovimentacaoCNJ.query.filter_by(caso_id=caso_db.id).all():
+                if not mov.data_movimentacao:
+                    continue
+                eventos.append(
+                    {
+                        "tipo": "movimentacao_cnj",
+                        "id": mov.id,
+                        "data": mov.data_movimentacao.isoformat(),
+                        "titulo": "Movimentação processual",
+                        "descricao": mov.descricao or "",
+                        "metadata": {},
+                    }
+                )
+
+            for pub in PublicacaoDJEN.query.filter_by(
+                tenant_id=tenant_id, caso_id=caso_db.id
+            ).all():
+                data_iso = None
+                if pub.data_disponibilizacao:
+                    data_iso = pub.data_disponibilizacao.isoformat()
+                elif pub.data_captura:
+                    data_iso = pub.data_captura.isoformat()
+                if not data_iso:
+                    continue
+                eventos.append(
+                    {
+                        "tipo": "publicacao_djen",
+                        "id": pub.id,
+                        "data": data_iso,
+                        "titulo": pub.tipo_comunicacao or "Publicação DJEN",
+                        "descricao": (pub.texto or "")[:500],
+                        "metadata": {
+                            "sigla_tribunal": pub.sigla_tribunal,
+                            "nome_orgao": pub.nome_orgao,
+                            "lida": pub.lida,
+                            "link": pub.link,
+                        },
+                    }
+                )
+
+            for doc in Documento.query.filter_by(tenant_id=tenant_id, caso_id=caso_db.id).all():
+                if not doc.data_upload:
+                    continue
+                eventos.append(
+                    {
+                        "tipo": "documento",
+                        "id": doc.id,
+                        "data": doc.data_upload.isoformat(),
+                        "titulo": doc.nome_arquivo,
+                        "descricao": "Documento anexado ao caso",
+                        "metadata": {
+                            "url_download": f"/api/v1/documentos/download/{doc.id}",
+                        },
+                    }
+                )
+
+            for tarefa in TarefaPrazo.query.filter_by(
+                tenant_id=tenant_id, caso_id=caso_db.id
+            ).all():
+                # Usa data_vencimento como ancora; cai para data_criacao se ausente.
+                if tarefa.data_vencimento:
+                    data_iso = tarefa.data_vencimento.isoformat()
+                elif tarefa.data_criacao:
+                    data_iso = tarefa.data_criacao.isoformat()
+                else:
+                    continue
+                eventos.append(
+                    {
+                        "tipo": "tarefa",
+                        "id": tarefa.id,
+                        "data": data_iso,
+                        "titulo": tarefa.titulo,
+                        "descricao": tarefa.descricao or "",
+                        "metadata": {
+                            "status": tarefa.status,
+                            "prioridade": tarefa.prioridade,
+                            "tipo_tarefa": tarefa.tipo_tarefa,
+                        },
+                    }
+                )
+
+            eventos.sort(key=lambda e: e["data"], reverse=True)
+            return {"caso_id": caso_db.id, "items": eventos}, 200
