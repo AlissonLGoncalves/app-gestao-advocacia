@@ -525,5 +525,27 @@ observação por batch — não recomendado.
    separar se houver necessidade auditável.
 5. **Janela de staging entre fases**: 24h é suficiente para detectar
    bugs operacionais? Ou esticar para 1 semana?
+6. **Política do `User`**: durante o login, o `tenant_id` do
+   solicitante ainda não foi resolvido. Opções:
+   - (a) `User` sem RLS (tratar como categoria C);
+   - (b) policy permissiva no `User` com `column-level grants`
+     restringindo acesso a colunas sensíveis;
+   - (c) endpoint de login conecta como `app_admin` (BYPASSRLS) e
+     todas as outras rotas usam `app_user`.
+
+   **Recomendação preliminar**: (c) — escopo cirúrgico, sem
+   complicar `column-level grants` que não temos infra hoje.
+   **Decidir antes do Batch 4** (cluster de auth).
+7. **Contrato de status code 404 vs 403**: hoje
+   `get_item_or_404` retorna **403** em acesso cross-tenant
+   (registrado em [`tenant-isolation.md`](tenant-isolation.md) como
+   correção). Com RLS, a row simplesmente "não existe" para o role
+   atual, então o código vira **404** naturalmente — mudança de
+   semântica visível para o frontend.
+
+   **Ação**: documentar essa mudança no `tenant-isolation.md` como
+   intencional antes da Fase 3, e validar com o frontend que
+   nenhum fluxo depende de distinguir 403 de 404 (busca por
+   `.status === 403` em todo o `gestao_advocacia_vite/src/`).
 
 Estas decisões viram itens do PR de Fase 1.
