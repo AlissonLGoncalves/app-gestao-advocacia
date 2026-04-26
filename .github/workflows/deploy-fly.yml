@@ -1,0 +1,64 @@
+name: Deploy backend to Fly
+
+# Trigger por pull_request:closed (em vez de push:main) porque o repo
+# eh privado em GitHub Free e branch protection real exige plano pago.
+# O guard 'if' no nivel do JOB garante que so deploya quando o PR foi
+# efetivamente merged, ignorando close-without-merge.
+# workflow_dispatch permite redeploy manual via UI para casos de
+# emergencia/rollback.
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+    paths:
+      - 'gestao_advocacia/**'
+  workflow_dispatch:
+
+# Evita deploys concorrentes derrubarem um ao outro durante rollout.
+# cancel-in-progress=false porque preferimos esperar o deploy em curso
+# concluir e enfileirar este, em vez de cancelar e deixar um deploy
+# parcial.
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: flyctl deploy + health check
+    # Guard no nivel do job: pull_request:closed dispara tambem em
+    # close-sem-merge; aqui filtramos para apenas merge de fato.
+    # workflow_dispatch passa direto.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: gestao_advocacia
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@v1.5
+
+      - name: Deploy to Fly
+        run: flyctl deploy --remote-only
+
+      # Pos-deploy health check: a rota raiz "/" do app responde com
+      # JSON {"status":"online"} quando o Flask boot completou e o
+      # blueprint da API esta montado. --retry 5 com 3s entre cada
+      # tentativa cobre os ~7s de cold start tipico do Fly auto_stop=stop.
+      # TODO: substituir por /healthz quando endpoint dedicado existir.
+      - name: Health check
+        run: |
+          curl --fail --silent --show-error \
+               --retry 5 --retry-delay 3 --retry-connrefused \
+               --max-time 30 \
+               https://app-gestao-advocacia.fly.dev/ \
+            | grep -q '"status":"online"' \
+            || (echo "::error::Health check falhou apos deploy" && exit 1)
