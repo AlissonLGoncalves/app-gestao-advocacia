@@ -516,41 +516,101 @@ observação por batch — não recomendado.
 
 ---
 
-## 10. Decisões pendentes (a resolver antes da Fase 1)
+## 10. Decisões resolvidas (validadas em 2026-04-26)
 
-1. **`MovimentacaoCNJ`**: denormalizar com `tenant_id` direto (PR
-   próprio, simples) ou usar policy com subquery? Recomendação:
-   denormalizar.
-2. **`PasswordResetToken`** e **`ConsentimentoUsuario`**: classificar
-   definitivamente (A/C/D) lendo o model completo.
-3. **Pgbouncer**: confirmar via `flyctl postgres connect` se a
-   `DATABASE_URL` atual atravessa pgbouncer ou conecta direto.
-4. **Role separado para scheduler**: `app_user` ou `app_scheduler`
-   distinto? Recomendação: começar com `app_user` único (simples),
-   separar se houver necessidade auditável.
-5. **Janela de staging entre fases**: 24h é suficiente para detectar
-   bugs operacionais? Ou esticar para 1 semana?
-6. **Política do `User`**: durante o login, o `tenant_id` do
-   solicitante ainda não foi resolvido. Opções:
-   - (a) `User` sem RLS (tratar como categoria C);
-   - (b) policy permissiva no `User` com `column-level grants`
-     restringindo acesso a colunas sensíveis;
-   - (c) endpoint de login conecta como `app_admin` (BYPASSRLS) e
-     todas as outras rotas usam `app_user`.
+As 7 decisões originalmente pendentes foram fechadas antes da Fase 1.
+Cada uma traz encaminhamento final + evidência. Itens com NOTA
+indicam que parte da decisão foi adiada para fase posterior por
+motivo justificado.
 
-   **Recomendação preliminar**: (c) — escopo cirúrgico, sem
-   complicar `column-level grants` que não temos infra hoje.
-   **Decidir antes do Batch 4** (cluster de auth).
-7. **Contrato de status code 404 vs 403**: hoje
-   `get_item_or_404` retorna **403** em acesso cross-tenant
-   (registrado em [`tenant-isolation.md`](tenant-isolation.md) como
-   correção). Com RLS, a row simplesmente "não existe" para o role
-   atual, então o código vira **404** naturalmente — mudança de
-   semântica visível para o frontend.
+1. **`MovimentacaoCNJ` — denormalizar `tenant_id`**.
+   Subquery em policy (`caso_id IN (SELECT id FROM caso WHERE
+   tenant_id = ...)`) seria custosa no hot-path de ingestão DJEN.
+   Denormalizar é mais simples e barato.
+   Evidência: [models/__init__.py:312-327](../gestao_advocacia/models/__init__.py#L312-L327)
+   — model só tem `caso_id`, sem `tenant_id`.
 
-   **Ação**: documentar essa mudança no `tenant-isolation.md` como
-   intencional antes da Fase 3, e validar com o frontend que
-   nenhum fluxo depende de distinguir 403 de 404 (busca por
-   `.status === 403` em todo o `gestao_advocacia_vite/src/`).
+2. **`PasswordResetToken` e `ConsentimentoUsuario` — classificação**.
+   - `PasswordResetToken` → **Categoria C (sem RLS)**. Fluxo de
+     "esqueci senha" é pré-autenticação, não há `tenant_id`
+     resolvido na request. Acesso só via `app_admin`.
+     Evidência: [models/__init__.py:890-913](../gestao_advocacia/models/__init__.py#L890-L913).
+   - `ConsentimentoUsuario` → **denormalizar `tenant_id`**
+     (consistente com #1) e habilitar RLS no Batch 4.
+     Evidência: [models/__init__.py:994-1013](../gestao_advocacia/models/__init__.py#L994-L1013).
 
-Estas decisões viram itens do PR de Fase 1.
+   **NOTA (a revisitar no Batch 4)**: consentimento LGPD é dado
+   pessoal individual, não estritamente do tenant. A policy final
+   pode precisar ser `user_id = current_user_id` em vez de
+   `tenant_id = current_tenant_id`. Reavaliar quando chegar no
+   Batch 4 — se decidir por user_id, denormalizar tenant_id ainda
+   serve para queries operacionais e exclusão em massa por tenant.
+
+3. **Pgbouncer — encaminhamento C aplicado** (worst-case +
+   `SET LOCAL` em transação garantida via `db.session.begin()`).
+   Robustez para futura migração a pgbouncer transaction-mode sem
+   custo prático no setup atual.
+
+   **NOTA — verdade do setup atual** (probe via
+   `flyctl ssh console -a patronus-db -C "ps -ef"` em
+   2026-04-26):
+
+   ```
+   postgres   679   postgres -D /data/postgresql -p 5433
+   root       681   /usr/sbin/haproxy -W -db -f /fly/haproxy.cfg
+   ```
+
+   Stack é `fly-apps/postgres-flex` (repmgr + haproxy + postgres
+   direto na porta 5433, haproxy escutando 5432). **Não há
+   pgbouncer** — diferente do antigo `fly pg create` que incluía
+   pgbouncer por padrão. Conexões atuais são diretas ao Postgres,
+   sem connection pooling transaction-mode.
+
+   `SET LOCAL` em transação é overkill hoje, mas implementação
+   tolera ambos os cenários e protege contra surpresa futura.
+
+4. **Role separado para scheduler — `app_user` único**.
+   Começar com role único simplifica o modelo. Separar
+   `app_scheduler` só se aparecer necessidade auditável (ex:
+   distinguir actions de fundo no audit log via `current_user`
+   Postgres). Hoje, o `AuditLog` já registra `user_id` da
+   aplicação, suficiente.
+
+5. **Janela de staging entre fases — escalonamento codificado**:
+   - **Fase 2 → Fase 3**: **24h** de observação. Fase 2 é
+     permissiva (zero impacto funcional esperado), basta confirmar
+     que nada quebrou.
+   - **Fase 3 → primeiro batch da Fase 4**: **1 semana**. Fase 3
+     ativa policies restritivas no primeiro cluster — janela maior
+     porque é a primeira oportunidade de detectar bugs reais de
+     isolamento ou queries que não consideravam o filtro implícito.
+   - **Entre cada batch da Fase 4**: **1 semana**. Cada batch
+     adiciona policies restritivas em mais tabelas; manter cadência
+     conservadora até esgotar.
+   - **Hardening (Fase 5)**: dispara após o último batch passar
+     1 semana sem incidente.
+
+   Métrica de sucesso por janela: 0 incidentes de isolamento + 0
+   regressões de performance > 20% nas queries afetadas. Se algum
+   dos dois falhar, parar e diagnosticar antes de prosseguir.
+
+6. **Política do `User` durante login — opção (c)**.
+   Endpoint `/auth/login` usa `app_admin` (BYPASSRLS). É cirúrgico:
+   só esse endpoint precisa resolver `email → user → tenant_id`
+   antes de existir um `tenant_id`. Demais rotas autenticadas usam
+   `app_user` com `tenant_id` já resolvido pelo JWT. Sem
+   `column-level grants` (que não temos infra para gerenciar hoje).
+
+   Aplicar no Batch 4 quando o `User` ganhar policy restritiva.
+
+7. **Contrato 404 vs 403 — sem dependência no frontend**.
+   `grep -rn "403" gestao_advocacia_vite/src/` retornou apenas
+   match em SVG de assets (irrelevante). Nenhum fluxo distingue
+   403 de 404. Mudar a semântica de cross-tenant access (de 403
+   explícito para 404 natural via RLS) é seguro.
+
+   Ação: documentar mudança em
+   [`tenant-isolation.md`](tenant-isolation.md) antes da Fase 3,
+   marcando como intencional.
+
+Decisões fechadas; Fase 1 está liberada para começar.
