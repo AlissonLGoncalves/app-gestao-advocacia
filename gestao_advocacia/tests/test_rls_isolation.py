@@ -63,7 +63,7 @@ class TestRLSTarefaPrazo:
     def test_update_other_tenant_affects_zero_rows(self, two_tenants):
         _set_tenant(two_tenants.tenant_a.id)
         result = db.session.execute(
-            text("UPDATE tarefa_prazo SET descricao = 'X' WHERE id = :tid"),
+            text("UPDATE tarefa_prazo SET titulo = 'X' WHERE id = :tid"),
             {"tid": two_tenants.tarefa_b.id},
         )
         assert result.rowcount == 0
@@ -121,7 +121,7 @@ class TestRLSEventoAgenda:
     def test_update_other_tenant_affects_zero_rows(self, two_tenants):
         _set_tenant(two_tenants.tenant_a.id)
         result = db.session.execute(
-            text("UPDATE evento_agenda SET descricao = 'X' WHERE id = :tid"),
+            text("UPDATE evento_agenda SET titulo = 'X' WHERE id = :tid"),
             {"tid": two_tenants.evento_b.id},
         )
         assert result.rowcount == 0
