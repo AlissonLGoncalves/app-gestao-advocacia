@@ -1,9 +1,10 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource
+from sqlalchemy import func
 
 from extensions import db
 from helpers import get_tenant_id
@@ -228,3 +229,134 @@ def register_dashboard_routes(app, dashboard_ns):
                 "dias": dias,
                 "grupos": grupos_list,
             }, 200
+
+    @dashboard_ns.route("/charts/casos-por-status")
+    class DashboardCasosPorStatusAPI(Resource):
+        @jwt_required()
+        @dashboard_ns.doc(
+            security="jsonWebToken",
+            description="Distribuicao de casos do tenant por status (PieChart).",
+        )
+        def get(self):
+            tenant_id = get_tenant_id()
+            rows = (
+                db.session.query(Caso.status, func.count(Caso.id))
+                .filter(Caso.tenant_id == tenant_id)
+                .group_by(Caso.status)
+                .all()
+            )
+            return {
+                "items": [
+                    {"label": status or "Sem status", "value": int(qtd)} for status, qtd in rows
+                ]
+            }, 200
+
+    @dashboard_ns.route("/charts/casos-por-area")
+    class DashboardCasosPorAreaAPI(Resource):
+        @jwt_required()
+        @dashboard_ns.doc(
+            security="jsonWebToken",
+            description="Distribuicao de casos do tenant por area do direito (PieChart).",
+        )
+        def get(self):
+            tenant_id = get_tenant_id()
+            rows = (
+                db.session.query(Caso.area_direito, func.count(Caso.id))
+                .filter(Caso.tenant_id == tenant_id)
+                .group_by(Caso.area_direito)
+                .all()
+            )
+            return {
+                "items": [
+                    {"label": area or "Nao informada", "value": int(qtd)} for area, qtd in rows
+                ]
+            }, 200
+
+    @dashboard_ns.route("/charts/financeiro-mensal")
+    class DashboardFinanceiroMensalAPI(Resource):
+        @jwt_required()
+        @dashboard_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Receita (recebimentos pagos) e despesa (despesas pagas) agregadas por mes "
+                "nos ultimos 12 meses para BarChart/LineChart."
+            ),
+        )
+        def get(self):
+            tenant_id = get_tenant_id()
+            hoje = date.today()
+            # Primeiro dia do mes 11 meses atras = janela de 12 meses cheia.
+            ano_inicio = hoje.year
+            mes_inicio = hoje.month - 11
+            while mes_inicio <= 0:
+                mes_inicio += 12
+                ano_inicio -= 1
+            data_inicio = date(ano_inicio, mes_inicio, 1)
+
+            recebimentos = Recebimento.query.filter(
+                Recebimento.tenant_id == tenant_id,
+                Recebimento.recebido.is_(True),
+                Recebimento.data_recebimento >= data_inicio,
+            ).all()
+            despesas = Despesa.query.filter(
+                Despesa.tenant_id == tenant_id,
+                Despesa.pago.is_(True),
+                Despesa.data_despesa >= data_inicio,
+            ).all()
+
+            buckets = {}
+            for i in range(12):
+                ano = ano_inicio
+                mes = mes_inicio + i
+                while mes > 12:
+                    mes -= 12
+                    ano += 1
+                chave = f"{ano:04d}-{mes:02d}"
+                buckets[chave] = {"mes": chave, "receita": 0.0, "despesa": 0.0}
+
+            for r in recebimentos:
+                chave = r.data_recebimento.strftime("%Y-%m")
+                if chave in buckets:
+                    buckets[chave]["receita"] += float(r.valor or 0)
+            for d in despesas:
+                chave = d.data_despesa.strftime("%Y-%m")
+                if chave in buckets:
+                    buckets[chave]["despesa"] += float(d.valor or 0)
+
+            items = sorted(buckets.values(), key=lambda b: b["mes"])
+            for b in items:
+                b["receita"] = round(b["receita"], 2)
+                b["despesa"] = round(b["despesa"], 2)
+            return {"items": items}, 200
+
+    @dashboard_ns.route("/charts/publicacoes-por-dia")
+    class DashboardPublicacoesPorDiaAPI(Resource):
+        @jwt_required()
+        @dashboard_ns.doc(
+            security="jsonWebToken",
+            description="Publicacoes DJEN por dia nos ultimos 30 dias (LineChart).",
+        )
+        def get(self):
+            tenant_id = get_tenant_id()
+            hoje = date.today()
+            data_inicio = hoje - timedelta(days=29)
+
+            rows = (
+                db.session.query(
+                    PublicacaoDJEN.data_disponibilizacao, func.count(PublicacaoDJEN.id)
+                )
+                .filter(
+                    PublicacaoDJEN.tenant_id == tenant_id,
+                    PublicacaoDJEN.data_disponibilizacao.isnot(None),
+                    PublicacaoDJEN.data_disponibilizacao >= data_inicio,
+                )
+                .group_by(PublicacaoDJEN.data_disponibilizacao)
+                .all()
+            )
+            por_dia = {d.isoformat(): int(qtd) for d, qtd in rows if d}
+            items = []
+            for i in range(30):
+                d = data_inicio + timedelta(days=i)
+                chave = d.isoformat()
+                items.append({"data": chave, "quantidade": por_dia.get(chave, 0)})
+            return {"items": items}, 200
