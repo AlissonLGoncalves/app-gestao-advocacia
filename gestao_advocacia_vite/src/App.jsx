@@ -27,6 +27,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
 import PerfilPage from './pages/PerfilPage.jsx'
+import OnboardingPage from './pages/auth/OnboardingPage.jsx'
 import NovoClientePorProcuracao from './pages/clientes/NovoClientePorProcuracao.jsx'
 import PortalPage from './pages/portal/PortalPage.jsx'
 import PortalRegisterPage from './pages/portal/PortalRegisterPage.jsx'
@@ -63,6 +64,63 @@ const ProtectedRoute = ({ children }) => {
   if (!token) {
     return <Navigate to="/login" replace />
   }
+  return children
+}
+
+// onboarding-wizard: gate que checa /tenant/onboarding-status uma vez por sessao
+// e redireciona para /onboarding se o tenant ainda nao completou o wizard.
+// Nao se aplica a roles 'cliente' (portal) e 'superadmin' (backoffice).
+const OnboardingGate = ({ children }) => {
+  const userStr = localStorage.getItem('user')
+  let role = ''
+  try {
+    role = userStr ? JSON.parse(userStr).role : ''
+  } catch {
+    /* */
+  }
+
+  // Cache em sessionStorage para nao re-disparar request a cada navegacao.
+  const cached = sessionStorage.getItem('onboarding_completed')
+  const [estado, setEstado] = useState(cached === 'true' ? 'completo' : null)
+
+  useEffect(() => {
+    if (estado === 'completo') return
+    if (role === 'cliente' || role === 'superadmin') {
+      setEstado('completo')
+      return
+    }
+    let active = true
+    api
+      .get('/tenant/onboarding-status')
+      .then((data) => {
+        if (!active) return
+        if (data?.onboarding_completed) {
+          sessionStorage.setItem('onboarding_completed', 'true')
+          setEstado('completo')
+        } else {
+          setEstado('pendente')
+        }
+      })
+      .catch(() => {
+        // Em caso de falha, nao bloquear o usuario — assume completo.
+        if (active) setEstado('completo')
+      })
+    return () => {
+      active = false
+    }
+  }, [estado, role])
+
+  if (estado === null) {
+    return (
+      <div
+        className="d-flex justify-content-center align-items-center"
+        style={{ minHeight: '60vh' }}
+      >
+        <span className="spinner-border text-primary" role="status" aria-label="Carregando" />
+      </div>
+    )
+  }
+  if (estado === 'pendente') return <Navigate to="/onboarding" replace />
   return children
 }
 
@@ -166,6 +224,7 @@ const MainLayout = () => {
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    sessionStorage.removeItem('onboarding_completed')
     toast.info('Logout realizado com sucesso!')
     navigate('/login')
   }
@@ -412,10 +471,20 @@ function App() {
           }
         />
         <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <OnboardingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/"
           element={
             <ProtectedRoute>
-              <MainLayout />
+              <OnboardingGate>
+                <MainLayout />
+              </OnboardingGate>
             </ProtectedRoute>
           }
         >
