@@ -4,3 +4,4 @@ venv/
 __pycache__/
 *.db
 backups/
+.claude/worktrees/
