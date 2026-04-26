@@ -1,6 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  DragOverlay,
+  useDroppable,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import {
+  agruparPorColuna,
+  calcularReorder,
+  aplicarReorderEmTarefas,
+} from '../utils/kanbanReorder.js'
 import {
   PlusIcon,
   ClockIcon,
@@ -12,6 +34,15 @@ import {
   ListBulletIcon,
   ViewColumnsIcon,
 } from '@heroicons/react/24/outline'
+
+// ── Constantes do Kanban ─────────────────────────────────────────────────────
+
+const COLUNAS = [
+  { id: 'A Fazer', titulo: 'A Fazer', cor: 'danger' },
+  { id: 'Fazendo', titulo: 'Em Andamento', cor: 'warning' },
+  { id: 'Concluído', titulo: 'Concluído', cor: 'success' },
+]
+const COLUNAS_IDS = COLUNAS.map((c) => c.id)
 
 // ── Helpers de data ──────────────────────────────────────────────────────────
 
@@ -32,6 +63,9 @@ const diasVencido = (t) => {
   const [by, bm, bd] = t.data_vencimento.split('-').map(Number)
   return Math.floor((new Date(ay, am - 1, ad) - new Date(by, bm - 1, bd)) / 86400000)
 }
+
+const getCorPrioridade = (p) =>
+  ({ Urgente: 'danger', Alta: 'warning', Baixa: 'info' })[p] || 'primary'
 
 const TAREFA_VAZIA = {
   titulo: '',
@@ -54,6 +88,8 @@ export default function PrazosPage() {
   const [showModal, setShowModal] = useState(false)
   const [editandoId, setEditandoId] = useState(null)
   const [novaTarefa, setNovaTarefa] = useState(TAREFA_VAZIA)
+
+  const [draggingId, setDraggingId] = useState(null)
 
   const carregarTarefas = useCallback(async () => {
     setLoading(true)
@@ -140,6 +176,7 @@ export default function PrazosPage() {
     }
   }
 
+  // Toggle "Concluir" da vista lista — usa PUT simples; posicao é preservada.
   const handleMoverTarefa = async (id, novoStatus) => {
     try {
       const token = localStorage.getItem('token')
@@ -154,167 +191,50 @@ export default function PrazosPage() {
     }
   }
 
-  const getCorPrioridade = (p) =>
-    ({ Urgente: 'danger', Alta: 'warning', Baixa: 'info' })[p] || 'primary'
+  // ── Drag & Drop (kanban) ─────────────────────────────────────────────────
 
-  // ── Vista Kanban ─────────────────────────────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
-  const [arrastandoId, setArrastandoId] = useState(null)
+  const grupos = useMemo(() => agruparPorColuna(tarefas, COLUNAS_IDS), [tarefas])
 
-  const renderCard = (t) => {
-    const overdue = isOverdue(t)
-    const dias = overdue ? diasVencido(t) : 0
-    const casoVinculado = casos.find((c) => c.id === t.caso_id)
+  const enviarReorder = useCallback(async (columnsPayload, snapshotAnterior) => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${API_URL}/tarefas/reorder`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columns: columnsPayload }),
+      })
+      if (!res.ok) throw new Error(`reorder ${res.status}`)
+    } catch {
+      toast.error('Não foi possível salvar a nova ordem.')
+      setTarefas(snapshotAnterior)
+    }
+  }, [])
 
-    return (
-      <div
-        key={t.id}
-        draggable
-        onDragStart={(e) => {
-          setArrastandoId(t.id)
-          e.dataTransfer.setData('tarefaId', t.id)
-        }}
-        className={`card mb-3 border-0 shadow-sm ${arrastandoId === t.id ? 'opacity-50' : ''}`}
-        style={{
-          cursor: 'grab',
-          borderRadius: 'var(--radius-md)',
-          borderLeft: overdue ? '4px solid #dc3545' : '4px solid transparent',
-          transform: arrastandoId === t.id ? 'scale(0.98)' : 'scale(1)',
-          transition: 'transform 0.1s, box-shadow 0.15s',
-        }}
-      >
-        <div className="card-body p-3">
-          <div className="d-flex justify-content-between align-items-start mb-2">
-            <span
-              className={`badge bg-${getCorPrioridade(t.prioridade)}-subtle text-${getCorPrioridade(t.prioridade)}`}
-            >
-              {t.prioridade}
-            </span>
-            <button
-              className="btn btn-link btn-sm p-0 text-muted"
-              title="Editar"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleEditarTarefa(t)
-              }}
-              style={{ lineHeight: 1 }}
-            >
-              <PencilSquareIcon style={{ width: 14, height: 14 }} />
-            </button>
-          </div>
+  const handleDragEnd = useCallback(
+    ({ active, over }) => {
+      setDraggingId(null)
+      if (!over) return
 
-          <h6
-            className="card-title fw-bold text-dark mb-1"
-            style={{ fontFamily: 'var(--font-heading)' }}
-          >
-            {t.titulo}
-          </h6>
+      const resultado = calcularReorder({
+        grupos,
+        colunasIds: COLUNAS_IDS,
+        activeId: active.id,
+        overId: over.id,
+        tarefas,
+      })
+      if (!resultado) return
 
-          {overdue && (
-            <p
-              className="mb-1 d-flex align-items-center gap-1 text-danger"
-              style={{ fontSize: '0.72rem', fontWeight: 600 }}
-            >
-              <ExclamationTriangleIcon style={{ width: 12, height: 12, flexShrink: 0 }} />
-              Vencido há {dias} dia{dias !== 1 ? 's' : ''}
-            </p>
-          )}
-
-          <div className="d-flex align-items-center mt-1">
-            <span className="small text-muted" style={{ fontSize: '0.72rem' }}>
-              {t.tipo_tarefa === 'Prazo' && (
-                <ExclamationCircleIcon
-                  className="text-danger"
-                  style={{ width: 12, display: 'inline', marginRight: 2 }}
-                />
-              )}
-              {t.tipo_tarefa}
-            </span>
-          </div>
-
-          {casoVinculado && (
-            <p
-              className="small text-muted mb-0 text-truncate mt-1"
-              style={{ fontSize: '0.72rem' }}
-              title={`${casoVinculado.titulo} (${casoVinculado.numero_processo})`}
-            >
-              <BriefcaseIcon
-                style={{ width: 11, marginRight: 3, display: 'inline', marginTop: '-2px' }}
-              />
-              {casoVinculado.titulo}
-            </p>
-          )}
-
-          {t.data_vencimento && (
-            <div className="d-flex align-items-center mt-2 pt-2 border-top">
-              <ClockIcon
-                className={overdue ? 'text-danger me-1' : 'text-muted me-1'}
-                style={{ width: 13 }}
-              />
-              <span
-                className={`small ${overdue ? 'text-danger fw-semibold' : 'text-muted'}`}
-                style={{ fontSize: '0.75rem' }}
-              >
-                {new Date(t.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  const renderColuna = (titulo, statusNome, cor) => {
-    const col = tarefas.filter((t) => t.status === statusNome)
-    return (
-      <div
-        className="col-md-4 d-flex flex-column"
-        style={{ minHeight: '600px' }}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault()
-          const idStr = e.dataTransfer.getData('tarefaId')
-          if (idStr) handleMoverTarefa(parseInt(idStr), statusNome)
-          setArrastandoId(null)
-        }}
-      >
-        <div
-          className="card shadow-sm h-100 border-0 bg-white"
-          style={{ borderRadius: 'var(--radius-lg)' }}
-        >
-          <div
-            className="card-header bg-white py-4 d-flex justify-content-between align-items-center border-bottom-0"
-            style={{
-              borderTopLeftRadius: 'var(--radius-lg)',
-              borderTopRightRadius: 'var(--radius-lg)',
-            }}
-          >
-            <h6 className="mb-0 fw-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-              {titulo}
-            </h6>
-            <span className={`badge bg-${cor}-subtle text-${cor} rounded-pill px-3 py-2`}>
-              {col.length}
-            </span>
-          </div>
-          <div
-            className="card-body overflow-auto p-3"
-            style={{
-              maxHeight: 'calc(100vh - 250px)',
-              background: 'var(--bg-main)',
-              borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
-            }}
-          >
-            {col.map(renderCard)}
-            {col.length === 0 && (
-              <div className="text-center py-4 text-muted small border border-dashed rounded bg-white">
-                Arraste tarefas para cá
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
+      const snapshotAnterior = tarefas
+      setTarefas(aplicarReorderEmTarefas(tarefas, resultado.novosGrupos, COLUNAS_IDS))
+      enviarReorder(resultado.payload, snapshotAnterior)
+    },
+    [grupos, tarefas, enviarReorder]
+  )
 
   // ── Vista Lista ───────────────────────────────────────────────────────────
 
@@ -396,7 +316,6 @@ export default function PrazosPage() {
               onConcluir={(t) =>
                 handleMoverTarefa(t.id, t.status === 'Concluído' ? 'A Fazer' : 'Concluído')
               }
-              getCorPrioridade={getCorPrioridade}
             />
           )
         })}
@@ -405,6 +324,8 @@ export default function PrazosPage() {
   }
 
   // ── Render principal ─────────────────────────────────────────────────────
+
+  const tarefaArrastada = draggingId != null ? tarefas.find((t) => t.id === draggingId) : null
 
   return (
     <div
@@ -418,7 +339,7 @@ export default function PrazosPage() {
           </h4>
           <p className="text-muted small mb-0 mx-2">
             {viewMode === 'kanban'
-              ? 'Gerencie o trabalho do escritório visualmente.'
+              ? 'Arraste cards entre colunas ou reordene dentro da mesma coluna.'
               : 'Visualize prazos agrupados por urgência.'}
           </p>
         </div>
@@ -472,11 +393,31 @@ export default function PrazosPage() {
           <span className="spinner-border text-primary" />
         </div>
       ) : viewMode === 'kanban' ? (
-        <div className="row g-4">
-          {renderColuna('A Fazer', 'A Fazer', 'danger')}
-          {renderColuna('Em Andamento', 'Fazendo', 'warning')}
-          {renderColuna('Concluído', 'Concluído', 'success')}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={({ active }) => setDraggingId(active.id)}
+          onDragCancel={() => setDraggingId(null)}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="row g-4">
+            {COLUNAS.map((coluna) => (
+              <KanbanColuna
+                key={coluna.id}
+                coluna={coluna}
+                ids={grupos[coluna.id]}
+                tarefas={tarefas}
+                casos={casos}
+                onEditar={handleEditarTarefa}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {tarefaArrastada ? (
+              <KanbanCardVisual tarefa={tarefaArrastada} casos={casos} arrastando />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       ) : (
         renderLista()
       )}
@@ -613,9 +554,180 @@ export default function PrazosPage() {
   )
 }
 
-// ── Sub-componente GrupoLista ────────────────────────────────────────────────
+// ── Sub-componentes do Kanban (dnd-kit) ──────────────────────────────────────
 
-function GrupoLista({ grupo, casos, onEditar, onConcluir, getCorPrioridade }) {
+function KanbanColuna({ coluna, ids, tarefas, casos, onEditar }) {
+  const { setNodeRef, isOver } = useDroppable({ id: coluna.id })
+  const cards = ids.map((id) => tarefas.find((t) => t.id === id)).filter(Boolean)
+
+  return (
+    <div className="col-md-4 d-flex flex-column" style={{ minHeight: '600px' }}>
+      <div
+        className="card shadow-sm h-100 border-0 bg-white"
+        style={{ borderRadius: 'var(--radius-lg)' }}
+      >
+        <div
+          className="card-header bg-white py-4 d-flex justify-content-between align-items-center border-bottom-0"
+          style={{
+            borderTopLeftRadius: 'var(--radius-lg)',
+            borderTopRightRadius: 'var(--radius-lg)',
+          }}
+        >
+          <h6 className="mb-0 fw-bold" style={{ fontFamily: 'var(--font-heading)' }}>
+            {coluna.titulo}
+          </h6>
+          <span
+            className={`badge bg-${coluna.cor}-subtle text-${coluna.cor} rounded-pill px-3 py-2`}
+          >
+            {cards.length}
+          </span>
+        </div>
+        <div
+          ref={setNodeRef}
+          className="card-body overflow-auto p-3"
+          style={{
+            maxHeight: 'calc(100vh - 250px)',
+            background: isOver ? 'rgba(13,110,253,0.04)' : 'var(--bg-main)',
+            borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
+            transition: 'background 0.15s',
+          }}
+        >
+          <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+            {cards.map((t) => (
+              <KanbanCard key={t.id} tarefa={t} casos={casos} onEditar={onEditar} />
+            ))}
+          </SortableContext>
+          {cards.length === 0 && (
+            <div className="text-center py-4 text-muted small border border-dashed rounded bg-white">
+              Arraste tarefas para cá
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function KanbanCard({ tarefa, casos, onEditar }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tarefa.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <KanbanCardVisual tarefa={tarefa} casos={casos} onEditar={onEditar} />
+    </div>
+  )
+}
+
+function KanbanCardVisual({ tarefa, casos, onEditar, arrastando }) {
+  const overdue = isOverdue(tarefa)
+  const dias = overdue ? diasVencido(tarefa) : 0
+  const casoVinculado = casos.find((c) => c.id === tarefa.caso_id)
+
+  return (
+    <div
+      className={`card mb-3 border-0 shadow-sm ${arrastando ? 'shadow' : ''}`}
+      style={{
+        cursor: arrastando ? 'grabbing' : 'grab',
+        borderRadius: 'var(--radius-md)',
+        borderLeft: overdue ? '4px solid #dc3545' : '4px solid transparent',
+        transform: arrastando ? 'rotate(2deg)' : 'none',
+      }}
+    >
+      <div className="card-body p-3">
+        <div className="d-flex justify-content-between align-items-start mb-2">
+          <span
+            className={`badge bg-${getCorPrioridade(tarefa.prioridade)}-subtle text-${getCorPrioridade(tarefa.prioridade)}`}
+          >
+            {tarefa.prioridade}
+          </span>
+          {onEditar && (
+            <button
+              className="btn btn-link btn-sm p-0 text-muted"
+              title="Editar"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                onEditar(tarefa)
+              }}
+              style={{ lineHeight: 1 }}
+            >
+              <PencilSquareIcon style={{ width: 14, height: 14 }} />
+            </button>
+          )}
+        </div>
+
+        <h6
+          className="card-title fw-bold text-dark mb-1"
+          style={{ fontFamily: 'var(--font-heading)' }}
+        >
+          {tarefa.titulo}
+        </h6>
+
+        {overdue && (
+          <p
+            className="mb-1 d-flex align-items-center gap-1 text-danger"
+            style={{ fontSize: '0.72rem', fontWeight: 600 }}
+          >
+            <ExclamationTriangleIcon style={{ width: 12, height: 12, flexShrink: 0 }} />
+            Vencido há {dias} dia{dias !== 1 ? 's' : ''}
+          </p>
+        )}
+
+        <div className="d-flex align-items-center mt-1">
+          <span className="small text-muted" style={{ fontSize: '0.72rem' }}>
+            {tarefa.tipo_tarefa === 'Prazo' && (
+              <ExclamationCircleIcon
+                className="text-danger"
+                style={{ width: 12, display: 'inline', marginRight: 2 }}
+              />
+            )}
+            {tarefa.tipo_tarefa}
+          </span>
+        </div>
+
+        {casoVinculado && (
+          <p
+            className="small text-muted mb-0 text-truncate mt-1"
+            style={{ fontSize: '0.72rem' }}
+            title={`${casoVinculado.titulo} (${casoVinculado.numero_processo})`}
+          >
+            <BriefcaseIcon
+              style={{ width: 11, marginRight: 3, display: 'inline', marginTop: '-2px' }}
+            />
+            {casoVinculado.titulo}
+          </p>
+        )}
+
+        {tarefa.data_vencimento && (
+          <div className="d-flex align-items-center mt-2 pt-2 border-top">
+            <ClockIcon
+              className={overdue ? 'text-danger me-1' : 'text-muted me-1'}
+              style={{ width: 13 }}
+            />
+            <span
+              className={`small ${overdue ? 'text-danger fw-semibold' : 'text-muted'}`}
+              style={{ fontSize: '0.75rem' }}
+            >
+              {new Date(tarefa.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Sub-componente GrupoLista (vista lista) ──────────────────────────────────
+
+function GrupoLista({ grupo, casos, onEditar, onConcluir }) {
   const [collapsed, setCollapsed] = useState(grupo.collapsed ?? false)
 
   return (

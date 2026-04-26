@@ -680,6 +680,7 @@ class TarefaPrazo(db.Model):
     )  # Prazo, Peticionamento, Reunião, Ligação, Outros
     origem_id = db.Column(db.String(100), nullable=True)  # Ex: ID do MNI
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    posicao = db.Column(db.Integer, nullable=True, default=0)
 
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_tarefaprazo_user_id"), nullable=False
@@ -687,7 +688,10 @@ class TarefaPrazo(db.Model):
     caso_id = db.Column(
         db.Integer, db.ForeignKey("caso.id", name="fk_tarefaprazo_caso_id"), nullable=True
     )
-    __table_args__ = (db.Index("ix_tarefa_prazo_tenant_created", "tenant_id", "data_criacao"),)
+    __table_args__ = (
+        db.Index("ix_tarefa_prazo_tenant_created", "tenant_id", "data_criacao"),
+        db.Index("ix_tarefa_prazo_tenant_status_posicao", "tenant_id", "status", "posicao"),
+    )
 
     def to_dict(self):
         return {
@@ -699,6 +703,7 @@ class TarefaPrazo(db.Model):
             "data_vencimento": self.data_vencimento.isoformat() if self.data_vencimento else None,
             "tipo_tarefa": self.tipo_tarefa,
             "origem_id": self.origem_id,
+            "posicao": self.posicao,
             "user_id": self.user_id,
             "caso_id": self.caso_id,
             "data_criacao": self.data_criacao.isoformat() if self.data_criacao else None,
