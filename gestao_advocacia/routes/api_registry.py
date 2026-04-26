@@ -414,6 +414,7 @@ def register_api_routes(app, api, finance_access_required):
             "data_vencimento": fields.DateTime(dt_format="iso8601"),
             "tipo_tarefa": fields.String,
             "origem_id": fields.String,
+            "posicao": fields.Integer,
             "data_criacao": fields.DateTime(dt_format="iso8601"),
             "user_id": fields.Integer,
             "caso_id": fields.Integer,
