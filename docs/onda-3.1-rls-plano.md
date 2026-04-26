@@ -454,6 +454,25 @@ ajustar entrypoint do Alembic.
 - Recomendação separada (não bloqueia 3.1): migrar dev para Postgres
   via Docker — issue própria.
 
+### 7.7 Alembic não enxerga RLS policies
+
+**Causa**: policies são objetos do Postgres não modelados pelo
+SQLAlchemy. Alembic com `--autogenerate` pode propor remoção ou
+ignorar diff — em ambos os casos, o estado real do schema diverge do
+que Alembic acha que existe.
+
+**Mitigação**:
+
+- Em `migrations/env.py`, adicionar `include_object` callback que
+  filtra objetos do tipo `policy` (e relacionados, ex: `RLS enable`)
+  para fora do diff de autogenerate.
+- Usar `op.execute("ALTER TABLE ... ENABLE ROW LEVEL SECURITY")` e
+  `op.execute("CREATE POLICY ...")` em migrations dedicadas escritas
+  manualmente — **nunca via autogenerate**.
+- Revisar **toda** migration `--autogenerate` daqui pra frente
+  conferindo que não toca policies. Adicionar checklist no PR template
+  de migration.
+
 ---
 
 ## 8. Checklist de pronto por fase
