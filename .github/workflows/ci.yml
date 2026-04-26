@@ -150,8 +150,13 @@ jobs:
           cache: "npm"
           cache-dependency-path: gestao_advocacia_vite/package-lock.json
 
+      # ci-greenfield: usar 'npm install' em vez de 'npm ci' porque o package-lock.json
+      # eh gerado em Windows e nao contem deps optional Linux-only (ex: @emnapi/core)
+      # que sao peer transitivas de libs nativas do Vite/esbuild. 'npm install' resolve
+      # essas deps no Linux do CI sem quebrar; '--no-audit --prefer-offline' mantem o
+      # cache do setup-node e evita o audit (que ja roda como step proprio abaixo).
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install --no-audit --prefer-offline
 
       - name: Run frontend security audit (high/critical)
         run: npm audit --audit-level=high
