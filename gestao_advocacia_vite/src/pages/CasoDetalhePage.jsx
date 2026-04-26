@@ -6,6 +6,7 @@ import { toast } from 'react-toastify' // Para notificações
 import { atualizarCasoViaCnj, getCaso, listMovimentacoesCaso } from '../api/casos.js'
 import HonorariosCasoCard from '../components/HonorariosCasoCard'
 import DocumentosCasoTab from '../components/DocumentosCasoTab'
+import CasoTimeline from '../components/CasoTimeline'
 
 // Componente auxiliar para exibir mensagens de status (loading, error, success)
 const StatusDisplay = ({ isLoading, error, successMessage, className = '' }) => {
@@ -271,6 +272,18 @@ function CasoDetalhePage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+      {/* SEÇÃO LINHA DO TEMPO (4 fontes agregadas) */}
+      <div className="card shadow-lg mb-4">
+        <div className="card-header bg-light py-3">
+          <h5 className="card-title mb-0 text-primary">Linha do Tempo</h5>
+          <small className="text-muted">
+            Movimentações CNJ, publicações DJEN, documentos e prazos em ordem cronológica
+          </small>
+        </div>
+        <div className="card-body p-4">
+          <CasoTimeline casoId={casoId} />
         </div>
       </div>
       {/* SEÇÃO DE HONORÁRIOS ADVOCATÍCIOS FINANCEIROS */}
