@@ -12,6 +12,7 @@ import {
   FunnelIcon,
   DocumentArrowDownIcon,
   BriefcaseIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
@@ -34,6 +35,14 @@ function CasoList({ onEditCaso, refreshKey }) {
   const [dataCriacaoFimFilter, setDataCriacaoFimFilter] = useState('')
   const [dataAtualizacaoInicioFilter, setDataAtualizacaoInicioFilter] = useState('')
   const [dataAtualizacaoFimFilter, setDataAtualizacaoFimFilter] = useState('')
+  const [areaDireitoFilter, setAreaDireitoFilter] = useState('')
+  const [faseProcessualFilter, setFaseProcessualFilter] = useState('')
+  const [varaJuizoFilter, setVaraJuizoFilter] = useState('')
+  const [instanciaFilter, setInstanciaFilter] = useState('')
+  const [valorCausaMinFilter, setValorCausaMinFilter] = useState('')
+  const [valorCausaMaxFilter, setValorCausaMaxFilter] = useState('')
+  const [dataDistribuicaoInicioFilter, setDataDistribuicaoInicioFilter] = useState('')
+  const [dataDistribuicaoFimFilter, setDataDistribuicaoFimFilter] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
   const [sortConfig, setSortConfig] = useState({ key: 'data_atualizacao', direction: 'desc' })
@@ -82,6 +91,14 @@ function CasoList({ onEditCaso, refreshKey }) {
         data_criacao_fim: dataCriacaoFimFilter,
         data_atualizacao_inicio: dataAtualizacaoInicioFilter,
         data_atualizacao_fim: dataAtualizacaoFimFilter,
+        area_direito: areaDireitoFilter,
+        fase_processual: faseProcessualFilter,
+        vara_juizo: varaJuizoFilter,
+        instancia: instanciaFilter,
+        valor_causa_min: valorCausaMinFilter,
+        valor_causa_max: valorCausaMaxFilter,
+        data_distribuicao_inicio: dataDistribuicaoInicioFilter,
+        data_distribuicao_fim: dataDistribuicaoFimFilter,
       })
       setCasos(Array.isArray(data) ? data : data.casos || [])
     } catch (err) {
@@ -101,6 +118,14 @@ function CasoList({ onEditCaso, refreshKey }) {
     dataCriacaoFimFilter,
     dataAtualizacaoInicioFilter,
     dataAtualizacaoFimFilter,
+    areaDireitoFilter,
+    faseProcessualFilter,
+    varaJuizoFilter,
+    instanciaFilter,
+    valorCausaMinFilter,
+    valorCausaMaxFilter,
+    dataDistribuicaoInicioFilter,
+    dataDistribuicaoFimFilter,
     sortConfig,
   ])
 
@@ -166,8 +191,66 @@ function CasoList({ onEditCaso, refreshKey }) {
     setDataCriacaoFimFilter('')
     setDataAtualizacaoInicioFilter('')
     setDataAtualizacaoFimFilter('')
+    setAreaDireitoFilter('')
+    setFaseProcessualFilter('')
+    setVaraJuizoFilter('')
+    setInstanciaFilter('')
+    setValorCausaMinFilter('')
+    setValorCausaMaxFilter('')
+    setDataDistribuicaoInicioFilter('')
+    setDataDistribuicaoFimFilter('')
     setShowFilters(false)
   }
+
+  const filtrosAtivos = [
+    searchTerm && { label: `Busca: ${searchTerm}`, clear: () => setSearchTerm('') },
+    statusFilter && { label: `Status: ${statusFilter}`, clear: () => setStatusFilter('') },
+    clienteFilter && {
+      label: `Cliente: ${clientes.find((c) => String(c.id) === String(clienteFilter))?.nome_razao_social || clienteFilter}`,
+      clear: () => setClienteFilter(''),
+    },
+    areaDireitoFilter && {
+      label: `Área: ${areaDireitoFilter}`,
+      clear: () => setAreaDireitoFilter(''),
+    },
+    faseProcessualFilter && {
+      label: `Fase: ${faseProcessualFilter}`,
+      clear: () => setFaseProcessualFilter(''),
+    },
+    varaJuizoFilter && { label: `Vara: ${varaJuizoFilter}`, clear: () => setVaraJuizoFilter('') },
+    instanciaFilter && {
+      label: `Instância: ${instanciaFilter}`,
+      clear: () => setInstanciaFilter(''),
+    },
+    (valorCausaMinFilter || valorCausaMaxFilter) && {
+      label: `Valor: ${valorCausaMinFilter || '0'} – ${valorCausaMaxFilter || '∞'}`,
+      clear: () => {
+        setValorCausaMinFilter('')
+        setValorCausaMaxFilter('')
+      },
+    },
+    (dataDistribuicaoInicioFilter || dataDistribuicaoFimFilter) && {
+      label: `Distribuição: ${dataDistribuicaoInicioFilter || '…'} a ${dataDistribuicaoFimFilter || '…'}`,
+      clear: () => {
+        setDataDistribuicaoInicioFilter('')
+        setDataDistribuicaoFimFilter('')
+      },
+    },
+    (dataCriacaoInicioFilter || dataCriacaoFimFilter) && {
+      label: `Criação: ${dataCriacaoInicioFilter || '…'} a ${dataCriacaoFimFilter || '…'}`,
+      clear: () => {
+        setDataCriacaoInicioFilter('')
+        setDataCriacaoFimFilter('')
+      },
+    },
+    (dataAtualizacaoInicioFilter || dataAtualizacaoFimFilter) && {
+      label: `Atualização: ${dataAtualizacaoInicioFilter || '…'} a ${dataAtualizacaoFimFilter || '…'}`,
+      clear: () => {
+        setDataAtualizacaoInicioFilter('')
+        setDataAtualizacaoFimFilter('')
+      },
+    },
+  ].filter(Boolean)
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -312,6 +395,93 @@ function CasoList({ onEditCaso, refreshKey }) {
           <div className="mt-3 pt-3 border-top" id="filtrosAvancadosCasos">
             <div className="row g-2 align-items-center mb-2">
               <div className="col-md-3 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Área do Direito</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm"
+                  placeholder="Ex: Trabalhista"
+                  value={areaDireitoFilter}
+                  onChange={(e) => setAreaDireitoFilter(e.target.value)}
+                />
+              </div>
+              <div className="col-md-3 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Fase Processual</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm"
+                  placeholder="Ex: Conhecimento"
+                  value={faseProcessualFilter}
+                  onChange={(e) => setFaseProcessualFilter(e.target.value)}
+                />
+              </div>
+              <div className="col-md-3 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Vara/Juízo</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm"
+                  placeholder="contém..."
+                  value={varaJuizoFilter}
+                  onChange={(e) => setVaraJuizoFilter(e.target.value)}
+                />
+              </div>
+              <div className="col-md-3 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Instância</label>
+                <select
+                  className="form-select form-select-sm"
+                  value={instanciaFilter}
+                  onChange={(e) => setInstanciaFilter(e.target.value)}
+                >
+                  <option value="">Todas</option>
+                  <option value="1ª Instância">1ª Instância</option>
+                  <option value="2ª Instância">2ª Instância</option>
+                  <option value="Superior">Superior</option>
+                </select>
+              </div>
+            </div>
+            <div className="row g-2 align-items-center mb-2">
+              <div className="col-md-3 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Valor da causa (mín)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-control form-control-sm"
+                  value={valorCausaMinFilter}
+                  onChange={(e) => setValorCausaMinFilter(e.target.value)}
+                />
+              </div>
+              <div className="col-md-3 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Valor da causa (máx)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-control form-control-sm"
+                  value={valorCausaMaxFilter}
+                  onChange={(e) => setValorCausaMaxFilter(e.target.value)}
+                />
+              </div>
+              <div className="col-md-3 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Distribuição De:</label>
+                <input
+                  type="date"
+                  className="form-control form-control-sm"
+                  value={dataDistribuicaoInicioFilter}
+                  onChange={(e) => setDataDistribuicaoInicioFilter(e.target.value)}
+                />
+              </div>
+              <div className="col-md-3 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Distribuição Até:</label>
+                <input
+                  type="date"
+                  className="form-control form-control-sm"
+                  value={dataDistribuicaoFimFilter}
+                  onChange={(e) => setDataDistribuicaoFimFilter(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="row g-2 align-items-center mb-2">
+              <div className="col-md-3 col-sm-6">
                 <label htmlFor="dataCriacaoInicioFilter" className="form-label form-label-sm mb-1">
                   Criação De:
                 </label>
@@ -363,6 +533,30 @@ function CasoList({ onEditCaso, refreshKey }) {
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {filtrosAtivos.length > 0 && (
+          <div className="mt-3 pt-3 border-top d-flex flex-wrap gap-2 align-items-center">
+            <small className="text-muted me-1">Filtros ativos:</small>
+            {filtrosAtivos.map((f, idx) => (
+              <span
+                key={idx}
+                className="badge bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center gap-1"
+                style={{ fontSize: '0.72rem', padding: '4px 8px' }}
+              >
+                {f.label}
+                <button
+                  type="button"
+                  className="btn btn-sm p-0 border-0 bg-transparent text-primary-emphasis"
+                  onClick={f.clear}
+                  aria-label="Remover filtro"
+                  style={{ lineHeight: 1 }}
+                >
+                  <XMarkIcon style={{ width: 12, height: 12 }} />
+                </button>
+              </span>
+            ))}
           </div>
         )}
       </div>

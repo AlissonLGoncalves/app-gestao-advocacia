@@ -14,6 +14,8 @@ import {
   ChevronUpIcon,
   DocumentTextIcon,
   UsersIcon,
+  FunnelIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import GerarDocumentoModal from './components/GerarDocumentoModal.jsx'
@@ -32,6 +34,10 @@ function ClienteList({ onEditCliente, refreshKey }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('')
   const [tipoPessoaFilter, setTipoPessoaFilter] = useState('')
+  const [cidadeFilter, setCidadeFilter] = useState('')
+  const [estadoFilter, setEstadoFilter] = useState('')
+  const [profissaoFilter, setProfissaoFilter] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
 
   const [sortConfig, setSortConfig] = useState({ key: 'nome_razao_social', direction: 'asc' })
 
@@ -54,6 +60,9 @@ function ClienteList({ onEditCliente, refreshKey }) {
         sort_order: sortConfig.direction,
         search: appliedSearchTerm,
         tipo_pessoa: tipoPessoaFilter,
+        cidade: cidadeFilter,
+        estado: estadoFilter,
+        profissao: profissaoFilter,
       })
       setClientes(Array.isArray(data) ? data : data.clientes || [])
     } catch (err) {
@@ -66,7 +75,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
     } finally {
       setLoading(false)
     }
-  }, [appliedSearchTerm, tipoPessoaFilter, sortConfig])
+  }, [appliedSearchTerm, tipoPessoaFilter, cidadeFilter, estadoFilter, profissaoFilter, sortConfig])
 
   useEffect(() => {
     fetchClientes()
@@ -163,7 +172,31 @@ function ClienteList({ onEditCliente, refreshKey }) {
     setSearchTerm('')
     setAppliedSearchTerm('')
     setTipoPessoaFilter('')
+    setCidadeFilter('')
+    setEstadoFilter('')
+    setProfissaoFilter('')
+    setShowFilters(false)
   }
+
+  const filtrosAtivos = [
+    appliedSearchTerm && {
+      label: `Busca: ${appliedSearchTerm}`,
+      clear: () => {
+        setSearchTerm('')
+        setAppliedSearchTerm('')
+      },
+    },
+    tipoPessoaFilter && {
+      label: `Tipo: ${tipoPessoaFilter}`,
+      clear: () => setTipoPessoaFilter(''),
+    },
+    cidadeFilter && { label: `Cidade: ${cidadeFilter}`, clear: () => setCidadeFilter('') },
+    estadoFilter && { label: `UF: ${estadoFilter}`, clear: () => setEstadoFilter('') },
+    profissaoFilter && {
+      label: `Profissão: ${profissaoFilter}`,
+      clear: () => setProfissaoFilter(''),
+    },
+  ].filter(Boolean)
 
   if (loading && clientes.length === 0) {
     return (
@@ -231,14 +264,88 @@ function ClienteList({ onEditCliente, refreshKey }) {
             </select>
           </div>
           <div className="col-lg-3 col-md-12 text-lg-end mt-2 mt-lg-0">
-            <button
-              onClick={resetFilters}
-              className="btn btn-sm btn-outline-secondary py-1 px-2 w-100"
-            >
-              Limpar Filtros
-            </button>
+            <div className="btn-group w-100" role="group">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary py-1 px-2 d-inline-flex align-items-center justify-content-center"
+                onClick={() => setShowFilters((v) => !v)}
+                aria-expanded={showFilters}
+                aria-controls="filtrosAvancadosClientes"
+              >
+                <FunnelIcon style={{ width: 14, height: 14 }} className="me-1" />
+                {showFilters ? 'Ocultar' : 'Avançados'}
+              </button>
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="btn btn-sm btn-outline-secondary py-1 px-2"
+              >
+                Limpar
+              </button>
+            </div>
           </div>
         </div>
+
+        {showFilters && (
+          <div className="mt-3 pt-3 border-top" id="filtrosAvancadosClientes">
+            <div className="row g-2 align-items-center mb-2">
+              <div className="col-md-5 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Cidade</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm"
+                  placeholder="contém..."
+                  value={cidadeFilter}
+                  onChange={(e) => setCidadeFilter(e.target.value)}
+                />
+              </div>
+              <div className="col-md-2 col-sm-6">
+                <label className="form-label form-label-sm mb-1">UF</label>
+                <input
+                  type="text"
+                  maxLength={2}
+                  className="form-control form-control-sm text-uppercase"
+                  value={estadoFilter}
+                  onChange={(e) => setEstadoFilter(e.target.value.toUpperCase())}
+                />
+              </div>
+              <div className="col-md-5 col-sm-12">
+                <label className="form-label form-label-sm mb-1">Profissão (PF)</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm"
+                  placeholder="contém..."
+                  value={profissaoFilter}
+                  onChange={(e) => setProfissaoFilter(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {filtrosAtivos.length > 0 && (
+          <div className="mt-3 pt-3 border-top d-flex flex-wrap gap-2 align-items-center">
+            <small className="text-muted me-1">Filtros ativos:</small>
+            {filtrosAtivos.map((f, idx) => (
+              <span
+                key={idx}
+                className="badge bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center gap-1"
+                style={{ fontSize: '0.72rem', padding: '4px 8px' }}
+              >
+                {f.label}
+                <button
+                  type="button"
+                  className="btn btn-sm p-0 border-0 bg-transparent text-primary-emphasis"
+                  onClick={f.clear}
+                  aria-label="Remover filtro"
+                  style={{ lineHeight: 1 }}
+                >
+                  <XMarkIcon style={{ width: 12, height: 12 }} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && clientes.length > 0 && (
