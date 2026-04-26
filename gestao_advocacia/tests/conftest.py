@@ -4,6 +4,7 @@
 
 import os
 import sys
+from datetime import datetime
 from typing import NamedTuple
 
 import pytest
@@ -18,7 +19,7 @@ from app import (  # Importa a factory e o objeto db
 )
 from app import db as _db
 from config_test import ConfigTest  # Importa a configuração de teste
-from models import Caso, Cliente, Tenant, User
+from models import Caso, Cliente, Documento, EventoAgenda, TarefaPrazo, Tenant, User
 
 _TEST_PASSWORD = "test-password-123"
 
@@ -33,6 +34,12 @@ class TwoTenantsFixture(NamedTuple):
     cliente_b: Cliente
     caso_a: Caso
     caso_b: Caso
+    tarefa_a: TarefaPrazo
+    tarefa_b: TarefaPrazo
+    evento_a: EventoAgenda
+    evento_b: EventoAgenda
+    documento_a: Documento
+    documento_b: Documento
 
 
 @pytest.fixture(scope="session")
@@ -203,6 +210,52 @@ def two_tenants(db) -> TwoTenantsFixture:
         tenant_id=tenant_b.id,
     )
     db.session.add_all([caso_a, caso_b])
+    db.session.flush()
+
+    tarefa_a = TarefaPrazo(
+        titulo="TEST-A-tarefa",
+        user_id=admin_a.id,
+        tenant_id=tenant_a.id,
+        caso_id=caso_a.id,
+    )
+    tarefa_b = TarefaPrazo(
+        titulo="TEST-B-tarefa",
+        user_id=admin_b.id,
+        tenant_id=tenant_b.id,
+        caso_id=caso_b.id,
+    )
+    db.session.add_all([tarefa_a, tarefa_b])
+
+    _evento_data_inicio = datetime(2026, 1, 1, 10, 0, 0)
+    evento_a = EventoAgenda(
+        titulo="TEST-A-evento",
+        data_inicio=_evento_data_inicio,
+        user_id=admin_a.id,
+        tenant_id=tenant_a.id,
+    )
+    evento_b = EventoAgenda(
+        titulo="TEST-B-evento",
+        data_inicio=_evento_data_inicio,
+        user_id=admin_b.id,
+        tenant_id=tenant_b.id,
+    )
+    db.session.add_all([evento_a, evento_b])
+
+    documento_a = Documento(
+        nome_arquivo="TEST-A.pdf",
+        path_arquivo="/tmp/TEST-A.pdf",
+        user_id=admin_a.id,
+        tenant_id=tenant_a.id,
+        caso_id=caso_a.id,
+    )
+    documento_b = Documento(
+        nome_arquivo="TEST-B.pdf",
+        path_arquivo="/tmp/TEST-B.pdf",
+        user_id=admin_b.id,
+        tenant_id=tenant_b.id,
+        caso_id=caso_b.id,
+    )
+    db.session.add_all([documento_a, documento_b])
     db.session.commit()
 
     return TwoTenantsFixture(
@@ -215,6 +268,12 @@ def two_tenants(db) -> TwoTenantsFixture:
         cliente_b=cliente_b,
         caso_a=caso_a,
         caso_b=caso_b,
+        tarefa_a=tarefa_a,
+        tarefa_b=tarefa_b,
+        evento_a=evento_a,
+        evento_b=evento_b,
+        documento_a=documento_a,
+        documento_b=documento_b,
     )
 
 

@@ -11,3 +11,9 @@ def test_two_tenants_fixture_sanity(two_tenants):
     assert two_tenants.cliente_b.tenant_id == two_tenants.tenant_b.id
     assert two_tenants.caso_b.cliente_id == two_tenants.cliente_b.id
     assert two_tenants.caso_b.tenant_id == two_tenants.tenant_b.id
+    assert two_tenants.tarefa_a.tenant_id == two_tenants.tenant_a.id
+    assert two_tenants.tarefa_b.tenant_id == two_tenants.tenant_b.id
+    assert two_tenants.evento_a.tenant_id == two_tenants.tenant_a.id
+    assert two_tenants.evento_b.tenant_id == two_tenants.tenant_b.id
+    assert two_tenants.documento_a.tenant_id == two_tenants.tenant_a.id
+    assert two_tenants.documento_b.tenant_id == two_tenants.tenant_b.id
