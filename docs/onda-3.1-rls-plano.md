@@ -332,13 +332,18 @@ Implementação proposta:
 no Fly e fazer redeploy. App detecta a flag e roda
 `ALTER POLICY ... USING (true)` na tabela listada (idempotente).
 
-**Cenário B — bug crítico em todas**: `RLS_DISABLED_TABLES=*` desabilita
-todas as policies (volta a `USING (true)`). RLS continua habilitado
-mas sem efeito. Ainda dá pra observar logs e ajustar.
+**Cenário B — bug crítico em qualquer escopo**:
+`RLS_DISABLED_TABLES=*` desabilita o efeito das policies em todas as
+tabelas (volta a `USING (true)`). RLS continua habilitado
+formalmente, mas sem restrição. Esta é a **única alavanca de runtime**
+necessária — cobre desde 1 tabela até "todas falhando".
 
-**Cenário C — catastrofe**: migration de revert que faz `ALTER TABLE
-... DISABLE ROW LEVEL SECURITY` em todas. PR de hotfix preparado e
-testado em staging.
+**Artefato preparado mas fora do fluxo padrão**: PR de hotfix com
+`ALTER TABLE ... DISABLE ROW LEVEL SECURITY` em todas as tabelas, já
+testado em staging e pendente de merge. Só usado em cenário exótico
+onde `USING (true)` não resolve (ex: bug no próprio binding da
+variável de sessão antes do `SET LOCAL`). Mantido fora do runtime
+porque exige migration + deploy completo, mais lento que `B`.
 
 **Não usar**: `flyctl postgres restore` — perde dados pós-deploy.
 
