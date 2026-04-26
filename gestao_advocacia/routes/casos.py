@@ -167,6 +167,14 @@ def register_casos_routes(
             data_criacao_fim = request.args.get("data_criacao_fim", "").strip()
             data_atualizacao_inicio = request.args.get("data_atualizacao_inicio", "").strip()
             data_atualizacao_fim = request.args.get("data_atualizacao_fim", "").strip()
+            area_direito = request.args.get("area_direito", "").strip()
+            fase_processual = request.args.get("fase_processual", "").strip()
+            vara_juizo = request.args.get("vara_juizo", "").strip()
+            instancia = request.args.get("instancia", "").strip()
+            valor_causa_min = request.args.get("valor_causa_min", "").strip()
+            valor_causa_max = request.args.get("valor_causa_max", "").strip()
+            data_distribuicao_inicio = request.args.get("data_distribuicao_inicio", "").strip()
+            data_distribuicao_fim = request.args.get("data_distribuicao_fim", "").strip()
             sort_by = request.args.get("sort_by", "data_atualizacao").strip()
             sort_order = request.args.get("sort_order", request.args.get("order", "desc")).strip()
 
@@ -211,6 +219,37 @@ def register_casos_routes(
                 query = query.filter(db.func.date(Caso.data_atualizacao) >= atualizacao_inicio)
             if atualizacao_fim:
                 query = query.filter(db.func.date(Caso.data_atualizacao) <= atualizacao_fim)
+
+            if area_direito:
+                query = query.filter(Caso.area_direito == area_direito)
+            if fase_processual:
+                query = query.filter(Caso.fase_processual == fase_processual)
+            if vara_juizo:
+                query = query.filter(Caso.vara_juizo.ilike(f"%{vara_juizo}%"))
+            if instancia:
+                query = query.filter(Caso.instancia == instancia)
+
+            def _parse_float(value, field_name):
+                if not value:
+                    return None
+                try:
+                    return float(value)
+                except ValueError:
+                    casos_ns.abort(400, f"{field_name} inválido. Use um número.")
+
+            vc_min = _parse_float(valor_causa_min, "valor_causa_min")
+            vc_max = _parse_float(valor_causa_max, "valor_causa_max")
+            if vc_min is not None:
+                query = query.filter(Caso.valor_causa >= vc_min)
+            if vc_max is not None:
+                query = query.filter(Caso.valor_causa <= vc_max)
+
+            distrib_inicio = _parse_date(data_distribuicao_inicio, "data_distribuicao_inicio")
+            distrib_fim = _parse_date(data_distribuicao_fim, "data_distribuicao_fim")
+            if distrib_inicio:
+                query = query.filter(Caso.data_distribuicao >= distrib_inicio)
+            if distrib_fim:
+                query = query.filter(Caso.data_distribuicao <= distrib_fim)
 
             allowed_sort_fields = {
                 "titulo": Caso.titulo,
