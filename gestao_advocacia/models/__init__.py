@@ -18,6 +18,8 @@ class Tenant(db.Model):
     # admin-fase0: status do tenant para suspensao via backoffice (ativo|suspenso|cancelado)
     status = db.Column(db.String(20), nullable=False, default="ativo", server_default="ativo")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # onboarding-wizard: NULL para tenants novos que ainda nao completaram o wizard pos-signup.
+    onboarding_completed_at = db.Column(db.DateTime, nullable=True)
     users = db.relationship("User", backref="tenant", lazy="dynamic")
 
     def to_dict(self):
@@ -32,6 +34,9 @@ class Tenant(db.Model):
             "endereco": self.endereco,
             "status": self.status,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "onboarding_completed_at": (
+                self.onboarding_completed_at.isoformat() if self.onboarding_completed_at else None
+            ),
         }
 
 
