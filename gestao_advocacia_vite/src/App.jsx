@@ -28,6 +28,7 @@ import SettingsPage from './pages/SettingsPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
 import PerfilPage from './pages/PerfilPage.jsx'
 import OnboardingPage from './pages/auth/OnboardingPage.jsx'
+import LandingPage from './pages/LandingPage.jsx'
 import NovoClientePorProcuracao from './pages/clientes/NovoClientePorProcuracao.jsx'
 import PortalPage from './pages/portal/PortalPage.jsx'
 import PortalRegisterPage from './pages/portal/PortalRegisterPage.jsx'
@@ -65,6 +66,15 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace />
   }
   return children
+}
+
+// landing-page: rota raiz publica.
+// Se ja existe sessao, manda direto para o dashboard preservando o comportamento
+// anterior. Caso contrario mostra a LandingPage publica para captacao.
+const HomeRoute = () => {
+  const token = localStorage.getItem('token')
+  if (token) return <Navigate to="/dashboard" replace />
+  return <LandingPage />
 }
 
 // onboarding-wizard: gate que checa /tenant/onboarding-status uma vez por sessao
@@ -478,8 +488,8 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/" element={<HomeRoute />} />
         <Route
-          path="/"
           element={
             <ProtectedRoute>
               <OnboardingGate>
@@ -488,7 +498,6 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
 
           <Route path="clientes" element={<ClientesPage />} />
