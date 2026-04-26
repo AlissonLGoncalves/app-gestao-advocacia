@@ -158,6 +158,9 @@ def register_clientes_routes(app, clientes_ns, cliente_input_model_dto, cliente_
         def get(self):
             search = request.args.get("search", "").strip()
             tipo_pessoa = request.args.get("tipo_pessoa", "").strip()
+            cidade = request.args.get("cidade", "").strip()
+            estado = request.args.get("estado", "").strip().upper()
+            profissao = request.args.get("profissao", "").strip()
             sort_by = request.args.get("sort_by", "nome_razao_social")
             sort_order = request.args.get("sort_order", "asc")
             query = query_for_tenant(Cliente)
@@ -173,6 +176,12 @@ def register_clientes_routes(app, clientes_ns, cliente_input_model_dto, cliente_
                 )
             if tipo_pessoa:
                 query = query.filter_by(tipo_pessoa=tipo_pessoa)
+            if cidade:
+                query = query.filter(Cliente.cidade.ilike(f"%{cidade}%"))
+            if estado:
+                query = query.filter(Cliente.estado == estado)
+            if profissao:
+                query = query.filter(Cliente.profissao.ilike(f"%{profissao}%"))
             ALLOWED_CLIENTE_SORT_FIELDS = {
                 "nome_razao_social",
                 "cpf_cnpj",
