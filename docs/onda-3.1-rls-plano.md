@@ -523,6 +523,35 @@ mesma operação funciona sem ajuste.
 
 **Refs**: issue #102.
 
+### 7.9 batch_alter_table exige CREATE no schema public
+
+**Causa**: `op.batch_alter_table(...)` cria tabelas temporarias no
+schema durante operacoes que reescrevem a tabela (drop constraint,
+alter column nullability, etc). Isso requer `CREATE` privilege no
+schema. `GRANT USAGE` nao cobre — sao privilegios distintos.
+
+**Manifestacao real**: o release_command da migration `b4c5d6e7f8a9`
+(drift fix de password_reset_token, PR #105) falhou em prod em
+2026-04-26 com:
+
+```
+psycopg2.errors.InsufficientPrivilege: permission denied for schema public
+```
+
+**Mitigacao aplicada em prod**: `GRANT CREATE ON SCHEMA public TO
+app_admin` via peer auth no container do Postgres.
+
+**Mitigacao para ambientes futuros**: o mesmo SQL setup
+[`docs/ops/transfer_rls_ownership.sql`](ops/transfer_rls_ownership.sql)
+agora inclui o GRANT CREATE alem do ALTER TABLE OWNER. Rodar uma vez
+por ambiente apos Fase 1, antes do primeiro deploy de Fase 2+.
+
+**Nao afeta**: migrations que so usam `op.execute("ALTER TABLE
+... ENABLE RLS")` ou `CREATE/DROP POLICY` — essas nao criam tabelas
+temporarias, so precisam de ownership.
+
+**Refs**: issue #106.
+
 ---
 
 ## 8. Checklist de pronto por fase
