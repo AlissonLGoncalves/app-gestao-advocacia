@@ -12,7 +12,11 @@ primary_region = "gru"
   scheduler = "python -m scheduler_runner"
 
 [deploy]
-  release_command = "USE_DATABASE_URL_ADMIN=true flask db upgrade"
+  # Wrappamos com `sh -c` porque Fly nao invoca shell por padrao —
+  # passa release_command como array de argv. Sem o sh -c, "KEY=val cmd"
+  # vira tentativa de executar um binario chamado "KEY=val", machine
+  # crasha com exit code -1.
+  release_command = "sh -c 'USE_DATABASE_URL_ADMIN=true flask db upgrade'"
 
 [env]
   PORT = "8080"
