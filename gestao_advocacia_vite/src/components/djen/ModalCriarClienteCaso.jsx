@@ -99,8 +99,7 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
   // Focus management: salva o elemento que abriu o painel, move foco para o
   // primeiro campo focavel do corpo, e devolve foco ao elemento original ao fechar.
   useEffect(() => {
-    const elementoOriginal =
-      typeof document !== 'undefined' ? document.activeElement : null
+    const elementoOriginal = typeof document !== 'undefined' ? document.activeElement : null
     const primeiroCampo = panelRef.current?.querySelector(
       '.painel-body input, .painel-body select, .painel-body textarea, .painel-body button'
     )

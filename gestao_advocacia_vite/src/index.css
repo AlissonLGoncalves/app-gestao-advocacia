@@ -13,15 +13,15 @@
   --text-1: #101828;
   --text-2: #475467;
   --text-3: #667085;
-  --primary: #007AFF;
-  --primary-strong: #0051D5;
-  --danger: #FF3B30;
-  --success: #34C759;
-  --warning: #FF9500;
-  --indigo: #5856D6;
-  --teal: #5AC8FA;
-  --pink: #FF2D55;
-  --yellow: #FFCC00;
+  --primary: #007aff;
+  --primary-strong: #0051d5;
+  --danger: #ff3b30;
+  --success: #34c759;
+  --warning: #ff9500;
+  --indigo: #5856d6;
+  --teal: #5ac8fa;
+  --pink: #ff2d55;
+  --yellow: #ffcc00;
   --sidebar-width: 286px;
   --radius-sm: 10px;
   --radius-md: 14px;
@@ -30,8 +30,10 @@
   --shadow-sm: 0 10px 30px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 16px 42px rgba(15, 23, 42, 0.1);
   --ease: 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
-  --font-title: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-title:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 *,
@@ -366,7 +368,7 @@ body {
 
 .btn-primary {
   border: 0;
-  background: linear-gradient(140deg, var(--primary), #4DA3FF);
+  background: linear-gradient(140deg, var(--primary), #4da3ff);
   box-shadow: 0 8px 20px rgba(0, 122, 255, 0.32);
   color: #fff;
 }
@@ -374,7 +376,7 @@ body {
 .btn-primary:hover,
 .btn-primary:focus {
   color: #fff;
-  background: linear-gradient(140deg, var(--primary-strong), #1A8AFF);
+  background: linear-gradient(140deg, var(--primary-strong), #1a8aff);
   box-shadow: 0 12px 26px rgba(0, 122, 255, 0.36);
 }
 
@@ -456,7 +458,7 @@ body {
 
 .Toastify__progress-bar {
   /* !important necessário para sobrescrever estilo inline da lib react-toastify */
-  background: linear-gradient(120deg, var(--primary), #4DA3FF) !important;
+  background: linear-gradient(120deg, var(--primary), #4da3ff) !important;
 }
 
 .auth-container {

@@ -20,8 +20,7 @@ function PortalRegisterPage() {
       setTokenValido(false)
       return
     }
-    api.post('/auth/termos-vigentes', {}, { auth: false })
-      .catch(() => {})
+    api.post('/auth/termos-vigentes', {}, { auth: false }).catch(() => {})
     try {
       const payload = JSON.parse(atob(inviteToken.split('.')[1]))
       if (payload.invite_role !== 'cliente') {
@@ -48,15 +47,19 @@ function PortalRegisterPage() {
     }
     setLoading(true)
     try {
-      await api.post('/auth/register-invite', {
-        invite_token: inviteToken,
-        username: username.trim(),
-        password,
-        aceite_termos: true,
-        aceite_lgpd: true,
-        versao_termos: 'v1.0',
-        versao_lgpd: 'v1.0',
-      }, { auth: false })
+      await api.post(
+        '/auth/register-invite',
+        {
+          invite_token: inviteToken,
+          username: username.trim(),
+          password,
+          aceite_termos: true,
+          aceite_lgpd: true,
+          versao_termos: 'v1.0',
+          versao_lgpd: 'v1.0',
+        },
+        { auth: false }
+      )
       toast.success('Acesso criado! Faça login para acessar seu portal.')
       navigate('/login')
     } catch (err) {
@@ -91,11 +94,17 @@ function PortalRegisterPage() {
       className="min-vh-100 d-flex align-items-center justify-content-center"
       style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)' }}
     >
-      <div className="card border-0 shadow-lg" style={{ width: '100%', maxWidth: 420, borderRadius: 16 }}>
+      <div
+        className="card border-0 shadow-lg"
+        style={{ width: '100%', maxWidth: 420, borderRadius: 16 }}
+      >
         {/* Header */}
         <div
           className="p-4 text-white text-center"
-          style={{ background: 'linear-gradient(135deg, #1e40af 0%, #1e3a5f 100%)', borderRadius: '16px 16px 0 0' }}
+          style={{
+            background: 'linear-gradient(135deg, #1e40af 0%, #1e3a5f 100%)',
+            borderRadius: '16px 16px 0 0',
+          }}
         >
           <div
             className="bg-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
@@ -104,9 +113,7 @@ function PortalRegisterPage() {
             <i className="bi bi-person-badge-fill text-primary fs-4" />
           </div>
           <h5 className="fw-bold mb-0">Portal do Cliente</h5>
-          {escritorio && (
-            <p className="small text-white-50 mb-0 mt-1">{escritorio}</p>
-          )}
+          {escritorio && <p className="small text-white-50 mb-0 mt-1">{escritorio}</p>}
         </div>
 
         {/* Body */}
@@ -143,22 +150,26 @@ function PortalRegisterPage() {
                 minLength={8}
               />
             </div>
-            <button
-              type="submit"
-              className="btn btn-primary w-100 fw-bold py-2"
-              disabled={loading}
-            >
+            <button type="submit" className="btn btn-primary w-100 fw-bold py-2" disabled={loading}>
               {loading ? (
-                <><span className="spinner-border spinner-border-sm me-2" />Criando acesso...</>
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" />
+                  Criando acesso...
+                </>
               ) : (
-                <><i className="bi bi-shield-check me-2" />Ativar Meu Acesso</>
+                <>
+                  <i className="bi bi-shield-check me-2" />
+                  Ativar Meu Acesso
+                </>
               )}
             </button>
           </form>
 
           <p className="text-center text-muted small mt-3 mb-0">
             Já tem acesso?{' '}
-            <a href="/login" className="text-primary fw-semibold">Fazer login</a>
+            <a href="/login" className="text-primary fw-semibold">
+              Fazer login
+            </a>
           </p>
         </div>
       </div>
