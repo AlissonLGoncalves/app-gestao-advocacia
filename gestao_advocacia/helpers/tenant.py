@@ -1,12 +1,65 @@
+from contextlib import contextmanager
 from functools import wraps
 
 from flask import current_app, g, request
 from flask_jwt_extended import get_jwt_identity
 from flask_restx import abort
+from sqlalchemy import text
 
 from extensions import db
 from models import User
 from utils.log_sanitizer import mask_user_id
+
+
+def _session_has_open_transaction():
+    in_transaction = getattr(db.session, "in_transaction", None)
+    if callable(in_transaction):
+        return bool(in_transaction())
+
+    # Fallback defensivo para stacks legados (SQLAlchemy < 1.4).
+    return getattr(db.session, "transaction", None) is not None
+
+
+def set_current_tenant_id(tenant_id):
+    """Define o tenant atual no contexto SQL da sessao.
+
+    Usa set_config(name, value, is_local=true), que e equivalente
+    semantico ao SET LOCAL e suporta bind parameters com seguranca.
+    """
+    if tenant_id is None:
+        raise ValueError("tenant_id nao pode ser None")
+
+    params = {"tid": str(int(tenant_id))}
+    statement = text("SELECT set_config('app.current_tenant_id', :tid, true)")
+    db.session.execute(statement, params)
+
+
+@contextmanager
+def tenant_session(tenant_id):
+    """Injeta tenant no contexto SQL via set_config (equivalente a SET LOCAL).
+
+    Uso esperado em jobs/scripts (fora de request context):
+
+        for oab in DjenOabMonitoramento.query.all():  # roda como app_admin
+            with tenant_session(oab.tenant_id):
+                processar_publicacoes(oab)             # respeita RLS
+
+    Comportamento de transacao:
+    - Se ja existe transacao aberta: usa a atual, sem commit no exit.
+    - Se nao existe: abre via db.session.begin(), com commit/rollback
+      automatico ao sair do bloco.
+    """
+    if tenant_id is None:
+        raise ValueError("tenant_id nao pode ser None em tenant_session")
+
+    if _session_has_open_transaction():
+        set_current_tenant_id(tenant_id)
+        yield
+        return
+
+    with db.session.begin():
+        set_current_tenant_id(tenant_id)
+        yield
 
 
 def tenant_scoped(fn):

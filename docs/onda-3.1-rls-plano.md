@@ -1,4 +1,3 @@
-# Onda 3.1 — RLS no Postgres (plano de implementação)
 
 > Este documento é **só plano**. Nenhum código, migration, model ou
 > teste é alterado por este PR. A implementação acontece em PRs
@@ -168,6 +167,13 @@ def _set_tenant_in_session():
   tabela com policy, RLS vai retornar lista vazia. Isso é seguro mas
   pode mascarar bugs — adicionar log WARNING quando hook detecta rota
   autenticada sem tenant resolvido.
+
+**Implementação real (Fase 1, commit 6bb4cab):** combinação de hook
+`before_request` (define `g._rls_tenant_id` + injeta na 1ª transação
+via `set_config(..., true)`) + event listener no engine `begin`
+(re-injeta em transações subsequentes intra-request, depois de
+`commit()`/`rollback()`). Sem o listener, `set_config` seria perdido
+em rotas POST/PUT/DELETE que comitam no meio.
 
 ### 2.4 Helper para jobs/scripts
 

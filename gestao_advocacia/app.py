@@ -3,11 +3,22 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Blueprint, Flask, make_response, redirect, request
+from flask import (
+    Blueprint,
+    Flask,
+    current_app,
+    g,
+    has_request_context,
+    make_response,
+    redirect,
+    request,
+)
 from flask import abort as flask_abort
 from flask_cors import CORS
-from flask_jwt_extended import get_jwt
+from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended.exceptions import JWTExtendedException
 from flask_restx import Api, abort
+from sqlalchemy import event
 
 from app_runtime import (
     configure_cors_origins,
@@ -25,6 +36,7 @@ from openapi_docs import register_openapi_docs
 # admin-fase0: namespace isolado do backoffice super-admin
 from routes.admin import register_admin_routes  # noqa: E402
 from routes.api_registry import register_api_routes
+from utils.log_sanitizer import mask_user_id
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,7 +55,46 @@ def finance_access_required(fn):
     return wrapper
 
 
+def _is_public_or_unauthenticated_path(path):
+    if path == "/":
+        return True
+    public_prefixes = (
+        "/api/v1/auth/login",
+        "/api/v1/auth/register",
+        "/api/v1/auth/register-invite",
+        "/api/v1/auth/termos-vigentes",
+        "/api/v1/auth/forgot-password",
+        "/api/v1/auth/reset-password",
+        "/api/v1/docs",
+        "/admin/v1/docs",
+        "/swaggerui",
+        "/static",
+    )
+    return path.startswith(public_prefixes)
+
+
+def _register_rls_engine_events(engine):
+    """Re-aplica app.current_tenant_id em cada nova transacao dentro de request context.
+
+    Em jobs/scripts/testes nao ha contexto de request, entao o listener e no-op
+    e o tenant e injetado explicitamente via tenant_session().
+    """
+
+    @event.listens_for(engine, "begin")
+    def _reapply_tenant_on_new_transaction(conn):
+        if not has_request_context():
+            return
+        tid = getattr(g, "_rls_tenant_id", None)
+        if tid is None:
+            return
+        conn.exec_driver_sql(
+            "SELECT set_config('app.current_tenant_id', %s, true)",
+            (str(int(tid)),),
+        )
+
+
 from helpers import get_item_or_404  # noqa: E402, F401
+from helpers.tenant import set_current_tenant_id  # noqa: E402
 from models import (  # noqa: E402, F401
     Caso,
     Cliente,
@@ -75,6 +126,8 @@ def create_app(config_class=Config):
     )
 
     db.init_app(app)
+    with app.app_context():
+        _register_rls_engine_events(db.engine)
     migrate.init_app(app, db)
     jwt.init_app(app)
     configure_jwt_error_handlers(jwt)
@@ -134,7 +187,7 @@ def create_app(config_class=Config):
     # admin-fase0: error handlers especificos do admin_api.
     # Cobre tanto excecoes do flask_jwt_extended quanto da PyJWT subjacente
     # (token mal-formado pode escapar do wrapper em algumas versoes).
-    from flask_jwt_extended.exceptions import JWTExtendedException, NoAuthorizationError
+    from flask_jwt_extended.exceptions import NoAuthorizationError
     from jwt.exceptions import PyJWTError
 
     @admin_api.errorhandler(NoAuthorizationError)
@@ -182,6 +235,56 @@ def create_app(config_class=Config):
         return response
 
     app.register_blueprint(legacy_api_bp)
+
+    @app.before_request
+    def set_tenant_rls_context():
+        if request.method == "OPTIONS":
+            return
+        if _is_public_or_unauthenticated_path(request.path):
+            return
+
+        try:
+            verify_jwt_in_request(optional=True)
+        except Exception as exc:
+            current_app.logger.warning(
+                "rls_tenant_context_invalid_jwt",
+                extra={
+                    "event": "rls_tenant_context_invalid_jwt",
+                    "path": request.path,
+                    "err": str(exc),
+                },
+            )
+            return
+
+        user_id = get_jwt_identity()
+        if user_id is None:
+            return
+
+        user = db.session.get(User, user_id)
+        if not user:
+            current_app.logger.warning(
+                "rls_tenant_context_user_not_found",
+                extra={
+                    "event": "rls_tenant_context_user_not_found",
+                    "user_id_hash": mask_user_id(user_id),
+                    "path": request.path,
+                },
+            )
+            return
+
+        if user.tenant_id is None:
+            current_app.logger.warning(
+                "rls_tenant_context_missing_tenant",
+                extra={
+                    "event": "rls_tenant_context_missing_tenant",
+                    "user_id_hash": mask_user_id(user_id),
+                    "path": request.path,
+                },
+            )
+            return
+
+        g._rls_tenant_id = user.tenant_id
+        set_current_tenant_id(user.tenant_id)
 
     configure_scheduler(app)
     register_status_route(app)

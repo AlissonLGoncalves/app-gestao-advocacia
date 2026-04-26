@@ -4,6 +4,7 @@
 
 import os
 import sys
+from typing import NamedTuple
 
 import pytest
 from sqlalchemy import inspect
@@ -17,6 +18,21 @@ from app import (  # Importa a factory e o objeto db
 )
 from app import db as _db
 from config_test import ConfigTest  # Importa a configuração de teste
+from models import Caso, Cliente, Tenant, User
+
+_TEST_PASSWORD = "test-password-123"
+
+
+class TwoTenantsFixture(NamedTuple):
+    tenant_a: Tenant
+    tenant_b: Tenant
+    admin_a: User
+    admin_b: User
+    admin_password: str
+    cliente_a: Cliente
+    cliente_b: Cliente
+    caso_a: Caso
+    caso_b: Caso
 
 
 @pytest.fixture(scope="session")
@@ -121,6 +137,85 @@ def db(app):
                 _db.session.execute(table.delete())
         _db.session.commit()
         yield _db
+
+
+@pytest.fixture()
+def two_tenants(db) -> TwoTenantsFixture:
+    """Cria 2 tenants completos para testes multi-tenant.
+
+    Cada tenant tem 1 user admin, 1 cliente, 1 caso. Senha plain dos
+    admins exposta em .admin_password (mesma para A e B) para testes
+    que envolvem login.
+
+    Usage:
+        def test_isolation(two_tenants):
+            assert two_tenants.cliente_a.tenant_id != two_tenants.cliente_b.tenant_id
+    """
+    tenant_a = Tenant(nome_escritorio="Tenant A", status="ativo")
+    tenant_b = Tenant(nome_escritorio="Tenant B", status="ativo")
+    db.session.add_all([tenant_a, tenant_b])
+    db.session.flush()
+
+    admin_a = User(
+        username="admin_a",
+        email="admin_a@teste.local",
+        role="admin",
+        tenant_id=tenant_a.id,
+    )
+    admin_a.set_password(_TEST_PASSWORD)
+    admin_b = User(
+        username="admin_b",
+        email="admin_b@teste.local",
+        role="admin",
+        tenant_id=tenant_b.id,
+    )
+    admin_b.set_password(_TEST_PASSWORD)
+    db.session.add_all([admin_a, admin_b])
+    db.session.flush()
+
+    cliente_a = Cliente(
+        nome_razao_social="Cliente A",
+        cpf_cnpj="TEST-A-CPF",
+        tipo_pessoa="PF",
+        user_id=admin_a.id,
+        tenant_id=tenant_a.id,
+    )
+    cliente_b = Cliente(
+        nome_razao_social="Cliente B",
+        cpf_cnpj="TEST-B-CPF",
+        tipo_pessoa="PF",
+        user_id=admin_b.id,
+        tenant_id=tenant_b.id,
+    )
+    db.session.add_all([cliente_a, cliente_b])
+    db.session.flush()
+
+    caso_a = Caso(
+        titulo="Caso A",
+        cliente_id=cliente_a.id,
+        user_id=admin_a.id,
+        tenant_id=tenant_a.id,
+    )
+    caso_b = Caso(
+        titulo="Caso B",
+        cliente_id=cliente_b.id,
+        user_id=admin_b.id,
+        tenant_id=tenant_b.id,
+    )
+    db.session.add_all([caso_a, caso_b])
+    db.session.commit()
+
+    return TwoTenantsFixture(
+        tenant_a=tenant_a,
+        tenant_b=tenant_b,
+        admin_a=admin_a,
+        admin_b=admin_b,
+        admin_password=_TEST_PASSWORD,
+        cliente_a=cliente_a,
+        cliente_b=cliente_b,
+        caso_a=caso_a,
+        caso_b=caso_b,
+    )
 
 
 @pytest.fixture()

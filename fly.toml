@@ -12,7 +12,7 @@ primary_region = "gru"
   scheduler = "python -m scheduler_runner"
 
 [deploy]
-  release_command = "flask db upgrade"
+  release_command = "USE_DATABASE_URL_ADMIN=true flask db upgrade"
 
 [env]
   PORT = "8080"

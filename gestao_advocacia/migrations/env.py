@@ -49,6 +49,26 @@ def get_metadata():
     return target_db.metadata
 
 
+def include_object(object, name, type_, reflected, compare_to):
+    """Filtro de objetos para autogenerate do Alembic.
+
+    Alembic 1.x nao tem awareness nativa de RLS policies — elas nao
+    aparecem como type_='policy' no autogenerate. Este filtro tem
+    duas camadas:
+
+    1. Hoje: filtra alembic_version (gerenciada pelo proprio Alembic).
+    2. Futuro: filtra type_='policy' caso versoes futuras do Alembic
+       (>= 1.13) ganhem suporte. Sem isso, flask db migrate numa branch
+       com policies ativas poderia gerar DROP POLICY, corrompendo o
+       isolamento silenciosamente.
+    """
+    if type_ == "table" and name == "alembic_version":
+        return False
+    if type_ == "policy":
+        return False
+    return True
+
+
 def run_migrations_offline():
     """Run migrations in 'offline' mode.
 
@@ -62,7 +82,12 @@ def run_migrations_offline():
 
     """
     url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=get_metadata(), literal_binds=True)
+    context.configure(
+        url=url,
+        target_metadata=get_metadata(),
+        literal_binds=True,
+        include_object=include_object,  # garante que alembic_version e policies futuras sejam ignoradas
+    )
 
     with context.begin_transaction():
         context.run_migrations()
@@ -89,11 +114,18 @@ def run_migrations_online():
     conf_args = current_app.extensions["migrate"].configure_args
     if conf_args.get("process_revision_directives") is None:
         conf_args["process_revision_directives"] = process_revision_directives
+    # injeta include_object no conf_args, padrao igual ao process_revision_directives
+    if conf_args.get("include_object") is None:
+        conf_args["include_object"] = include_object
 
     connectable = get_engine()
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=get_metadata(), **conf_args)
+        context.configure(
+            connection=connection,
+            target_metadata=get_metadata(),
+            **conf_args,
+        )
 
         with context.begin_transaction():
             context.run_migrations()
