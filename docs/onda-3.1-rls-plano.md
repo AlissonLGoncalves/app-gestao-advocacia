@@ -285,11 +285,14 @@ em PRs de 3-5 tabelas por vez. Ordem sugerida:
 - **Batch 1**: `Cliente`, `Caso`, `MovimentacaoCNJ` (precisa policy
   com subquery via `caso_id` ou denormalização — decidir antes do PR).
 - **Batch 2**: `Despesa`, `Recebimento`, `ContratoHonorario`.
-- **Batch 3**: `User`, `LoginAudit`, `AuditLog`, `ConsentimentoUsuario`,
-  `PasswordResetToken` (cuidado com fluxos de auth — login não tem
-  tenant ainda resolvido).
-- **Batch 4**: `DjenOabMonitoramento`, `PublicacaoDJEN`,
+- **Batch 3**: `DjenOabMonitoramento`, `PublicacaoDJEN`,
   `DjenVinculoDecisao`, `ProcuracaoAnalise`.
+- **Batch 4 (último)**: `User`, `LoginAudit`, `AuditLog`,
+  `ConsentimentoUsuario`, `PasswordResetToken`. **Cluster de
+  autenticação atrasado de propósito**: login não tem `tenant_id`
+  resolvido, qualquer regressão aqui derruba o sistema todo. Ao chegar
+  neste batch, já temos 3 batches de observação acumulada em prod
+  (~6 semanas) cobrindo os padrões de query mais comuns.
 
 **Critério de pronto por batch**: 24h em staging + suite
 `test_rls_isolation` cobrindo as tabelas do batch.
