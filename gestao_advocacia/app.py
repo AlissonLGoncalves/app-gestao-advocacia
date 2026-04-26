@@ -84,6 +84,8 @@ def _register_rls_engine_events(engine):
     def _reapply_tenant_on_new_transaction(conn):
         if not has_request_context():
             return
+        if conn.dialect.name == "sqlite":
+            return
         tid = getattr(g, "_rls_tenant_id", None)
         if tid is None:
             return

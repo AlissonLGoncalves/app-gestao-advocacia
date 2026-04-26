@@ -25,9 +25,15 @@ def set_current_tenant_id(tenant_id):
 
     Usa set_config(name, value, is_local=true), que e equivalente
     semantico ao SET LOCAL e suporta bind parameters com seguranca.
+
+    No-op em SQLite (dev local e suite de testes): set_config e funcao
+    do Postgres e RLS so existe em Postgres. Risco 7.6 do plano.
     """
     if tenant_id is None:
         raise ValueError("tenant_id nao pode ser None")
+
+    if db.engine.dialect.name == "sqlite":
+        return
 
     params = {"tid": str(int(tenant_id))}
     statement = text("SELECT set_config('app.current_tenant_id', :tid, true)")
