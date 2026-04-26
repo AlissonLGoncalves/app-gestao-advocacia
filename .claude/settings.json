@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(python -m flask db migrate -m \"add portal_cliente_id to user\")",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
