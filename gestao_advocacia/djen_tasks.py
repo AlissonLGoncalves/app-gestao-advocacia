@@ -9,7 +9,6 @@
 #      mesmo que não tenham OAB configurada.
 # ==============================================================================
 import logging
-import re
 import time
 from datetime import datetime, timedelta
 
@@ -459,7 +458,6 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
     # enriquecimento-cnj: hot-path — auto-vincular a Caso do MESMO tenant.
     # Caller pode ter passado caso_id explicitamente (ex.: busca por processo);
     # so vinculamos automaticamente quando caso_id veio None E temos numero_proc.
-    auto_vinculou_caso = False
     status_origem_default = "pendente"
     if caso_id is None and numero_proc:
         try:
@@ -471,7 +469,6 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
             ).first()
             if caso_match:
                 caso_id = caso_match.id
-                auto_vinculou_caso = True
                 status_origem_default = "criado_automaticamente"
                 try:
                     from flask import current_app  # noqa: PLC0415
@@ -490,7 +487,7 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
                     pass
         except Exception:
             # enriquecimento-cnj: nunca derrubar a ingestao por causa do enriquecimento
-            auto_vinculou_caso = False
+            pass
 
     pub = PublicacaoDJEN(
         user_id=user_id,

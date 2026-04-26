@@ -120,12 +120,7 @@ def _reprocessar(app, tenant_id: int, apply: bool, auto_vincular_caso: bool) -> 
                             pub.polo_passivo = polo_passivo_novo
 
                 # enriquecimento-cnj: backfill — auto-vinculacao a Caso (mesmo tenant).
-                if (
-                    auto_vincular_caso
-                    and apply
-                    and pub.caso_id is None
-                    and pub.numero_processo
-                ):
+                if auto_vincular_caso and apply and pub.caso_id is None and pub.numero_processo:
                     caso = Caso.query.filter_by(
                         tenant_id=tenant_id,
                         numero_processo=pub.numero_processo,
