@@ -31,8 +31,17 @@ def _bootstrap_tenant_e_user(suffix=""):
     return t, u
 
 
-def _criar_publicacao(*, tenant_id, user_id, texto, numero_processo=None, caso_id=None,
-                     hash_com="hash_x", djen_id=None, status_origem=None):
+def _criar_publicacao(
+    *,
+    tenant_id,
+    user_id,
+    texto,
+    numero_processo=None,
+    caso_id=None,
+    hash_com="hash_x",
+    djen_id=None,
+    status_origem=None,
+):
     pub = PublicacaoDJEN(
         user_id=user_id,
         tenant_id=tenant_id,

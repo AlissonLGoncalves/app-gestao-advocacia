@@ -1,7 +1,5 @@
 """enriquecimento-cnj: testes do hot-path em _salvar_publicacao."""
 
-from datetime import date, datetime
-
 from djen_tasks import _salvar_publicacao
 from extensions import db as _db
 from models import Caso, Cliente, PublicacaoDJEN, Tenant, User
@@ -235,8 +233,11 @@ def test_salvar_publicacao_respeita_caso_id_passado_pelo_caller(app, db):
     """Quando caller ja passa caso_id, hot-path nao deve sobrescrever."""
     with app.app_context():
         t, u = _criar_tenant_e_user(suffix="caller")
-        caso_caller = _criar_caso(tenant=t, user=u, numero_processo="9999999-99.2024.8.16.0001", titulo="Caso Caller")
-        caso_match = _criar_caso(tenant=t, user=u, numero_processo=CNJ_VALIDO, titulo="Caso Match")
+        caso_caller = _criar_caso(
+            tenant=t, user=u, numero_processo="9999999-99.2024.8.16.0001", titulo="Caso Caller"
+        )
+        # caso_match existe so para validar que o auto-vinculo NAO sobrescreve o caso_id passado.
+        _criar_caso(tenant=t, user=u, numero_processo=CNJ_VALIDO, titulo="Caso Match")
 
         item = _item_base(
             id=11004,

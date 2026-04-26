@@ -123,7 +123,7 @@ def extrair_primeiro_cnj_valido(texto):
 
         # Olha janela antes do match para identificar prefixo de prioridade
         inicio = max(0, match.start() - _PREFIX_WINDOW)
-        antes = s[inicio:match.start()]
+        antes = s[inicio : match.start()]
         if _PREFIX_PRIORITY.search(antes):
             candidato_priorizado = canonico
             break

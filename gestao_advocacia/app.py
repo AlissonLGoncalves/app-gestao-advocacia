@@ -21,10 +21,10 @@ from config import Config
 from extensions import db, jwt, limiter, migrate
 from logging_config import configure_json_logging
 from openapi_docs import register_openapi_docs
-from routes.api_registry import register_api_routes
 
 # admin-fase0: namespace isolado do backoffice super-admin
 from routes.admin import register_admin_routes  # noqa: E402
+from routes.api_registry import register_api_routes
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -111,9 +111,7 @@ def create_app(config_class=Config):
     from flask_restx import Namespace as _Namespace
 
     admin_bp = Blueprint("admin_api", __name__, url_prefix="/admin/v1")
-    admin_swagger_doc = (
-        "/admin/v1/docs" if os.environ.get("FLASK_ENV") != "production" else False
-    )
+    admin_swagger_doc = "/admin/v1/docs" if os.environ.get("FLASK_ENV") != "production" else False
     admin_api = Api(
         admin_bp,
         version="1.0",

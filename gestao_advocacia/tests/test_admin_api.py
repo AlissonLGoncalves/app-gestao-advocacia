@@ -15,7 +15,6 @@ permite role=superadmin) e gera tokens via create_access_token.
 
 import json
 
-import pytest
 from flask_jwt_extended import create_access_token
 
 from extensions import db as _db
@@ -85,6 +84,7 @@ def test_admin_token_assinado_com_chave_errada_retorna_401(client, db):
     # JWT bem-formado mas assinado com outra chave -> InvalidSignatureError (PyJWT).
     # Deve cair em 401 tambem.
     import jwt as _pyjwt
+
     fake_token = _pyjwt.encode({"sub": "1", "role": "superadmin"}, "wrong-key", algorithm="HS256")
     resp = client.get(f"{ADMIN_BASE}/me", headers={"Authorization": f"Bearer {fake_token}"})
     assert resp.status_code == 401
@@ -115,7 +115,8 @@ def test_superadmin_acesso_negado_para_admin_normal(app, client, db):
 # ---------------------------------------------------------------------------
 def test_superadmin_lista_tenants(app, client, db):
     t1 = _criar_tenant("Escritorio Alpha", documento="11111111000111")
-    t2 = _criar_tenant("Escritorio Beta", documento="22222222000122")
+    # t2 e criado apenas para que o GET /tenants liste >=2 itens (efeito colateral no DB).
+    _criar_tenant("Escritorio Beta", documento="22222222000122")
     sa = _criar_user(
         username="sa_lista", email="sa_lista@x.com", role="superadmin", tenant_id=t1.id
     )
@@ -138,12 +139,8 @@ def test_superadmin_detalhe_tenant_com_contadores(app, client, db):
     owner = _criar_user(
         username="owner_x", email="owner_x@x.com", role="admin", tenant_id=tenant.id
     )
-    _criar_user(
-        username="assist_x", email="assist_x@x.com", role="assistente", tenant_id=tenant.id
-    )
-    sa = _criar_user(
-        username="sa_det", email="sa_det@x.com", role="superadmin", tenant_id=None
-    )
+    _criar_user(username="assist_x", email="assist_x@x.com", role="assistente", tenant_id=tenant.id)
+    sa = _criar_user(username="sa_det", email="sa_det@x.com", role="superadmin", tenant_id=None)
     token = _token_para(app, sa)
 
     resp = client.get(f"{ADMIN_BASE}/tenants/{tenant.id}", headers=_auth_headers(token))
@@ -168,9 +165,7 @@ def test_superadmin_detalhe_tenant_404(app, client, db):
 # ---------------------------------------------------------------------------
 def test_admin_audit_log_registra_suspensao(app, client, db):
     tenant = _criar_tenant("Para Suspender")
-    sa = _criar_user(
-        username="sa_susp", email="sa_susp@x.com", role="superadmin", tenant_id=None
-    )
+    sa = _criar_user(username="sa_susp", email="sa_susp@x.com", role="superadmin", tenant_id=None)
     token = _token_para(app, sa)
 
     resp = client.post(
@@ -232,9 +227,8 @@ def test_login_bloqueado_para_tenant_suspenso(app, client, db):
 
     # LoginAudit registrado com motivo correto
     from models import LoginAudit
-    audit = (
-        LoginAudit.query.filter_by(user_id=user.id).order_by(LoginAudit.id.desc()).first()
-    )
+
+    audit = LoginAudit.query.filter_by(user_id=user.id).order_by(LoginAudit.id.desc()).first()
     assert audit is not None
     assert audit.sucesso is False
     assert audit.motivo_falha == "tenant_suspenso"

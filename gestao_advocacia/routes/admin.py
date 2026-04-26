@@ -85,7 +85,7 @@ def register_admin_routes(admin_ns):
             params={
                 "q": "Termo de busca (nome, documento ou email)",
                 "status": "Filtro por status (ativo|suspenso|cancelado)",
-                "page": f"Pagina (default 1)",
+                "page": "Pagina (default 1)",
                 "size": f"Itens por pagina (default {PAGINATION_DEFAULT}, max {PAGINATION_MAX})",
             },
         )
@@ -148,7 +148,9 @@ def register_admin_routes(admin_ns):
                 return {"message": "Tenant nao encontrado."}, 404
 
             total_usuarios = db.session.query(User).filter(User.tenant_id == tenant_id).count()
-            total_clientes = db.session.query(Cliente).filter(Cliente.tenant_id == tenant_id).count()
+            total_clientes = (
+                db.session.query(Cliente).filter(Cliente.tenant_id == tenant_id).count()
+            )
             total_casos = db.session.query(Caso).filter(Caso.tenant_id == tenant_id).count()
 
             owner = (
