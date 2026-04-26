@@ -593,9 +593,11 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
                   onClick={handleConvidarPortal}
                   disabled={inviteLoading}
                 >
-                  {inviteLoading
-                    ? <span className="spinner-border spinner-border-sm" />
-                    : <i className="bi bi-person-badge" />}
+                  {inviteLoading ? (
+                    <span className="spinner-border spinner-border-sm" />
+                  ) : (
+                    <i className="bi bi-person-badge" />
+                  )}
                   Convidar para o Portal do Cliente
                 </button>
               ) : (

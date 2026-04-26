@@ -213,11 +213,15 @@ export default function AdminTenantDetailPage() {
         <div>
           <h2 className="h4 mb-1">{tenant.nome_escritorio}</h2>
           <div className="d-flex flex-wrap align-items-center gap-2">
-            <span className={`badge ${
-              tenant.status === 'ativo' ? 'bg-success-subtle text-success' :
-              tenant.status === 'suspenso' ? 'bg-warning-subtle text-warning' :
-              'bg-danger-subtle text-danger'
-            }`}>
+            <span
+              className={`badge ${
+                tenant.status === 'ativo'
+                  ? 'bg-success-subtle text-success'
+                  : tenant.status === 'suspenso'
+                    ? 'bg-warning-subtle text-warning'
+                    : 'bg-danger-subtle text-danger'
+              }`}
+            >
               {tenant.status}
             </span>
             <small className="text-muted">ID #{tenant.id}</small>
@@ -291,7 +295,9 @@ export default function AdminTenantDetailPage() {
                 <div>
                   {tenant.owner ? (
                     <>
-                      <div className="fw-semibold">{tenant.owner.nome_completo || tenant.owner.username}</div>
+                      <div className="fw-semibold">
+                        {tenant.owner.nome_completo || tenant.owner.username}
+                      </div>
                       <small className="text-muted">{tenant.owner.email}</small>
                     </>
                   ) : (
@@ -330,7 +336,8 @@ export default function AdminTenantDetailPage() {
 
             {/* TODO Fase 1: plano, billing, contratos, score de churn, metricas avancadas */}
             <div className="text-muted small">
-              <strong>Em breve:</strong> plano e billing, contratos, métricas de uso e score de churn.
+              <strong>Em breve:</strong> plano e billing, contratos, métricas de uso e score de
+              churn.
             </div>
           </div>
         </div>
@@ -384,12 +391,17 @@ export default function AdminTenantDetailPage() {
                     <div className="d-flex justify-content-between gap-2">
                       <div>
                         <span className="fw-semibold">{ev.action}</span>
-                        <small className="text-muted ms-2">por {ev.admin_username || `#${ev.admin_user_id}`}</small>
+                        <small className="text-muted ms-2">
+                          por {ev.admin_username || `#${ev.admin_user_id}`}
+                        </small>
                       </div>
                       <small className="text-muted">{formatDateTime(ev.created_at)}</small>
                     </div>
                     {ev.after_json && (
-                      <pre className="small text-muted mt-2 mb-0" style={{ whiteSpace: 'pre-wrap' }}>
+                      <pre
+                        className="small text-muted mt-2 mb-0"
+                        style={{ whiteSpace: 'pre-wrap' }}
+                      >
                         {ev.after_json}
                       </pre>
                     )}

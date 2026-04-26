@@ -875,9 +875,7 @@ export default function DjenPage() {
                         className="form-control form-control-sm"
                         placeholder="Ex: 94297"
                         value={filtros.numero_oab}
-                        onChange={(e) =>
-                          setFiltros((f) => ({ ...f, numero_oab: e.target.value }))
-                        }
+                        onChange={(e) => setFiltros((f) => ({ ...f, numero_oab: e.target.value }))}
                       />
                     </div>
                     <div className="col-md-3">
@@ -886,9 +884,7 @@ export default function DjenPage() {
                         className="form-control form-control-sm"
                         placeholder="Parcial ou completo"
                         value={filtros.nome_parte}
-                        onChange={(e) =>
-                          setFiltros((f) => ({ ...f, nome_parte: e.target.value }))
-                        }
+                        onChange={(e) => setFiltros((f) => ({ ...f, nome_parte: e.target.value }))}
                       />
                     </div>
                     <div className="col-md-2">
@@ -1020,7 +1016,9 @@ export default function DjenPage() {
                                 marcarLida(pub, !pub.lida)
                               }}
                             >
-                              <i className={`bi ${pub.lida ? 'bi-envelope' : 'bi-envelope-open'}`} />
+                              <i
+                                className={`bi ${pub.lida ? 'bi-envelope' : 'bi-envelope-open'}`}
+                              />
                             </button>
                           </div>
                         </div>

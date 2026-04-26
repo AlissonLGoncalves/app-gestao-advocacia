@@ -49,17 +49,13 @@ beforeEach(() => {
 
 describe('useArrastavel', () => {
   it('estado_inicial_usa_initialPosition', () => {
-    const { result } = renderHook(() =>
-      useArrastavel({ initialPosition: { x: 120, y: 80 } })
-    )
+    const { result } = renderHook(() => useArrastavel({ initialPosition: { x: 120, y: 80 } }))
     expect(result.current.position).toEqual({ x: 120, y: 80 })
     expect(result.current.isDragging).toBe(false)
   })
 
   it('pointerdown_no_header_inicia_drag', () => {
-    const { result } = renderHook(() =>
-      useArrastavel({ initialPosition: { x: 100, y: 80 } })
-    )
+    const { result } = renderHook(() => useArrastavel({ initialPosition: { x: 100, y: 80 } }))
     attachFakePanel(result, { x: 100, y: 80 })
     const header = attachFakeHeader(result)
 
@@ -86,9 +82,7 @@ describe('useArrastavel', () => {
   })
 
   it('clamp_negativo_eh_limitado_a_zero_em_y', () => {
-    const { result } = renderHook(() =>
-      useArrastavel({ initialPosition: { x: 100, y: -500 } })
-    )
+    const { result } = renderHook(() => useArrastavel({ initialPosition: { x: 100, y: -500 } }))
     expect(result.current.position.y).toBeGreaterThanOrEqual(0)
   })
 
@@ -168,9 +162,7 @@ describe('useArrastavel', () => {
   })
 
   it('teclado_alt_shift_setas_move_o_painel_quando_header_focado', () => {
-    const { result } = renderHook(() =>
-      useArrastavel({ initialPosition: { x: 100, y: 100 } })
-    )
+    const { result } = renderHook(() => useArrastavel({ initialPosition: { x: 100, y: 100 } }))
     attachFakePanel(result, { x: 100, y: 100 })
     const header = attachFakeHeader(result)
 
@@ -190,9 +182,7 @@ describe('useArrastavel', () => {
   })
 
   it('teclado_sem_alt_shift_nao_move', () => {
-    const { result } = renderHook(() =>
-      useArrastavel({ initialPosition: { x: 100, y: 100 } })
-    )
+    const { result } = renderHook(() => useArrastavel({ initialPosition: { x: 100, y: 100 } }))
     const header = attachFakeHeader(result)
 
     const ev = new KeyboardEvent('keydown', {

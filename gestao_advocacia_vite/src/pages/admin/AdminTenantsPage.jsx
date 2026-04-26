@@ -13,7 +13,10 @@ const STATUS_BADGES = {
 }
 
 function StatusBadge({ status }) {
-  const cfg = STATUS_BADGES[status] || { className: 'badge bg-secondary-subtle text-muted', label: status || '—' }
+  const cfg = STATUS_BADGES[status] || {
+    className: 'badge bg-secondary-subtle text-muted',
+    label: status || '—',
+  }
   return <span className={cfg.className}>{cfg.label}</span>
 }
 

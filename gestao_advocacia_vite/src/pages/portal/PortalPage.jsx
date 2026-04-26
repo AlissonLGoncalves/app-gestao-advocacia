@@ -22,11 +22,7 @@ function CardSection({ title, icon, children, empty }) {
         <span className="fw-semibold">{title}</span>
       </div>
       <div className="card-body p-0">
-        {empty ? (
-          <p className="text-muted small text-center py-4 mb-0">{empty}</p>
-        ) : (
-          children
-        )}
+        {empty ? <p className="text-muted small text-center py-4 mb-0">{empty}</p> : children}
       </div>
     </div>
   )
@@ -41,7 +37,8 @@ function PortalPage() {
   const user = userStr ? JSON.parse(userStr) : {}
 
   useEffect(() => {
-    api.get('/portal/situacao')
+    api
+      .get('/portal/situacao')
       .then(setDados)
       .catch(() => {
         toast.error('Erro ao carregar dados do portal.')
@@ -99,7 +96,6 @@ function PortalPage() {
       </header>
 
       <div className="container py-4" style={{ maxWidth: 860 }}>
-
         {/* Resumo financeiro */}
         {pendencias.length > 0 && (
           <div className="alert alert-warning d-flex align-items-start gap-3 mb-4 shadow-sm border-0">
@@ -107,7 +103,8 @@ function PortalPage() {
             <div>
               <strong>Pendência financeira</strong>
               <div className="small mt-1">
-                Você possui {pendencias.length} parcela(s) em aberto. Entre em contato com o escritório para regularizar.
+                Você possui {pendencias.length} parcela(s) em aberto. Entre em contato com o
+                escritório para regularizar.
               </div>
             </div>
           </div>
@@ -192,7 +189,10 @@ function PortalPage() {
                 {documentos.map((d) => {
                   const dt = d.data_upload ? new Date(d.data_upload) : null
                   return (
-                    <div key={d.id} className="list-group-item px-4 py-3 d-flex align-items-center gap-3">
+                    <div
+                      key={d.id}
+                      className="list-group-item px-4 py-3 d-flex align-items-center gap-3"
+                    >
                       <i className="bi bi-file-earmark-text text-primary fs-5" />
                       <div className="flex-grow-1 min-width-0">
                         <div className="small fw-semibold text-truncate">{d.nome_arquivo}</div>
@@ -218,17 +218,24 @@ function PortalPage() {
                 const venc = p.data_vencimento ? new Date(p.data_vencimento) : null
                 const vencido = venc && venc < new Date()
                 return (
-                  <div key={p.id} className="list-group-item px-4 py-3 d-flex justify-content-between align-items-center">
+                  <div
+                    key={p.id}
+                    className="list-group-item px-4 py-3 d-flex justify-content-between align-items-center"
+                  >
                     <div>
                       <div className="small fw-semibold">{p.descricao || 'Honorário'}</div>
                       {venc && (
-                        <div className={`small ${vencido ? 'text-danger fw-semibold' : 'text-muted'}`}>
+                        <div
+                          className={`small ${vencido ? 'text-danger fw-semibold' : 'text-muted'}`}
+                        >
                           Vencimento: {venc.toLocaleDateString('pt-BR')}
                           {vencido && ' (vencido)'}
                         </div>
                       )}
                     </div>
-                    <span className={`badge ${vencido ? 'bg-danger' : 'bg-warning text-dark'} fs-6`}>
+                    <span
+                      className={`badge ${vencido ? 'bg-danger' : 'bg-warning text-dark'} fs-6`}
+                    >
                       R$ {Number(p.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>

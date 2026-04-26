@@ -204,7 +204,7 @@ function RegisterPage() {
         cpf: tipoPessoa === 'PF' ? documento : null,
         tipo_pessoa: tipoPessoa,
         oab: oabSanitizada ? (oabMatch ? oabMatch[2] : oabSanitizada) : null,
-        sigla_oab_tribunal: oabSanitizada ? (oabMatch?.[1] || null) : null,
+        sigla_oab_tribunal: oabSanitizada ? oabMatch?.[1] || null : null,
         aceite_termos: true,
         aceite_lgpd: true,
         versao_termos: TERMS_VERSION,

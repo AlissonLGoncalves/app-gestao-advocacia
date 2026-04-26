@@ -125,9 +125,7 @@ export default function useArrastavel(options = {}) {
   const applyPosition = useCallback(
     (newPos) => {
       const panel = panelRef.current
-      const panelSize = panel
-        ? { w: panel.offsetWidth, h: panel.offsetHeight }
-        : null
+      const panelSize = panel ? { w: panel.offsetWidth, h: panel.offsetHeight } : null
       const clamped = clampToViewport(newPos, margin, panelSize)
       setPosition(clamped)
       schedulePersist(clamped)
@@ -250,9 +248,7 @@ export default function useArrastavel(options = {}) {
       e.preventDefault()
       setPosition((prev) => {
         const panel = panelRef.current
-        const panelSize = panel
-          ? { w: panel.offsetWidth, h: panel.offsetHeight }
-          : null
+        const panelSize = panel ? { w: panel.offsetWidth, h: panel.offsetHeight } : null
         const next = clampToViewport({ x: prev.x + dx, y: prev.y + dy }, margin, panelSize)
         schedulePersist(next)
         return next
@@ -268,9 +264,7 @@ export default function useArrastavel(options = {}) {
     const onResize = () => {
       setPosition((prev) => {
         const panel = panelRef.current
-        const panelSize = panel
-          ? { w: panel.offsetWidth, h: panel.offsetHeight }
-          : null
+        const panelSize = panel ? { w: panel.offsetWidth, h: panel.offsetHeight } : null
         return clampToViewport(prev, margin, panelSize)
       })
     }

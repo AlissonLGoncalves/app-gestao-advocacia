@@ -193,7 +193,9 @@ function SettingsPage() {
               </div>
               <div className="card-body p-4">
                 {loadingEscritorio ? (
-                  <div className="text-center py-5 text-muted">Carregando dados do escritório...</div>
+                  <div className="text-center py-5 text-muted">
+                    Carregando dados do escritório...
+                  </div>
                 ) : (
                   <form onSubmit={handleSalvarEscritorio}>
                     <div className="row g-3 mb-3">
@@ -206,7 +208,10 @@ function SettingsPage() {
                           className="form-control"
                           value={escritorioInfo.nome_escritorio}
                           onChange={(e) =>
-                            setEscritorioInfo({ ...escritorioInfo, nome_escritorio: e.target.value })
+                            setEscritorioInfo({
+                              ...escritorioInfo,
+                              nome_escritorio: e.target.value,
+                            })
                           }
                           required
                         />
@@ -243,9 +248,7 @@ function SettingsPage() {
                         />
                       </div>
                       <div className="col-md-6">
-                        <label className="form-label text-secondary small fw-bold">
-                          Telefone
-                        </label>
+                        <label className="form-label text-secondary small fw-bold">Telefone</label>
                         <input
                           type="text"
                           className="form-control"
@@ -268,21 +271,25 @@ function SettingsPage() {
                           className="form-control"
                           value={escritorioInfo.numero_oab_escritorio}
                           onChange={(e) =>
-                            setEscritorioInfo({ ...escritorioInfo, numero_oab_escritorio: e.target.value })
+                            setEscritorioInfo({
+                              ...escritorioInfo,
+                              numero_oab_escritorio: e.target.value,
+                            })
                           }
                           placeholder="12345"
                         />
                       </div>
                       <div className="col-md-6">
-                        <label className="form-label text-secondary small fw-bold">
-                          UF da OAB
-                        </label>
+                        <label className="form-label text-secondary small fw-bold">UF da OAB</label>
                         <input
                           type="text"
                           className="form-control"
                           value={escritorioInfo.sigla_oab_escritorio}
                           onChange={(e) =>
-                            setEscritorioInfo({ ...escritorioInfo, sigla_oab_escritorio: e.target.value.toUpperCase() })
+                            setEscritorioInfo({
+                              ...escritorioInfo,
+                              sigla_oab_escritorio: e.target.value.toUpperCase(),
+                            })
                           }
                           placeholder="SP"
                           maxLength={2}
@@ -500,7 +507,12 @@ function SettingsPage() {
                   <div className="d-flex align-items-center">
                     <div
                       className="bg-dark text-white rounded d-flex justify-content-center align-items-center me-4 shadow"
-                      style={{ width: '60px', height: '40px', fontWeight: '900', fontStyle: 'italic' }}
+                      style={{
+                        width: '60px',
+                        height: '40px',
+                        fontWeight: '900',
+                        fontStyle: 'italic',
+                      }}
                     >
                       VISA
                     </div>
