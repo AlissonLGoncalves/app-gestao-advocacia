@@ -34,9 +34,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: gestao_advocacia
+    # fly.toml fica na raiz do repo, nao em gestao_advocacia/.
+    # Sem working-directory, flyctl le fly.toml direto.
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
     steps:
