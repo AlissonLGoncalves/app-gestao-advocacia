@@ -63,8 +63,12 @@ jobs:
             gestao_advocacia/requirements.txt
             gestao_advocacia/requirements.lock
 
+      # ci-greenfield: requirements.lock e gerado em Windows e nao inclui deps com
+      # marker sys_platform != "win32" (ex: python-magic). Em Linux do CI, instalar
+      # via requirements.txt (com markers respeitados). pip-audit continua usando o
+      # lock para auditar versoes pinadas.
       - name: Install backend dependencies
-        run: pip install --require-hashes -r requirements.lock
+        run: pip install -r requirements.txt
 
       - name: Install pip-audit
         run: pip install pip-audit
@@ -124,8 +128,12 @@ jobs:
             gestao_advocacia/requirements.txt
             gestao_advocacia/requirements.lock
 
+      # ci-greenfield: requirements.lock e gerado em Windows e nao inclui deps com
+      # marker sys_platform != "win32" (ex: python-magic). Em Linux do CI, instalar
+      # via requirements.txt (com markers respeitados). pip-audit continua usando o
+      # lock para auditar versoes pinadas.
       - name: Install backend dependencies
-        run: pip install --require-hashes -r requirements.lock
+        run: pip install -r requirements.txt
 
       - name: Run database migrations on PostgreSQL
         run: python -m flask db upgrade
