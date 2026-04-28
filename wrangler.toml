@@ -1,4 +1,0 @@
-name = "app-gestao-advocacia"
-main = "workers/index.js"
-compatibility_date = "2026-04-18"
-workers_dev = true
