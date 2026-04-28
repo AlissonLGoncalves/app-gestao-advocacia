@@ -9,6 +9,9 @@ de exposição em caso de vazamento, rotacionar a cada **6 meses**.
 - Calendário fixo: **a cada 6 meses** (próxima rotação anotada abaixo).
 - Imediatamente se houver suspeita de vazamento (commit acidental,
   ex-colaborador com acesso ao repo, log público com o token, etc.).
+- Como parte da resposta a um incidente de produção quando a hipótese
+  inclui credencial comprometida — ver
+  [Rollback de deploy Fly](fly-rollback.md).
 
 ## Procedimento
 
