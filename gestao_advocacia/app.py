@@ -290,6 +290,9 @@ def create_app(config_class=Config):
 
     configure_scheduler(app)
     register_status_route(app)
+    from routes import register_health_route
+
+    register_health_route(app)
     register_openapi_docs(app)
 
     @app.errorhandler(429)

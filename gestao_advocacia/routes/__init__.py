@@ -7,5 +7,6 @@ from .dashboard import register_dashboard_routes as register_dashboard_routes
 from .despesas import register_despesas_routes as register_despesas_routes
 from .documentos import register_documentos_routes as register_documentos_routes
 from .eventos import register_eventos_routes as register_eventos_routes
+from .health import register_health_route as register_health_route
 from .recebimentos import register_recebimentos_routes as register_recebimentos_routes
 from .tarefas import register_tarefas_routes as register_tarefas_routes
