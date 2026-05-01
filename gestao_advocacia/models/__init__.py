@@ -938,6 +938,57 @@ class PasswordResetToken(db.Model):
     user = db.relationship("User", foreign_keys=[user_id])
 
 
+class DjenSyncJob(db.Model):
+    """Fila persistente de jobs de sincronizacao DJEN (B1 do roteiro 2026-05-01).
+
+    Endpoint POST /djen/sync enfileira aqui (status=pending) e retorna 202.
+    Processo djen-worker poll a cada 5s, pega job FOR UPDATE SKIP LOCKED, marca
+    running, executa job_monitorar_djen, marca done/failed com resumo.
+
+    Categoria C (sem RLS): worker e cross-tenant; tenant_id e dado da linha,
+    nao filtro de policy. Filtragem por tenant na leitura via /djen/sync/<id>
+    e na camada de aplicacao (endpoint exige user.tenant_id == job.tenant_id).
+    """
+
+    __tablename__ = "djen_sync_job"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_djen_sync_job_tenant_id"),
+        nullable=False,
+        index=True,
+    )
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_djen_sync_job_user_id"),
+        nullable=False,
+    )
+    # status: pending | running | done | failed
+    status = db.Column(
+        db.String(20), nullable=False, default="pending", server_default="pending", index=True
+    )
+    lookback_days = db.Column(db.Integer, nullable=False, default=30)
+    resumo = db.Column(db.JSON, nullable=True)
+    erro = db.Column(db.Text, nullable=True)
+    criado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    iniciado_em = db.Column(db.DateTime, nullable=True)
+    concluido_em = db.Column(db.DateTime, nullable=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+            "status": self.status,
+            "lookback_days": self.lookback_days,
+            "resumo": self.resumo,
+            "erro": self.erro,
+            "criado_em": self.criado_em.isoformat() if self.criado_em else None,
+            "iniciado_em": self.iniciado_em.isoformat() if self.iniciado_em else None,
+            "concluido_em": self.concluido_em.isoformat() if self.concluido_em else None,
+        }
+
+
 class AccessRequest(db.Model):
     """Solicitacao de acesso a beta privada (issue #112 v2).
 

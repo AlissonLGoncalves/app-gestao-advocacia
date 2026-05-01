@@ -15,6 +15,7 @@ import {
   listTriagem,
   processarLoteTriagem as processarLoteTriagemApi,
   syncDjen,
+  getSyncJobStatus,
   updatePublicacao,
   vincularDecisao,
 } from '../api/djen.js'
@@ -348,14 +349,62 @@ export default function DjenPage() {
     carregarUltimasPublicacoesDjen,
   ])
 
-  // ── Sincronizar ─────────────────────────────────────────────────────────────
+  // ── Sincronizar (B1 2026-05-01: async via djen-worker) ────────────────────
+  // POST /djen/sync retorna 202 + job_id; depois polling em GET /djen/sync/<id>
+  // a cada 3s ate status 'done' ou 'failed'. Timeout 5min total.
   const sincronizar = useCallback(
     async ({ silencioso = false } = {}) => {
       setSyncing(true)
+      let toastId = null
       try {
-        const payload = await syncDjen(diasSync)
-        if (payload) {
-          const resumo = payload?.resumo || {}
+        const enqueueResp = await syncDjen(diasSync)
+        const jobId = enqueueResp?.job_id
+        if (!jobId) {
+          if (!silencioso) toast.error('Falha ao enfileirar sync.')
+          return
+        }
+
+        if (!silencioso) {
+          const reused = enqueueResp?.reused
+          toastId = toast.info(
+            reused ? 'Sync ja em andamento, acompanhando...' : 'Sync iniciado em background...',
+            { autoClose: false, closeButton: false }
+          )
+        }
+
+        // Polling: 3s entre chamadas, max 5 min total
+        const MAX_POLL_ATTEMPTS = 100 // 100 * 3s = 300s = 5min
+        let attempt = 0
+        let finalJob = null
+        while (attempt < MAX_POLL_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, 3000))
+          attempt += 1
+          try {
+            const job = await getSyncJobStatus(jobId)
+            if (job.status === 'done' || job.status === 'failed') {
+              finalJob = job
+              break
+            }
+            // pending ou running: continua polling silenciosamente
+          } catch (e) {
+            // Erro de rede em uma chamada de polling nao aborta — tenta de novo
+            console.warn('Poll error (will retry):', e)
+          }
+        }
+
+        if (toastId !== null) toast.dismiss(toastId)
+
+        if (!finalJob) {
+          if (!silencioso) {
+            toast.warning('Sync ainda em andamento. Recarregue em alguns minutos.', {
+              autoClose: 6000,
+            })
+          }
+          return
+        }
+
+        if (finalJob.status === 'done') {
+          const resumo = finalJob.resumo || {}
           const salvas = resumo.publicacoes_salvas ?? 0
           const encontrados = resumo.itens_encontrados ?? 0
           const oabsProc = resumo.oabs_processadas ?? 0
@@ -370,13 +419,23 @@ export default function DjenPage() {
           await carregarOabs()
           await carregarTriagem()
           await carregarUltimasPublicacoesDjen()
-        } else if (!silencioso) {
-          toast.error('Erro ao sincronizar.')
+        } else {
+          // failed
+          const erro = finalJob.erro || ''
+          if (!silencioso) {
+            if (erro.toLowerCase().includes('rate limit') || erro.includes('429')) {
+              toast.warning(
+                'API do DJEN está limitada. Aguarde alguns minutos e tente novamente.',
+                { autoClose: 6000 }
+              )
+            } else {
+              toast.error(`Sync falhou: ${erro || 'erro desconhecido'}`, { autoClose: 8000 })
+            }
+          }
         }
       } catch (err) {
+        if (toastId !== null) toast.dismiss(toastId)
         if (silencioso) return
-        // Rate limit do DJEN/CNJ — backend retorna 429 com code djen_rate_limit.
-        // Mostrar toast amigavel orientando aguardar, em vez de "erro generico".
         if (err?.status === 429 || err?.payload?.code === 'djen_rate_limit') {
           toast.warning(
             err?.payload?.message ||

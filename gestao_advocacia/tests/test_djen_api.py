@@ -345,24 +345,14 @@ class TestDjenNaoLidas:
 
 
 class TestDjenSync:
-    def test_sync_manual_sucesso(self, auth_client, db):
-        """POST /api/v1/djen/sync inicia a sincronizaÃ§Ã£o manual (mockando o job)."""
-        with patch("djen_tasks.job_monitorar_djen") as mock_job:
-            mock_job.return_value = {
-                "ok": True,
-                "lookback_days": 30,
-                "oabs_processadas": 1,
-                "casos_processados": 0,
-                "itens_encontrados": 2,
-                "publicacoes_salvas": 1,
-                "erros": 0,
-            }
-            resp = auth_client.post("/api/v1/djen/sync", json={"dias": 1})
-        assert resp.status_code == 200
+    def test_sync_manual_enfileira_e_retorna_202(self, auth_client, db):
+        """POST /api/v1/djen/sync agora retorna 202 + job_id (B1 2026-05-01:
+        async via djen-worker). NAO chama job_monitorar_djen sincronamente."""
+        resp = auth_client.post("/api/v1/djen/sync", json={"dias": 1})
+        assert resp.status_code == 202
         data = json.loads(resp.data)
-        assert "message" in data
-        assert "Sincroniza" in data["message"]
-        assert "resumo" in data
+        assert "job_id" in data
+        assert data["status"] == "pending"
 
     def test_sync_sem_autenticacao(self, client, db):
         """POST /api/v1/djen/sync sem token retorna 401."""

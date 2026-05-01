@@ -46,7 +46,10 @@ export const criarClienteCasoTriagem = (pubId, payload) =>
     throw error
   })
 
+// B1 (2026-05-01): /djen/sync agora retorna 202 + job_id (async).
+// Use getSyncJobStatus(id) em polling para acompanhar progresso.
 export const syncDjen = (dias) => api.post('/djen/sync', { dias })
+export const getSyncJobStatus = (jobId) => api.get(`/djen/sync/${jobId}`)
 
 export const baixarCertidao = (pubId) => api.getBlob(`/djen/publicacoes/${pubId}/certidao`)
 

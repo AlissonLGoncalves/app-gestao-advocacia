@@ -1102,13 +1102,19 @@ def registrar_rotas_djen(
     @djen_ns.route("/sync")
     class DjenSyncAPI(Resource):
         @djen_ns.expect(sync_input_dto)
-        @djen_ns.doc(security="jsonWebToken", description="Dispara a sincronização manualmente.")
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Enfileira sync DJEN para o tenant atual. Retorna 202 + job_id."
+                " Use GET /djen/sync/<id> para acompanhar status."
+            ),
+        )
         @jwt_required()
         def post(self):
-            """Dispara busca imediata no DJEN para as OABs e processos do tenant."""
+            """Enfileira sync DJEN (B1 2026-05-01: async via djen-worker)."""
             user_id = get_jwt_identity()
             from app import User
-            from djen_tasks import job_monitorar_djen
+            from models import DjenSyncJob
 
             user = User.query.get(int(user_id))
             if not user:
@@ -1122,35 +1128,69 @@ def registrar_rotas_djen(
                 dias = 30
             dias = max(1, min(dias, 365))
 
-            from flask import current_app
-
-            from djen_service import DjenRateLimitError
-
-            try:
-                resumo = job_monitorar_djen(
-                    current_app._get_current_object(),
-                    lookback_days=dias,
-                    tenant_id=user.tenant_id,
-                    force=True,
+            # De-duplicacao simples: se ja ha job pending OR running para o
+            # mesmo tenant, reusar (em vez de empilhar varios). Evita rajadas
+            # se o user clicar 5x no botao.
+            existente = (
+                DjenSyncJob.query.filter(
+                    DjenSyncJob.tenant_id == user.tenant_id,
+                    DjenSyncJob.status.in_(["pending", "running"]),
                 )
+                .order_by(DjenSyncJob.criado_em.desc())
+                .first()
+            )
+            if existente:
                 return {
-                    "message": f"Sincronização concluída (janela: {dias} dia(s)).",
-                    "resumo": resumo,
-                }, 200
-            except DjenRateLimitError as e:
-                # ComunicaAPI/CNJ retornou 429 — refletir como 429 ao cliente
-                # com mensagem orientativa, em vez de 500.
-                logger.warning(f"DJEN rate limit no sync manual: {e}")
-                return {
-                    "message": (
-                        "API do DJEN (CNJ) retornou rate limit. Aguarde alguns minutos "
-                        "e tente novamente. Se persistir, reduza a janela de dias."
-                    ),
-                    "code": "djen_rate_limit",
-                }, 429
-            except Exception as e:
-                logger.error(f"Erro no sync DJEN manual: {e}", exc_info=True)
-                djen_ns.abort(500, "Erro ao iniciar sincronização.")
+                    "message": "Sync ja esta em andamento.",
+                    "job_id": existente.id,
+                    "status": existente.status,
+                    "reused": True,
+                }, 202
+
+            job = DjenSyncJob(
+                tenant_id=user.tenant_id,
+                user_id=user.id,
+                status="pending",
+                lookback_days=dias,
+            )
+            db.session.add(job)
+            db.session.commit()
+
+            logger.info(
+                "djen_sync_enqueued",
+                extra={
+                    "event": "djen_sync_enqueued",
+                    "job_id": job.id,
+                    "tenant_id": user.tenant_id,
+                    "lookback_days": dias,
+                },
+            )
+
+            return {
+                "message": "Sync enfileirado. Processamento em background.",
+                "job_id": job.id,
+                "status": "pending",
+            }, 202
+
+    @djen_ns.route("/sync/<int:job_id>")
+    class DjenSyncJobStatusAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description="Status de um job de sync DJEN (filtrado por tenant do JWT).",
+        )
+        @jwt_required()
+        def get(self, job_id):
+            user_id = get_jwt_identity()
+            from app import User
+            from models import DjenSyncJob
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            job = DjenSyncJob.query.get(job_id)
+            if not job or job.tenant_id != user.tenant_id:
+                djen_ns.abort(404, "Job nao encontrado.")
+            return job.to_dict(), 200
 
     # ── Tribunais (proxy) ─────────────────────────────────────────────────────
     @djen_ns.route("/tribunais")
