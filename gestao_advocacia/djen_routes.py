@@ -1124,6 +1124,8 @@ def registrar_rotas_djen(
 
             from flask import current_app
 
+            from djen_service import DjenRateLimitError
+
             try:
                 resumo = job_monitorar_djen(
                     current_app._get_current_object(),
@@ -1135,6 +1137,17 @@ def registrar_rotas_djen(
                     "message": f"Sincronização concluída (janela: {dias} dia(s)).",
                     "resumo": resumo,
                 }, 200
+            except DjenRateLimitError as e:
+                # ComunicaAPI/CNJ retornou 429 — refletir como 429 ao cliente
+                # com mensagem orientativa, em vez de 500.
+                logger.warning(f"DJEN rate limit no sync manual: {e}")
+                return {
+                    "message": (
+                        "API do DJEN (CNJ) retornou rate limit. Aguarde alguns minutos "
+                        "e tente novamente. Se persistir, reduza a janela de dias."
+                    ),
+                    "code": "djen_rate_limit",
+                }, 429
             except Exception as e:
                 logger.error(f"Erro no sync DJEN manual: {e}", exc_info=True)
                 djen_ns.abort(500, "Erro ao iniciar sincronização.")
