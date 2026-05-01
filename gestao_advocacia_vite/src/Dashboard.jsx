@@ -4,6 +4,7 @@ import { API_URL } from './config.js'
 import { listProximos } from './api/agenda.js'
 import { syncDjen, listOabs } from './api/djen.js'
 import MovimentacoesRecentes from './components/MovimentacoesRecentes.jsx'
+import OnboardingChecklist from './components/OnboardingChecklist.jsx'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -474,6 +475,15 @@ function Dashboard({ mudarSecao }) {
       )}
 
       {/* ── Stat Cards ──────────────────────────────────────────────────────── */}
+      <OnboardingChecklist
+        stats={{
+          totalClientes: stats.totalClientes,
+          casosAtivos: stats.casosAtivos,
+          oabsMonitoradas: oabsMonitoradas,
+          recebimentosPendentesQtd: stats.recebimentosPendentesQtd,
+        }}
+      />
+
       <div className="row g-3">
         <div className="col-sm-6 col-lg-3">
           <StatCard

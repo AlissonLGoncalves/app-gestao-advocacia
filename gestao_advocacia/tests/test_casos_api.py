@@ -7,7 +7,7 @@ from io import BytesIO
 from unittest.mock import patch
 
 from app import Caso
-from models import MovimentacaoCNJ
+from models import MovimentacaoCNJ, PublicacaoDJEN
 
 CASO_BASE = {
     "titulo": "Caso Teste Inicial",
@@ -300,3 +300,70 @@ def test_atualizar_cnj_sem_novas_atualiza_status_para_ultimo_movimento(auth_clie
     caso_atualizado = db.session.get(Caso, caso_id)
     assert caso_atualizado.status == "Definitivo"
     assert caso_atualizado.data_atualizacao == data_mais_recente
+
+
+def test_gerar_resumo_caso_com_publicacoes_djen_persiste_descricao(auth_client, db):
+    cliente_id = criar_cliente_teste(auth_client)
+    res_post = auth_client.post(
+        "/api/v1/casos",
+        json={
+            **CASO_BASE,
+            "cliente_id": cliente_id,
+            "numero_processo": "0000704-42.2022.8.16.0124",
+            "descricao": "",
+        },
+    )
+    assert res_post.status_code == 201
+    caso_id = json.loads(res_post.data)["id"]
+    caso_db = db.session.get(Caso, caso_id)
+
+    db.session.add(
+        PublicacaoDJEN(
+            tenant_id=caso_db.tenant_id,
+            user_id=caso_db.user_id,
+            caso_id=caso_id,
+            data_disponibilizacao=date(2026, 5, 1),
+            tipo_comunicacao="Intimação",
+            texto="Intima-se a parte autora para manifestação em 15 dias sobre o laudo pericial.",
+            sigla_tribunal="TJPR",
+            nome_orgao="2ª Vara Cível de Curitiba",
+        )
+    )
+    db.session.commit()
+
+    resumo_gerado = (
+        "Ação cível com intimação recente para manifestação da parte autora sobre laudo pericial, "
+        "no prazo de 15 dias, perante a 2ª Vara Cível de Curitiba. Próximo passo: preparar petição de resposta."
+    )
+
+    class FakeResponse:
+        text = resumo_gerado
+
+    class FakeModels:
+        def __init__(self):
+            self.calls = []
+
+        def generate_content(self, model, contents):
+            self.calls.append({"model": model, "contents": contents})
+            return FakeResponse()
+
+    class FakeClient:
+        def __init__(self):
+            self.models = FakeModels()
+
+    fake_client = FakeClient()
+
+    with patch("routes.casos.gemini_is_enabled", return_value=True):
+        with patch("routes.casos.get_gemini_client", return_value=fake_client):
+            response = auth_client.post(f"/api/v1/casos/{caso_id}/gerar-resumo")
+
+    assert response.status_code == 200, response.data
+    payload = json.loads(response.data)
+    assert payload["resumo"] == resumo_gerado
+    assert "Resumo gerado e salvo" in payload["message"]
+    assert fake_client.models.calls[0]["model"] == "gemini-2.5-flash"
+    assert "próximo passo prático para o advogado" in fake_client.models.calls[0]["contents"]
+    assert "laudo pericial" in fake_client.models.calls[0]["contents"]
+
+    caso_atualizado = db.session.get(Caso, caso_id)
+    assert caso_atualizado.descricao == resumo_gerado

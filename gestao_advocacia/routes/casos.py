@@ -12,6 +12,7 @@ from djen_tasks import (
     _salvar_publicacao,
 )
 from extensions import db
+from gemini_service import get_gemini_client, is_enabled as gemini_is_enabled
 from helpers import get_item_or_404, get_tenant_id, query_for_tenant, tenant_scoped
 from models import Caso, Cliente, Documento, MovimentacaoCNJ, PublicacaoDJEN, TarefaPrazo, log_audit
 from ocr_service import extract_case_data_from_file
@@ -829,6 +830,79 @@ def register_casos_routes(
                 }
                 for p in publicacoes
             ], 200
+
+    @casos_ns.route("/<int:caso_id>/gerar-resumo")
+    @casos_ns.param("caso_id", "ID do caso para gerar resumo via IA")
+    class CasoGerarResumoAPI(Resource):
+        @casos_ns.doc("gerar_resumo_caso_endpoint", security="jsonWebToken")
+        @jwt_required()
+        @tenant_scoped
+        def post(self, caso_id):
+            if not gemini_is_enabled():
+                casos_ns.abort(503, message="Serviço de IA não configurado.")
+
+            tenant_id = get_tenant_id()
+            caso_db = query_for_tenant(Caso).filter_by(id=caso_id).first()
+            if not caso_db:
+                casos_ns.abort(404, message=f"Caso com ID {caso_id} não foi encontrado.")
+
+            publicacoes = (
+                PublicacaoDJEN.query.filter_by(tenant_id=tenant_id, caso_id=caso_db.id)
+                .order_by(PublicacaoDJEN.data_disponibilizacao.desc(), PublicacaoDJEN.id.desc())
+                .limit(10)
+                .all()
+            )
+            if not publicacoes:
+                casos_ns.abort(422, message="Nenhuma publicação DJEN disponível para resumir.")
+
+            trechos = []
+            for publicacao in publicacoes:
+                data_str = (
+                    publicacao.data_disponibilizacao.strftime("%d/%m/%Y")
+                    if publicacao.data_disponibilizacao
+                    else "data desconhecida"
+                )
+                orgao = publicacao.nome_orgao or publicacao.sigla_tribunal or "órgão não informado"
+                texto = (publicacao.texto or "").strip()[:2500]
+                trechos.append(
+                    f"[{data_str}] Tipo: {publicacao.tipo_comunicacao or 'Publicação'} | Órgão: {orgao}\n{texto}"
+                )
+            contexto = "\n\n---\n\n".join(trechos)
+
+            prompt = (
+                "Você é um assistente jurídico sênior. Analise as publicações do DJEN e produza um "
+                "resumo processual objetivo, útil para preencher a descrição interna de um caso em um "
+                "software jurídico. Responda em português do Brasil, sem inventar fatos.\n\n"
+                "Estruture a resposta em um único texto corrido, com no máximo 6 linhas, cobrindo quando "
+                "possível: partes identificáveis, natureza da ação, fase ou situação processual atual, "
+                "última providência/intimação, e próximo passo prático para o advogado. Se alguma "
+                "informação não estiver nas publicações, simplesmente omita.\n\n"
+                f"Publicações DJEN:\n\n{contexto}"
+            )
+
+            client = get_gemini_client()
+            if client is None:
+                casos_ns.abort(503, message="Cliente de IA indisponível.")
+
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                )
+                resumo = (getattr(response, "text", None) or "").strip()
+            except Exception as exc:
+                casos_ns.abort(502, message=f"Erro ao chamar IA: {str(exc)}")
+
+            if not resumo:
+                casos_ns.abort(502, message="IA retornou resposta vazia.")
+
+            caso_db.descricao = resumo
+            db.session.commit()
+
+            return {
+                "resumo": resumo,
+                "message": "Resumo gerado e salvo na descrição do caso.",
+            }, 200
 
     @casos_ns.route("/<int:caso_id>/timeline")
     @casos_ns.param("caso_id", "ID do caso")
