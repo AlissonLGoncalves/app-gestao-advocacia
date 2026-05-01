@@ -360,46 +360,89 @@ def analisar_com_ia(publicacao):
     if not texto or len(texto) < 50:
         return None
 
-    # Trunca textos enormes (alguns autos completos passam de 50k chars)
-    texto_input = texto[:8000]
+    # Trunca textos muito grandes mas mantém contexto generoso (32k chars cobre
+    # a maior parte das intimações e até autos médios). Modelos atuais aceitam
+    # bem mais — limitamos só pra economizar tokens.
+    texto_input = texto[:32000]
 
-    prompt = f"""Voce e um analista juridico brasileiro. Extraia entidades estruturadas de uma
-publicacao do DJEN (Diario de Justica Eletronico Nacional) e retorne APENAS JSON valido,
-sem markdown, sem texto fora do JSON.
+    raw_json = getattr(publicacao, "raw_json", None) or {}
+    contexto_extra = ""
+    if isinstance(raw_json, dict):
+        partes_api = raw_json.get("partes") or raw_json.get("polo") or []
+        if partes_api:
+            try:
+                import json as _json  # noqa: PLC0415
 
-ESTRUTURA OBRIGATORIA:
+                contexto_extra = (
+                    "\n\nCONTEXTO ADICIONAL (partes vindas da API DJEN, formato bruto):\n"
+                    + _json.dumps(partes_api, ensure_ascii=False)[:2000]
+                )
+            except Exception:
+                contexto_extra = ""
+
+    prompt = f"""Voce e um analista juridico brasileiro especialista em extrair entidades
+estruturadas de publicacoes do DJEN (Diario de Justica Eletronico Nacional).
+Sua resposta DEVE ser APENAS JSON valido, sem markdown, sem texto fora do JSON.
+
+ESTRUTURA OBRIGATORIA (todos os campos sao obrigatorios — use null/lista vazia se nao tiver):
 {{
-  "numero_processo": "string CNJ no formato NNNNNNN-DD.AAAA.J.TR.OOOO ou null",
-  "tribunal": "sigla do tribunal: TJPR, TJSP, TRF4, TRT9, etc. ou null",
-  "classe_processual": "string ou null",
-  "assunto_principal": "string ou null",
-  "valor_causa": "string com R$ e numero, ou null",
-  "comarca": "nome da comarca ou null",
-  "nome_juiz": "nome completo do magistrado ou null",
-  "partes_autoras": ["lista de nomes dos autores/requerentes/exequentes/polo ativo"],
-  "partes_reus": ["lista de nomes dos reus/requeridos/executados/polo passivo"],
-  "representantes": ["lista de nomes dos advogados/procuradores"],
-  "oabs_encontradas": ["lista de OABs no formato 'OAB/UF NNNNN'"],
-  "documentos_extraidos": ["lista de CPFs/CNPJs com mascara"]
+  "numero_processo": "string no formato CNJ NNNNNNN-DD.AAAA.J.TR.OOOO, ou null",
+  "tribunal": "sigla do tribunal: TJPR, TJSP, TRF4, TRT9, STJ, etc., ou null",
+  "classe_processual": "ex: 'Procedimento Comum Civel', 'Acao Trabalhista - Rito Sumarissimo', 'Cumprimento de Sentenca', ou null",
+  "assunto_principal": "ex: 'Indenizacao por Danos Morais', 'Verbas Rescisorias', ou null",
+  "valor_causa": "string com R$ e numero formatado (ex: 'R$ 15.000,00'), ou null",
+  "comarca": "nome da comarca/secao judiciaria, ex: 'Curitiba', 'Cornelio Procopio', ou null",
+  "nome_juiz": "nome completo do magistrado, ou null",
+
+  "partes_autoras": [
+    {{
+      "nome": "nome COMPLETO da parte autora",
+      "tipo_pessoa": "PF" ou "PJ",
+      "cpf_cnpj": "CPF NNN.NNN.NNN-NN ou CNPJ NN.NNN.NNN/NNNN-NN, ou null",
+      "advogados": ["nome do(s) advogado(s) DESTA parte, separados — NUNCA junte com o nome da parte"],
+      "oabs": ["OAB no formato 'OAB/UF NNNNNN' do(s) advogado(s) DESTA parte"]
+    }}
+  ],
+  "partes_reus": [
+    {{ "nome": "...", "tipo_pessoa": "PF|PJ", "cpf_cnpj": "...|null", "advogados": [...], "oabs": [...] }}
+  ]
 }}
 
-REGRAS CRITICAS:
-1. NUNCA misture nome de parte com nome de advogado. Se ler "AUTOR: JOAO ADVOGADO(A): MARIA",
-   parte_autora = ["JOAO"] e representantes = ["MARIA"], NUNCA ["JOAO ADVOGADO(A): MARIA"].
-2. Se a publicacao mencionar varios autores ou varios reus, liste TODOS separadamente.
-3. Para CPF use formato NNN.NNN.NNN-NN. Para CNPJ NN.NNN.NNN/NNNN-NN.
-4. Liste apenas o que estiver EXPLICITO no texto. Nao invente.
-5. Quando um campo nao constar, use null ou lista vazia.
+REGRAS CRITICAS DE EXTRACAO:
+1. NUNCA cole nome de parte com nome de advogado. Se ler "AUTOR: LETICIA CARLA DA SILVA
+   ADVOGADO(A): JOSE": parte_autora.nome = "LETICIA CARLA DA SILVA" e
+   parte_autora.advogados = ["JOSE"]. NUNCA "LETICIA CARLA DA SILVA ADVOGADO(A): JOSE".
+2. CPF/CNPJ: associe a CADA PARTE o documento que aparece imediatamente proximo a ela
+   no texto (mesmo que sem label "CPF:"). Se a publicacao listar so um CPF e tem so
+   uma parte fisica, atribua a ela. Use formato NNN.NNN.NNN-NN para CPF e
+   NN.NNN.NNN/NNNN-NN para CNPJ. Se nao houver, use null.
+3. tipo_pessoa: PJ se nome contem LTDA/SA/S.A./ME/EIRELI/EPP/Banco/Cooperativa, ou se
+   o documento for CNPJ (14 digitos). PF caso contrario.
+4. Se a publicacao tem multiplos autores ou reus, liste TODOS separadamente como
+   objetos distintos no array.
+5. valor_causa: procure literais como "Valor da causa", "Valor atribuido", "Valor:".
+   Inclua o R\\$ e numero exatamente como aparece.
+6. classe_processual: priorize o nome da classe (ex.: "Procedimento Comum Civel"),
+   nao o numero da classe.
+7. SEMPRE responda em JSON valido — sem virgula sobrando, sem comentarios,
+   sem markdown, sem ```json ```.
+8. Liste APENAS o que estiver EXPLICITO no texto. Nao invente.
 
 PUBLICACAO:
-{texto_input}
+{texto_input}{contexto_extra}
 """
 
     try:
         from flask import current_app  # noqa: PLC0415
 
+        # Default flash (rapido/barato). Configurando GEMINI_TRIAGEM_MODEL pra
+        # 'gemini-2.5-pro' melhora muito a precisao em pubs longas/bagunçadas.
         model = current_app.config.get("GEMINI_TRIAGEM_MODEL", "gemini-2.5-flash")
-        response = client.models.generate_content(model=model, contents=prompt)
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config={"response_mime_type": "application/json"},
+        )
     except Exception as exc:
         try:
             from flask import current_app  # noqa: PLC0415
@@ -428,20 +471,82 @@ PUBLICACAO:
     if not isinstance(parsed, dict):
         return None
 
-    # Sanitiza retorno e calcula confianca apos extracao da IA
-    autores = [str(x).strip() for x in (parsed.get("partes_autoras") or []) if x]
-    reus = [str(x).strip() for x in (parsed.get("partes_reus") or []) if x]
-    representantes = [str(x).strip() for x in (parsed.get("representantes") or []) if x]
-    oabs = [str(x).strip() for x in (parsed.get("oabs_encontradas") or []) if x]
-    docs = [str(x).strip() for x in (parsed.get("documentos_extraidos") or []) if x]
-    numero_processo = (parsed.get("numero_processo") or "").strip() or None
-    tribunal = (parsed.get("tribunal") or "").strip() or None
+    def _norm_str(v):
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s or None
 
-    # Mesmo scoring do regex pra manter compatibilidade com revisao_manual_recomendada
+    def _norm_parte(p):
+        """Aceita objeto estruturado (novo formato) ou string solta (formato antigo)."""
+        if isinstance(p, dict):
+            return {
+                "nome": _norm_str(p.get("nome")) or "",
+                "tipo_pessoa": (
+                    (p.get("tipo_pessoa") or "PF").strip().upper() if p.get("tipo_pessoa") else "PF"
+                ),
+                "cpf_cnpj": _norm_str(p.get("cpf_cnpj")),
+                "advogados": [
+                    str(a).strip() for a in (p.get("advogados") or []) if str(a or "").strip()
+                ],
+                "oabs": [str(o).strip() for o in (p.get("oabs") or []) if str(o or "").strip()],
+            }
+        # fallback: string -> objeto minimo
+        nome = _norm_str(p)
+        if not nome:
+            return None
+        return {
+            "nome": nome,
+            "tipo_pessoa": "PF",
+            "cpf_cnpj": None,
+            "advogados": [],
+            "oabs": [],
+        }
+
+    autores_objs = [n for n in (_norm_parte(p) for p in (parsed.get("partes_autoras") or [])) if n]
+    reus_objs = [n for n in (_norm_parte(p) for p in (parsed.get("partes_reus") or [])) if n]
+
+    # Remove partes sem nome real
+    autores_objs = [a for a in autores_objs if a.get("nome")]
+    reus_objs = [r for r in reus_objs if r.get("nome")]
+
+    # Listas planas pra retrocompat com codigo antigo (regex/auto-vinculo)
+    autores_nomes = [a["nome"] for a in autores_objs]
+    reus_nomes = [r["nome"] for r in reus_objs]
+    representantes = []
+    oabs = []
+    docs = []
+    for p in autores_objs + reus_objs:
+        representantes.extend(p.get("advogados") or [])
+        oabs.extend(p.get("oabs") or [])
+        if p.get("cpf_cnpj"):
+            docs.append(p["cpf_cnpj"])
+    representantes = list(dict.fromkeys(representantes))
+    oabs = list(dict.fromkeys(oabs))
+    docs = list(dict.fromkeys(docs))
+
+    # Aceita tambem o formato antigo se o modelo retornar
+    for r in parsed.get("representantes") or []:
+        s = _norm_str(r)
+        if s and s not in representantes:
+            representantes.append(s)
+    for o in parsed.get("oabs_encontradas") or []:
+        s = _norm_str(o)
+        if s and s not in oabs:
+            oabs.append(s)
+    for d in parsed.get("documentos_extraidos") or []:
+        s = _norm_str(d)
+        if s and s not in docs:
+            docs.append(s)
+
+    numero_processo = _norm_str(parsed.get("numero_processo"))
+    tribunal = _norm_str(parsed.get("tribunal"))
+
+    # Scoring
     confidence = 0.0
     if numero_processo:
         confidence += 0.35
-    if autores or reus:
+    if autores_nomes or reus_nomes:
         confidence += 0.25
     if representantes:
         confidence += 0.15
@@ -451,22 +556,25 @@ PUBLICACAO:
         confidence += 0.05
     if docs:
         confidence += 0.10
-    # Bonus pra IA: estrutura limpa garante +0.10 (separou autor de advogado)
     confidence = round(min(confidence + 0.10, 1.0), 2)
 
     return {
         "numero_processo": numero_processo,
         "tribunal": tribunal,
-        "classe_processual": (parsed.get("classe_processual") or "").strip() or None,
-        "assunto_principal": (parsed.get("assunto_principal") or "").strip() or None,
-        "valor_causa": (parsed.get("valor_causa") or "").strip() or None,
-        "comarca": (parsed.get("comarca") or "").strip() or None,
-        "nome_juiz": (parsed.get("nome_juiz") or "").strip() or None,
-        "partes_autoras": autores,
-        "partes_reus": reus,
+        "classe_processual": _norm_str(parsed.get("classe_processual")),
+        "assunto_principal": _norm_str(parsed.get("assunto_principal")),
+        "valor_causa": _norm_str(parsed.get("valor_causa")),
+        "comarca": _norm_str(parsed.get("comarca")),
+        "nome_juiz": _norm_str(parsed.get("nome_juiz")),
+        # Listas planas pra retrocompatibilidade
+        "partes_autoras": autores_nomes,
+        "partes_reus": reus_nomes,
         "representantes": representantes,
         "oabs_encontradas": oabs,
         "documentos_extraidos": docs,
+        # Novo: objetos estruturados pra wizard usar (CPF associado, advogado da parte)
+        "partes_autoras_estruturadas": autores_objs,
+        "partes_reus_estruturadas": reus_objs,
         "confianca": confidence,
         "revisao_manual_recomendada": confidence < 0.6,
         "fonte_analise": "ia_gemini",

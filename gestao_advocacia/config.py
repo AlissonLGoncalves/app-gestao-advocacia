@@ -96,6 +96,10 @@ class Config:
     CNJ_API_KEY = os.environ.get("CNJ_API_KEY", "")
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
     GEMINI_PROCURACAO_MODEL = os.environ.get("GEMINI_PROCURACAO_MODEL", "gemini-2.5-flash")
+    # Triagem precisa extracao precisa (CPF associado a parte, advogados separados,
+    # valor causa, parte contraria). 'gemini-2.5-pro' eh ~5x melhor para isso. Custo
+    # cresce mas o volume eh baixo (so quando usuario clica num grupo).
+    GEMINI_TRIAGEM_MODEL = os.environ.get("GEMINI_TRIAGEM_MODEL", "gemini-2.5-pro")
     APP_VERSION = os.environ.get("APP_VERSION") or "1.7.0"
 
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()

@@ -547,7 +547,22 @@ function TriagemAssistidaPage() {
                               {parte.cpf_cnpj_sugerido}
                             </span>
                           )}
+                          {parte.oabs?.length > 0 && (
+                            <span
+                              className="badge bg-info-subtle text-info border"
+                              title="OAB(s) do(s) advogado(s) desta parte"
+                            >
+                              <i className="bi bi-person-badge me-1" />
+                              {parte.oabs.join(', ')}
+                            </span>
+                          )}
                         </div>
+                        {parte.advogados?.length > 0 && (
+                          <div className="mt-2 small text-muted">
+                            <i className="bi bi-briefcase me-1" />
+                            Advogado(s): {parte.advogados.join(', ')}
+                          </div>
+                        )}
                       </div>
                     </button>
                   </div>
