@@ -20,14 +20,17 @@ from app import (  # Importa a factory e o objeto db
 from app import db as _db
 from config_test import ConfigTest  # Importa a configuração de teste
 from models import (
+    AuditLog,
     Caso,
     Cliente,
+    ConsentimentoUsuario,
     ContratoHonorario,
     Despesa,
     DjenOabMonitoramento,
     DjenVinculoDecisao,
     Documento,
     EventoAgenda,
+    LoginAudit,
     MovimentacaoCNJ,
     ProcuracaoAnalise,
     PublicacaoDJEN,
@@ -72,6 +75,12 @@ class TwoTenantsFixture(NamedTuple):
     djen_vinculo_b: DjenVinculoDecisao
     procuracao_a: ProcuracaoAnalise
     procuracao_b: ProcuracaoAnalise
+    audit_log_a: AuditLog
+    audit_log_b: AuditLog
+    login_audit_a: LoginAudit
+    login_audit_b: LoginAudit
+    consentimento_a: ConsentimentoUsuario
+    consentimento_b: ConsentimentoUsuario
 
 
 @pytest.fixture(scope="session")
@@ -424,6 +433,52 @@ def two_tenants(db) -> TwoTenantsFixture:
         status="done",
     )
     db.session.add_all([procuracao_a, procuracao_b])
+    db.session.flush()
+
+    # Cluster auth (Batch 4)
+    audit_log_a = AuditLog(
+        tenant_id=tenant_a.id,
+        user_id=admin_a.id,
+        acao="create",
+        tabela_afetada="caso",
+        registro_id=caso_a.id,
+    )
+    audit_log_b = AuditLog(
+        tenant_id=tenant_b.id,
+        user_id=admin_b.id,
+        acao="create",
+        tabela_afetada="caso",
+        registro_id=caso_b.id,
+    )
+    db.session.add_all([audit_log_a, audit_log_b])
+
+    login_audit_a = LoginAudit(
+        tenant_id=tenant_a.id,
+        user_id=admin_a.id,
+        email_tentativa=admin_a.email,
+        sucesso=True,
+    )
+    login_audit_b = LoginAudit(
+        tenant_id=tenant_b.id,
+        user_id=admin_b.id,
+        email_tentativa=admin_b.email,
+        sucesso=True,
+    )
+    db.session.add_all([login_audit_a, login_audit_b])
+
+    consentimento_a = ConsentimentoUsuario(
+        tenant_id=tenant_a.id,
+        user_id=admin_a.id,
+        tipo="termos_uso",
+        versao="v1.0",
+    )
+    consentimento_b = ConsentimentoUsuario(
+        tenant_id=tenant_b.id,
+        user_id=admin_b.id,
+        tipo="termos_uso",
+        versao="v1.0",
+    )
+    db.session.add_all([consentimento_a, consentimento_b])
     db.session.commit()
 
     return TwoTenantsFixture(
@@ -458,6 +513,12 @@ def two_tenants(db) -> TwoTenantsFixture:
         djen_vinculo_b=djen_vinculo_b,
         procuracao_a=procuracao_a,
         procuracao_b=procuracao_b,
+        audit_log_a=audit_log_a,
+        audit_log_b=audit_log_b,
+        login_audit_a=login_audit_a,
+        login_audit_b=login_audit_b,
+        consentimento_a=consentimento_a,
+        consentimento_b=consentimento_b,
     )
 
 
