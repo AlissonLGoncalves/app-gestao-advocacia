@@ -57,8 +57,7 @@ const formatarData = (iso) => {
 /** Renderiza campo de label:valor para o detalhe da movimentação CNJ */
 function CampoDetalhe({ label, valor }) {
   if (valor === null || valor === undefined || valor === '') return null
-  const texto =
-    typeof valor === 'object' ? JSON.stringify(valor, null, 2) : String(valor)
+  const texto = typeof valor === 'object' ? JSON.stringify(valor, null, 2) : String(valor)
   return (
     <div className="mb-1">
       <span className="text-muted" style={{ fontSize: '0.72rem', fontWeight: 600 }}>
@@ -335,8 +334,8 @@ export default function CasoTimeline({ casoId }) {
   if (items.length === 0) {
     return (
       <p className="text-muted fst-italic text-center py-3 small mb-0">
-        Sem eventos registrados para este caso ainda. Clique em "Verificar Publicações no DJEN" para sincronizar.
-        Documentos anexados e tarefas também aparecerão aqui em ordem cronológica.
+        Sem eventos registrados para este caso ainda. Clique em "Verificar Publicações no DJEN" para
+        sincronizar. Documentos anexados e tarefas também aparecerão aqui em ordem cronológica.
       </p>
     )
   }
@@ -449,11 +448,13 @@ export default function CasoTimeline({ casoId }) {
           >
             {expandidoTodos ? (
               <>
-                <ChevronUpIcon style={{ width: 14, height: 14 }} /> Recolher ({items.length - ITENS_INICIAIS} ocultos)
+                <ChevronUpIcon style={{ width: 14, height: 14 }} /> Recolher (
+                {items.length - ITENS_INICIAIS} ocultos)
               </>
             ) : (
               <>
-                <ChevronDownIcon style={{ width: 14, height: 14 }} /> Ver todos ({items.length} eventos)
+                <ChevronDownIcon style={{ width: 14, height: 14 }} /> Ver todos ({items.length}{' '}
+                eventos)
               </>
             )}
           </button>

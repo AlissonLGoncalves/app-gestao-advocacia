@@ -18,7 +18,8 @@ const PASSOS = [
   {
     id: 'caso',
     titulo: 'Crie um caso',
-    descricao: 'Cadastre o processo com o número CNJ (ex: 0000000-00.0000.8.00.0000) para habilitar a sincronização automática.',
+    descricao:
+      'Cadastre o processo com o número CNJ (ex: 0000000-00.0000.8.00.0000) para habilitar a sincronização automática.',
     acao: '/casos',
     acaoLabel: 'Ir para Casos',
     verificar: (stats) => stats.casosAtivos > 0,
@@ -26,7 +27,8 @@ const PASSOS = [
   {
     id: 'djen',
     titulo: 'Configure o monitoramento DJEN',
-    descricao: 'Informe sua OAB para receber automaticamente as publicações do Diário da Justiça Eletrônico.',
+    descricao:
+      'Informe sua OAB para receber automaticamente as publicações do Diário da Justiça Eletrônico.',
     acao: '/djen',
     acaoLabel: 'Configurar DJEN',
     verificar: (stats) => stats.oabConfigurada,
@@ -60,7 +62,8 @@ export default function OnboardingChecklist({ stats }) {
     casosAtivos: stats?.casosAtivos ?? 0,
     oabConfigurada: (stats?.oabsMonitoradas ?? 0) > 0,
     temPrazo: false, // conservador: não temos esse dado no stats geral ainda
-    temRecebimento: (stats?.recebimentosPendentesQtd ?? 0) > 0 || (stats?.recebimentosPagosQtd ?? 0) > 0,
+    temRecebimento:
+      (stats?.recebimentosPendentesQtd ?? 0) > 0 || (stats?.recebimentosPagosQtd ?? 0) > 0,
   }
 
   const passosConcluidos = PASSOS.filter((p) => p.verificar(statsCompletos))
@@ -90,7 +93,9 @@ export default function OnboardingChecklist({ stats }) {
         onClick={() => setRecolhido((v) => !v)}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setRecolhido((v) => !v) }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') setRecolhido((v) => !v)
+        }}
       >
         <div className="d-flex align-items-center gap-3">
           <div>
