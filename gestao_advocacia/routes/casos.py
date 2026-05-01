@@ -855,8 +855,14 @@ def register_casos_routes(
             if not publicacoes:
                 casos_ns.abort(422, message="Nenhuma publicação DJEN disponível para resumir.")
 
+            # Ordenar do mais antigo para o mais recente para dar contexto cronológico à IA
+            publicacoes_cronologicas = sorted(
+                publicacoes,
+                key=lambda p: p.data_disponibilizacao or datetime.min,
+            )
+
             trechos = []
-            for publicacao in publicacoes:
+            for publicacao in publicacoes_cronologicas:
                 data_str = (
                     publicacao.data_disponibilizacao.strftime("%d/%m/%Y")
                     if publicacao.data_disponibilizacao
@@ -869,15 +875,30 @@ def register_casos_routes(
                 )
             contexto = "\n\n---\n\n".join(trechos)
 
+            data_mais_recente = publicacoes_cronologicas[-1].data_disponibilizacao
+            data_mais_antiga = publicacoes_cronologicas[0].data_disponibilizacao
+            periodo_str = (
+                f"{data_mais_antiga.strftime('%d/%m/%Y')} a {data_mais_recente.strftime('%d/%m/%Y')}"
+                if data_mais_antiga and data_mais_recente
+                else "período desconhecido"
+            )
+
             prompt = (
-                "Você é um assistente jurídico sênior. Analise as publicações do DJEN e produza um "
-                "resumo processual objetivo, útil para preencher a descrição interna de um caso em um "
-                "software jurídico. Responda em português do Brasil, sem inventar fatos.\n\n"
-                "Estruture a resposta em um único texto corrido, com no máximo 6 linhas, cobrindo quando "
-                "possível: partes identificáveis, natureza da ação, fase ou situação processual atual, "
-                "última providência/intimação, e próximo passo prático para o advogado. Se alguma "
-                "informação não estiver nas publicações, simplesmente omita.\n\n"
-                f"Publicações DJEN:\n\n{contexto}"
+                "Você é um assistente jurídico sênior. Analise as publicações do DJEN fornecidas e produza um "
+                "resumo processual objetivo para uso interno em um software jurídico. "
+                "Responda em português do Brasil.\n\n"
+                "REGRAS OBRIGATÓRIAS:\n"
+                "1. Baseie o resumo EXCLUSIVAMENTE no conteúdo das publicações abaixo. Não invente fatos.\n"
+                "2. A situação do processo deve refletir a ÚLTIMA publicação disponível — não presuma "
+                "o estado atual se ele não constar nas publicações.\n"
+                "3. Se a última publicação indicar arquivamento, encerramento ou trânsito em julgado, "
+                "mencione isso claramente como o estado final registrado.\n"
+                "4. Não sugira 'próximo passo' se o processo aparenta encerrado.\n\n"
+                f"Período coberto pelas publicações: {periodo_str}\n\n"
+                "Estruture em um único parágrafo com no máximo 6 linhas, cobrindo: partes identificáveis, "
+                "natureza da ação, situação processual conforme última publicação disponível, e "
+                "última providência registrada. Omita o que não constar nas publicações.\n\n"
+                f"Publicações DJEN (ordem cronológica, da mais antiga à mais recente):\n\n{contexto}"
             )
 
             client = get_gemini_client()
