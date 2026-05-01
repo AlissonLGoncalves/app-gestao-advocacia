@@ -362,7 +362,8 @@ def test_gerar_resumo_caso_com_publicacoes_djen_persiste_descricao(auth_client, 
     assert payload["resumo"] == resumo_gerado
     assert "Resumo gerado e salvo" in payload["message"]
     assert fake_client.models.calls[0]["model"] == "gemini-2.5-flash"
-    assert "próximo passo prático para o advogado" in fake_client.models.calls[0]["contents"]
+    assert "REGRAS OBRIGATÓRIAS" in fake_client.models.calls[0]["contents"]
+    assert "Publicações DJEN" in fake_client.models.calls[0]["contents"]
     assert "laudo pericial" in fake_client.models.calls[0]["contents"]
 
     caso_atualizado = db.session.get(Caso, caso_id)
