@@ -1040,23 +1040,36 @@ def registrar_rotas_djen(
                         # Reusa o caso existente em vez de duplicar
                         caso_obj = existente
                 if caso_obj is None:
+                    # Trunca defensivamente todos os campos string para os
+                    # tamanhos do schema. A IA pode retornar campos enormes
+                    # (ex.: tipo_acao com texto inteiro da decisao colado).
+                    def _trim(v, n):
+                        if v is None:
+                            return None
+                        s = str(v).strip()
+                        return s[:n] if s else None
+
+                    tipo_acao_raw = (
+                        caso_payload.get("tipo_acao")
+                        or analise.get("classe_processual")
+                        or pub_principal.nome_classe
+                    )
+                    vara_juizo_raw = caso_payload.get("vara_juizo") or pub_principal.nome_orgao
+                    comarca_raw = caso_payload.get("comarca") or analise.get("comarca")
+
                     caso_obj = Caso(
                         tenant_id=user.tenant_id,
                         user_id=user.id,
                         cliente_id=cliente.id,
-                        titulo=str(titulo)[:200],
-                        numero_processo=numero_processo,
-                        tipo_acao=(
-                            caso_payload.get("tipo_acao")
-                            or analise.get("classe_processual")
-                            or pub_principal.nome_classe
-                        ),
-                        vara_juizo=(caso_payload.get("vara_juizo") or pub_principal.nome_orgao),
-                        comarca=caso_payload.get("comarca") or analise.get("comarca"),
+                        titulo=_trim(titulo, 200),
+                        numero_processo=_trim(numero_processo, 30),
+                        tipo_acao=_trim(tipo_acao_raw, 100),
+                        vara_juizo=_trim(vara_juizo_raw, 100),
+                        comarca=_trim(comarca_raw, 100),
                         valor_causa=_parse_decimal_or_none(
                             caso_payload.get("valor_causa") or analise.get("valor_causa")
                         ),
-                        parte_contraria=caso_payload.get("parte_contraria"),
+                        parte_contraria=_trim(caso_payload.get("parte_contraria"), 200),
                         status="Ativo",
                         notas_caso=caso_payload.get("notas_caso")
                         or "Caso criado via triagem em lote (DJEN).",
