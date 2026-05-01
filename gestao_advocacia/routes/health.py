@@ -45,9 +45,7 @@ def register_health_route(app):
 
         # 2. Alembic head atual == heads do codigo
         try:
-            db_head = db.session.execute(
-                text("SELECT version_num FROM alembic_version")
-            ).scalar()
+            db_head = db.session.execute(text("SELECT version_num FROM alembic_version")).scalar()
         except Exception as exc:  # noqa: BLE001
             checks["alembic"] = {"ok": False, "error": f"db_read_failed: {str(exc)[:120]}"}
             ok = False

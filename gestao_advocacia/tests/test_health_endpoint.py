@@ -25,7 +25,9 @@ def alembic_seeded(db):
     cfg.set_main_option("script_location", str(migrations_dir))
     head = ScriptDirectory.from_config(cfg).get_heads()[0]
 
-    db.session.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)"))
+    db.session.execute(
+        text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)")
+    )
     db.session.execute(text("DELETE FROM alembic_version"))
     db.session.execute(text("INSERT INTO alembic_version (version_num) VALUES (:v)"), {"v": head})
     db.session.commit()
