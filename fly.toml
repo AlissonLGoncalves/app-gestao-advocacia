@@ -8,7 +8,13 @@ primary_region = "gru"
 [build]
 
 [processes]
-  app = "gunicorn -b 0.0.0.0:8080 app:app"
+  # --timeout 600 (10 min) cobre operacoes longas como /djen/sync, que faz
+  # multiplas chamadas externas ao ComunicaAPI/CNJ. Sem isso, gunicorn mata
+  # o worker depois do default 30s e o cliente ve 500 + CORS missing
+  # (worker morre antes de adicionar headers CORS na resposta).
+  # --workers 2 mantem capacidade de servir health check enquanto outra
+  # request esta em processamento longo (1 worker = stall completo).
+  app = "gunicorn -b 0.0.0.0:8080 --workers 2 --timeout 600 app:app"
   scheduler = "python -m scheduler_runner"
 
 [deploy]
@@ -30,12 +36,15 @@ primary_region = "gru"
   min_machines_running = 1
   processes = ["app"]
 
-  # Health check para garantir que o app esta respondendo
+  # Health check via /api/v1/health (issue #95): valida DB, alembic, namespaces.
+  # path "/" antes era OK mas nao validava DB; mudanca em 2026-05-01 apos os
+  # incidentes de RLS — queremos que o Fly marque a maquina nao-saudavel se DB
+  # quebrar, nao apenas se o Flask boot ate.
   [[http_service.checks]]
     grace_period = "30s"
     interval = "30s"
     method = "GET"
-    path = "/"
+    path = "/api/v1/health"
     timeout = "5s"
 
   [http_service.concurrency]
