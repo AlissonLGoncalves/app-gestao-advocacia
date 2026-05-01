@@ -8,14 +8,17 @@ primary_region = "gru"
 [build]
 
 [processes]
-  # --timeout 600 (10 min) cobre operacoes longas como /djen/sync, que faz
-  # multiplas chamadas externas ao ComunicaAPI/CNJ. Sem isso, gunicorn mata
-  # o worker depois do default 30s e o cliente ve 500 + CORS missing
-  # (worker morre antes de adicionar headers CORS na resposta).
-  # --workers 2 mantem capacidade de servir health check enquanto outra
-  # request esta em processamento longo (1 worker = stall completo).
+  # --timeout 600 (10 min) era band-aid quando /djen/sync rodava sincrono.
+  # Apos B1 (2026-05-01) o sync vai para fila djen_sync_job processada pelo
+  # processo djen-worker. Mantido em 600s como margem de seguranca para
+  # outros endpoints longos (uploads grandes etc); --workers 2 garante que
+  # health check responde mesmo se 1 worker estiver ocupado.
   app = "gunicorn -b 0.0.0.0:8080 --workers 2 --timeout 600 app:app"
   scheduler = "python -m scheduler_runner"
+  # B1: processo dedicado para DJEN sync. Poll a cada 5s na tabela
+  # djen_sync_job, pega FOR UPDATE SKIP LOCKED, processa via app_admin.
+  # 1 maquina suficiente — fila de jobs e per-tenant com de-dup no enqueue.
+  djen-worker = "python djen_worker.py"
 
 [deploy]
   # Wrappamos com `sh -c` porque Fly nao invoca shell por padrao —
