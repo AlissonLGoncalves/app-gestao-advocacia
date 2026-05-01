@@ -248,7 +248,7 @@ function NovoClientePorProcuracao() {
             </button>
           </span>
         )
-        navigate(id ? `/clientes/${id}` : '/clientes')
+        navigate('/clientes')
         return
       }
 
@@ -260,7 +260,7 @@ function NovoClientePorProcuracao() {
       }
 
       toast.success('Cliente criado com sucesso.')
-      navigate(id ? `/clientes/${id}` : '/clientes')
+      navigate('/clientes')
     } catch (error) {
       toast.error(error.message || 'Erro ao criar cliente.')
     } finally {
@@ -271,7 +271,7 @@ function NovoClientePorProcuracao() {
   async function handleCriarCasoAutomatico() {
     if (!clienteCriadoId || !analiseResult?.id) {
       setShowCriarCasoModal(false)
-      navigate(clienteCriadoId ? `/clientes/${clienteCriadoId}` : '/clientes')
+      navigate('/clientes')
       return
     }
 
@@ -304,11 +304,11 @@ function NovoClientePorProcuracao() {
         </span>
       )
       setShowCriarCasoModal(false)
-      navigate(`/clientes/${clienteCriadoId}`)
+      navigate('/clientes')
     } catch (error) {
       toast.error(error.message || 'Erro ao criar caso.')
       setShowCriarCasoModal(false)
-      navigate(`/clientes/${clienteCriadoId}`)
+      navigate('/clientes')
     } finally {
       setCriandoCaso(false)
     }
@@ -732,7 +732,7 @@ function NovoClientePorProcuracao() {
                   className="btn btn-outline-secondary"
                   onClick={() => {
                     setShowCriarCasoModal(false)
-                    navigate(clienteCriadoId ? `/clientes/${clienteCriadoId}` : '/clientes')
+                    navigate('/clientes')
                   }}
                   disabled={criandoCaso}
                 >
