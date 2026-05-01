@@ -221,6 +221,7 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
               instancia: jsonRes.dados.instancia || prev.instancia,
               data_distribuicao:
                 normalizarDataParaInput(jsonRes.dados.data_distribuicao) || prev.data_distribuicao,
+              area_direito: jsonRes.dados.area_direito || prev.area_direito,
               parte_contraria:
                 jsonRes.dados.parte_contraria || parteContrariaInferida || prev.parte_contraria,
               notas_caso: jsonRes.dados.resumo_fatos

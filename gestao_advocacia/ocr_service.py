@@ -558,16 +558,19 @@ def _extract_case_data_from_text(text):
         extracted["data_distribuicao"] = _normalizar_data_distribuicao(data_match_iso.group(1))
 
     # Titulo Genérico pela primeira linha útil ou Autor X Réu
-    autor_match = re.search(r"^\s*([A-Z\s]+),\s*já qualificado", text, re.MULTILINE)
-    reu_match = re.search(r"em face de\s*([A-Z\s]+)", text, re.IGNORECASE)
+    autor_match = re.search(r"^\s*([A-Z\s]{5,}),\s*(?:brasileiro|brasileira|já qualificad)", text, re.MULTILINE | re.IGNORECASE)
+    reu_match = re.search(r"em face d[eo]\s+([A-ZÁÀÂÃÉÊÍÓÔÕÚÇ][^,\n\r]{3,60})", text, re.IGNORECASE)
 
     if autor_match and reu_match:
         autor = autor_match.group(1).strip().title()
         reu = reu_match.group(1).strip().title()
-        extracted["titulo"] = f"AÇÃO: {autor} X {reu}"
-        extracted["parte_contraria"] = autor
+        extracted["titulo"] = f"{autor} x {reu}"
+        extracted["parte_contraria"] = reu  # réu é a parte contrária, não o autor
+    elif reu_match:
+        reu = reu_match.group(1).strip().title()
+        extracted["parte_contraria"] = reu
+        extracted["titulo"] = f"Ação c/ {reu}"
     else:
-        # Pega a primeira grande linha centralizada como título possivel
         extracted["titulo"] = "Processo Lançado via Petição Autográfica"
 
     if not extracted["instancia"]:
@@ -599,23 +602,41 @@ def _extract_case_data_with_gemini(text):
         client = genai.Client()
 
         prompt = """
-Você é um extator de dados jurídicos brasileiro (Legaltech).
-Analise o texto desta capa de processo/petição inicial e retorne APENAS um JSON válido. 
-Nenhuma outra palavra. Apenas o JSON cru com estas chaves:
-- "numero_processo" (string, formato CNJ se achar)
-- "valor_causa" (float)
-- "titulo" (string, geralmente "AUTOR x REU" ou resumo da ação)
-- "resumo_fatos" (string, um parágrafo que resume a tese/fatos do caso para um advogado ler rapidamente)
-    - "parte_contraria" (string)
-    - "vara_juizo" (string)
-    - "comarca" (string)
-    - "instancia" (string: JE, 1ª Instância, 2ª Instância)
-    - "tipo_acao" (string)
-    - "fase_processual" (string)
-    - "data_distribuicao" (string no formato YYYY-MM-DD; vazio se não achar)
+Você é um extrator de dados jurídicos brasileiro (Legaltech).
+Analise o texto desta petição/processo e retorne APENAS um JSON válido, sem markdown, sem texto antes ou depois.
+
+REGRAS:
+1. "numero_processo": número CNJ no formato 0000000-00.0000.0.00.0000. Se não encontrar, deixe "".
+2. "valor_causa": valor numérico float (ex: 30000.00). Procure por 'valor da causa', 'dá-se à causa o valor de', 'R$ XX.XXX,XX'. Se não encontrar, use 0.
+3. "titulo": no formato "NOME DO AUTOR x NOME DO RÉU". O AUTOR é quem propõe a ação (requerente/autor). O RÉU é quem está sendo acionado (requerido/réu/demandado). Exemplo: "Adriano Basso Marson x Luis Alexandre Hizo".
+4. "resumo_fatos": parágrafo curto resumindo a tese jurídica do caso.
+5. "parte_contraria": nome completo do RÉU/requerido/demandado (não o autor). Se houver múltiplos réus, separe por vírgula.
+6. "vara_juizo": nome completo da vara ou juizado (ex: "Juizado Especial Cível da Comarca de Arapongas").
+7. "comarca": apenas a cidade da comarca (ex: "Arapongas").
+8. "instancia": use exatamente um destes valores: "JE" (Juizado Especial), "1ª Instância", "2ª Instância" ou "".
+9. "tipo_acao": nome da ação (ex: "Ação de Rescisão Contratual c/c Indenização").
+10. "area_direito": área do direito (ex: "Cível", "Trabalhista", "Criminal", "Família", "Consumidor", "Previdenciário"). Infira pelo contexto.
+11. "fase_processual": fase atual se identificável (ex: "Petição Inicial", "Execução"), ou "".
+12. "data_distribuicao": formato YYYY-MM-DD se encontrar data de distribuição/ajuizamento, ou "".
+
+Retorne SOMENTE este JSON:
+{
+  "numero_processo": "",
+  "valor_causa": 0,
+  "titulo": "",
+  "resumo_fatos": "",
+  "parte_contraria": "",
+  "vara_juizo": "",
+  "comarca": "",
+  "instancia": "",
+  "tipo_acao": "",
+  "area_direito": "",
+  "fase_processual": "",
+  "data_distribuicao": ""
+}
 
 TEXTO DA PETIÇÃO:
-""" + text[:15000]  # Limite de texto
+""" + text[:15000]
 
         response = client.models.generate_content(
             model="gemini-2.5-flash",
@@ -645,6 +666,7 @@ TEXTO DA PETIÇÃO:
             "comarca": (json_data.get("comarca") or "").strip(),
             "instancia": (json_data.get("instancia") or "").strip(),
             "tipo_acao": (json_data.get("tipo_acao") or "").strip(),
+            "area_direito": (json_data.get("area_direito") or "").strip(),
             "fase_processual": (json_data.get("fase_processual") or "").strip(),
             "data_distribuicao": (json_data.get("data_distribuicao") or "").strip(),
         }
