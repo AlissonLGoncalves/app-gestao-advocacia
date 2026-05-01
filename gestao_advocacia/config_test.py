@@ -22,3 +22,7 @@ class ConfigTest:
     DJEN_JOB_ENABLED = False
     # Desabilitar rate limiting nos testes (para não atrapalhar outros testes)
     RATELIMIT_ENABLED = False
+    # Em testes, /register fica aberto para nao quebrar suite existente que cria
+    # usuarios via self-signup. O test do gate (issue #112) sobrescreve via
+    # monkeypatch da config. Producao default = "closed".
+    REGISTRATION_MODE = "open"

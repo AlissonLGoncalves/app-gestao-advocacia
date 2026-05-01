@@ -131,6 +131,14 @@ class Config:
     # Token de convite: padrão 48h. Ajuste com INVITE_TOKEN_HOURS env var.
     INVITE_TOKEN_HOURS = int(os.environ.get("INVITE_TOKEN_HOURS", "48"))
 
+    # Modo de cadastro (issue #112):
+    # - "closed" (padrao): /register retorna 403; apenas /register-invite com token
+    #   valido funciona. Use enquanto nao houver gate de pagamento integrado.
+    # - "open": permite self-signup direto. So habilitar quando Stripe/cobranca
+    #   estiver bloqueando acesso pos-trial — sem gate de pagamento, "open" deixa
+    #   qualquer um criar tenant gratuito sem limite.
+    REGISTRATION_MODE = os.environ.get("REGISTRATION_MODE", "closed").lower()
+
     if os.environ.get("FLASK_ENV") == "production" and not GEMINI_API_KEY:
         logging.getLogger(__name__).warning(
             "GEMINI_API_KEY não configurada em produção. Recursos Gemini ficarão desabilitados."
