@@ -13,6 +13,7 @@ import {
   DocumentArrowDownIcon,
   BriefcaseIcon,
   XMarkIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
@@ -632,21 +633,15 @@ function CasoList({ onEditCaso, refreshKey }) {
             {casos.map((caso) => (
               <tr key={caso.id}>
                 <td className="px-3 py-2">
-                  {caso.numero_processo ? (
-                    <span
-                      role="button"
-                      className="text-primary text-decoration-underline"
-                      style={{ cursor: 'pointer' }}
-                      title="Ver publicações DJEN deste processo"
-                      onClick={() =>
-                        navigate(`/djen?processo=${encodeURIComponent(caso.numero_processo)}`)
-                      }
-                    >
-                      {caso.titulo}
-                    </span>
-                  ) : (
-                    caso.titulo
-                  )}
+                  <span
+                    role="button"
+                    className="text-primary text-decoration-underline"
+                    style={{ cursor: 'pointer' }}
+                    title="Abrir detalhes do caso (linha do tempo, publicações vinculadas, etc.)"
+                    onClick={() => navigate(`/casos/detalhe/${caso.id}`)}
+                  >
+                    {caso.titulo}
+                  </span>
                 </td>
                 <td className="px-3 py-2">{caso.cliente?.nome_razao_social || 'N/A'}</td>
                 <td className="px-3 py-2">
@@ -680,6 +675,21 @@ function CasoList({ onEditCaso, refreshKey }) {
                     : '-'}
                 </td>
                 <td className="px-3 py-2 text-center">
+                  <button
+                    onClick={() => navigate(`/casos/detalhe/${caso.id}`)}
+                    className="btn btn-sm btn-outline-info me-1 p-1 lh-1"
+                    title="Ver detalhes do caso (linha do tempo, publicações)"
+                    disabled={deletingId === caso.id}
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <EyeIcon style={{ width: '16px', height: '16px' }} />
+                  </button>
                   <button
                     onClick={() => onEditCaso(caso)}
                     className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
