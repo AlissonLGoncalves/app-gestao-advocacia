@@ -36,6 +36,9 @@ const initialStatePF = {
   descricao_cnpj_secundario: '',
   cnpj_terciario: '',
   descricao_cnpj_terciario: '',
+  responsavel_nome: '',
+  responsavel_cpf: '',
+  responsavel_cargo: '',
 }
 
 const initialStatePJ = {
@@ -55,6 +58,7 @@ function normalizeTipoPessoa(raw) {
 function toFieldMap(dadosExtraidos) {
   const outorgante = dadosExtraidos?.outorgante || {}
   const endereco = outorgante?.endereco || {}
+  const representante = outorgante?.representante_legal || {}
 
   return {
     nome_razao_social: outorgante?.nome_completo || '',
@@ -72,6 +76,10 @@ function toFieldMap(dadosExtraidos) {
     estado: endereco?.uf || '',
     telefone: outorgante?.telefone || '',
     email: outorgante?.email || '',
+    // Representante legal (PJ) — extraido do prompt Gemini quando outorgante e empresa
+    responsavel_nome: representante?.nome || '',
+    responsavel_cpf: representante?.cpf || '',
+    responsavel_cargo: representante?.cargo || '',
   }
 }
 
@@ -511,6 +519,65 @@ function NovoClientePorProcuracao() {
                 </CampoExtraido>
               </div>
             </div>
+
+            {formData.tipo_pessoa === 'PJ' && (
+              <div className="row mt-3 pt-3 border-top">
+                <div className="col-12 mb-2">
+                  <small className="text-muted fw-bold">
+                    Representante legal (pessoa física que assina pela empresa)
+                  </small>
+                </div>
+                <div className="col-md-5">
+                  <CampoExtraido
+                    id="responsavel_nome"
+                    label="Nome do responsável"
+                    status={statusFor('responsavel_nome')}
+                  >
+                    <input
+                      id="responsavel_nome"
+                      name="responsavel_nome"
+                      className="form-control form-control-sm"
+                      value={formData.responsavel_nome || ''}
+                      onChange={handleFieldChange}
+                      placeholder="Ex: João da Silva"
+                    />
+                  </CampoExtraido>
+                </div>
+                <div className="col-md-3">
+                  <CampoExtraido
+                    id="responsavel_cpf"
+                    label="CPF do responsável"
+                    status={statusFor('responsavel_cpf')}
+                    warning={warningFor('responsavel_cpf')}
+                  >
+                    <input
+                      id="responsavel_cpf"
+                      name="responsavel_cpf"
+                      className="form-control form-control-sm"
+                      value={formData.responsavel_cpf || ''}
+                      onChange={handleFieldChange}
+                      placeholder="000.000.000-00"
+                    />
+                  </CampoExtraido>
+                </div>
+                <div className="col-md-4">
+                  <CampoExtraido
+                    id="responsavel_cargo"
+                    label="Cargo"
+                    status={statusFor('responsavel_cargo')}
+                  >
+                    <input
+                      id="responsavel_cargo"
+                      name="responsavel_cargo"
+                      className="form-control form-control-sm"
+                      value={formData.responsavel_cargo || ''}
+                      onChange={handleFieldChange}
+                      placeholder="Ex: Sócio Administrador"
+                    />
+                  </CampoExtraido>
+                </div>
+              </div>
+            )}
 
             <div className="row">
               <div className="col-md-2">

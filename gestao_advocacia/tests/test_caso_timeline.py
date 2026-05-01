@@ -1,7 +1,7 @@
 # Testes do GET /api/v1/casos/{id}/timeline (linha do tempo do caso).
 
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 
 def _criar_cliente(auth_client, nome="Cliente Teste", cpf="00011122233"):

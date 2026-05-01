@@ -615,7 +615,9 @@ def registrar_rotas_djen(
                 numero_proc_expr = db.func.replace(
                     db.func.replace(
                         db.func.replace(
-                            db.func.replace(db.func.coalesce(PublicacaoDJEN.numero_processo, ""), ".", ""),
+                            db.func.replace(
+                                db.func.coalesce(PublicacaoDJEN.numero_processo, ""), ".", ""
+                            ),
                             "-",
                             "",
                         ),
@@ -657,9 +659,7 @@ def registrar_rotas_djen(
                         ]
                     )
 
-                q = q.filter(
-                    db.or_(*filtros_numero)
-                )
+                q = q.filter(db.or_(*filtros_numero))
 
             nome_parte = request.args.get("nome_parte")
             if nome_parte:

@@ -558,7 +558,11 @@ def _extract_case_data_from_text(text):
         extracted["data_distribuicao"] = _normalizar_data_distribuicao(data_match_iso.group(1))
 
     # Titulo Genérico pela primeira linha útil ou Autor X Réu
-    autor_match = re.search(r"^\s*([A-Z\s]{5,}),\s*(?:brasileiro|brasileira|já qualificad)", text, re.MULTILINE | re.IGNORECASE)
+    autor_match = re.search(
+        r"^\s*([A-Z\s]{5,}),\s*(?:brasileiro|brasileira|já qualificad)",
+        text,
+        re.MULTILINE | re.IGNORECASE,
+    )
     reu_match = re.search(r"em face d[eo]\s+([A-ZÁÀÂÃÉÊÍÓÔÕÚÇ][^,\n\r]{3,60})", text, re.IGNORECASE)
 
     if autor_match and reu_match:

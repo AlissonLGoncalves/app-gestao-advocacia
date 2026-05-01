@@ -154,7 +154,12 @@ Use exatamente esta estrutura:
       "cep": ""
     }},
     "telefone": "",
-    "email": ""
+    "email": "",
+    "representante_legal": {{
+      "nome": "",
+      "cpf": "",
+      "cargo": ""
+    }}
   }},
   "outorgado": {{
     "nome": "",
@@ -170,6 +175,15 @@ Use exatamente esta estrutura:
 }}
 
 Se algum campo não estiver presente, retorne string vazia.
+
+REGRAS ESPECÍFICAS PARA PESSOA JURÍDICA (PJ):
+- Quando outorgante é PJ, "representante_legal" deve conter dados da pessoa
+  física que assina em nome da empresa (geralmente sócio, administrador,
+  diretor, presidente). Procure por frases como "neste ato representada por",
+  "por seu administrador/sócio/diretor", etc.
+- "cargo" pode ser: "Sócio Administrador", "Diretor Presidente",
+  "Procurador", "Representante Legal", etc.
+
 Contexto do advogado responsável no sistema:
 - nome: {advogado.get("nome") or ""}
 - oab: {advogado.get("oab") or ""}
@@ -254,5 +268,12 @@ def validar_extracao(dados: dict) -> tuple[bool, list[str]]:
     telefone = _only_digits(outorgante.get("telefone"))
     if telefone and len(telefone) not in {10, 11}:
         avisos.append("Telefone do outorgante inválido.")
+
+    # Validacoes de representante legal (apenas para PJ)
+    if tipo_pessoa == "PJ":
+        representante = outorgante.get("representante_legal") or {}
+        rep_cpf = representante.get("cpf")
+        if rep_cpf and not _is_valid_cpf(rep_cpf):
+            avisos.append("CPF do representante legal inválido.")
 
     return len(avisos) == 0, avisos
