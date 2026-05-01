@@ -262,19 +262,30 @@ def create_app(config_class=Config):
         if user_id is None:
             return
 
-        user = db.session.get(User, user_id)
-        if not user:
-            current_app.logger.warning(
-                "rls_tenant_context_user_not_found",
-                extra={
-                    "event": "rls_tenant_context_user_not_found",
-                    "user_id_hash": mask_user_id(user_id),
-                    "path": request.path,
-                },
-            )
-            return
+        # HOTFIX (incidente 2026-05-01): apos Batch 4, RLS restritivo na
+        # tabela User bloqueia o lookup aqui (chicken-and-egg: ainda nao
+        # setamos tenant_id na sessao, justamente porque estamos tentando
+        # descobrir qual e). Solucao: lookup via admin_session (BYPASSRLS),
+        # mesma estrategia do /auth/login. Sem isso, todas as requests
+        # autenticadas que tocam tabelas com RLS retornam 500
+        # (current_setting indefinido).
+        from helpers.admin_session import admin_session
 
-        if user.tenant_id is None:
+        with admin_session() as _admin:
+            _user = _admin.get(User, int(user_id))
+            if not _user:
+                current_app.logger.warning(
+                    "rls_tenant_context_user_not_found",
+                    extra={
+                        "event": "rls_tenant_context_user_not_found",
+                        "user_id_hash": mask_user_id(user_id),
+                        "path": request.path,
+                    },
+                )
+                return
+            user_tenant_id = _user.tenant_id
+
+        if user_tenant_id is None:
             current_app.logger.warning(
                 "rls_tenant_context_missing_tenant",
                 extra={
@@ -285,8 +296,8 @@ def create_app(config_class=Config):
             )
             return
 
-        g._rls_tenant_id = user.tenant_id
-        set_current_tenant_id(user.tenant_id)
+        g._rls_tenant_id = user_tenant_id
+        set_current_tenant_id(user_tenant_id)
 
     configure_scheduler(app)
     register_status_route(app)
