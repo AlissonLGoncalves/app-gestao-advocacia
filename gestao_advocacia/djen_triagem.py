@@ -439,7 +439,16 @@ REGRAS CRITICAS DE EXTRACAO:
    Inclua o R\\$ e numero exatamente como aparece.
 
 6. classe_processual: priorize o nome da classe (ex.: "Procedimento Comum Civel"),
-   nao o numero da classe.
+   nao o numero da classe. MAXIMO 80 caracteres.
+
+6a. LIMITES DE TAMANHO (respeite SEMPRE):
+    - classe_processual: max 80 chars (ex.: 'Procedimento Comum Civel')
+    - assunto_principal: max 200 chars
+    - comarca: max 80 chars (so o nome da comarca, sem mencionar vara)
+    - valor_causa: max 50 chars (ex.: 'R$ 39.069,87')
+    - nome de cada parte: max 120 chars
+    Se um campo seria mais longo, RESUMA. Nao copie texto da decisao
+    nem pareceres. Se nao souber resumir, retorne null.
 
 7. SEMPRE responda em JSON valido — sem virgula sobrando, sem comentarios,
    sem markdown, sem ```json ```.
