@@ -609,11 +609,56 @@ def registrar_rotas_djen(
 
             numero_proc = request.args.get("numero_processo")
             if numero_proc:
-                q = q.filter(
-                    db.or_(
-                        PublicacaoDJEN.numero_processo.ilike(f"%{numero_proc}%"),
-                        PublicacaoDJEN.texto.ilike(f"%{numero_proc}%"),
+                numero_proc_clean = numero_proc.strip()
+                numero_proc_digits = re.sub(r"\D", "", numero_proc_clean)
+
+                numero_proc_expr = db.func.replace(
+                    db.func.replace(
+                        db.func.replace(
+                            db.func.replace(db.func.coalesce(PublicacaoDJEN.numero_processo, ""), ".", ""),
+                            "-",
+                            "",
+                        ),
+                        "/",
+                        "",
+                    ),
+                    " ",
+                    "",
+                )
+                numero_proc_masc_expr = db.func.replace(
+                    db.func.replace(
+                        db.func.replace(
+                            db.func.replace(
+                                db.func.coalesce(PublicacaoDJEN.numero_processo_mascara, ""),
+                                ".",
+                                "",
+                            ),
+                            "-",
+                            "",
+                        ),
+                        "/",
+                        "",
+                    ),
+                    " ",
+                    "",
+                )
+
+                filtros_numero = [
+                    PublicacaoDJEN.numero_processo.ilike(f"%{numero_proc_clean}%"),
+                    PublicacaoDJEN.numero_processo_mascara.ilike(f"%{numero_proc_clean}%"),
+                    PublicacaoDJEN.texto.ilike(f"%{numero_proc_clean}%"),
+                ]
+
+                if numero_proc_digits:
+                    filtros_numero.extend(
+                        [
+                            numero_proc_expr.ilike(f"%{numero_proc_digits}%"),
+                            numero_proc_masc_expr.ilike(f"%{numero_proc_digits}%"),
+                        ]
                     )
+
+                q = q.filter(
+                    db.or_(*filtros_numero)
                 )
 
             nome_parte = request.args.get("nome_parte")

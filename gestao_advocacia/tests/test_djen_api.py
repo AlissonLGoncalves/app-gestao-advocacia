@@ -42,14 +42,24 @@ def _criar_caso(auth_client, db):
     return json.loads(resp.data)["id"]
 
 
-def _criar_publicacao(db, tenant_id, user_id, caso_id=None, lida=False, djen_id=1):
+def _criar_publicacao(
+    db,
+    tenant_id,
+    user_id,
+    caso_id=None,
+    lida=False,
+    djen_id=1,
+    numero_processo="0001234-12.2024.8.16.0001",
+    numero_processo_mascara=None,
+):
     """Insere diretamente uma publicaÃ§Ã£o no banco de teste."""
     pub = PublicacaoDJEN(
         tenant_id=tenant_id,
         user_id=user_id,
         djen_id=djen_id,
         hash_comunicacao=f"hash-{djen_id}",
-        numero_processo="0001234-12.2024.8.16.0001",
+        numero_processo=numero_processo,
+        numero_processo_mascara=numero_processo_mascara,
         sigla_tribunal="TJPR",
         nome_orgao="1Âª Vara CÃ­vel",
         tipo_comunicacao="IntimaÃ§Ã£o",
@@ -202,6 +212,29 @@ class TestDjenPublicacoes:
         resp_outro = auth_client.get("/api/v1/djen/publicacoes?sigla_tribunal=TJSP")
         data_outro = json.loads(resp_outro.data)
         assert data_outro["total"] == 0
+
+    def test_filtro_numero_processo_mascarado_encontra_registro_sem_mascara(
+        self, auth_client, db, app
+    ):
+        """GET /api/v1/djen/publicacoes?numero_processo deve funcionar com/sem máscara."""
+        with app.app_context():
+            from app import User
+
+            user = User.query.filter_by(username="testuser").first()
+            _criar_publicacao(
+                db,
+                user.tenant_id,
+                user.id,
+                djen_id=350,
+                numero_processo="00007044220228160124",
+                numero_processo_mascara="0000704-42.2022.8.16.0124",
+            )
+
+        resp = auth_client.get("/api/v1/djen/publicacoes?numero_processo=0000704-42.2022.8.16.0124")
+        data = json.loads(resp.data)
+        assert resp.status_code == 200
+        assert data["total"] == 1
+        assert data["items"][0]["djen_id"] == 350
 
     def test_paginacao(self, auth_client, db, app):
         """GET /api/v1/djen/publicacoes com limit e offset pagina corretamente."""
