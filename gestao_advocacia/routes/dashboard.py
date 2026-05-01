@@ -147,26 +147,14 @@ def register_dashboard_routes(app, dashboard_ns):
             hoje = datetime.utcnow().date()
             data_inicio = hoje - timedelta(days=dias - 1)
 
-            # Query base: publicacoes do tenant com vinculo ou triagem processada
-            query = (
-                PublicacaoDJEN.query.filter(
-                    PublicacaoDJEN.tenant_id == tenant_id,
-                    PublicacaoDJEN.data_disponibilizacao >= data_inicio,
-                    PublicacaoDJEN.ativo.is_(True),
-                )
-                .filter(
-                    db.or_(
-                        PublicacaoDJEN.caso_id.isnot(None),
-                        db.and_(
-                            PublicacaoDJEN.triagem_ignorada.is_(False),
-                            PublicacaoDJEN.status_origem.in_(
-                                ["criado_automaticamente", "revisado_manual"]
-                            ),
-                        ),
-                    )
-                )
-                .order_by(PublicacaoDJEN.data_disponibilizacao.desc())
-            )
+            # Query base: TODAS as publicacoes do tenant no periodo (incluindo as
+            # ainda em triagem). O widget eh a "caixa de entrada" do advogado —
+            # filtrar so as ja vinculadas escondia justamente o que precisa de acao.
+            query = PublicacaoDJEN.query.filter(
+                PublicacaoDJEN.tenant_id == tenant_id,
+                PublicacaoDJEN.data_disponibilizacao >= data_inicio,
+                PublicacaoDJEN.ativo.is_(True),
+            ).order_by(PublicacaoDJEN.data_disponibilizacao.desc())
 
             publicacoes = query.all()
 
