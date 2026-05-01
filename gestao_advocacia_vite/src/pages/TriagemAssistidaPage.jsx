@@ -71,7 +71,12 @@ function TriagemAssistidaPage() {
   const carregarPendentes = useCallback(async () => {
     setLoadingLista(true)
     try {
-      const data = await listTriagem({ somente_pendentes: true, limit: 100, offset: 0 })
+      const data = await listTriagem({
+        somente_pendentes: true,
+        limit: 100,
+        offset: 0,
+        lite: true,
+      })
       const items = (data.items || []).map((it) => it.publicacao)
       setPendentes(items)
       setPendentesTotal(data.total || items.length)

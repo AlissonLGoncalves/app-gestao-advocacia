@@ -730,7 +730,7 @@ def registrar_rotas_djen(
             """Fila de triagem com análise de partes/representantes e sugestões de vínculo."""
             user_id = get_jwt_identity()
             from app import Cliente, User
-            from djen_triagem import analisar_publicacao_com_fallback_ia, sugerir_vinculos
+            from djen_triagem import analisar_publicacao, sugerir_vinculos
 
             user = User.query.get(int(user_id))
             if not user:
@@ -755,11 +755,20 @@ def registrar_rotas_djen(
                 .all()
             )
 
+            # Modo lite: o wizard de triagem assistida so precisa da lista de
+            # publicacoes (sem analise/sugestoes). Para 200+ pendentes, rodar
+            # regex em todas em serie e' lento; sugerir_vinculos faz queries
+            # extras por pub. Lite pula tudo isso.
+            lite = request.args.get("lite", "false").lower() == "true"
+
             itens = []
             for pub in pubs:
-                # Roda regex (rapido, gratis) e cai pro Gemini quando confianca < 0.5.
-                # Custo: ~$0.001/publicacao para os casos de baixa confianca.
-                analise = analisar_publicacao_com_fallback_ia(pub, limiar=0.5)
+                if lite:
+                    itens.append({"publicacao": pub.to_dict()})
+                    continue
+                # Apenas regex (rapido, gratis). Gemini fica reservado ao endpoint
+                # /triagem/<id>/analise-ia que o wizard chama por publicacao.
+                analise = analisar_publicacao(pub)
                 sugestoes = sugerir_vinculos(db, Cliente, Caso, user.tenant_id, analise)
                 itens.append(
                     {
