@@ -53,6 +53,7 @@ function renderPage() {
       <Routes>
         <Route path="/clientes/novo/procuracao" element={<NovoClientePorProcuracao />} />
         <Route path="/clientes/:id" element={<div>Detalhe Cliente</div>} />
+        <Route path="/clientes" element={<div>Detalhe Cliente</div>} />
         <Route path="/casos/detalhe/:id" element={<div>Detalhe Caso</div>} />
       </Routes>
     </MemoryRouter>

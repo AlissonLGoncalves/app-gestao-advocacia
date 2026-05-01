@@ -120,6 +120,30 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     return ''
   }
 
+  const formatCPFCNPJ = (value, tipoPessoa, isAdicional = false) => {
+    if (!value) return ''
+    const apenasNumeros = value.replace(/\D/g, '')
+
+    if (tipoPessoa === 'PF' && !isAdicional) {
+      return apenasNumeros
+        .slice(0, 11)
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    }
+
+    if (tipoPessoa === 'PJ') {
+      return apenasNumeros
+        .slice(0, 14)
+        .replace(/(\d{2})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1/$2')
+        .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+    }
+
+    return value
+  }
+
   useEffect(() => {
     clearValidationErrors()
     setCpfCnpjLiberadoEdicao(false)
@@ -170,30 +194,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     if (validationErrors.data_nascimento) {
       setValidationErrors((prev) => ({ ...prev, data_nascimento: '' }))
     }
-  }
-
-  const formatCPFCNPJ = (value, tipoPessoa, isAdicional = false) => {
-    if (!value) return ''
-    const apenasNumeros = value.replace(/\D/g, '')
-
-    if (tipoPessoa === 'PF' && !isAdicional) {
-      return apenasNumeros
-        .slice(0, 11)
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-    }
-
-    if (tipoPessoa === 'PJ') {
-      return apenasNumeros
-        .slice(0, 14)
-        .replace(/(\d{2})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d)/, '$1/$2')
-        .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
-    }
-
-    return value
   }
 
   const handleChange = (e) => {

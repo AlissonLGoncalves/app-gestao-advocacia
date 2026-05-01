@@ -31,7 +31,7 @@ function EventoAgendaSection({
   eventoData,
   setEventoData,
   formData,
-  eventosIA,
+  eventosIA = [],
   setEventosIA,
 }) {
   const [arquivo, setArquivo] = useState(null)

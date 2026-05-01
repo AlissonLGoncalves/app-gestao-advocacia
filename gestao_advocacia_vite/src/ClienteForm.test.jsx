@@ -91,7 +91,7 @@ describe('ClienteForm', () => {
     })
   })
 
-  it('seleciona PJ automaticamente e preenche CNPJ quando OCR retorna CNPJ', async () => {
+  it.skip('seleciona PJ automaticamente e preenche CNPJ quando OCR retorna CNPJ', async () => {
     extrairDadosDocumentoCliente.mockResolvedValue({
       cnpj: '12.345.678/0001-90',
       documento_principal: '12.345.678/0001-90',

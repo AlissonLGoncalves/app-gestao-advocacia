@@ -134,6 +134,9 @@ def register_casos_routes(
                     "dados": None,
                 }, 400
 
+            # texto_extraido vai junto para o frontend persistir como .md
+            # vinculado ao caso (~50 KB vs ~5 MB do PDF original).
+            texto_extraido = (resultado.get("texto_extraido") or "").strip()
             return {
                 "message": "Leitura da petição concluída.",
                 "dados": {
@@ -152,6 +155,8 @@ def register_casos_routes(
                     ),
                     "fonte": resultado.get("fonte") or "OCR",
                 },
+                "texto_extraido": texto_extraido,
+                "nome_arquivo_original": arquivo.filename,
             }, 200
 
     @casos_ns.route("/consulta-publica-cnj")

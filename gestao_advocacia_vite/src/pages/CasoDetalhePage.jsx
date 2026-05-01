@@ -3,7 +3,12 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { API_URL } from '../config.js' // Importa API_URL
 import { toast } from 'react-toastify' // Para notificações
-import { atualizarCasoViaDjen, gerarResumoCaso, getCaso, listPublicacoesDjenCaso } from '../api/casos.js'
+import {
+  atualizarCasoViaDjen,
+  gerarResumoCaso,
+  getCaso,
+  listPublicacoesDjenCaso,
+} from '../api/casos.js'
 import HonorariosCasoCard from '../components/HonorariosCasoCard'
 import DocumentosCasoTab from '../components/DocumentosCasoTab'
 import CasoTimeline from '../components/CasoTimeline'
@@ -31,8 +36,8 @@ function CasoDetalhePage() {
   const [isLoadingMovimentacoes, setIsLoadingMovimentacoes] = useState(false)
   const [isLoadingAtualizacaoCNJ, setIsLoadingAtualizacaoCNJ] = useState(false)
   const [timelineRefreshNonce, setTimelineRefreshNonce] = useState(0)
-    const [isLoadingResumo, setIsLoadingResumo] = useState(false)
-    const [resumoError, setResumoError] = useState('')
+  const [isLoadingResumo, setIsLoadingResumo] = useState(false)
+  const [resumoError, setResumoError] = useState('')
 
   const [fetchError, setFetchError] = useState('')
   const [atualizacaoCNJError, setAtualizacaoCNJError] = useState('')
@@ -237,22 +242,30 @@ function CasoDetalhePage() {
                 >
                   {caso.descricao || 'Nenhuma descrição fornecida.'}
                 </p>
-                  <button
-                    onClick={handleGerarResumo}
-                    disabled={isLoadingResumo || publicacoesDjen.length === 0}
-                    className="btn btn-sm btn-outline-secondary mt-2 w-100"
-                    title={publicacoesDjen.length === 0 ? 'Sincronize o DJEN primeiro' : 'Usa IA para resumir as publicações DJEN'}
-                  >
-                    {isLoadingResumo ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Gerando resumo...
-                      </>
-                    ) : (
-                      '✨ Gerar Resumo com IA'
-                    )}
-                  </button>
-                  {resumoError && <p className="small text-danger mt-1">{resumoError}</p>}
+                <button
+                  onClick={handleGerarResumo}
+                  disabled={isLoadingResumo || publicacoesDjen.length === 0}
+                  className="btn btn-sm btn-outline-secondary mt-2 w-100"
+                  title={
+                    publicacoesDjen.length === 0
+                      ? 'Sincronize o DJEN primeiro'
+                      : 'Usa IA para resumir as publicações DJEN'
+                  }
+                >
+                  {isLoadingResumo ? (
+                    <>
+                      <span
+                        className="spinner-border spinner-border-sm me-2"
+                        role="status"
+                        aria-hidden="true"
+                      ></span>
+                      Gerando resumo...
+                    </>
+                  ) : (
+                    '✨ Gerar Resumo com IA'
+                  )}
+                </button>
+                {resumoError && <p className="small text-danger mt-1">{resumoError}</p>}
               </div>
             </div>
 
