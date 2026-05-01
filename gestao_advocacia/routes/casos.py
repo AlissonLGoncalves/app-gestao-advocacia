@@ -166,7 +166,9 @@ def register_casos_routes(
                 else "2ª Instância" if instancia_raw == "G2" else instancia_raw
             )
 
-            data_distribuicao = _normalizar_data_yyyy_mm_dd(dados_processo.get("dataAjuizamento", ""))
+            data_distribuicao = _normalizar_data_yyyy_mm_dd(
+                dados_processo.get("dataAjuizamento", "")
+            )
 
             valor_causa = dados_processo.get("valorAcao")
             resumo = dados_processo.get("resumo", "")
@@ -665,9 +667,7 @@ def register_casos_routes(
                 db.session.commit()
 
                 if novas_movs_count > 0:
-                    msg_final = (
-                        f"Caso atualizado. {novas_movs_count} nova(s) movimentação(ões) registrada(s)."
-                    )
+                    msg_final = f"Caso atualizado. {novas_movs_count} nova(s) movimentação(ões) registrada(s)."
                 elif backfill_movs_count > 0:
                     msg_final = (
                         "Nenhuma nova movimentação encontrada, mas histórico completo foi sincronizado "
@@ -704,9 +704,12 @@ def register_casos_routes(
     @casos_ns.route("/<int:caso_id>/atualizar-djen")
     @casos_ns.param("caso_id", "ID do caso para buscar publicações no DJEN")
     class CasoAtualizarDJENAPI(Resource):
-        @casos_ns.doc("atualizar_caso_via_djen", security="jsonWebToken",
-                      description="Consulta o DJEN (ComunicaAPI) pelo número de processo do caso e "
-                                  "registra novas publicações na timeline.")
+        @casos_ns.doc(
+            "atualizar_caso_via_djen",
+            security="jsonWebToken",
+            description="Consulta o DJEN (ComunicaAPI) pelo número de processo do caso e "
+            "registra novas publicações na timeline.",
+        )
         @jwt_required()
         @tenant_scoped
         def post(self, caso_id):
@@ -719,7 +722,9 @@ def register_casos_routes(
 
             numero = (caso.numero_processo or "").strip()
             if not numero:
-                return {"message": "Este caso não possui número de processo para consulta ao DJEN."}, 400
+                return {
+                    "message": "Este caso não possui número de processo para consulta ao DJEN."
+                }, 400
 
             app.logger.info(
                 f"DJEN: buscando publicações para caso {caso_id}, processo '{numero}', "
@@ -737,7 +742,9 @@ def register_casos_routes(
                     logger=app.logger,
                 )
             except DjenRateLimitError:
-                return {"message": "DJEN: limite de requisições atingido. Tente novamente em 1 minuto."}, 429
+                return {
+                    "message": "DJEN: limite de requisições atingido. Tente novamente em 1 minuto."
+                }, 429
             except DjenAPIError as e:
                 return {"message": f"Erro ao consultar o DJEN: {str(e)}"}, 502
 
@@ -745,7 +752,8 @@ def register_casos_routes(
             for item in items:
                 try:
                     salvo = _salvar_publicacao(
-                        db, PublicacaoDJEN,
+                        db,
+                        PublicacaoDJEN,
                         user_id=user_id_atual,
                         tenant_id=tenant_id,
                         caso_id=caso_id,
@@ -763,7 +771,9 @@ def register_casos_routes(
                 db.session.commit()
             except Exception as e_commit:
                 db.session.rollback()
-                app.logger.error(f"DJEN: erro no commit para caso {caso_id}: {e_commit}", exc_info=True)
+                app.logger.error(
+                    f"DJEN: erro no commit para caso {caso_id}: {e_commit}", exc_info=True
+                )
                 return {"message": "Erro interno ao salvar publicações."}, 500
 
             if novas > 0:
@@ -821,7 +831,9 @@ def register_casos_routes(
                     "id": p.id,
                     "tipo_comunicacao": p.tipo_comunicacao,
                     "texto": p.texto,
-                    "data_disponibilizacao": p.data_disponibilizacao.isoformat() if p.data_disponibilizacao else None,
+                    "data_disponibilizacao": (
+                        p.data_disponibilizacao.isoformat() if p.data_disponibilizacao else None
+                    ),
                     "sigla_tribunal": p.sigla_tribunal,
                     "nome_orgao": p.nome_orgao,
                     "lida": p.lida,
@@ -912,7 +924,40 @@ def register_casos_routes(
                 )
                 resumo = (getattr(response, "text", None) or "").strip()
             except Exception as exc:
-                casos_ns.abort(502, message=f"Erro ao chamar IA: {str(exc)}")
+                msg = str(exc)
+                # 429 RESOURCE_EXHAUSTED do Gemini API: cota free-tier (20/dia)
+                # ou rate limit por minuto. Resposta amigavel ao inves de
+                # despejar JSON cru de erro do Google.
+                if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
+                    casos_ns.abort(
+                        429,
+                        message=(
+                            "Cota da IA do Google esgotada (free tier = 20 resumos/dia). "
+                            "Para gerar mais, habilite billing em "
+                            "https://console.cloud.google.com/billing — apos isso a cota "
+                            "sobe para milhares por minuto e o custo por resumo e centavos."
+                        ),
+                    )
+                # 503 / model overloaded: indisponibilidade temporaria
+                if (
+                    "503" in msg
+                    or "UNAVAILABLE" in msg
+                    or "high demand" in msg.lower()
+                    or "overloaded" in msg.lower()
+                ):
+                    casos_ns.abort(
+                        503,
+                        message=(
+                            "Servico de IA do Google esta sobrecarregado no momento. "
+                            "Tente novamente em alguns minutos."
+                        ),
+                    )
+                # Outros erros: log completo no servidor, mensagem curta para o cliente
+                app.logger.error("Erro inesperado ao chamar Gemini: %s", msg, exc_info=True)
+                casos_ns.abort(
+                    502,
+                    message="Falha ao gerar resumo via IA. Tente novamente em instantes.",
+                )
 
             if not resumo:
                 casos_ns.abort(502, message="IA retornou resposta vazia.")
