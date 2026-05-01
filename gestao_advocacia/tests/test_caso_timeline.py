@@ -100,6 +100,7 @@ def test_timeline_inclui_movimentacao_cnj_e_publicacao_djen(auth_client, db):
     user_id = json.loads(res_me.data)["id"]
 
     mov = MovimentacaoCNJ(
+        tenant_id=tenant_id,
         caso_id=caso["id"],
         data_movimentacao=datetime(2026, 1, 10, 9, 0, 0),
         descricao="Despacho proferido",

@@ -312,6 +312,15 @@ class Caso(db.Model):
 class MovimentacaoCNJ(db.Model):
     __tablename__ = "movimentacao_cnj"
     id = db.Column(db.Integer, primary_key=True)
+    # tenant_id denormalizado (Onda 3.1 Fase 4 Batch 1, decisao #1 do plano):
+    # categoria B no design original — tenant resolvido via FK caso_id.
+    # Denormalizado para evitar subquery por linha em policy RLS no hot-path
+    # de ingestao DJEN/CNJ. Sempre populado a partir do caso pai.
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_movimentacao_cnj_tenant_id"),
+        nullable=False,
+    )
     caso_id = db.Column(
         db.Integer,
         db.ForeignKey("caso.id", name="fk_movimentacao_cnj_caso_id"),
@@ -323,7 +332,11 @@ class MovimentacaoCNJ(db.Model):
     dados_integra_cnj = db.Column(db.JSON, nullable=True)
     data_registro_sistema = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (
-        db.Index("ix_movimentacao_cnj_tenant_created", "caso_id", "data_registro_sistema"),
+        db.Index(
+            "ix_movimentacao_cnj_tenant_data_registro",
+            "tenant_id",
+            "data_registro_sistema",
+        ),
     )
 
     def __repr__(self):
@@ -332,6 +345,7 @@ class MovimentacaoCNJ(db.Model):
     def to_dict(self):
         return {
             "id": self.id,
+            "tenant_id": self.tenant_id,
             "caso_id": self.caso_id,
             "data_movimentacao": (
                 self.data_movimentacao.isoformat() if self.data_movimentacao else None
@@ -339,7 +353,7 @@ class MovimentacaoCNJ(db.Model):
             "descricao": self.descricao,
             "dados_integra_cnj": self.dados_integra_cnj,
             "data_registro_sistema": (
-                self.data_registro_sistema.isoformat() if self.data_registro else None
+                self.data_registro_sistema.isoformat() if self.data_registro_sistema else None
             ),
         }
 
