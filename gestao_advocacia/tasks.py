@@ -193,6 +193,7 @@ def job_verificar_processos_cnj():
 
                                 if not mov_existente_job:
                                     nova_mov_db_job = MovimentacaoCNJ(
+                                        tenant_id=caso_item.tenant_id,
                                         caso_id=caso_item.id,
                                         data_movimentacao=data_mov_obj_job,
                                         descricao=descricao_db_job,

@@ -526,6 +526,7 @@ def register_casos_routes(
 
                     if not mov_existente:
                         nova_mov = MovimentacaoCNJ(
+                            tenant_id=caso_para_atualizar.tenant_id,
                             caso_id=caso_para_atualizar.id,
                             data_movimentacao=data_mov_obj_utc,
                             descricao=descricao_db,
