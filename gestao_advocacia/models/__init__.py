@@ -148,6 +148,11 @@ class Cliente(db.Model):
     descricao_cnpj_secundario = db.Column(db.String(200), nullable=True)
     cnpj_terciario = db.Column(db.String(20), nullable=True)
     descricao_cnpj_terciario = db.Column(db.String(200), nullable=True)
+    # Representante legal (PJ): pessoa fisica que assina procuracoes em nome
+    # da empresa. Obrigatorio na pratica para validade da procuracao.
+    responsavel_nome = db.Column(db.String(200), nullable=True)
+    responsavel_cpf = db.Column(db.String(14), nullable=True)
+    responsavel_cargo = db.Column(db.String(100), nullable=True)  # ex: Sócio Administrador
     # Endereço
     cep = db.Column(db.String(10), nullable=True)
     rua = db.Column(db.String(200), nullable=True)
@@ -188,6 +193,9 @@ class Cliente(db.Model):
             "descricao_cnpj_secundario": self.descricao_cnpj_secundario,
             "cnpj_terciario": self.cnpj_terciario,
             "descricao_cnpj_terciario": self.descricao_cnpj_terciario,
+            "responsavel_nome": self.responsavel_nome,
+            "responsavel_cpf": self.responsavel_cpf,
+            "responsavel_cargo": self.responsavel_cargo,
             "cep": self.cep,
             "rua": self.rua,
             "numero": self.numero,

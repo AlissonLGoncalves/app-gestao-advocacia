@@ -48,6 +48,9 @@ const initialStatePJ = {
   descricao_cnpj_secundario: '',
   cnpj_terciario: '',
   descricao_cnpj_terciario: '',
+  responsavel_nome: '',
+  responsavel_cpf: '',
+  responsavel_cargo: '',
   cep: '',
   rua: '',
   numero: '',
@@ -357,7 +360,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
         <h5 className="mb-0">{isEditing ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</h5>
       </div>
       <div className="card-body p-4">
-
         <form onSubmit={handleSubmit}>
           <DadosPessoaisSection
             formData={formData}

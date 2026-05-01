@@ -5,14 +5,15 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource
 
 from cnj_service import consultar_processo_cnj
-from djen_service import DjenAPIError, DjenRateLimitError, consultar_comunicacoes
+from djen_service import DjenAPIError, DjenRateLimitError
 from djen_tasks import (
     _consultar_processo_com_fallback,
     _inferir_sigla_tribunal_por_numero_processo,
     _salvar_publicacao,
 )
 from extensions import db
-from gemini_service import get_gemini_client, is_enabled as gemini_is_enabled
+from gemini_service import get_gemini_client
+from gemini_service import is_enabled as gemini_is_enabled
 from helpers import get_item_or_404, get_tenant_id, query_for_tenant, tenant_scoped
 from models import Caso, Cliente, Documento, MovimentacaoCNJ, PublicacaoDJEN, TarefaPrazo, log_audit
 from ocr_service import extract_case_data_from_file

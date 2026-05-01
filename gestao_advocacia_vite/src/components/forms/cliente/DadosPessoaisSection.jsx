@@ -353,6 +353,55 @@ function DadosPessoaisSection({
               />
             </div>
           </div>
+
+          <h6 className="mt-4 mb-3 text-muted small">
+            Representante Legal (pessoa que assina pela empresa)
+          </h6>
+          <div className="row">
+            <div className="col-md-5 mb-3">
+              <label htmlFor="responsavel_nome" className="form-label form-label-sm">
+                Nome do Responsável
+              </label>
+              <input
+                type="text"
+                name="responsavel_nome"
+                id="responsavel_nome"
+                className="form-control form-control-sm"
+                value={formData.responsavel_nome || ''}
+                onChange={onChange}
+                placeholder="Ex: João da Silva"
+              />
+            </div>
+            <div className="col-md-3 mb-3">
+              <label htmlFor="responsavel_cpf" className="form-label form-label-sm">
+                CPF do Responsável
+              </label>
+              <input
+                type="text"
+                name="responsavel_cpf"
+                id="responsavel_cpf"
+                className="form-control form-control-sm"
+                value={formData.responsavel_cpf || ''}
+                onChange={onChange}
+                placeholder="000.000.000-00"
+                maxLength={14}
+              />
+            </div>
+            <div className="col-md-4 mb-3">
+              <label htmlFor="responsavel_cargo" className="form-label form-label-sm">
+                Cargo
+              </label>
+              <input
+                type="text"
+                name="responsavel_cargo"
+                id="responsavel_cargo"
+                className="form-control form-control-sm"
+                value={formData.responsavel_cargo || ''}
+                onChange={onChange}
+                placeholder="Ex: Sócio Administrador"
+              />
+            </div>
+          </div>
         </>
       )}
     </>

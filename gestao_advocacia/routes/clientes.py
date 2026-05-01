@@ -69,6 +69,10 @@ def register_clientes_routes(app, clientes_ns, cliente_input_model_dto, cliente_
         cliente.descricao_cnpj_terciario = data.get(
             "descricao_cnpj_terciario", cliente.descricao_cnpj_terciario
         )
+        # Representante legal (PJ)
+        cliente.responsavel_nome = data.get("responsavel_nome", cliente.responsavel_nome)
+        cliente.responsavel_cpf = data.get("responsavel_cpf", cliente.responsavel_cpf)
+        cliente.responsavel_cargo = data.get("responsavel_cargo", cliente.responsavel_cargo)
         # Endereço
         cliente.cep = data.get("cep", cliente.cep)
         cliente.rua = data.get("rua", cliente.rua)
