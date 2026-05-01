@@ -938,6 +938,56 @@ class PasswordResetToken(db.Model):
     user = db.relationship("User", foreign_keys=[user_id])
 
 
+class AccessRequest(db.Model):
+    """Solicitacao de acesso a beta privada (issue #112 v2).
+
+    Coleta lead pre-comercial via /api/v1/auth/access-request publico.
+    Superadmin revisa em /admin/v1/access-requests e aprova ou rejeita.
+    Categoria C — sem tenant_id, sem RLS, acesso so via admin_session
+    ou superadmin endpoint.
+    """
+
+    __tablename__ = "access_request"
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(120), nullable=False, index=True)
+    oab = db.Column(db.String(30), nullable=True)
+    sigla_oab = db.Column(db.String(10), nullable=True)
+    telefone = db.Column(db.String(30), nullable=True)
+    escritorio = db.Column(db.String(200), nullable=True)
+    mensagem = db.Column(db.Text, nullable=True)
+    status = db.Column(
+        db.String(20), nullable=False, default="pending", server_default="pending", index=True
+    )
+    motivo_rejeicao = db.Column(db.String(500), nullable=True)
+    ip = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(500), nullable=True)
+    criado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    processado_em = db.Column(db.DateTime, nullable=True)
+    processado_por_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_access_request_processado_por_user_id"),
+        nullable=True,
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "nome": self.nome,
+            "email": self.email,
+            "oab": self.oab,
+            "sigla_oab": self.sigla_oab,
+            "telefone": self.telefone,
+            "escritorio": self.escritorio,
+            "mensagem": self.mensagem,
+            "status": self.status,
+            "motivo_rejeicao": self.motivo_rejeicao,
+            "criado_em": self.criado_em.isoformat() if self.criado_em else None,
+            "processado_em": self.processado_em.isoformat() if self.processado_em else None,
+            "processado_por_user_id": self.processado_por_user_id,
+        }
+
+
 # admin-fase0: auditoria das acoes do super-admin (across tenants)
 class AdminAuditLog(db.Model):
     __tablename__ = "admin_audit_log"

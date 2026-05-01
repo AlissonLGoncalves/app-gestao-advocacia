@@ -16,6 +16,7 @@ from flask_restx import Resource
 from extensions import db, limiter
 from helpers.admin_security import registrar_admin_audit, superadmin_required
 from models import (
+    AccessRequest,
     AdminAuditLog,
     Caso,
     Cliente,
@@ -342,3 +343,129 @@ def register_admin_routes(admin_ns):
                 .all()
             )
             return {"items": [a.to_dict() for a in anotacoes]}, 200
+
+    # ===== Access Requests (issue #112 v2) =====
+
+    @admin_ns.route("/access-requests")
+    class AdminAccessRequestsList(Resource):
+        @limiter.limit(ADMIN_RATE_LIMIT)
+        @jwt_required()
+        @superadmin_required
+        @admin_ns.doc(
+            security="jsonWebToken",
+            description="Lista solicitacoes de acesso. Filtro opcional ?status=pending|approved|rejected.",
+        )
+        def get(self):
+            from helpers.admin_session import admin_session
+
+            status_filtro = (request.args.get("status") or "").strip().lower()
+            page = _parse_int_param(request.args.get("page"), 1, 1, 10000)
+            per_page = _parse_int_param(
+                request.args.get("per_page"), PAGINATION_DEFAULT, 1, PAGINATION_MAX
+            )
+
+            with admin_session() as s:
+                q = s.query(AccessRequest)
+                if status_filtro in ("pending", "approved", "rejected"):
+                    q = q.filter(AccessRequest.status == status_filtro)
+                total = q.count()
+                items = (
+                    q.order_by(AccessRequest.criado_em.desc())
+                    .offset((page - 1) * per_page)
+                    .limit(per_page)
+                    .all()
+                )
+                return {
+                    "items": [a.to_dict() for a in items],
+                    "total": total,
+                    "page": page,
+                    "per_page": per_page,
+                }, 200
+
+    @admin_ns.route("/access-requests/<int:request_id>/approve")
+    class AdminAccessRequestApprove(Resource):
+        @limiter.limit(ADMIN_RATE_LIMIT)
+        @jwt_required()
+        @superadmin_required
+        @admin_ns.doc(security="jsonWebToken")
+        def post(self, request_id):
+            from datetime import datetime as _dt
+
+            from helpers.admin_session import admin_session
+
+            user_id_str = get_jwt_identity()
+            try:
+                actor_user_id = int(user_id_str) if user_id_str else None
+            except (TypeError, ValueError):
+                actor_user_id = None
+
+            with admin_session() as s:
+                ar = s.get(AccessRequest, request_id)
+                if not ar:
+                    return {"message": "Solicitacao nao encontrada."}, 404
+                if ar.status != "pending":
+                    return {"message": f"Solicitacao ja esta com status '{ar.status}'."}, 400
+                ar.status = "approved"
+                ar.processado_em = _dt.utcnow()
+                ar.processado_por_user_id = actor_user_id
+                payload = ar.to_dict()
+
+            try:
+                registrar_admin_audit(
+                    action="access_request.approve",
+                    target_type="access_request",
+                    target_id=request_id,
+                    after={"email": payload["email"], "status": "approved"},
+                )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            return payload, 200
+
+    @admin_ns.route("/access-requests/<int:request_id>/reject")
+    class AdminAccessRequestReject(Resource):
+        @limiter.limit(ADMIN_RATE_LIMIT)
+        @jwt_required()
+        @superadmin_required
+        @admin_ns.doc(security="jsonWebToken")
+        def post(self, request_id):
+            from datetime import datetime as _dt
+
+            from helpers.admin_session import admin_session
+
+            data = request.get_json(silent=True) or {}
+            motivo = (data.get("motivo") or "").strip()[:500] or None
+
+            user_id_str = get_jwt_identity()
+            try:
+                actor_user_id = int(user_id_str) if user_id_str else None
+            except (TypeError, ValueError):
+                actor_user_id = None
+
+            with admin_session() as s:
+                ar = s.get(AccessRequest, request_id)
+                if not ar:
+                    return {"message": "Solicitacao nao encontrada."}, 404
+                if ar.status != "pending":
+                    return {"message": f"Solicitacao ja esta com status '{ar.status}'."}, 400
+                ar.status = "rejected"
+                ar.motivo_rejeicao = motivo
+                ar.processado_em = _dt.utcnow()
+                ar.processado_por_user_id = actor_user_id
+                payload = ar.to_dict()
+
+            try:
+                registrar_admin_audit(
+                    action="access_request.reject",
+                    target_type="access_request",
+                    target_id=request_id,
+                    after={
+                        "email": payload["email"],
+                        "status": "rejected",
+                        "motivo": motivo or None,
+                    },
+                )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            return payload, 200

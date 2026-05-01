@@ -203,12 +203,9 @@ export default function LandingPage() {
             <Link to="/login" className="text-decoration-none text-secondary small">
               Entrar
             </Link>
-            <a
-              href="mailto:alisson.16lg@gmail.com?subject=Solicitação%20de%20acesso%20Patronus&body=Olá%2C%0A%0AGostaria%20de%20solicitar%20acesso%20à%20beta%20privada%20do%20Patronus.%0A%0ANome%3A%20%0AOAB%2FUF%3A%20%0ATelefone%3A%20%0AEscritório%3A%20%0A"
-              className="btn btn-primary btn-sm rounded-pill px-3"
-            >
+            <Link to="/solicitar-acesso" className="btn btn-primary btn-sm rounded-pill px-3">
               Solicitar acesso
-            </a>
+            </Link>
           </nav>
         </div>
       </header>
@@ -234,13 +231,13 @@ export default function LandingPage() {
                 e agenda.
               </p>
               <div className="d-flex flex-wrap gap-2">
-                <a
-                  href="mailto:alisson.16lg@gmail.com?subject=Solicitação%20de%20acesso%20Patronus&body=Olá%2C%0A%0AGostaria%20de%20solicitar%20acesso%20à%20beta%20privada%20do%20Patronus.%0A%0ANome%3A%20%0AOAB%2FUF%3A%20%0ATelefone%3A%20%0AEscritório%3A%20%0A"
+                <Link
+                  to="/solicitar-acesso"
                   className="btn btn-primary btn-lg rounded-pill px-4 d-inline-flex align-items-center gap-2"
                 >
                   Solicitar acesso à beta
                   <ArrowRightIcon style={{ width: 18, height: 18 }} />
-                </a>
+                </Link>
                 <a
                   href="#como-funciona"
                   className="btn btn-outline-secondary btn-lg rounded-pill px-4"
@@ -534,12 +531,12 @@ export default function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <a
-                    href="mailto:alisson.16lg@gmail.com?subject=Solicitação%20de%20acesso%20Patronus&body=Olá%2C%0A%0AGostaria%20de%20solicitar%20acesso%20à%20beta%20privada%20do%20Patronus.%0A%0APlano%20de%20interesse%3A%20%0ANome%3A%20%0AOAB%2FUF%3A%20%0ATelefone%3A%20%0AEscritório%3A%20%0A"
+                  <Link
+                    to="/solicitar-acesso"
                     className={`btn ${p.destaque ? 'btn-primary' : 'btn-outline-primary'} w-100 rounded-pill`}
                   >
                     Solicitar acesso
-                  </a>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -600,13 +597,13 @@ export default function LandingPage() {
                 respondemos em até 48h com um convite individual.
               </p>
               <div className="d-flex flex-wrap justify-content-center gap-2">
-                <a
-                  href="mailto:alisson.16lg@gmail.com?subject=Solicitação%20de%20acesso%20Patronus&body=Olá%2C%0A%0AGostaria%20de%20solicitar%20acesso%20à%20beta%20privada%20do%20Patronus.%0A%0ANome%3A%20%0AOAB%2FUF%3A%20%0ATelefone%3A%20%0AEscritório%3A%20%0A"
+                <Link
+                  to="/solicitar-acesso"
                   className="btn btn-primary btn-lg rounded-pill px-5 d-inline-flex align-items-center gap-2"
                 >
                   Solicitar acesso à beta
                   <ArrowRightIcon style={{ width: 18, height: 18 }} />
-                </a>
+                </Link>
               </div>
               <p className="small mt-3 mb-0" style={{ color: 'rgba(255,255,255,0.7)' }}>
                 Análise individual · resposta em até 48h · convite por email
