@@ -335,8 +335,8 @@ export default function CasoTimeline({ casoId }) {
   if (items.length === 0) {
     return (
       <p className="text-muted fst-italic text-center py-3 small mb-0">
-        Sem eventos registrados para este caso ainda. Movimentações CNJ, publicações DJEN,
-        documentos anexados e tarefas aparecerão aqui em ordem cronológica.
+        Sem eventos registrados para este caso ainda. Clique em "Verificar Publicações no DJEN" para sincronizar.
+        Documentos anexados e tarefas também aparecerão aqui em ordem cronológica.
       </p>
     )
   }

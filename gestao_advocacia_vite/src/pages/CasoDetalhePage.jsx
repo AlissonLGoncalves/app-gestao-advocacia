@@ -278,7 +278,7 @@ function CasoDetalhePage() {
         <div className="card-header bg-light py-3">
           <h5 className="card-title mb-0 text-primary">Linha do Tempo</h5>
           <small className="text-muted">
-            Movimentações CNJ, publicações DJEN, documentos e prazos em ordem cronológica
+            Publicações DJEN, documentos e prazos em ordem cronológica
           </small>
         </div>
         <div className="card-body p-4">

@@ -88,9 +88,10 @@ def test_timeline_agrega_documento_e_tarefa_ordenado_desc(auth_client, db):
     assert items[0]["tipo"] == "tarefa"
 
 
-def test_timeline_inclui_movimentacao_cnj_e_publicacao_djen(auth_client, db):
+def test_timeline_inclui_publicacao_djen(auth_client, db):
+    """Timeline exibe publicacoes DJEN vinculadas ao caso (CNJ/DataJud removido)."""
     from extensions import db as _db
-    from models import MovimentacaoCNJ, PublicacaoDJEN
+    from models import PublicacaoDJEN
 
     caso = _bootstrap_caso(auth_client)
 
@@ -99,12 +100,6 @@ def test_timeline_inclui_movimentacao_cnj_e_publicacao_djen(auth_client, db):
     res_me = auth_client.get("/api/v1/auth/me")
     user_id = json.loads(res_me.data)["id"]
 
-    mov = MovimentacaoCNJ(
-        tenant_id=tenant_id,
-        caso_id=caso["id"],
-        data_movimentacao=datetime(2026, 1, 10, 9, 0, 0),
-        descricao="Despacho proferido",
-    )
     pub = PublicacaoDJEN(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -114,15 +109,15 @@ def test_timeline_inclui_movimentacao_cnj_e_publicacao_djen(auth_client, db):
         texto="Intimar para manifestação em 15 dias.",
         sigla_tribunal="TJPR",
     )
-    _db.session.add_all([mov, pub])
+    _db.session.add(pub)
     _db.session.commit()
 
     res = auth_client.get(f"/api/v1/casos/{caso['id']}/timeline")
     assert res.status_code == 200
     items = json.loads(res.data)["items"]
     tipos = [i["tipo"] for i in items]
-    assert "movimentacao_cnj" in tipos
     assert "publicacao_djen" in tipos
+    assert "movimentacao_cnj" not in tipos
 
 
 def test_timeline_isolamento_cross_tenant(client, auth_client, db):

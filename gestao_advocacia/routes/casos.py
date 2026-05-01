@@ -802,10 +802,9 @@ def register_casos_routes(
     @casos_ns.route("/<int:caso_id>/timeline")
     @casos_ns.param("caso_id", "ID do caso")
     class CasoTimelineAPI(Resource):
-        """Linha do Tempo: agrega 4 fontes (movimentacoes CNJ, publicacoes DJEN,
-        documentos e tarefas/prazos) ordenado por data desc para visualizacao
-        unificada do andamento do caso. Eventos da Agenda nao aparecem porque
-        EventoAgenda atualmente nao tem caso_id (ver TODO em models)."""
+        """Linha do Tempo: agrega publicacoes DJEN, documentos e tarefas/prazos
+        ordenados por data desc. Movimentacoes DataJud (CNJ) removidas — o DJEN
+        e a fonte primaria com texto completo das intimacoes e decisoes."""
 
         @casos_ns.doc("listar_timeline_caso_endpoint", security="jsonWebToken")
         @jwt_required()
@@ -817,22 +816,6 @@ def register_casos_routes(
                 casos_ns.abort(404, message=f"Caso com ID {caso_id} não foi encontrado.")
 
             eventos = []
-
-            for mov in MovimentacaoCNJ.query.filter_by(caso_id=caso_db.id).all():
-                if not mov.data_movimentacao:
-                    continue
-                eventos.append(
-                    {
-                        "tipo": "movimentacao_cnj",
-                        "id": mov.id,
-                        "data": mov.data_movimentacao.isoformat(),
-                        "titulo": "Movimentação processual",
-                        "descricao": mov.descricao or "",
-                        "metadata": {
-                            "dados_integra_cnj": mov.dados_integra_cnj or {},
-                        },
-                    }
-                )
 
             for pub in PublicacaoDJEN.query.filter_by(
                 tenant_id=tenant_id, caso_id=caso_db.id
