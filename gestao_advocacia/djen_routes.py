@@ -841,6 +841,120 @@ def registrar_rotas_djen(
                 "ainda_pendentes": ainda_pendentes,
             }, 200
 
+    @djen_ns.route("/triagem/<int:pub_id>/analise-ia")
+    class PublicacaoTriagemAnaliseIAAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Roda Gemini sobre a publicacao e retorna analise estruturada para "
+                "o wizard de triagem assistida: partes (autoras/reus) com docs/oab "
+                "associados, dados do caso (numero, classe, valor, comarca, vara, "
+                "tipo_acao). Custo: ~\\$0.001/chamada."
+            ),
+        )
+        @jwt_required()
+        def get(self, pub_id):
+            user_id = get_jwt_identity()
+            from app import User
+            from djen_triagem import analisar_publicacao_com_fallback_ia
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, "Módulo DJEN desabilitado para este tenant no rollout atual.")
+
+            pub = PublicacaoDJEN.query.filter_by(id=pub_id, tenant_id=user.tenant_id).first()
+            if not pub:
+                djen_ns.abort(404, "Publicação não encontrada.")
+
+            # Sempre tenta IA mesmo se confianca regex >= limiar — neste fluxo o
+            # usuario pediu explicitamente para reconhecer dados pra cadastrar
+            # (background do botao "Cadastrar com IA"), entao queremos a IA.
+            analise = analisar_publicacao_com_fallback_ia(pub, limiar=1.1)
+
+            # Tenta classificar cada parte com possiveis docs/oab a partir do texto
+            texto = pub.texto or ""
+            import re
+
+            from djen_triagem import CPF_CNPJ_REGEX
+
+            docs_no_texto = [re.sub(r"\D", "", d) for d in CPF_CNPJ_REGEX.findall(texto) if d]
+
+            def _enriquecer_parte(nome, papel):
+                nome_norm = re.sub(r"\s+", " ", (nome or "").strip())
+                if not nome_norm:
+                    return None
+                # Heuristica simples: tipo_pessoa pelo doc associado (se tiver)
+                # ou pelo nome (LTDA/SA/ME -> PJ).
+                tipo_pessoa = "PF"
+                cpf_cnpj_sugerido = None
+                up = nome_norm.upper()
+                marcadores_pj = (" LTDA", " S/A", " S.A", " SA", " ME ", " EIRELI", " EPP")
+                if any(m in f" {up} " for m in marcadores_pj):
+                    tipo_pessoa = "PJ"
+
+                # Tenta achar um doc no texto cuja vizinhanca menciona o nome
+                if nome_norm and docs_no_texto:
+                    primeiro_token = nome_norm.split()[0].upper()
+                    if primeiro_token in texto.upper():
+                        idx = texto.upper().find(primeiro_token)
+                        # Procura doc num raio de 200 chars do nome
+                        janela = texto[max(0, idx - 100) : idx + 300]
+                        m = CPF_CNPJ_REGEX.search(janela)
+                        if m:
+                            doc_bruto = m.group(0)
+                            digitos = re.sub(r"\D", "", doc_bruto)
+                            if len(digitos) == 14:
+                                tipo_pessoa = "PJ"
+                                cpf_cnpj_sugerido = (
+                                    f"{digitos[:2]}.{digitos[2:5]}.{digitos[5:8]}/"
+                                    f"{digitos[8:12]}-{digitos[12:]}"
+                                )
+                            elif len(digitos) == 11:
+                                tipo_pessoa = "PF"
+                                cpf_cnpj_sugerido = (
+                                    f"{digitos[:3]}.{digitos[3:6]}.{digitos[6:9]}-{digitos[9:]}"
+                                )
+
+                return {
+                    "nome": nome_norm,
+                    "papel": papel,
+                    "tipo_pessoa": tipo_pessoa,
+                    "cpf_cnpj_sugerido": cpf_cnpj_sugerido,
+                }
+
+            partes_estruturadas = []
+            for nome in analise.get("partes_autoras") or []:
+                parte = _enriquecer_parte(nome, "autor")
+                if parte:
+                    partes_estruturadas.append(parte)
+            for nome in analise.get("partes_reus") or []:
+                parte = _enriquecer_parte(nome, "reu")
+                if parte:
+                    partes_estruturadas.append(parte)
+
+            dados_caso = {
+                "titulo": (
+                    f"Processo {analise.get('numero_processo') or pub.numero_processo or pub.id}"
+                ),
+                "numero_processo": analise.get("numero_processo") or pub.numero_processo,
+                "tipo_acao": analise.get("classe_processual") or pub.nome_classe,
+                "vara_juizo": pub.nome_orgao,
+                "comarca": analise.get("comarca"),
+                "valor_causa": analise.get("valor_causa"),
+                "tribunal": analise.get("tribunal") or pub.sigla_tribunal,
+                "assunto_principal": analise.get("assunto_principal"),
+            }
+
+            return {
+                "publicacao": pub.to_dict(),
+                "analise": analise,
+                "partes": partes_estruturadas,
+                "dados_caso_sugeridos": dados_caso,
+                "fonte_analise": analise.get("fonte_analise", "regex"),
+            }, 200
+
     @djen_ns.route("/triagem/<int:pub_id>/criar-cliente-caso")
     class PublicacaoTriagemCriarCasoAPI(Resource):
         @djen_ns.doc(

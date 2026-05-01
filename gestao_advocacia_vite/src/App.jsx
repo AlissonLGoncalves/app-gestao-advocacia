@@ -27,6 +27,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
 import SolicitarAcessoPage from './pages/SolicitarAcessoPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
+import TriagemAssistidaPage from './pages/TriagemAssistidaPage.jsx'
 import PerfilPage from './pages/PerfilPage.jsx'
 import OnboardingPage from './pages/auth/OnboardingPage.jsx'
 import LandingPage from './pages/LandingPage.jsx'
@@ -538,6 +539,7 @@ function App() {
           <Route path="documentos/editar/:documentoId" element={<DocumentosPage />} />
 
           <Route path="djen" element={<DjenPage />} />
+          <Route path="djen/triagem-assistida" element={<TriagemAssistidaPage />} />
 
           <Route path="relatorios" element={<RelatoriosPage />} />
 
