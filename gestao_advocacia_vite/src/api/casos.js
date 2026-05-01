@@ -21,6 +21,7 @@ export const listCasosByCliente = (clienteId, params = {}) =>
   listCasos({ ...params, cliente_id: clienteId })
 
 export const listMovimentacoesCaso = (id) => api.get(`/casos/${id}/movimentacoes-cnj`)
+export const listPublicacoesDjenCaso = (id) => api.get(`/casos/${id}/publicacoes-djen`)
 export const listAndamentosCaso = (id) => api.get(`/casos/${id}/andamentos`)
 
 export const atualizarCasoViaCnj = (id) => api.post(`/casos/${id}/atualizar-cnj`, {})

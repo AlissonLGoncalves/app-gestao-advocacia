@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { API_URL } from '../config.js' // Importa API_URL
 import { toast } from 'react-toastify' // Para notificações
-import { atualizarCasoViaDjen, getCaso, listMovimentacoesCaso } from '../api/casos.js'
+import { atualizarCasoViaDjen, getCaso, listPublicacoesDjenCaso } from '../api/casos.js'
 import HonorariosCasoCard from '../components/HonorariosCasoCard'
 import DocumentosCasoTab from '../components/DocumentosCasoTab'
 import CasoTimeline from '../components/CasoTimeline'
@@ -24,7 +24,7 @@ function CasoDetalhePage() {
   const navigate = useNavigate()
 
   const [caso, setCaso] = useState(null)
-  const [movimentacoesCNJ, setMovimentacoesCNJ] = useState([])
+  const [publicacoesDjen, setPublicacoesDjen] = useState([])
   const [prazos, setPrazos] = useState([])
 
   const [isLoadingCaso, setIsLoadingCaso] = useState(true)
@@ -72,8 +72,8 @@ function CasoDetalhePage() {
       setCaso(dataCaso)
       setIsLoadingCaso(false)
 
-      const dataMovCNJ = await listMovimentacoesCaso(casoId)
-      setMovimentacoesCNJ(dataMovCNJ)
+      const dataMovCNJ = await listPublicacoesDjenCaso(casoId)
+      setPublicacoesDjen(dataMovCNJ)
 
       // Buscar Prazos/Tarefas Vinculados
       const resTarefas = await fetch(`${API_URL}/tarefas`, { headers: authHeaders })
@@ -353,34 +353,54 @@ function CasoDetalhePage() {
       <div className="card shadow-lg">
         <div className="card-header bg-light py-3">
           <h5 className="card-title mb-0 text-primary">
-            Histórico de Movimentações do CNJ ({movimentacoesCNJ.length})
+            Publicações DJEN ({publicacoesDjen.length})
           </h5>
         </div>
-        <div className="card-body p-3" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div className="card-body p-3" style={{ maxHeight: '500px', overflowY: 'auto' }}>
           {isLoadingMovimentacoes ? (
-            <p className="text-muted text-center py-3">Carregando movimentações...</p>
-          ) : movimentacoesCNJ.length > 0 ? (
+            <p className="text-muted text-center py-3">Carregando publicações...</p>
+          ) : publicacoesDjen.length > 0 ? (
             <ul className="list-group list-group-flush">
-              {movimentacoesCNJ.map((mov) => (
-                <li key={mov.id} className="list-group-item px-0 py-2">
+              {publicacoesDjen.map((pub) => (
+                <li key={pub.id} className="list-group-item px-0 py-3">
+                  <div className="d-flex justify-content-between align-items-start mb-1">
+                    <span className="badge bg-primary me-2">
+                      {pub.tipo_comunicacao || 'Publicação'}
+                    </span>
+                    <span className="text-black-50" style={{ fontSize: '0.75rem' }}>
+                      {pub.sigla_tribunal}
+                      {pub.nome_orgao ? ` — ${pub.nome_orgao}` : ''}
+                    </span>
+                  </div>
                   <p className="fw-medium text-dark small mb-1">
-                    Data: {formatarDataLegivel(mov.data_movimentacao)}
+                    Data:{' '}
+                    {pub.data_disponibilizacao
+                      ? new Date(pub.data_disponibilizacao).toLocaleDateString('pt-BR')
+                      : 'Não informada'}
                   </p>
                   <p
-                    className="text-muted small mb-1"
+                    className="text-muted small mb-2"
                     style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                   >
-                    {mov.descricao}
+                    {pub.texto || 'Sem conteúdo disponível.'}
                   </p>
-                  <p className="text-black-50" style={{ fontSize: '0.7rem' }}>
-                    Registrado no sistema em: {formatarDataLegivel(mov.data_registro_sistema)}
-                  </p>
+                  {pub.link && (
+                    <a
+                      href={pub.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="small text-primary"
+                    >
+                      Ver publicação original
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
           ) : (
             <p className="text-muted fst-italic text-center py-3">
-              Nenhuma movimentação do CNJ registrada para este caso no sistema.
+              Nenhuma publicação DJEN registrada. Clique em &ldquo;Verificar Publicações no
+              DJEN&rdquo; para sincronizar.
             </p>
           )}
         </div>

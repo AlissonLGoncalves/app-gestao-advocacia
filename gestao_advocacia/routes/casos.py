@@ -799,6 +799,37 @@ def register_casos_routes(
             )
             return movimentacoes, 200
 
+    @casos_ns.route("/<int:caso_id>/publicacoes-djen")
+    @casos_ns.param("caso_id", "ID do caso para listar publicações DJEN vinculadas")
+    class CasoListarPublicacoesDjenAPI(Resource):
+        @casos_ns.doc("listar_publicacoes_djen_caso_endpoint", security="jsonWebToken")
+        @jwt_required()
+        @tenant_scoped
+        def get(self, caso_id):
+            tenant_id = get_tenant_id()
+            caso_db = query_for_tenant(Caso).filter_by(id=caso_id).first()
+            if not caso_db:
+                casos_ns.abort(404, message=f"Caso com ID {caso_id} não foi encontrado.")
+            publicacoes = (
+                PublicacaoDJEN.query.filter_by(tenant_id=tenant_id, caso_id=caso_db.id)
+                .order_by(PublicacaoDJEN.data_disponibilizacao.desc(), PublicacaoDJEN.id.desc())
+                .all()
+            )
+            return [
+                {
+                    "id": p.id,
+                    "tipo_comunicacao": p.tipo_comunicacao,
+                    "texto": p.texto,
+                    "data_disponibilizacao": p.data_disponibilizacao.isoformat() if p.data_disponibilizacao else None,
+                    "sigla_tribunal": p.sigla_tribunal,
+                    "nome_orgao": p.nome_orgao,
+                    "lida": p.lida,
+                    "link": p.link,
+                    "data_captura": p.data_captura.isoformat() if p.data_captura else None,
+                }
+                for p in publicacoes
+            ], 200
+
     @casos_ns.route("/<int:caso_id>/timeline")
     @casos_ns.param("caso_id", "ID do caso")
     class CasoTimelineAPI(Resource):
