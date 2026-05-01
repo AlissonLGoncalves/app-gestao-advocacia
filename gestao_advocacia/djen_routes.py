@@ -850,6 +850,197 @@ def registrar_rotas_djen(
                 "ainda_pendentes": ainda_pendentes,
             }, 200
 
+    @djen_ns.route("/triagem/grupos")
+    class PublicacaoTriagemGruposAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Agrupa publicacoes pendentes em buckets: mesmo processo, "
+                "cliente cadastrado, mesmo nome (novo), isoladas."
+            ),
+        )
+        @jwt_required()
+        def get(self):
+            user_id = get_jwt_identity()
+            from app import Cliente, User
+            from djen_triagem import montar_grupos_pendentes
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, "Módulo DJEN desabilitado para este tenant no rollout atual.")
+
+            grupos = montar_grupos_pendentes(db, Cliente, Caso, PublicacaoDJEN, user.tenant_id)
+            return {"grupos": grupos, "total_grupos": len(grupos)}, 200
+
+    @djen_ns.route("/triagem/vincular-em-lote")
+    class PublicacaoTriagemVincularLoteAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Vincula um conjunto de publicacoes pendentes ao mesmo Caso. "
+                "Recebe pub_ids[] e ou cliente_id+caso_id (vinculo direto) "
+                "ou cliente_payload+caso_payload (cria cliente/caso primeiro)."
+            ),
+        )
+        @jwt_required()
+        def post(self):
+            user_id = get_jwt_identity()
+            from app import Cliente, User
+            from djen_triagem import analisar_publicacao
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, "Módulo DJEN desabilitado para este tenant no rollout atual.")
+
+            payload = request.get_json(silent=True) or {}
+            pub_ids = payload.get("pub_ids") or []
+            if not isinstance(pub_ids, list) or not pub_ids:
+                djen_ns.abort(400, "pub_ids deve ser uma lista nao vazia.")
+
+            cliente_id = payload.get("cliente_id")
+            cliente_payload = payload.get("cliente_payload")
+            caso_id_existente = payload.get("caso_id")
+            caso_payload = payload.get("caso_payload") or {}
+            papel_cliente = (payload.get("papel_cliente") or "").strip().lower()
+
+            pubs = PublicacaoDJEN.query.filter(
+                PublicacaoDJEN.id.in_(pub_ids),
+                PublicacaoDJEN.tenant_id == user.tenant_id,
+            ).all()
+            if not pubs:
+                djen_ns.abort(404, "Nenhuma publicacao encontrada para os ids informados.")
+
+            cliente = None
+            cliente_criado = False
+            if cliente_id:
+                cliente = Cliente.query.filter_by(
+                    id=int(cliente_id), tenant_id=user.tenant_id
+                ).first()
+                if not cliente:
+                    djen_ns.abort(404, "Cliente nao encontrado para este tenant.")
+            elif cliente_payload:
+                if papel_cliente not in {"autor", "reu"}:
+                    djen_ns.abort(400, "papel_cliente obrigatorio quando criar cliente novo.")
+                nome_cliente = (cliente_payload.get("nome_razao_social") or "").strip()
+                if not nome_cliente:
+                    djen_ns.abort(400, "cliente_payload.nome_razao_social obrigatorio.")
+                tipo_pessoa = (cliente_payload.get("tipo_pessoa") or "PF").strip().upper()
+                if tipo_pessoa not in {"PF", "PJ"}:
+                    djen_ns.abort(400, "tipo_pessoa deve ser PF ou PJ.")
+                cpf_cnpj = (cliente_payload.get("cpf_cnpj") or "").strip()[:20] or None
+                if not cpf_cnpj:
+                    base = f"DJEN-LOTE-{pubs[0].id}"
+                    documento = base
+                    contador = 1
+                    while Cliente.query.filter_by(
+                        tenant_id=user.tenant_id, user_id=user.id, cpf_cnpj=documento
+                    ).first():
+                        contador += 1
+                        documento = f"{base}-{contador}"[:20]
+                    cpf_cnpj = documento
+
+                cliente = Cliente(
+                    tenant_id=user.tenant_id,
+                    user_id=user.id,
+                    nome_razao_social=nome_cliente[:200],
+                    tipo_pessoa=tipo_pessoa,
+                    cpf_cnpj=cpf_cnpj,
+                    email=(cliente_payload.get("email") or "").strip()[:120] or None,
+                    notas_gerais="Criado via triagem em lote (DJEN).",
+                )
+                db.session.add(cliente)
+                db.session.flush()
+                cliente_criado = True
+            else:
+                djen_ns.abort(400, "Informe cliente_id ou cliente_payload.")
+
+            # Determina o Caso a vincular
+            caso_obj = None
+            caso_criado = False
+            if caso_id_existente:
+                caso_obj = Caso.query.filter_by(
+                    id=int(caso_id_existente), tenant_id=user.tenant_id
+                ).first()
+                if not caso_obj:
+                    djen_ns.abort(404, "Caso nao encontrado para este tenant.")
+            else:
+                # Cria 1 caso novo a partir de caso_payload + dados da primeira pub
+                pub_principal = pubs[0]
+                analise = analisar_publicacao(pub_principal)
+                titulo = (
+                    caso_payload.get("titulo")
+                    or f"Processo {analise.get('numero_processo') or pub_principal.numero_processo or pub_principal.id}"
+                )
+                numero_processo = (
+                    caso_payload.get("numero_processo")
+                    or analise.get("numero_processo")
+                    or pub_principal.numero_processo
+                )
+                if numero_processo:
+                    existente = Caso.query.filter_by(
+                        tenant_id=user.tenant_id, numero_processo=numero_processo
+                    ).first()
+                    if existente:
+                        # Reusa o caso existente em vez de duplicar
+                        caso_obj = existente
+                if caso_obj is None:
+                    caso_obj = Caso(
+                        tenant_id=user.tenant_id,
+                        user_id=user.id,
+                        cliente_id=cliente.id,
+                        titulo=str(titulo)[:200],
+                        numero_processo=numero_processo,
+                        tipo_acao=(
+                            caso_payload.get("tipo_acao")
+                            or analise.get("classe_processual")
+                            or pub_principal.nome_classe
+                        ),
+                        vara_juizo=(caso_payload.get("vara_juizo") or pub_principal.nome_orgao),
+                        comarca=caso_payload.get("comarca") or analise.get("comarca"),
+                        valor_causa=_parse_decimal_or_none(
+                            caso_payload.get("valor_causa") or analise.get("valor_causa")
+                        ),
+                        parte_contraria=caso_payload.get("parte_contraria"),
+                        status="Ativo",
+                        notas_caso=caso_payload.get("notas_caso")
+                        or "Caso criado via triagem em lote (DJEN).",
+                    )
+                    db.session.add(caso_obj)
+                    db.session.flush()
+                    caso_criado = True
+
+            # Vincula todas as pubs
+            vinculadas = 0
+            ja_vinculadas = 0
+            for pub in pubs:
+                if pub.caso_id:
+                    ja_vinculadas += 1
+                    continue
+                pub.caso_id = caso_obj.id
+                pub.status_origem = "revisado_manual"
+                vinculadas += 1
+
+            try:
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                current_app.logger.error("djen_vincular_lote_falha: %s", exc)
+                djen_ns.abort(500, "Falha ao salvar.")
+
+            return {
+                "cliente_id": cliente.id,
+                "cliente_criado": cliente_criado,
+                "caso_id": caso_obj.id,
+                "caso_criado": caso_criado,
+                "vinculadas": vinculadas,
+                "ja_vinculadas": ja_vinculadas,
+                "total_recebidas": len(pubs),
+            }, 200
+
     @djen_ns.route("/triagem/<int:pub_id>/analise-ia")
     class PublicacaoTriagemAnaliseIAAPI(Resource):
         @djen_ns.doc(

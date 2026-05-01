@@ -497,6 +497,200 @@ def analisar_publicacao_com_fallback_ia(publicacao, limiar=0.5):
     return analise
 
 
+def montar_grupos_pendentes(db, Cliente, Caso, PublicacaoDJEN, tenant_id):
+    """Agrupa publicacoes pendentes (caso_id IS NULL, triagem_ignorada=False)
+    em buckets que fazem sentido para o usuario tratar de uma vez.
+
+    Tipos de grupo:
+    - mesmo_processo: 2+ pubs com mesmo numero CNJ
+    - cliente_existente: pubs cuja parte bate com Cliente cadastrado
+    - mesmo_nome_novo: 2+ pubs com mesma parte (cliente ainda nao cadastrado)
+    - isolada: 1 pub sem grupo
+
+    Retorna lista ordenada (grupos maiores primeiro, isoladas no fim).
+    """
+    from collections import defaultdict
+
+    pubs = (
+        PublicacaoDJEN.query.filter(
+            PublicacaoDJEN.tenant_id == tenant_id,
+            PublicacaoDJEN.caso_id.is_(None),
+            PublicacaoDJEN.triagem_ignorada.is_(False),
+        )
+        .order_by(PublicacaoDJEN.data_disponibilizacao.desc())
+        .all()
+    )
+
+    # Carrega clientes do tenant para matching
+    clientes = Cliente.query.filter_by(tenant_id=tenant_id).all()
+    cliente_por_nome = {}
+    for c in clientes:
+        if c.nome_razao_social:
+            cliente_por_nome[normalizar_nome(c.nome_razao_social)] = c
+    cliente_por_doc = {}
+    for c in clientes:
+        if c.cpf_cnpj:
+            doc = re.sub(r"\D", "", c.cpf_cnpj)
+            if doc:
+                cliente_por_doc[doc] = c
+
+    # Pre-processa cada pub
+    pub_infos = []
+    for pub in pubs:
+        analise = analisar_publicacao(pub)
+        nomes = (analise.get("partes_autoras") or []) + (analise.get("partes_reus") or [])
+        docs = [re.sub(r"\D", "", d) for d in (analise.get("documentos_extraidos") or []) if d]
+
+        # Tenta achar cliente existente por doc ou nome
+        cliente_match = None
+        for d in docs:
+            if d and d in cliente_por_doc:
+                cliente_match = cliente_por_doc[d]
+                break
+        if not cliente_match:
+            for nome in nomes:
+                ck = normalizar_nome(nome)
+                if ck and ck in cliente_por_nome:
+                    cliente_match = cliente_por_nome[ck]
+                    break
+
+        pub_infos.append(
+            {
+                "pub": pub,
+                "numero_processo": pub.numero_processo or analise.get("numero_processo"),
+                "nomes": nomes,
+                "cliente_match": cliente_match,
+            }
+        )
+
+    grupos = []
+    pubs_alocadas = set()
+
+    # 1) Mesmo CNJ (2+ pubs)
+    por_cnj = defaultdict(list)
+    for info in pub_infos:
+        if info["numero_processo"]:
+            por_cnj[info["numero_processo"]].append(info)
+    for cnj, lista in por_cnj.items():
+        if len(lista) >= 2:
+            cliente_unico = None
+            ids_clientes = {(i["cliente_match"].id if i["cliente_match"] else None) for i in lista}
+            if len(ids_clientes) == 1 and None not in ids_clientes:
+                cliente_unico = lista[0]["cliente_match"]
+
+            grupos.append(
+                {
+                    "id": f"cnj:{cnj}",
+                    "tipo": "mesmo_processo",
+                    "titulo": f"Processo {cnj}",
+                    "descricao": f"{len(lista)} publicações do mesmo processo",
+                    "pub_ids": [i["pub"].id for i in lista],
+                    "cliente_existente_id": cliente_unico.id if cliente_unico else None,
+                    "cliente_existente_nome": (
+                        cliente_unico.nome_razao_social if cliente_unico else None
+                    ),
+                    "count": len(lista),
+                    "amostra_titulo": (
+                        lista[0]["pub"].numero_processo_mascara
+                        or lista[0]["pub"].numero_processo
+                        or ""
+                    ),
+                }
+            )
+            for i in lista:
+                pubs_alocadas.add(i["pub"].id)
+
+    # 2) Cliente cadastrado (sem CNJ duplicado ja agrupado)
+    por_cliente = defaultdict(list)
+    for info in pub_infos:
+        if info["pub"].id in pubs_alocadas:
+            continue
+        if info["cliente_match"]:
+            por_cliente[info["cliente_match"].id].append(info)
+    for cliente_id, lista in por_cliente.items():
+        cliente = lista[0]["cliente_match"]
+        grupos.append(
+            {
+                "id": f"cliente:{cliente_id}",
+                "tipo": "cliente_existente",
+                "titulo": cliente.nome_razao_social,
+                "descricao": (
+                    f"{len(lista)} publicação(ões) de cliente já cadastrado — "
+                    "vincular tudo direto"
+                ),
+                "pub_ids": [i["pub"].id for i in lista],
+                "cliente_existente_id": cliente_id,
+                "cliente_existente_nome": cliente.nome_razao_social,
+                "count": len(lista),
+                "amostra_titulo": cliente.nome_razao_social,
+            }
+        )
+        for i in lista:
+            pubs_alocadas.add(i["pub"].id)
+
+    # 3) Mesmo nome novo (cluster por primeiro nome)
+    por_nome_novo = defaultdict(list)
+    for info in pub_infos:
+        if info["pub"].id in pubs_alocadas:
+            continue
+        if info["nomes"]:
+            chave = normalizar_nome(info["nomes"][0])
+            if chave:
+                por_nome_novo[chave].append(info)
+    for nome_norm, lista in por_nome_novo.items():
+        if len(lista) >= 2:
+            grupos.append(
+                {
+                    "id": f"nome:{nome_norm}",
+                    "tipo": "mesmo_nome_novo",
+                    "titulo": lista[0]["nomes"][0],
+                    "descricao": (
+                        f"{len(lista)} publicação(ões) com mesmo nome — "
+                        "cadastrar uma vez e vincular todas"
+                    ),
+                    "pub_ids": [i["pub"].id for i in lista],
+                    "cliente_existente_id": None,
+                    "cliente_existente_nome": None,
+                    "count": len(lista),
+                    "amostra_titulo": lista[0]["nomes"][0],
+                }
+            )
+            for i in lista:
+                pubs_alocadas.add(i["pub"].id)
+
+    # 4) Isoladas
+    isoladas = []
+    for info in pub_infos:
+        if info["pub"].id in pubs_alocadas:
+            continue
+        nome_principal = info["nomes"][0] if info["nomes"] else ""
+        isoladas.append(
+            {
+                "id": f"pub:{info['pub'].id}",
+                "tipo": "isolada",
+                "titulo": nome_principal or f"Publicação {info['pub'].id}",
+                "descricao": (
+                    info["pub"].numero_processo_mascara or info["pub"].numero_processo or "Sem CNJ"
+                ),
+                "pub_ids": [info["pub"].id],
+                "cliente_existente_id": (
+                    info["cliente_match"].id if info["cliente_match"] else None
+                ),
+                "cliente_existente_nome": (
+                    info["cliente_match"].nome_razao_social if info["cliente_match"] else None
+                ),
+                "count": 1,
+                "amostra_titulo": nome_principal or info["pub"].numero_processo_mascara or "",
+            }
+        )
+
+    # Ordena: grupos maiores primeiro, isoladas no fim
+    grupos.sort(key=lambda g: (-g["count"], g["tipo"]))
+    grupos.extend(isoladas)
+
+    return grupos
+
+
 def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise):
     numero_processo = (analise.get("numero_processo") or "").strip()
     nomes = _dedupe_preserving_order(
