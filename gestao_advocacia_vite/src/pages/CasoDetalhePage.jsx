@@ -136,6 +136,7 @@ function CasoDetalhePage() {
     try {
       const resp = await gerarResumoCaso(caso.id)
       toast.success(resp.message || 'Resumo gerado com sucesso!')
+      setCaso((prev) => ({ ...prev, descricao: resp.resumo }))
       await carregarDadosDoCaso()
     } catch (err) {
       setResumoError(err.message)
