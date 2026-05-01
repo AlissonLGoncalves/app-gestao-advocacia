@@ -24,9 +24,13 @@ from models import (
     Cliente,
     ContratoHonorario,
     Despesa,
+    DjenOabMonitoramento,
+    DjenVinculoDecisao,
     Documento,
     EventoAgenda,
     MovimentacaoCNJ,
+    ProcuracaoAnalise,
+    PublicacaoDJEN,
     Recebimento,
     TarefaPrazo,
     Tenant,
@@ -60,6 +64,14 @@ class TwoTenantsFixture(NamedTuple):
     recebimento_b: Recebimento
     contrato_a: ContratoHonorario
     contrato_b: ContratoHonorario
+    djen_oab_a: DjenOabMonitoramento
+    djen_oab_b: DjenOabMonitoramento
+    publicacao_djen_a: PublicacaoDJEN
+    publicacao_djen_b: PublicacaoDJEN
+    djen_vinculo_a: DjenVinculoDecisao
+    djen_vinculo_b: DjenVinculoDecisao
+    procuracao_a: ProcuracaoAnalise
+    procuracao_b: ProcuracaoAnalise
 
 
 @pytest.fixture(scope="session")
@@ -345,6 +357,73 @@ def two_tenants(db) -> TwoTenantsFixture:
         contrato_id=contrato_b.id,
     )
     db.session.add_all([recebimento_a, recebimento_b])
+    db.session.flush()
+
+    # Cluster DJEN + procuracao (Batch 3)
+    djen_oab_a = DjenOabMonitoramento(
+        tenant_id=tenant_a.id,
+        user_id=admin_a.id,
+        numero_oab="11111",
+        uf_oab="SP",
+    )
+    djen_oab_b = DjenOabMonitoramento(
+        tenant_id=tenant_b.id,
+        user_id=admin_b.id,
+        numero_oab="22222",
+        uf_oab="RJ",
+    )
+    db.session.add_all([djen_oab_a, djen_oab_b])
+
+    publicacao_djen_a = PublicacaoDJEN(
+        tenant_id=tenant_a.id,
+        user_id=admin_a.id,
+        caso_id=caso_a.id,
+        sigla_tribunal="TJSP",
+        texto="TEST-A-pub-djen",
+        data_disponibilizacao=_data_financeira,
+    )
+    publicacao_djen_b = PublicacaoDJEN(
+        tenant_id=tenant_b.id,
+        user_id=admin_b.id,
+        caso_id=caso_b.id,
+        sigla_tribunal="TJRJ",
+        texto="TEST-B-pub-djen",
+        data_disponibilizacao=_data_financeira,
+    )
+    db.session.add_all([publicacao_djen_a, publicacao_djen_b])
+    db.session.flush()
+
+    djen_vinculo_a = DjenVinculoDecisao(
+        tenant_id=tenant_a.id,
+        user_id=admin_a.id,
+        publicacao_id=publicacao_djen_a.id,
+        acao="criar",
+        origem_acao="manual",
+    )
+    djen_vinculo_b = DjenVinculoDecisao(
+        tenant_id=tenant_b.id,
+        user_id=admin_b.id,
+        publicacao_id=publicacao_djen_b.id,
+        acao="criar",
+        origem_acao="manual",
+    )
+    db.session.add_all([djen_vinculo_a, djen_vinculo_b])
+
+    procuracao_a = ProcuracaoAnalise(
+        tenant_id=tenant_a.id,
+        user_id=admin_a.id,
+        arquivo_path="/tmp/proc-a.pdf",
+        arquivo_hash="hash-a",
+        status="done",
+    )
+    procuracao_b = ProcuracaoAnalise(
+        tenant_id=tenant_b.id,
+        user_id=admin_b.id,
+        arquivo_path="/tmp/proc-b.pdf",
+        arquivo_hash="hash-b",
+        status="done",
+    )
+    db.session.add_all([procuracao_a, procuracao_b])
     db.session.commit()
 
     return TwoTenantsFixture(
@@ -371,6 +450,14 @@ def two_tenants(db) -> TwoTenantsFixture:
         recebimento_b=recebimento_b,
         contrato_a=contrato_a,
         contrato_b=contrato_b,
+        djen_oab_a=djen_oab_a,
+        djen_oab_b=djen_oab_b,
+        publicacao_djen_a=publicacao_djen_a,
+        publicacao_djen_b=publicacao_djen_b,
+        djen_vinculo_a=djen_vinculo_a,
+        djen_vinculo_b=djen_vinculo_b,
+        procuracao_a=procuracao_a,
+        procuracao_b=procuracao_b,
     )
 
 
