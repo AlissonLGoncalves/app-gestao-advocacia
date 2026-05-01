@@ -36,6 +36,7 @@ import PortalRegisterPage from './pages/portal/PortalRegisterPage.jsx'
 // admin-fase0: paginas do backoffice super-admin
 import AdminTenantsPage from './pages/admin/AdminTenantsPage.jsx'
 import AdminTenantDetailPage from './pages/admin/AdminTenantDetailPage.jsx'
+import AdminAccessRequestsPage from './pages/admin/AdminAccessRequestsPage.jsx'
 import { adminApi } from './api/admin.js'
 import { APP_VERSION } from './version.js'
 import GlobalSearch from './components/GlobalSearch.jsx'
@@ -398,11 +399,16 @@ const MainLayout = () => {
           <SidebarLink to="/perfil" icon={UserCircleIcon}>
             Meu Perfil
           </SidebarLink>
-          {/* admin-fase0: item visivel apenas para superadmin */}
+          {/* admin-fase0: itens visiveis apenas para superadmin */}
           {userRole === 'superadmin' && (
-            <SidebarLink to="/admin/tenants" icon={BuildingOffice2Icon}>
-              Backoffice
-            </SidebarLink>
+            <>
+              <SidebarLink to="/admin/tenants" icon={BuildingOffice2Icon}>
+                Backoffice
+              </SidebarLink>
+              <SidebarLink to="/admin/access-requests" icon={UserCircleIcon}>
+                Solicitações
+              </SidebarLink>
+            </>
           )}
         </nav>
 
@@ -553,6 +559,14 @@ function App() {
             element={
               <SuperAdminRoute>
                 <AdminTenantDetailPage />
+              </SuperAdminRoute>
+            }
+          />
+          <Route
+            path="admin/access-requests"
+            element={
+              <SuperAdminRoute>
+                <AdminAccessRequestsPage />
               </SuperAdminRoute>
             }
           />
