@@ -652,6 +652,8 @@ def register_casos_routes(
                             "nome_orgao": pub.nome_orgao,
                             "lida": pub.lida,
                             "link": pub.link,
+                            "hash_comunicacao": pub.hash_comunicacao,
+                            "tem_texto_completo": bool(pub.texto and len(pub.texto) > 500),
                         },
                     }
                 )
