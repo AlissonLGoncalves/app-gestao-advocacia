@@ -181,9 +181,19 @@ def register_dashboard_routes(app, dashboard_ns):
                         "cliente_id": cliente_id,
                         "caso_id": pub.caso_id,
                         "numero_processo": pub.numero_processo or "",
+                        "numero_processo_mascara": getattr(pub, "numero_processo_mascara", "")
+                        or "",
                         "tribunal": pub.sigla_tribunal or "",
+                        "sigla_tribunal": pub.sigla_tribunal or "",
                         "orgao": pub.nome_orgao or "",
+                        "nome_orgao": pub.nome_orgao or "",
                         "tipo_comunicacao": pub.tipo_comunicacao or "",
+                        "data_disponibilizacao": pub.data_disponibilizacao.isoformat()
+                        if pub.data_disponibilizacao
+                        else None,
+                        "hash_comunicacao": getattr(pub, "hash_comunicacao", "") or "",
+                        "link": getattr(pub, "link", "") or "",
+                        "origem_busca": getattr(pub, "origem_busca", "") or "",
                         "resumo": resumo,
                         "lida": pub.lida,
                     }

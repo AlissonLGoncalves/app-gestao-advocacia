@@ -1,5 +1,5 @@
 /**
- * Tests for MovimentacoesRecentes component (F3)
+ * Tests for MovimentacoesRecentes component (padrao DJEN)
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -11,6 +11,11 @@ const mockNavigate = vi.fn()
 
 // Mock fetch
 globalThis.fetch = vi.fn()
+
+// Mock api/djen baixarCertidao para evitar import real
+vi.mock('../api/djen.js', () => ({
+  baixarCertidao: vi.fn(() => Promise.resolve(new Blob(['fake-pdf'], { type: 'application/pdf' }))),
+}))
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -51,10 +56,14 @@ const mockData = {
           cliente_id: 45,
           caso_id: 67,
           numero_processo: '0000472-75.2025.8.16.0075',
+          numero_processo_mascara: '0000472-75.2025.8.16.0075',
           tribunal: 'TJPR',
+          sigla_tribunal: 'TJPR',
           orgao: '2a Vara Civel de Cornelio Procopio',
+          nome_orgao: '2a Vara Civel de Cornelio Procopio',
           tipo_comunicacao: 'Intimacao',
-          resumo: 'Texto da publicação de hoje com mais informações...',
+          data_disponibilizacao: '2026-04-18',
+          hash_comunicacao: 'abc123',
           lida: false,
         },
       ],
@@ -69,10 +78,14 @@ const mockData = {
           cliente_id: 46,
           caso_id: 68,
           numero_processo: '0000473-75.2025.8.16.0075',
+          numero_processo_mascara: '0000473-75.2025.8.16.0075',
           tribunal: 'TJSP',
+          sigla_tribunal: 'TJSP',
           orgao: '1a Vara de São Paulo',
+          nome_orgao: '1a Vara de São Paulo',
           tipo_comunicacao: 'Decisão',
-          resumo: 'Decisão do tribunal...',
+          data_disponibilizacao: '2026-04-17',
+          hash_comunicacao: '',
           lida: true,
         },
       ],
@@ -99,8 +112,8 @@ describe('MovimentacoesRecentes', () => {
       </BrowserRouter>
     )
 
-    expect(screen.getByText('Movimentacoes recentes')).toBeInTheDocument()
-    expect(screen.getByText('Publicacoes DJEN dos ultimos dias')).toBeInTheDocument()
+    expect(screen.getByText('Movimentações recentes')).toBeInTheDocument()
+    expect(screen.getByText('Publicações DJEN dos últimos dias')).toBeInTheDocument()
   })
 
   it('loads publications on mount with default 7 days', async () => {
@@ -163,7 +176,7 @@ describe('MovimentacoesRecentes', () => {
     })
   })
 
-  it('displays client names from publications', async () => {
+  it('displays sigla_tribunal and tipo_comunicacao as badges', async () => {
     render(
       <BrowserRouter>
         <MovimentacoesRecentes />
@@ -171,38 +184,14 @@ describe('MovimentacoesRecentes', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Dirce de Oliveira Pedotti')).toBeInTheDocument()
-      expect(screen.getByText('João da Silva')).toBeInTheDocument()
-    })
-  })
-
-  it('displays tribunal and orgao information', async () => {
-    render(
-      <BrowserRouter>
-        <MovimentacoesRecentes />
-      </BrowserRouter>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByText(/TJPR/)).toBeInTheDocument()
-      expect(screen.getByText(/2a Vara Civel de Cornelio Procopio/)).toBeInTheDocument()
-    })
-  })
-
-  it('displays tipo_comunicacao as badge', async () => {
-    render(
-      <BrowserRouter>
-        <MovimentacoesRecentes />
-      </BrowserRouter>
-    )
-
-    await waitFor(() => {
+      expect(screen.getByText('TJPR')).toBeInTheDocument()
+      expect(screen.getByText('TJSP')).toBeInTheDocument()
       expect(screen.getByText('Intimacao')).toBeInTheDocument()
       expect(screen.getByText('Decisão')).toBeInTheDocument()
     })
   })
 
-  it('displays unread indicator (red dot) for unread publications', async () => {
+  it('displays nome_orgao and process number', async () => {
     render(
       <BrowserRouter>
         <MovimentacoesRecentes />
@@ -210,16 +199,12 @@ describe('MovimentacoesRecentes', () => {
     )
 
     await waitFor(() => {
-      // Verify unread publication exists
-      const direcElement = screen
-        .getByText('Dirce de Oliveira Pedotti')
-        .closest('.publication-item')
-      expect(direcElement).toBeInTheDocument()
-      // The red dot should be present (as a styled div)
+      expect(screen.getByText(/2a Vara Civel de Cornelio Procopio/)).toBeInTheDocument()
+      expect(screen.getByText('0000472-75.2025.8.16.0075')).toBeInTheDocument()
     })
   })
 
-  it('displays truncated resumo text', async () => {
+  it('shows "Nova" badge for unread publications', async () => {
     render(
       <BrowserRouter>
         <MovimentacoesRecentes />
@@ -227,9 +212,7 @@ describe('MovimentacoesRecentes', () => {
     )
 
     await waitFor(() => {
-      // Check that long text is truncated with ...
-      const resumo = screen.getByText(/Texto da publicação de hoje/)
-      expect(resumo.textContent).toContain('...')
+      expect(screen.getByText('Nova')).toBeInTheDocument()
     })
   })
 
@@ -249,7 +232,7 @@ describe('MovimentacoesRecentes', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/Nenhuma publicacao nos ultimos 7 dias/)).toBeInTheDocument()
+      expect(screen.getByText(/Nenhuma publicação nos últimos 7 dias/)).toBeInTheDocument()
     })
   })
 
@@ -280,7 +263,7 @@ describe('MovimentacoesRecentes', () => {
     expect(cardElement).toHaveClass('custom-class')
   })
 
-  it('navigates to case detail when clicking the publication card', async () => {
+  it('navigates to /djen?publicacao=ID when clicking the publication card', async () => {
     render(
       <BrowserRouter>
         <MovimentacoesRecentes />
@@ -291,23 +274,7 @@ describe('MovimentacoesRecentes', () => {
       expect(screen.getByText('Dirce de Oliveira Pedotti')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByText('Dirce de Oliveira Pedotti'))
-
-    expect(mockNavigate).toHaveBeenCalledWith('/casos/detalhe/67')
-  })
-
-  it('opens the DJEN publication detail when clicking the process number', async () => {
-    render(
-      <BrowserRouter>
-        <MovimentacoesRecentes />
-      </BrowserRouter>
-    )
-
-    const numeroProcesso = await screen.findByRole('button', {
-      name: '0000472-75.2025.8.16.0075',
-    })
-
-    fireEvent.click(numeroProcesso)
+    fireEvent.click(screen.getByText('0000472-75.2025.8.16.0075'))
 
     expect(mockNavigate).toHaveBeenCalledWith('/djen?publicacao=1')
   })
