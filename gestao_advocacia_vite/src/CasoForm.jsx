@@ -44,6 +44,8 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
     tipo: 'Prazo',
     notas: '',
   })
+  // Eventos sugeridos pela IA (após upload de PDF). Cada um tem `selecionado`.
+  const [eventosIA, setEventosIA] = useState([])
 
   const { validationErrors, setValidationErrors, clearValidationErrors, handleSubmit } =
     useCasoForm({
@@ -53,6 +55,7 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
       onCasoChange,
       criarEvento,
       eventoData,
+      eventosIA,
       setLoading,
     })
 
@@ -73,7 +76,9 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
     const separador = t.includes(' x ') ? ' x ' : t.includes(' X ') ? ' X ' : null
     if (!separador) return ''
     const [a, b] = t.split(separador).map((v) => v.trim())
-    const cliente = String(nomeCliente || '').trim().toLowerCase()
+    const cliente = String(nomeCliente || '')
+      .trim()
+      .toLowerCase()
     if (!cliente) return a || b || ''
     if (a.toLowerCase().includes(cliente)) return b || ''
     if (b.toLowerCase().includes(cliente)) return a || ''
@@ -201,7 +206,9 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
         try {
           const jsonRes = JSON.parse(xhr.responseText)
           if (jsonRes.dados) {
-            const clienteSelecionado = clientes.find((c) => String(c.id) === String(formData.cliente_id))
+            const clienteSelecionado = clientes.find(
+              (c) => String(c.id) === String(formData.cliente_id)
+            )
             const parteContrariaInferida = inferirParteContraria(
               jsonRes.dados.titulo,
               clienteSelecionado?.nome_razao_social
@@ -267,7 +274,10 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
             cursor: 'pointer',
           }}
           role="alert"
-          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setIsDragOver(true)
+          }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={(e) => {
             e.preventDefault()
@@ -315,7 +325,10 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
             <button
               type="button"
               className="btn btn-outline-primary shadow-sm rounded-pill btn-sm"
-              onClick={(e) => { e.stopPropagation(); magicFileRef.current?.click() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                magicFileRef.current?.click()
+              }}
               disabled={isMagicLoading}
             >
               Carregar Arquivo do Processo
@@ -345,6 +358,9 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
             setCriarEvento={setCriarEvento}
             eventoData={eventoData}
             setEventoData={setEventoData}
+            formData={formData}
+            eventosIA={eventosIA}
+            setEventosIA={setEventosIA}
           />
 
           <hr className="my-4" />

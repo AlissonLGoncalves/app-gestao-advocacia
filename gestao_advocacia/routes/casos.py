@@ -62,6 +62,53 @@ def register_casos_routes(
         caso.notas_caso = data.get("notas_caso", caso.notas_caso)
         return caso
 
+    @casos_ns.route("/extrair-eventos-ia")
+    class CasoExtrairEventosIAAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @casos_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Extrai eventos juridicos (audiencias, prazos de contestacao, recursos, "
+                "embargos) de um PDF/imagem via Gemini. Retorna lista estruturada para o "
+                "usuario selecionar quais criar como eventos na agenda."
+            ),
+        )
+        def post(self):
+            from eventos_extractor_service import extrair_eventos
+
+            arquivo = request.files.get("documento") or request.files.get("file")
+            if not arquivo or not getattr(arquivo, "filename", ""):
+                return {"message": 'Nenhum arquivo enviado. Use o campo "documento".'}, 400
+
+            contexto = {
+                "data_distribuicao": (request.form.get("data_distribuicao") or "").strip(),
+                "tipo_acao": (request.form.get("tipo_acao") or "").strip(),
+                "vara_juizo": (request.form.get("vara_juizo") or "").strip(),
+            }
+
+            resultado = extrair_eventos(arquivo, contexto=contexto)
+
+            if not resultado.get("ok"):
+                code = resultado.get("code", "")
+                if code == "rate_limit":
+                    status = 429
+                elif code in ("ai_overloaded", "ai_disabled", "ai_unavailable"):
+                    status = 503
+                elif code in ("no_file", "parse_error"):
+                    status = 400
+                else:
+                    status = 502
+                return {
+                    "message": resultado.get("error", "Falha ao extrair eventos."),
+                    "code": code,
+                }, status
+
+            return {
+                "message": f"{len(resultado['eventos'])} evento(s) detectado(s).",
+                "eventos": resultado["eventos"],
+            }, 200
+
     @casos_ns.route("/leitura-peticao")
     class CasoLeituraPeticaoAPI(Resource):
         @jwt_required()
