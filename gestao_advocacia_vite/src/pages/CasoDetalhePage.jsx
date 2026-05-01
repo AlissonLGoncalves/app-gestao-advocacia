@@ -126,22 +126,26 @@ function CasoDetalhePage() {
     }
   }
 
-  if (isLoadingCaso && !caso) {
-    const handleGerarResumo = async () => {
-      setIsLoadingResumo(true)
-      setResumoError('')
-      try {
-        const resp = await gerarResumoCaso(caso.id)
-        toast.success(resp.message || 'Resumo gerado com sucesso!')
-        await carregarDadosDoCaso()
-      } catch (err) {
-        setResumoError(err.message)
-        toast.error(`Erro ao gerar resumo: ${err.message}`)
-      } finally {
-        setIsLoadingResumo(false)
-      }
+  const handleGerarResumo = async () => {
+    if (!caso) {
+      return
     }
 
+    setIsLoadingResumo(true)
+    setResumoError('')
+    try {
+      const resp = await gerarResumoCaso(caso.id)
+      toast.success(resp.message || 'Resumo gerado com sucesso!')
+      await carregarDadosDoCaso()
+    } catch (err) {
+      setResumoError(err.message)
+      toast.error(`Erro ao gerar resumo: ${err.message}`)
+    } finally {
+      setIsLoadingResumo(false)
+    }
+  }
+
+  if (isLoadingCaso && !caso) {
     return (
       <div
         className="d-flex justify-content-center align-items-center"
