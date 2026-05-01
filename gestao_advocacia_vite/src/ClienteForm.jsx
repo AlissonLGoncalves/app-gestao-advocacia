@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useConfirm } from './hooks/useConfirm.jsx'
 import { API_URL } from './config.js'
 import { toast } from 'react-toastify'
@@ -74,6 +74,8 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
   const [loadingCep, setLoadingCep] = useState(false)
   const [loadingCnpj, setLoadingCnpj] = useState(false)
   const [loadingOcr, setLoadingOcr] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const ocrFileRef = useRef(null)
   const [cpfCnpjLiberadoEdicao, setCpfCnpjLiberadoEdicao] = useState(false)
 
   const { validationErrors, setValidationErrors, clearValidationErrors, handleSubmit } =
@@ -528,40 +530,59 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
       </div>
       <div className="card-body p-4">
         {!isEditing && (
-          <div className="alert alert-secondary d-flex align-items-center mb-4" role="alert">
-            <div className="me-3">
-              <span className="fs-3">📄✨</span>
-            </div>
-            <div className="flex-grow-1">
-              <h6 className="mb-1 text-dark fw-bold">Auto-Preenchimento Mágico (Leitura IA)</h6>
-              <p className="mb-0 small text-muted">
-                Envie a procuração em PDF (ou outros formatos) para extrair e preencher
-                automaticamente os dados do cliente.
-              </p>
-            </div>
-            <div>
-              <input
-                type="file"
-                multiple
-                accept="application/pdf, .docx, .xlsx, .xls, .txt, image/png, image/jpeg, image/jpg"
-                id="documento_ocr"
-                style={{ display: 'none' }}
-                onChange={handleFileUploadOcr}
-              />
-              <label
-                htmlFor="documento_ocr"
-                className="btn btn-primary btn-sm ms-2 mb-0"
-                style={{ cursor: 'pointer' }}
-              >
+          <div
+            className="alert alert-secondary mb-4"
+            style={{
+              border: isDragOver ? '2px dashed #0d6efd' : '2px dashed #6c757d',
+              backgroundColor: isDragOver ? '#e8f0fe' : '#f8f9fa',
+              transition: 'border-color 0.2s, background-color 0.2s',
+              cursor: loadingOcr ? 'not-allowed' : 'pointer',
+            }}
+            role="alert"
+            onDragOver={(e) => { e.preventDefault(); if (!loadingOcr) setIsDragOver(true) }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setIsDragOver(false)
+              if (loadingOcr) return
+              const files = e.dataTransfer.files
+              if (files?.length) handleFileUploadOcr({ target: { files } })
+            }}
+            onClick={() => !loadingOcr && ocrFileRef.current?.click()}
+          >
+            <input
+              ref={ocrFileRef}
+              type="file"
+              multiple
+              accept="application/pdf, .docx, .xlsx, .xls, .txt, image/png, image/jpeg, image/jpg"
+              style={{ display: 'none' }}
+              onChange={handleFileUploadOcr}
+            />
+            <div className="d-flex align-items-center">
+              <div className="me-3">
+                <span className="fs-3">📄✨</span>
+              </div>
+              <div className="flex-grow-1">
+                <h6 className="mb-1 text-dark fw-bold">Auto-Preenchimento Mágico (Leitura IA)</h6>
+                <p className="mb-0 small text-muted">
+                  {isDragOver
+                    ? 'Solte o arquivo aqui...'
+                    : loadingOcr
+                      ? 'Analisando documentos...'
+                      : 'Arraste a procuração aqui ou clique para selecionar. Extrai dados do cliente automaticamente.'}
+                </p>
+              </div>
+              <div>
                 {loadingOcr ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2"></span> Analisando
-                    Lote...
-                  </>
+                  <span className="btn btn-primary btn-sm ms-2 mb-0 disabled">
+                    <span className="spinner-border spinner-border-sm me-2"></span> Analisando Lote...
+                  </span>
                 ) : (
-                  'Importar Procuração/Documentos'
+                  <span className="btn btn-primary btn-sm ms-2 mb-0">
+                    Importar Procuração/Documentos
+                  </span>
                 )}
-              </label>
+              </div>
             </div>
           </div>
         )}
