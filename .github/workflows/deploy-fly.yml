@@ -48,16 +48,16 @@ jobs:
       - name: Deploy to Fly
         run: flyctl deploy --remote-only
 
-      # Pos-deploy health check: a rota raiz "/" do app responde com
-      # JSON {"status":"online"} quando o Flask boot completou e o
-      # blueprint da API esta montado. --retry 5 com 3s entre cada
-      # tentativa cobre os ~7s de cold start tipico do Fly auto_stop=stop.
-      # TODO: substituir por /healthz quando endpoint dedicado existir.
+      # Pos-deploy health check via /api/v1/health (issue #95): valida
+      # SELECT 1 no Postgres + alembic_version sincronizado com o codigo +
+      # blueprints da API montados. Retorna 503 (e curl --fail aborta) se
+      # qualquer check falhar. --retry 5 com 3s entre tentativas cobre os
+      # ~7s de cold start tipico do Fly auto_stop=stop.
       - name: Health check
         run: |
           curl --fail --silent --show-error \
                --retry 5 --retry-delay 3 --retry-connrefused \
                --max-time 30 \
-               https://app-gestao-advocacia.fly.dev/ \
-            | grep -q '"status":"online"' \
+               https://app-gestao-advocacia.fly.dev/api/v1/health \
+            | grep -q '"status":"ok"' \
             || (echo "::error::Health check falhou apos deploy" && exit 1)
