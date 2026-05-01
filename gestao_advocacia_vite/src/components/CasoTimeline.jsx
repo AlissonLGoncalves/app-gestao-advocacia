@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react'
+import { toast } from 'react-toastify'
 import { api } from '../api/client.js'
+import { getPublicacao, baixarCertidao as baixarCertidaoApi } from '../api/djen.js'
 import {
   ScaleIcon,
   NewspaperIcon,
   DocumentTextIcon,
   ClipboardDocumentListIcon,
+  ArrowTopRightOnSquareIcon,
+  DocumentArrowDownIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from '@heroicons/react/24/outline'
 
 const CONFIG_POR_TIPO = {
@@ -43,6 +49,135 @@ const formatarData = (iso) => {
   } catch {
     return iso
   }
+}
+
+/**
+ * Bloco expansivel para itens publicacao_djen — mostra texto truncado por
+ * default, e ao clicar em "Ver completo" busca o texto inteiro via API
+ * (POST /djen/publicacoes/<id>) e expande inline. Botoes "Ver original"
+ * (link externo do tribunal) e "Baixar certidão" (PDF blob) replicam o
+ * comportamento do painel "Detalhe da Publicação" da DjenPage.
+ */
+function PublicacaoDjenItem({ item }) {
+  const [expandido, setExpandido] = useState(false)
+  const [textoCompleto, setTextoCompleto] = useState(null)
+  const [carregando, setCarregando] = useState(false)
+  const [baixando, setBaixando] = useState(false)
+
+  const meta = item.metadata || {}
+  const temMaisTexto = meta.tem_texto_completo === true
+  const temLinkOriginal = !!meta.link
+  const temCertidao = !!meta.hash_comunicacao
+
+  const toggleExpandir = async () => {
+    if (expandido) {
+      setExpandido(false)
+      return
+    }
+    setExpandido(true)
+    if (textoCompleto !== null || !temMaisTexto) return
+    setCarregando(true)
+    try {
+      const pub = await getPublicacao(item.id)
+      setTextoCompleto(pub?.texto || item.descricao || '')
+    } catch (e) {
+      toast.error(e?.message || 'Falha ao carregar texto completo.')
+      setExpandido(false)
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  const baixarCertidao = async () => {
+    if (!temCertidao) {
+      toast.warning('Esta publicação não possui certidão disponível.')
+      return
+    }
+    setBaixando(true)
+    try {
+      const blob = await baixarCertidaoApi(item.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certidao_djen_${item.id}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      toast.error(e?.message || 'Falha ao baixar certidão.')
+    } finally {
+      setBaixando(false)
+    }
+  }
+
+  // Texto exibido: o que veio de "descricao" (truncado a 500), ou o completo se carregado
+  const texto = expandido && textoCompleto !== null ? textoCompleto : item.descricao || ''
+
+  return (
+    <>
+      {item.descricao && (
+        <p
+          className="text-muted small mb-1"
+          style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+        >
+          {carregando ? 'Carregando texto completo...' : texto}
+          {!expandido && temMaisTexto && <span className="text-muted fst-italic"> (...)</span>}
+        </p>
+      )}
+
+      {meta.sigla_tribunal && (
+        <p className="text-muted mb-2 mt-1" style={{ fontSize: '0.72rem' }}>
+          {meta.sigla_tribunal}
+          {meta.nome_orgao ? ` · ${meta.nome_orgao}` : ''}
+          {meta.lida === false ? ' · não lida' : ''}
+        </p>
+      )}
+
+      <div className="d-flex flex-wrap gap-1 mt-1">
+        {temMaisTexto && (
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={toggleExpandir}
+            disabled={carregando}
+            style={{ fontSize: '0.75rem' }}
+          >
+            {expandido ? (
+              <>
+                <ChevronUpIcon style={{ width: 14, height: 14 }} /> Recolher
+              </>
+            ) : (
+              <>
+                <ChevronDownIcon style={{ width: 14, height: 14 }} /> Ver completo
+              </>
+            )}
+          </button>
+        )}
+        {temLinkOriginal && (
+          <a
+            href={meta.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-outline-primary"
+            style={{ fontSize: '0.75rem' }}
+          >
+            <ArrowTopRightOnSquareIcon style={{ width: 14, height: 14 }} /> Ver original
+          </a>
+        )}
+        {temCertidao && (
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-success"
+            onClick={baixarCertidao}
+            disabled={baixando}
+            style={{ fontSize: '0.75rem' }}
+          >
+            <DocumentArrowDownIcon style={{ width: 14, height: 14 }} />{' '}
+            {baixando ? 'Baixando...' : 'Baixar certidão'}
+          </button>
+        )}
+      </div>
+    </>
+  )
 }
 
 export default function CasoTimeline({ casoId }) {
@@ -150,29 +285,28 @@ export default function CasoTimeline({ casoId }) {
               <h6 className="fw-semibold mb-1 text-dark" style={{ fontSize: '0.9rem' }}>
                 {item.titulo}
               </h6>
-              {item.descricao && (
-                <p
-                  className="text-muted small mb-0"
-                  style={{
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {item.descricao}
-                </p>
-              )}
-              {item.tipo === 'publicacao_djen' && item.metadata?.sigla_tribunal && (
-                <p className="text-muted mb-0 mt-1" style={{ fontSize: '0.72rem' }}>
-                  {item.metadata.sigla_tribunal}
-                  {item.metadata.nome_orgao ? ` · ${item.metadata.nome_orgao}` : ''}
-                  {item.metadata.lida === false ? ' · não lida' : ''}
-                </p>
-              )}
-              {item.tipo === 'tarefa' && item.metadata?.status && (
-                <p className="text-muted mb-0 mt-1" style={{ fontSize: '0.72rem' }}>
-                  {item.metadata.tipo_tarefa} · {item.metadata.status} · prioridade{' '}
-                  {item.metadata.prioridade}
-                </p>
+              {item.tipo === 'publicacao_djen' ? (
+                <PublicacaoDjenItem item={item} />
+              ) : (
+                <>
+                  {item.descricao && (
+                    <p
+                      className="text-muted small mb-0"
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {item.descricao}
+                    </p>
+                  )}
+                  {item.tipo === 'tarefa' && item.metadata?.status && (
+                    <p className="text-muted mb-0 mt-1" style={{ fontSize: '0.72rem' }}>
+                      {item.metadata.tipo_tarefa} · {item.metadata.status} · prioridade{' '}
+                      {item.metadata.prioridade}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </li>
