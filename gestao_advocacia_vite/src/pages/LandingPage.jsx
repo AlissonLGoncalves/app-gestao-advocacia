@@ -343,15 +343,12 @@ export default function LandingPage() {
           <div className="row justify-content-center text-center mb-5">
             <div className="col-lg-8">
               <p className="lp-section-eyebrow">Por que Patronus existe</p>
-              <h2
-                className="lp-headline mb-3"
-                style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}
-              >
+              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}>
                 O e-mail não foi desenhado para gestão de prazos.
               </h2>
               <p className="text-muted mb-0" style={{ maxWidth: 680, margin: '0 auto' }}>
-                A publicação cai no inbox compartilhado às 3h da manhã. O estagiário marca como
-                lida sem identificar o processo. Três dias depois, o prazo venceu. A planilha de
+                A publicação cai no inbox compartilhado às 3h da manhã. O estagiário marca como lida
+                sem identificar o processo. Três dias depois, o prazo venceu. A planilha de
                 controle? Ninguém atualizou.
               </p>
             </div>
@@ -381,10 +378,7 @@ export default function LandingPage() {
           <div className="row justify-content-center text-center mb-5">
             <div className="col-lg-8">
               <p className="lp-section-eyebrow">Recursos</p>
-              <h2
-                className="lp-headline mb-3"
-                style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}
-              >
+              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}>
                 Tudo o que um escritório jurídico precisa.
               </h2>
               <p className="text-muted mb-0">
@@ -419,10 +413,7 @@ export default function LandingPage() {
           <div className="row align-items-center g-5">
             <div className="col-lg-5">
               <p className="lp-section-eyebrow">Como funciona</p>
-              <h2
-                className="lp-headline mb-3"
-                style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)' }}
-              >
+              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)' }}>
                 Do cadastro à primeira publicação automática em poucos minutos.
               </h2>
               <p className="text-muted mb-4">
@@ -469,16 +460,13 @@ export default function LandingPage() {
             </div>
             <div className="col-lg-6">
               <p className="lp-section-eyebrow">Diferenciais</p>
-              <h2
-                className="lp-headline mb-3"
-                style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)' }}
-              >
+              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)' }}>
                 Não é um CRM com cara de software jurídico.
               </h2>
               <p className="text-muted mb-4">
                 É um sistema desenhado desde a primeira linha de código para o fluxo de um
-                escritório brasileiro. Sem adaptações de Salesforce. Sem integração "em breve" com
-                o CNJ. Sem cobrança extra por usuário ativo.
+                escritório brasileiro. Sem adaptações de Salesforce. Sem integração "em breve" com o
+                CNJ. Sem cobrança extra por usuário ativo.
               </p>
               <ul className="list-unstyled mb-0">
                 {DIFERENCIAIS.map((d) => (
@@ -509,10 +497,7 @@ export default function LandingPage() {
           <div className="row justify-content-center text-center mb-5">
             <div className="col-lg-8">
               <p className="lp-section-eyebrow">Planos</p>
-              <h2
-                className="lp-headline mb-3"
-                style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}
-              >
+              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}>
                 14 dias grátis antes de qualquer cobrança.
               </h2>
               <p className="text-muted mb-0">
