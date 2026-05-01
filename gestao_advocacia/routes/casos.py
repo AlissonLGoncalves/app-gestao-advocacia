@@ -743,7 +743,9 @@ def register_casos_routes(
                         "data": mov.data_movimentacao.isoformat(),
                         "titulo": "Movimentação processual",
                         "descricao": mov.descricao or "",
-                        "metadata": {},
+                        "metadata": {
+                            "dados_integra_cnj": mov.dados_integra_cnj or {},
+                        },
                     }
                 )
 

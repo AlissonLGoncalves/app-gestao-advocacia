@@ -11,7 +11,10 @@ import {
   DocumentArrowDownIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline'
+
+const ITENS_INICIAIS = 10
 
 const CONFIG_POR_TIPO = {
   movimentacao_cnj: {
@@ -49,6 +52,89 @@ const formatarData = (iso) => {
   } catch {
     return iso
   }
+}
+
+/** Renderiza campo de label:valor para o detalhe da movimentação CNJ */
+function CampoDetalhe({ label, valor }) {
+  if (valor === null || valor === undefined || valor === '') return null
+  const texto =
+    typeof valor === 'object' ? JSON.stringify(valor, null, 2) : String(valor)
+  return (
+    <div className="mb-1">
+      <span className="text-muted" style={{ fontSize: '0.72rem', fontWeight: 600 }}>
+        {label}:{' '}
+      </span>
+      <span className="text-dark" style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap' }}>
+        {texto}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Bloco expansível para itens movimentacao_cnj — exibe a descrição e, ao
+ * clicar em "Ver detalhes", abre o painel com os dados brutos do CNJ
+ * (dados_integra_cnj) formatados em campos legíveis.
+ */
+function MovimentacaoCnjItem({ item }) {
+  const [expandido, setExpandido] = useState(false)
+  const meta = item.metadata || {}
+  const dados = meta.dados_integra_cnj || {}
+
+  const complementos = Array.isArray(dados.complementosTabelados)
+    ? dados.complementosTabelados.map((c) => c.nome || c.descricao).filter(Boolean)
+    : []
+  const orgao = dados.orgaoJulgador?.nome || null
+  const nacional = dados.movimentoNacional?.descricao || null
+  const local = dados.movimentoLocal?.descricao || null
+  const codigo = dados.codigo || null
+
+  const temDetalhe = complementos.length > 0 || orgao || nacional || local || codigo
+
+  return (
+    <>
+      {item.descricao && (
+        <p className="text-muted small mb-1" style={{ wordBreak: 'break-word' }}>
+          {item.descricao}
+        </p>
+      )}
+      {temDetalhe && (
+        <div className="mt-1">
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+            onClick={() => setExpandido((v) => !v)}
+          >
+            {expandido ? (
+              <>
+                <ChevronUpIcon style={{ width: 13, height: 13 }} /> Recolher
+              </>
+            ) : (
+              <>
+                <InformationCircleIcon style={{ width: 13, height: 13 }} /> Ver detalhes
+              </>
+            )}
+          </button>
+
+          {expandido && (
+            <div
+              className="mt-2 p-2 rounded border"
+              style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
+            >
+              <CampoDetalhe label="Código" valor={codigo} />
+              {complementos.length > 0 && (
+                <CampoDetalhe label="Complementos" valor={complementos.join(' | ')} />
+              )}
+              <CampoDetalhe label="Órgão julgador" valor={orgao} />
+              <CampoDetalhe label="Movimento nacional" valor={nacional} />
+              <CampoDetalhe label="Movimento local" valor={local} />
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
 }
 
 /**
@@ -184,11 +270,13 @@ export default function CasoTimeline({ casoId }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [expandidoTodos, setExpandidoTodos] = useState(false)
 
   useEffect(() => {
     let active = true
     setLoading(true)
     setError(null)
+    setExpandidoTodos(false)
     api
       .get(`/casos/${casoId}/timeline`)
       .then((data) => {
@@ -222,96 +310,124 @@ export default function CasoTimeline({ casoId }) {
     )
   }
 
+  const itemsVisiveis = expandidoTodos ? items : items.slice(0, ITENS_INICIAIS)
+  const temMais = items.length > ITENS_INICIAIS
+
   return (
-    <ul className="list-unstyled mb-0" style={{ position: 'relative' }}>
-      {items.map((item, idx) => {
-        const config = CONFIG_POR_TIPO[item.tipo] || {
-          label: item.tipo,
-          cor: '#6b7280',
-          icone: DocumentTextIcon,
-        }
-        const Icone = config.icone
-        const ehUltimo = idx === items.length - 1
+    <>
+      <ul className="list-unstyled mb-0" style={{ position: 'relative' }}>
+        {itemsVisiveis.map((item, idx) => {
+          const config = CONFIG_POR_TIPO[item.tipo] || {
+            label: item.tipo,
+            cor: '#6b7280',
+            icone: DocumentTextIcon,
+          }
+          const Icone = config.icone
+          const ehUltimo = idx === itemsVisiveis.length - 1 && !temMais
 
-        return (
-          <li
-            key={`${item.tipo}-${item.id}`}
-            className="d-flex gap-3 pb-3"
-            style={{ position: 'relative' }}
-          >
-            <div className="d-flex flex-column align-items-center" style={{ flexShrink: 0 }}>
-              <span
-                className="rounded-circle d-flex align-items-center justify-content-center"
-                style={{
-                  width: 36,
-                  height: 36,
-                  backgroundColor: `${config.cor}15`,
-                  border: `2px solid ${config.cor}`,
-                }}
-                title={config.label}
-              >
-                <Icone style={{ width: 18, height: 18, color: config.cor }} />
-              </span>
-              {!ehUltimo && (
+          return (
+            <li
+              key={`${item.tipo}-${item.id}`}
+              className="d-flex gap-3 pb-3"
+              style={{ position: 'relative' }}
+            >
+              <div className="d-flex flex-column align-items-center" style={{ flexShrink: 0 }}>
                 <span
+                  className="rounded-circle d-flex align-items-center justify-content-center"
                   style={{
-                    flex: 1,
-                    width: 2,
-                    backgroundColor: '#e5e7eb',
-                    marginTop: 4,
-                    minHeight: 20,
-                  }}
-                />
-              )}
-            </div>
-
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
-                <span
-                  className="badge"
-                  style={{
+                    width: 36,
+                    height: 36,
                     backgroundColor: `${config.cor}15`,
-                    color: config.cor,
-                    fontWeight: 600,
-                    fontSize: '0.7rem',
+                    border: `2px solid ${config.cor}`,
                   }}
+                  title={config.label}
                 >
-                  {config.label}
+                  <Icone style={{ width: 18, height: 18, color: config.cor }} />
                 </span>
-                <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                  {formatarData(item.data)}
-                </small>
+                {!ehUltimo && (
+                  <span
+                    style={{
+                      flex: 1,
+                      width: 2,
+                      backgroundColor: '#e5e7eb',
+                      marginTop: 4,
+                      minHeight: 20,
+                    }}
+                  />
+                )}
               </div>
-              <h6 className="fw-semibold mb-1 text-dark" style={{ fontSize: '0.9rem' }}>
-                {item.titulo}
-              </h6>
-              {item.tipo === 'publicacao_djen' ? (
-                <PublicacaoDjenItem item={item} />
-              ) : (
-                <>
-                  {item.descricao && (
-                    <p
-                      className="text-muted small mb-0"
-                      style={{
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                      }}
-                    >
-                      {item.descricao}
-                    </p>
-                  )}
-                  {item.tipo === 'tarefa' && item.metadata?.status && (
-                    <p className="text-muted mb-0 mt-1" style={{ fontSize: '0.72rem' }}>
-                      {item.metadata.tipo_tarefa} · {item.metadata.status} · prioridade{' '}
-                      {item.metadata.prioridade}
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          </li>
-        )
-      })}
-    </ul>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
+                  <span
+                    className="badge"
+                    style={{
+                      backgroundColor: `${config.cor}15`,
+                      color: config.cor,
+                      fontWeight: 600,
+                      fontSize: '0.7rem',
+                    }}
+                  >
+                    {config.label}
+                  </span>
+                  <small className="text-muted" style={{ fontSize: '0.75rem' }}>
+                    {formatarData(item.data)}
+                  </small>
+                </div>
+                <h6 className="fw-semibold mb-1 text-dark" style={{ fontSize: '0.9rem' }}>
+                  {item.titulo}
+                </h6>
+                {item.tipo === 'publicacao_djen' ? (
+                  <PublicacaoDjenItem item={item} />
+                ) : item.tipo === 'movimentacao_cnj' ? (
+                  <MovimentacaoCnjItem item={item} />
+                ) : (
+                  <>
+                    {item.descricao && (
+                      <p
+                        className="text-muted small mb-0"
+                        style={{
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {item.descricao}
+                      </p>
+                    )}
+                    {item.tipo === 'tarefa' && item.metadata?.status && (
+                      <p className="text-muted mb-0 mt-1" style={{ fontSize: '0.72rem' }}>
+                        {item.metadata.tipo_tarefa} · {item.metadata.status} · prioridade{' '}
+                        {item.metadata.prioridade}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+
+      {temMais && (
+        <div className="text-center mt-2">
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-primary"
+            style={{ fontSize: '0.8rem' }}
+            onClick={() => setExpandidoTodos((v) => !v)}
+          >
+            {expandidoTodos ? (
+              <>
+                <ChevronUpIcon style={{ width: 14, height: 14 }} /> Recolher ({items.length - ITENS_INICIAIS} ocultos)
+              </>
+            ) : (
+              <>
+                <ChevronDownIcon style={{ width: 14, height: 14 }} /> Ver todos ({items.length} eventos)
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </>
   )
 }
