@@ -111,11 +111,16 @@ function CasoDetalhePage() {
 
     try {
       const dataResposta = await atualizarCasoViaCnj(caso.id)
+      const novas = Number(dataResposta?.novas_movimentacoes_registradas || 0)
+      const backfill = Number(dataResposta?.movimentacoes_backfill_registradas || 0)
 
-      setAtualizacaoCNJSuccess(
-        dataResposta.message || 'Informações do caso atualizadas com sucesso a partir do CNJ!'
-      )
-      toast.success(dataResposta.message || 'Atualização CNJ bem-sucedida!')
+      let mensagem = dataResposta.message || 'Informações do caso atualizadas com sucesso a partir do CNJ!'
+      if (backfill > 0 && novas === 0) {
+        mensagem = `Nenhuma nova movimentação no CNJ. Histórico sincronizado: ${backfill} registro(s).`
+      }
+
+      setAtualizacaoCNJSuccess(mensagem)
+      toast.success(mensagem)
       await carregarDadosDoCaso()
       setTimelineRefreshNonce((v) => v + 1)
     } catch (err) {
