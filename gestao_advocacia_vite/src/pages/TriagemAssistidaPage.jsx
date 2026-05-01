@@ -2,35 +2,40 @@
  * TriagemAssistidaPage — Wizard guiado para cadastrar clientes/casos a partir
  * das publicações DJEN pendentes (sem vínculo com cliente).
  *
- * Fluxo (5 etapas):
- *   1. Lista de pendentes (sidebar) — usuário escolhe a próxima a tratar
- *   2. IA analisa a publicação (Gemini) — extrai partes, docs, OABs, dados do caso
- *   3. Usuário escolhe QUAL parte é o cliente dele (cards com Autor/Réu)
- *   4. Form do cliente pré-preenchido — usuário revisa nome, CPF/CNPJ, tipo
- *   5. Form do caso pré-preenchido — usuário revisa numero, vara, valor
- *   6. Confirmar → cria tudo, vincula publicação, avança para próxima
+ * Fluxo (com agrupamento):
+ *   1. Lista de GRUPOS — pubs agrupadas por mesmo processo, mesmo cliente
+ *      cadastrado, mesmo nome novo, ou isoladas.
+ *   2. Click num grupo:
+ *      - Se 'cliente_existente' → confirmação simples (vincula tudo direto)
+ *      - Se 'mesmo_processo' / 'mesmo_nome_novo' / 'isolada' → wizard:
+ *        2a. IA analisa a primeira pub do grupo
+ *        2b. Usuário escolhe parte (cliente)
+ *        2c. Form cliente (pré-preenchido)
+ *        2d. Form caso (pré-preenchido)
+ *        2e. Confirma → cria cliente + caso + vincula TODAS as pubs do grupo
  *
  * Atalhos:
- *   1, 2, 3 ... — escolhe a parte
- *   Enter — avança etapa
- *   Esc   — volta etapa
+ *   1, 2, 3 ... — escolhe a parte na etapa de seleção
+ *   Esc       — volta etapa
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 
-import { criarClienteCasoTriagem, getAnaliseIA, listTriagem } from '../api/djen.js'
+import { getAnaliseIA, listGruposPendentes, vincularEmLote } from '../api/djen.js'
 
 const STEP_LIST = 0
-const STEP_ANALYSE = 1
-const STEP_PICK_PARTY = 2
-const STEP_CLIENT_FORM = 3
-const STEP_CASE_FORM = 4
-const STEP_DONE = 5
+const STEP_CONFIRM_EXISTING = 1
+const STEP_ANALYSE = 2
+const STEP_PICK_PARTY = 3
+const STEP_CLIENT_FORM = 4
+const STEP_CASE_FORM = 5
+const STEP_DONE = 6
 
 const PROGRESS_LABELS = {
-  [STEP_LIST]: 'Selecionar publicação',
+  [STEP_LIST]: 'Selecionar grupo',
+  [STEP_CONFIRM_EXISTING]: 'Confirmar vínculo',
   [STEP_ANALYSE]: 'Analisando com IA',
   [STEP_PICK_PARTY]: 'Identificar cliente',
   [STEP_CLIENT_FORM]: 'Revisar dados do cliente',
@@ -38,15 +43,28 @@ const PROGRESS_LABELS = {
   [STEP_DONE]: 'Concluído',
 }
 
+const TIPO_LABELS = {
+  mesmo_processo: { label: 'Mesmo processo', cor: 'primary', icone: 'bi-folder' },
+  cliente_existente: {
+    label: 'Cliente já cadastrado',
+    cor: 'success',
+    icone: 'bi-person-check',
+  },
+  mesmo_nome_novo: {
+    label: 'Mesmo nome (cliente novo)',
+    cor: 'warning',
+    icone: 'bi-people',
+  },
+  isolada: { label: 'Publicação isolada', cor: 'secondary', icone: 'bi-file-earmark' },
+}
+
 function TriagemAssistidaPage() {
   const navigate = useNavigate()
 
-  const [pendentes, setPendentes] = useState([])
-  const [pendentesTotal, setPendentesTotal] = useState(0)
-  const [pubAtual, setPubAtual] = useState(null)
+  const [grupos, setGrupos] = useState([])
   const [loadingLista, setLoadingLista] = useState(true)
+  const [grupoAtual, setGrupoAtual] = useState(null)
   const [analise, setAnalise] = useState(null)
-  const [loadingAnalise, setLoadingAnalise] = useState(false)
   const [step, setStep] = useState(STEP_LIST)
   const [parteEscolhida, setParteEscolhida] = useState(null)
   const [clienteForm, setClienteForm] = useState({
@@ -68,34 +86,34 @@ function TriagemAssistidaPage() {
   const [salvando, setSalvando] = useState(false)
   const [tratadas, setTratadas] = useState(0)
 
-  const carregarPendentes = useCallback(async () => {
+  const carregarGrupos = useCallback(async () => {
     setLoadingLista(true)
     try {
-      const data = await listTriagem({
-        somente_pendentes: true,
-        limit: 100,
-        offset: 0,
-        lite: true,
-      })
-      const items = (data.items || []).map((it) => it.publicacao)
-      setPendentes(items)
-      setPendentesTotal(data.total || items.length)
+      const data = await listGruposPendentes()
+      setGrupos(data.grupos || [])
     } catch (err) {
-      toast.error(err?.message || 'Falha ao carregar pendentes.')
+      toast.error(err?.message || 'Falha ao carregar grupos.')
     } finally {
       setLoadingLista(false)
     }
   }, [])
 
   useEffect(() => {
-    carregarPendentes()
-  }, [carregarPendentes])
+    carregarGrupos()
+  }, [carregarGrupos])
 
-  const iniciarComPub = async (pub) => {
-    setPubAtual(pub)
+  const totalPendentes = useMemo(() => grupos.reduce((acc, g) => acc + (g.count || 0), 0), [grupos])
+
+  const iniciarComGrupo = async (grupo) => {
+    setGrupoAtual(grupo)
     setAnalise(null)
     setParteEscolhida(null)
-    setClienteForm({ nome_razao_social: '', tipo_pessoa: 'PF', cpf_cnpj: '', email: '' })
+    setClienteForm({
+      nome_razao_social: grupo.cliente_existente_nome || grupo.titulo || '',
+      tipo_pessoa: 'PF',
+      cpf_cnpj: '',
+      email: '',
+    })
     setCasoForm({
       titulo: '',
       numero_processo: '',
@@ -106,10 +124,34 @@ function TriagemAssistidaPage() {
       parte_contraria: '',
       notas_caso: '',
     })
+
+    if (grupo.tipo === 'cliente_existente') {
+      // Pula direto para confirmação
+      setStep(STEP_CONFIRM_EXISTING)
+      // Mas ainda roda análise da primeira pub pra preencher dados do caso
+      try {
+        const data = await getAnaliseIA(grupo.pub_ids[0])
+        setAnalise(data)
+        const sugerido = data.dados_caso_sugeridos || {}
+        setCasoForm((prev) => ({
+          ...prev,
+          titulo: sugerido.titulo || `Processo de ${grupo.cliente_existente_nome}`,
+          numero_processo: sugerido.numero_processo || '',
+          tipo_acao: sugerido.tipo_acao || '',
+          vara_juizo: sugerido.vara_juizo || '',
+          comarca: sugerido.comarca || '',
+          valor_causa: sugerido.valor_causa || '',
+          notas_caso: `Caso criado via triagem em lote (${grupo.count} publicações vinculadas).`,
+        }))
+      } catch {
+        // Se falhar análise, deixa form vazio — usuário preenche
+      }
+      return
+    }
+
     setStep(STEP_ANALYSE)
-    setLoadingAnalise(true)
     try {
-      const data = await getAnaliseIA(pub.id)
+      const data = await getAnaliseIA(grupo.pub_ids[0])
       setAnalise(data)
       const sugerido = data.dados_caso_sugeridos || {}
       setCasoForm((prev) => ({
@@ -120,14 +162,12 @@ function TriagemAssistidaPage() {
         vara_juizo: sugerido.vara_juizo || prev.vara_juizo,
         comarca: sugerido.comarca || prev.comarca,
         valor_causa: sugerido.valor_causa || prev.valor_causa,
-        notas_caso: 'Caso criado pela triagem assistida (revisar dados extraídos).',
+        notas_caso: `Caso criado via triagem assistida (${grupo.count} publicação(ões) vinculadas).`,
       }))
       setStep(STEP_PICK_PARTY)
     } catch (err) {
       toast.error(err?.message || 'Falha ao analisar publicação.')
       setStep(STEP_LIST)
-    } finally {
-      setLoadingAnalise(false)
     }
   }
 
@@ -139,7 +179,6 @@ function TriagemAssistidaPage() {
       cpf_cnpj: parte.cpf_cnpj_sugerido || '',
       email: '',
     })
-    // Define parte contrária no caso (a outra parte do polo oposto)
     const partes = analise?.partes || []
     const oposto = partes.find((p) => p.papel !== parte.papel)
     setCasoForm((prev) => ({
@@ -149,19 +188,13 @@ function TriagemAssistidaPage() {
     setStep(STEP_CLIENT_FORM)
   }
 
-  const salvar = async () => {
-    if (!pubAtual || !parteEscolhida) return
+  const salvarLote = async ({ usarClienteExistente }) => {
+    if (!grupoAtual) return
     setSalvando(true)
     try {
       const payload = {
-        cliente_id: null,
-        cliente_payload: {
-          nome_razao_social: clienteForm.nome_razao_social,
-          tipo_pessoa: clienteForm.tipo_pessoa,
-          cpf_cnpj: clienteForm.cpf_cnpj || null,
-          email: clienteForm.email || null,
-        },
-        papel_cliente: parteEscolhida.papel,
+        pub_ids: grupoAtual.pub_ids,
+        papel_cliente: parteEscolhida?.papel || 'autor',
         caso_payload: {
           titulo: casoForm.titulo,
           numero_processo: casoForm.numero_processo || null,
@@ -173,17 +206,26 @@ function TriagemAssistidaPage() {
           notas_caso: casoForm.notas_caso || null,
         },
       }
-      const result = await criarClienteCasoTriagem(pubAtual.id, payload)
-      if (result?.mensagem && result?.caso_existente) {
-        toast.warning(`Já existe caso com este número: ${result.caso_existente.titulo}`)
-        return
+      if (usarClienteExistente && grupoAtual.cliente_existente_id) {
+        payload.cliente_id = grupoAtual.cliente_existente_id
+      } else {
+        payload.cliente_payload = {
+          nome_razao_social: clienteForm.nome_razao_social,
+          tipo_pessoa: clienteForm.tipo_pessoa,
+          cpf_cnpj: clienteForm.cpf_cnpj || null,
+          email: clienteForm.email || null,
+        }
       }
-      toast.success('Cliente e caso criados, publicação vinculada!')
-      setTratadas((n) => n + 1)
+      const result = await vincularEmLote(payload)
+      toast.success(
+        `${result.vinculadas} publicação(ões) vinculadas! ` +
+          (result.cliente_criado ? 'Cliente criado. ' : 'Cliente reutilizado. ') +
+          (result.caso_criado ? 'Caso criado.' : 'Caso reutilizado.')
+      )
+      setTratadas((n) => n + result.vinculadas)
       setStep(STEP_DONE)
-      // Remove a publicação da lista local e avança para a próxima
-      setPendentes((prev) => prev.filter((p) => p.id !== pubAtual.id))
-      setPendentesTotal((n) => Math.max(0, n - 1))
+      // Remove grupo da lista local
+      setGrupos((prev) => prev.filter((g) => g.id !== grupoAtual.id))
     } catch (err) {
       toast.error(err?.message || 'Falha ao salvar.')
     } finally {
@@ -191,19 +233,19 @@ function TriagemAssistidaPage() {
     }
   }
 
-  const proximaPublicacao = () => {
-    if (pendentes.length > 0) {
-      iniciarComPub(pendentes[0])
+  const proximoGrupo = () => {
+    if (grupos.length > 0) {
+      iniciarComGrupo(grupos[0])
     } else {
       setStep(STEP_LIST)
-      setPubAtual(null)
+      setGrupoAtual(null)
     }
   }
 
   const voltar = () => {
-    if (step === STEP_PICK_PARTY) {
+    if (step === STEP_CONFIRM_EXISTING || step === STEP_PICK_PARTY) {
       setStep(STEP_LIST)
-      setPubAtual(null)
+      setGrupoAtual(null)
     } else if (step === STEP_CLIENT_FORM) {
       setStep(STEP_PICK_PARTY)
       setParteEscolhida(null)
@@ -231,6 +273,7 @@ function TriagemAssistidaPage() {
 
   const progressPct = useMemo(() => {
     if (step === STEP_LIST) return 0
+    if (step === STEP_CONFIRM_EXISTING) return 50
     if (step === STEP_ANALYSE) return 20
     if (step === STEP_PICK_PARTY) return 40
     if (step === STEP_CLIENT_FORM) return 60
@@ -247,7 +290,7 @@ function TriagemAssistidaPage() {
             Triagem assistida por IA
           </h3>
           <p className="text-muted mb-0 small">
-            Wizard guiado para cadastrar clientes e casos a partir das publicações DJEN pendentes.
+            Wizard guiado por grupos. Cadastre uma vez e vincule várias publicações de uma vez.
           </p>
         </div>
         <button className="btn btn-outline-secondary btn-sm" onClick={() => navigate('/djen')}>
@@ -257,13 +300,13 @@ function TriagemAssistidaPage() {
       </div>
 
       {/* Barra de progresso */}
-      {pubAtual && (
+      {grupoAtual && (
         <div className="card border-0 shadow-sm mb-3">
           <div className="card-body py-3">
             <div className="d-flex justify-content-between align-items-center mb-2">
               <span className="small fw-semibold text-muted">{PROGRESS_LABELS[step]}</span>
               <span className="small text-muted">
-                {tratadas} tratada(s) · {pendentesTotal} restante(s)
+                {tratadas} pub. tratadas · {totalPendentes} restantes em {grupos.length} grupo(s)
               </span>
             </div>
             <div className="progress" style={{ height: 6 }}>
@@ -276,14 +319,16 @@ function TriagemAssistidaPage() {
         </div>
       )}
 
-      {/* STEP 0: Lista */}
+      {/* STEP 0: Lista de grupos */}
       {step === STEP_LIST && (
         <div className="card border-0 shadow-sm">
           <div className="card-header bg-white d-flex justify-content-between align-items-center">
-            <strong>{pendentesTotal} publicação(ões) pendente(s) sem vínculo</strong>
+            <strong>
+              {totalPendentes} publicação(ões) em {grupos.length} grupo(s)
+            </strong>
             <button
               className="btn btn-sm btn-outline-secondary"
-              onClick={carregarPendentes}
+              onClick={carregarGrupos}
               disabled={loadingLista}
             >
               <i className="bi bi-arrow-repeat me-1" />
@@ -294,9 +339,11 @@ function TriagemAssistidaPage() {
             {loadingLista ? (
               <div className="text-center py-5">
                 <div className="spinner-border text-primary" role="status" />
-                <p className="mt-3 text-muted small">Carregando pendentes...</p>
+                <p className="mt-3 text-muted small">
+                  Agrupando pendentes (pode levar alguns segundos)...
+                </p>
               </div>
-            ) : pendentes.length === 0 ? (
+            ) : grupos.length === 0 ? (
               <div className="text-center py-5 text-muted">
                 <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '3rem' }} />
                 <h5 className="mt-3">Nenhuma publicação pendente!</h5>
@@ -305,47 +352,141 @@ function TriagemAssistidaPage() {
             ) : (
               <>
                 <p className="text-muted small mb-3">
-                  Clique numa publicação para iniciar o wizard. A IA vai analisar e te perguntar
-                  quem é o cliente.
+                  Clique num grupo para tratá-lo. <strong>Cliente já cadastrado</strong> vincula
+                  tudo de uma vez. Os demais grupos abrem o wizard guiado.
                 </p>
                 <div className="d-grid gap-2">
-                  {pendentes.slice(0, 30).map((pub) => (
-                    <button
-                      key={pub.id}
-                      className="card border-0 shadow-sm text-start"
-                      onClick={() => iniciarComPub(pub)}
-                      style={{ cursor: 'pointer', background: '#fff' }}
-                    >
-                      <div className="card-body py-2 px-3">
-                        <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                          <span className="badge bg-secondary">{pub.sigla_tribunal || '—'}</span>
-                          <span className="badge bg-light text-dark border">
-                            {pub.tipo_comunicacao || 'Comunicação'}
-                          </span>
-                          <small className="text-muted ms-auto">{pub.data_disponibilizacao}</small>
+                  {grupos.map((grupo) => {
+                    const meta = TIPO_LABELS[grupo.tipo] || TIPO_LABELS.isolada
+                    return (
+                      <button
+                        key={grupo.id}
+                        className="card border-0 shadow-sm text-start"
+                        onClick={() => iniciarComGrupo(grupo)}
+                        style={{ cursor: 'pointer', background: '#fff' }}
+                      >
+                        <div className="card-body py-3 px-3">
+                          <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                            <span className={`badge bg-${meta.cor}`}>
+                              <i className={`bi ${meta.icone} me-1`} />
+                              {meta.label}
+                            </span>
+                            <span className="badge bg-light text-dark border">
+                              {grupo.count} publicação(ões)
+                            </span>
+                            {grupo.cliente_existente_id && (
+                              <span className="badge bg-success-subtle text-success border">
+                                <i className="bi bi-check-circle me-1" />
+                                Cliente cadastrado
+                              </span>
+                            )}
+                          </div>
+                          <h6 className="mb-1">{grupo.titulo}</h6>
+                          <div className="text-muted small">{grupo.descricao}</div>
                         </div>
-                        <div className="fw-semibold small">
-                          {pub.numero_processo_mascara || pub.numero_processo || 'Sem CNJ'}
-                        </div>
-                        <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                          {pub.nome_orgao}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    )
+                  })}
                 </div>
-                {pendentes.length > 30 && (
-                  <p className="text-muted small mt-2 text-center">
-                    Mostrando 30 de {pendentes.length}. Trate algumas e atualize a lista.
-                  </p>
-                )}
               </>
             )}
           </div>
         </div>
       )}
 
-      {/* STEP 1: Análise */}
+      {/* STEP 1 (cliente_existente): Confirmação */}
+      {step === STEP_CONFIRM_EXISTING && grupoAtual && (
+        <div className="card border-0 shadow-sm">
+          <div className="card-header bg-white">
+            <strong>
+              <i className="bi bi-person-check text-success me-2" />
+              Vincular ao cliente existente
+            </strong>
+          </div>
+          <div className="card-body">
+            <div className="alert alert-success">
+              <strong>{grupoAtual.cliente_existente_nome}</strong> já está cadastrado. Vamos criar 1
+              caso novo (ou reutilizar caso existente com mesmo CNJ) e vincular as{' '}
+              <strong>{grupoAtual.count} publicação(ões)</strong> a ele.
+            </div>
+
+            <h6 className="mt-3">Dados do caso a criar:</h6>
+            <div className="row g-3">
+              <div className="col-md-12">
+                <label className="form-label small fw-semibold">
+                  Título do caso <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={casoForm.titulo}
+                  onChange={(e) => setCasoForm({ ...casoForm, titulo: e.target.value })}
+                />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label small fw-semibold">CNJ</label>
+                <input
+                  type="text"
+                  className="form-control font-monospace"
+                  value={casoForm.numero_processo}
+                  onChange={(e) => setCasoForm({ ...casoForm, numero_processo: e.target.value })}
+                />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label small fw-semibold">Tipo de ação</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={casoForm.tipo_acao}
+                  onChange={(e) => setCasoForm({ ...casoForm, tipo_acao: e.target.value })}
+                />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label small fw-semibold">Vara / Juízo</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={casoForm.vara_juizo}
+                  onChange={(e) => setCasoForm({ ...casoForm, vara_juizo: e.target.value })}
+                />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label small fw-semibold">Parte contrária</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={casoForm.parte_contraria}
+                  onChange={(e) => setCasoForm({ ...casoForm, parte_contraria: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="card-footer bg-white d-flex justify-content-between">
+            <button className="btn btn-outline-secondary" onClick={voltar}>
+              Cancelar
+            </button>
+            <button
+              className="btn btn-success"
+              disabled={salvando || !casoForm.titulo.trim()}
+              onClick={() => salvarLote({ usarClienteExistente: true })}
+            >
+              {salvando ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-1" />
+                  Vinculando...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-check-circle me-1" />
+                  Vincular {grupoAtual.count} publicação(ões)
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 2: Analyse */}
       {step === STEP_ANALYSE && (
         <div className="card border-0 shadow-sm">
           <div className="card-body text-center py-5">
@@ -362,20 +503,20 @@ function TriagemAssistidaPage() {
         </div>
       )}
 
-      {/* STEP 2: Escolher parte */}
+      {/* STEP 3: Pick party */}
       {step === STEP_PICK_PARTY && analise && (
         <div className="card border-0 shadow-sm">
           <div className="card-header bg-white">
-            <strong>Quem é o seu cliente nesta publicação?</strong>
+            <strong>Quem é o seu cliente neste grupo?</strong>
             <p className="text-muted small mb-0 mt-1">
-              A IA identificou as partes abaixo. Clique em qual delas é o cliente que você
-              representa (atalho: tecla numérica).
+              {grupoAtual?.count} publicação(ões) serão vinculadas ao cliente que você escolher.
+              Atalho: tecla numérica.
             </p>
           </div>
           <div className="card-body">
             {(analise.partes || []).length === 0 ? (
               <div className="alert alert-warning">
-                A IA não conseguiu identificar partes nesta publicação. Use o fluxo manual.
+                A IA não identificou partes nesta publicação. Volte e use o fluxo manual.
               </div>
             ) : (
               <div className="row g-2">
@@ -413,33 +554,17 @@ function TriagemAssistidaPage() {
                 ))}
               </div>
             )}
-
-            {/* Resumo da publicação */}
-            <details className="mt-4">
-              <summary className="text-muted small">
-                Ver texto da publicação (
-                {analise.publicacao?.numero_processo_mascara || analise.publicacao?.numero_processo}
-                )
-              </summary>
-              <div
-                className="mt-2 p-3 small bg-light rounded"
-                style={{ maxHeight: 200, overflow: 'auto', fontSize: '0.8rem' }}
-              >
-                {analise.publicacao?.texto?.substring(0, 1500)}
-                {(analise.publicacao?.texto?.length || 0) > 1500 && '...'}
-              </div>
-            </details>
           </div>
           <div className="card-footer bg-white text-end">
             <button className="btn btn-link" onClick={voltar}>
               <i className="bi bi-arrow-left me-1" />
-              Escolher outra publicação
+              Voltar para grupos
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 3: Form Cliente */}
+      {/* STEP 4: Form Cliente */}
       {step === STEP_CLIENT_FORM && parteEscolhida && (
         <div className="card border-0 shadow-sm">
           <div className="card-header bg-white">
@@ -483,7 +608,6 @@ function TriagemAssistidaPage() {
                   className="form-control"
                   value={clienteForm.cpf_cnpj}
                   onChange={(e) => setClienteForm({ ...clienteForm, cpf_cnpj: e.target.value })}
-                  placeholder="(opcional — pode preencher depois)"
                 />
               </div>
               <div className="col-md-6">
@@ -493,7 +617,6 @@ function TriagemAssistidaPage() {
                   className="form-control"
                   value={clienteForm.email}
                   onChange={(e) => setClienteForm({ ...clienteForm, email: e.target.value })}
-                  placeholder="(opcional)"
                 />
               </div>
             </div>
@@ -515,13 +638,13 @@ function TriagemAssistidaPage() {
         </div>
       )}
 
-      {/* STEP 4: Form Caso */}
+      {/* STEP 5: Form Caso */}
       {step === STEP_CASE_FORM && (
         <div className="card border-0 shadow-sm">
           <div className="card-header bg-white">
             <strong>Revisar dados do caso</strong>
             <p className="text-muted small mb-0 mt-1">
-              Dados extraídos da publicação. Ajuste e confirme para criar tudo.
+              Vamos criar 1 caso e vincular as {grupoAtual?.count} publicação(ões) do grupo.
             </p>
           </div>
           <div className="card-body">
@@ -592,15 +715,6 @@ function TriagemAssistidaPage() {
                   placeholder="R$ 0,00"
                 />
               </div>
-              <div className="col-md-12">
-                <label className="form-label small fw-semibold">Notas</label>
-                <textarea
-                  className="form-control"
-                  rows={2}
-                  value={casoForm.notas_caso}
-                  onChange={(e) => setCasoForm({ ...casoForm, notas_caso: e.target.value })}
-                />
-              </div>
             </div>
           </div>
           <div className="card-footer bg-white d-flex justify-content-between">
@@ -611,7 +725,7 @@ function TriagemAssistidaPage() {
             <button
               className="btn btn-success"
               disabled={salvando || !casoForm.titulo.trim()}
-              onClick={salvar}
+              onClick={() => salvarLote({ usarClienteExistente: false })}
             >
               {salvando ? (
                 <>
@@ -621,7 +735,7 @@ function TriagemAssistidaPage() {
               ) : (
                 <>
                   <i className="bi bi-check-circle me-1" />
-                  Criar cliente, caso e vincular
+                  Criar e vincular {grupoAtual?.count} publicação(ões)
                 </>
               )}
             </button>
@@ -629,26 +743,26 @@ function TriagemAssistidaPage() {
         </div>
       )}
 
-      {/* STEP 5: Done */}
+      {/* STEP 6: Done */}
       {step === STEP_DONE && (
         <div className="card border-0 shadow-sm">
           <div className="card-body text-center py-5">
             <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '4rem' }} />
             <h4 className="mt-3">Pronto!</h4>
-            <p className="text-muted">Cliente e caso criados, publicação vinculada com sucesso.</p>
+            <p className="text-muted">Grupo tratado com sucesso.</p>
             <div className="d-flex gap-2 justify-content-center flex-wrap mt-4">
               <button
                 className="btn btn-primary"
-                onClick={proximaPublicacao}
-                disabled={pendentes.length === 0}
+                onClick={proximoGrupo}
+                disabled={grupos.length === 0}
               >
-                {pendentes.length > 0 ? (
+                {grupos.length > 0 ? (
                   <>
-                    Próxima publicação ({pendentes.length} restantes)
+                    Próximo grupo ({grupos.length} restantes)
                     <i className="bi bi-arrow-right ms-1" />
                   </>
                 ) : (
-                  'Todas tratadas!'
+                  'Todos os grupos tratados!'
                 )}
               </button>
               <button className="btn btn-outline-secondary" onClick={() => navigate('/djen')}>

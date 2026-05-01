@@ -50,6 +50,10 @@ export const autoVincularPendentes = () => api.post('/djen/triagem/auto-vincular
 
 export const getAnaliseIA = (pubId) => api.get(`/djen/triagem/${pubId}/analise-ia`)
 
+export const listGruposPendentes = () => api.get('/djen/triagem/grupos')
+
+export const vincularEmLote = (payload) => api.post('/djen/triagem/vincular-em-lote', payload)
+
 // B1 (2026-05-01): /djen/sync agora retorna 202 + job_id (async).
 // Use getSyncJobStatus(id) em polling para acompanhar progresso.
 export const syncDjen = (dias) => api.post('/djen/sync', { dias })
