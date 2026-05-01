@@ -2,11 +2,12 @@
 # Testes para as rotas da API de Casos.
 
 import json
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO
 from unittest.mock import patch
 
 from app import Caso
+from models import MovimentacaoCNJ
 
 CASO_BASE = {
     "titulo": "Caso Teste Inicial",
@@ -187,3 +188,115 @@ def test_leitura_peticao_sucesso(auth_client, db):
     assert payload["dados"]["vara_juizo"] == "2ª Vara Cível"
     assert payload["dados"]["comarca"] == "Curitiba"
     assert payload["dados"]["data_distribuicao"] == "2022-03-30"
+
+
+def test_atualizar_cnj_sem_novas_faz_backfill_quando_timeline_vazia(auth_client, db):
+    cliente_id = criar_cliente_teste(auth_client)
+    res_post = auth_client.post(
+        "/api/v1/casos",
+        json={
+            **CASO_BASE,
+            "cliente_id": cliente_id,
+            "numero_processo": "0000704-42.2022.8.16.0124",
+        },
+    )
+    assert res_post.status_code == 201
+    caso_id = json.loads(res_post.data)["id"]
+
+    dados_cnj_mock = {
+        "hits": {
+            "hits": [
+                {
+                    "_source": {
+                        "movimentos": [
+                            {"nome": "Arquivado Definitivamente", "dataHora": "2024x-invalid"},
+                            {"nome": "Baixa definitiva", "dataHora": "2023x-invalid"},
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+
+    with patch("routes.casos.consultar_processo_cnj", return_value=(dados_cnj_mock, 200)):
+        response = auth_client.post(f"/api/v1/casos/{caso_id}/atualizar-cnj")
+
+    assert response.status_code == 200, response.data
+    payload = json.loads(response.data)
+    assert payload["novas_movimentacoes_registradas"] == 0
+    assert payload["movimentacoes_backfill_registradas"] == 2
+    assert "histórico completo foi sincronizado" in payload["message"]
+
+    movs = MovimentacaoCNJ.query.filter_by(caso_id=caso_id).all()
+    assert len(movs) == 2
+
+    caso_db = db.session.get(Caso, caso_id)
+    assert caso_db.status == "Arquivado Definitivamente"
+    assert caso_db.data_ultima_verificacao_cnj is not None
+
+
+def test_atualizar_cnj_sem_novas_atualiza_status_para_ultimo_movimento(auth_client, db):
+    cliente_id = criar_cliente_teste(auth_client)
+    res_post = auth_client.post(
+        "/api/v1/casos",
+        json={
+            **CASO_BASE,
+            "cliente_id": cliente_id,
+            "numero_processo": "0000704-42.2022.8.16.0124",
+        },
+    )
+    assert res_post.status_code == 201
+    caso_id = json.loads(res_post.data)["id"]
+    caso_db = db.session.get(Caso, caso_id)
+
+    data_mais_recente = datetime.fromisoformat("2024-01-25T17:07:00")
+    data_antiga = datetime.fromisoformat("2023-11-27T21:16:50")
+    db.session.add_all(
+        [
+            MovimentacaoCNJ(
+                tenant_id=caso_db.tenant_id,
+                caso_id=caso_id,
+                data_movimentacao=data_mais_recente,
+                descricao="Definitivo",
+                dados_integra_cnj={"nome": "Definitivo"},
+            ),
+            MovimentacaoCNJ(
+                tenant_id=caso_db.tenant_id,
+                caso_id=caso_id,
+                data_movimentacao=data_antiga,
+                descricao="Documento",
+                dados_integra_cnj={"nome": "Documento"},
+            ),
+        ]
+    )
+    db.session.commit()
+
+    dados_cnj_mock = {
+        "hits": {
+            "hits": [
+                {
+                    "_source": {
+                        "movimentos": [
+                            {"nome": "Definitivo", "dataHora": "2024-01-25T17:07:00.000Z"},
+                            {"nome": "Documento", "dataHora": "2023-11-27T21:16:50.000Z"},
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+
+    with patch("routes.casos.consultar_processo_cnj", return_value=(dados_cnj_mock, 200)):
+        response = auth_client.post(f"/api/v1/casos/{caso_id}/atualizar-cnj")
+
+    assert response.status_code == 200, response.data
+    payload = json.loads(response.data)
+    assert payload["novas_movimentacoes_registradas"] == 0
+    assert payload["movimentacoes_backfill_registradas"] == 0
+
+    movs = MovimentacaoCNJ.query.filter_by(caso_id=caso_id).all()
+    assert len(movs) == 2
+
+    caso_atualizado = db.session.get(Caso, caso_id)
+    assert caso_atualizado.status == "Definitivo"
+    assert caso_atualizado.data_atualizacao == data_mais_recente

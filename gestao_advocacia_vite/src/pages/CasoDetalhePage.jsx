@@ -30,6 +30,7 @@ function CasoDetalhePage() {
   const [isLoadingCaso, setIsLoadingCaso] = useState(true)
   const [isLoadingMovimentacoes, setIsLoadingMovimentacoes] = useState(false)
   const [isLoadingAtualizacaoCNJ, setIsLoadingAtualizacaoCNJ] = useState(false)
+  const [timelineRefreshNonce, setTimelineRefreshNonce] = useState(0)
 
   const [fetchError, setFetchError] = useState('')
   const [atualizacaoCNJError, setAtualizacaoCNJError] = useState('')
@@ -116,6 +117,7 @@ function CasoDetalhePage() {
       )
       toast.success(dataResposta.message || 'Atualização CNJ bem-sucedida!')
       await carregarDadosDoCaso()
+      setTimelineRefreshNonce((v) => v + 1)
     } catch (err) {
       console.error('Erro durante a atualização via CNJ:', err)
       setAtualizacaoCNJError(err.message)
@@ -283,7 +285,7 @@ function CasoDetalhePage() {
           </small>
         </div>
         <div className="card-body p-4">
-          <CasoTimeline casoId={casoId} />
+          <CasoTimeline key={`${casoId}-${timelineRefreshNonce}`} casoId={casoId} />
         </div>
       </div>
       {/* SEÇÃO DE HONORÁRIOS ADVOCATÍCIOS FINANCEIROS */}

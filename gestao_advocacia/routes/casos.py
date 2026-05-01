@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -512,26 +512,14 @@ def register_casos_routes(
                     }, 200
 
                 novas_movs_count = 0
+                backfill_movs_count = 0
                 data_mov_recente_lote = None
                 desc_mov_recente_lote = "Nenhuma nova movimentação significativa identificada."
                 movimentos_api_cnj.sort(
                     key=lambda m: m.get("dataHora", "1900-01-01T00:00:00Z"), reverse=True
                 )
 
-                for movimento_json in movimentos_api_cnj:
-                    data_mov_str_api = movimento_json.get("dataHora")
-                    if not data_mov_str_api:
-                        continue
-                    try:
-                        data_mov_obj_utc = datetime.fromisoformat(
-                            data_mov_str_api.replace("Z", "+00:00")
-                        )
-                    except ValueError:
-                        app.logger.warning(
-                            f"API CNJ: Formato de 'dataHora' ('{data_mov_str_api}') inválido para caso {caso_id}. Ignorando."
-                        )
-                        continue
-
+                def _extrair_descricao_movimento(movimento_json):
                     desc_parts = []
 
                     if movimento_json.get("nome"):
@@ -565,13 +553,38 @@ def register_casos_routes(
                             if isinstance(comp_item, dict) and comp_item.get("descricao"):
                                 desc_parts.append(comp_item["descricao"])
 
-                    descricao_db = " | ".join(filter(None, desc_parts))
-                    if not descricao_db:
-                        descricao_db = (
+                    descricao = " | ".join(filter(None, desc_parts))
+                    if not descricao:
+                        descricao = (
                             movimento_json.get("descricao")
                             or movimento_json.get("nome")
                             or f"Movimento Cód: {movimento_json.get('codigoNacional', {}).get('codigo', 'N/A')}"
                         )
+                    return descricao
+
+                def _parse_data_movimento(movimento_json):
+                    data_mov_str_api = movimento_json.get("dataHora")
+                    if not data_mov_str_api:
+                        return None
+                    try:
+                        data_mov = datetime.fromisoformat(data_mov_str_api.replace("Z", "+00:00"))
+                        return data_mov.replace(tzinfo=None) if data_mov.tzinfo else data_mov
+                    except ValueError:
+                        app.logger.warning(
+                            f"API CNJ: Formato de 'dataHora' ('{data_mov_str_api}') inválido para caso {caso_id}. Ignorando no fluxo normal."
+                        )
+                        return None
+
+                movimento_api_recente = movimentos_api_cnj[0] if movimentos_api_cnj else {}
+                desc_mov_recente_api = _extrair_descricao_movimento(movimento_api_recente)
+                data_mov_recente_api = _parse_data_movimento(movimento_api_recente)
+
+                for movimento_json in movimentos_api_cnj:
+                    data_mov_obj_utc = _parse_data_movimento(movimento_json)
+                    if not data_mov_obj_utc:
+                        continue
+
+                    descricao_db = _extrair_descricao_movimento(movimento_json)
 
                     mov_existente = (
                         MovimentacaoCNJ.query.filter_by(
@@ -598,22 +611,69 @@ def register_casos_routes(
                             data_mov_recente_lote = data_mov_obj_utc
                             desc_mov_recente_lote = descricao_db
 
-                if novas_movs_count > 0 and data_mov_recente_lote:
-                    caso_para_atualizar.status = desc_mov_recente_lote[:255]
-                    caso_para_atualizar.data_atualizacao = data_mov_recente_lote
+                # Se o CNJ retornou histórico mas nada foi considerado "novo" e o caso ainda
+                # não possui movimentações locais, faz backfill completo para preencher timeline.
+                movs_existentes_count = MovimentacaoCNJ.query.filter_by(
+                    caso_id=caso_para_atualizar.id
+                ).count()
+                if novas_movs_count == 0 and movs_existentes_count == 0 and movimentos_api_cnj:
+                    base_dt_backfill = data_mov_recente_api or datetime.utcnow()
+                    for idx, movimento_json in enumerate(movimentos_api_cnj):
+                        descricao_db = _extrair_descricao_movimento(movimento_json)
+                        data_mov_obj_utc = _parse_data_movimento(movimento_json)
+                        if not data_mov_obj_utc:
+                            data_mov_obj_utc = base_dt_backfill - timedelta(seconds=idx)
+
+                        mov_existente = (
+                            MovimentacaoCNJ.query.filter_by(
+                                caso_id=caso_para_atualizar.id,
+                                data_movimentacao=data_mov_obj_utc,
+                            )
+                            .filter(MovimentacaoCNJ.descricao.startswith(descricao_db[:150]))
+                            .first()
+                        )
+                        if mov_existente:
+                            continue
+
+                        db.session.add(
+                            MovimentacaoCNJ(
+                                tenant_id=caso_para_atualizar.tenant_id,
+                                caso_id=caso_para_atualizar.id,
+                                data_movimentacao=data_mov_obj_utc,
+                                descricao=descricao_db,
+                                dados_integra_cnj=movimento_json,
+                            )
+                        )
+                        backfill_movs_count += 1
+
+                # Mantém status do caso alinhado com o último retorno do CNJ, mesmo sem novas.
+                status_ref = desc_mov_recente_lote if novas_movs_count > 0 else desc_mov_recente_api
+                data_ref = data_mov_recente_lote if novas_movs_count > 0 else data_mov_recente_api
+                if status_ref:
+                    caso_para_atualizar.status = status_ref[:255]
+                if data_ref:
+                    caso_para_atualizar.data_atualizacao = data_ref
 
                 caso_para_atualizar.data_ultima_verificacao_cnj = datetime.utcnow()
                 db.session.commit()
 
-                msg_final = (
-                    f"Caso atualizado. {novas_movs_count} nova(s) movimentação(ões) registrada(s)."
-                    if novas_movs_count > 0
-                    else "Nenhuma nova movimentação encontrada para registrar."
-                )
+                if novas_movs_count > 0:
+                    msg_final = (
+                        f"Caso atualizado. {novas_movs_count} nova(s) movimentação(ões) registrada(s)."
+                    )
+                elif backfill_movs_count > 0:
+                    msg_final = (
+                        "Nenhuma nova movimentação encontrada, mas histórico completo foi sincronizado "
+                        f"({backfill_movs_count} registro(s))."
+                    )
+                else:
+                    msg_final = "Nenhuma nova movimentação encontrada para registrar."
+
                 app.logger.info(f"API CNJ: Atualização para caso {caso_id} concluída. {msg_final}")
                 return {
                     "message": msg_final,
                     "novas_movimentacoes_registradas": novas_movs_count,
+                    "movimentacoes_backfill_registradas": backfill_movs_count,
                     "descricao_ultima_movimentacao_nova": (
                         desc_mov_recente_lote if novas_movs_count > 0 else None
                     ),
