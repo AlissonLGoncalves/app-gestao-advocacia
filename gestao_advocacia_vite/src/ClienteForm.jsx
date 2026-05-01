@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { useConfirm } from './hooks/useConfirm.jsx'
 import { API_URL } from './config.js'
 import { toast } from 'react-toastify'
@@ -73,9 +73,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
   const [loading, setLoading] = useState(false)
   const [loadingCep, setLoadingCep] = useState(false)
   const [loadingCnpj, setLoadingCnpj] = useState(false)
-  const [loadingOcr, setLoadingOcr] = useState(false)
-  const [isDragOver, setIsDragOver] = useState(false)
-  const ocrFileRef = useRef(null)
   const [cpfCnpjLiberadoEdicao, setCpfCnpjLiberadoEdicao] = useState(false)
 
   const { validationErrors, setValidationErrors, clearValidationErrors, handleSubmit } =
@@ -333,175 +330,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
     if (formData.tipo_pessoa === 'PJ') buscarDadosCNPJ(e.target.value, e.target.name)
   }
 
-  const handleFileUploadOcr = async (e) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-
-    let totalSize = 0
-    Array.from(files).forEach((f) => {
-      totalSize += f.size
-    })
-
-    if (totalSize > 100 * 1024 * 1024) {
-      toast.warn('O tamanho total dos arquivos excede o limite de 100MB do Lote.')
-      return
-    }
-
-    const permitidos = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'text/plain',
-      'image/jpeg',
-      'image/png',
-      'image/jpg',
-    ]
-
-    const hasInvalid = Array.from(files).some(
-      (file) =>
-        !permitidos.includes(file.type) &&
-        !file.name.match(/\.(pdf|docx|xlsx|xls|txt|jpg|jpeg|png)$/i)
-    )
-
-    if (hasInvalid) {
-      toast.warn(
-        'Algum formato inválido no Lote. Envie apenas Documentos, Planilhas, Textos ou Imagens JPG/PNG.'
-      )
-      return
-    }
-
-    setLoadingOcr(true)
-    const dataToSend = new FormData()
-    Array.from(files).forEach((file) => dataToSend.append('documentos', file))
-
-    try {
-      const data = await extrairDadosDocumentoCliente(dataToSend)
-
-      const messageExtraida = []
-      setFormData((prev) => {
-        const documento = data.documento_principal || data.cnpj || data.cpf
-        const tipoDetectado =
-          data.tipo_pessoa_sugerida || (data.cnpj ? 'PJ' : data.cpf ? 'PF' : prev.tipo_pessoa)
-
-        let updates = { ...prev }
-        if (tipoDetectado !== prev.tipo_pessoa) {
-          const commonData = {
-            nome_razao_social: prev.nome_razao_social,
-            cep: prev.cep,
-            rua: prev.rua,
-            numero: prev.numero,
-            bairro: prev.bairro,
-            cidade: prev.cidade,
-            estado: prev.estado,
-            pais: prev.pais,
-            telefone: prev.telefone,
-            email: prev.email,
-            notas_gerais: prev.notas_gerais,
-          }
-          updates = {
-            ...(tipoDetectado === 'PJ' ? initialStatePJ : initialStatePF),
-            ...commonData,
-            tipo_pessoa: tipoDetectado,
-          }
-          messageExtraida.push(`Tipo Pessoa (${tipoDetectado})`)
-        }
-
-        if (documento) {
-          updates.cpf_cnpj = formatCPFCNPJ(documento, tipoDetectado, false)
-          messageExtraida.push(tipoDetectado === 'PJ' ? 'CNPJ' : 'CPF')
-        }
-        if (data.nome_razao_social) {
-          updates.nome_razao_social = data.nome_razao_social
-          messageExtraida.push('Nome/Razão Social')
-        }
-        if (data.rg) {
-          updates.rg = data.rg
-          messageExtraida.push('RG')
-        }
-        if (data.orgao_emissor) {
-          updates.orgao_emissor = data.orgao_emissor
-          messageExtraida.push('Órgão Emissor')
-        }
-        if (data.data_nascimento) {
-          updates.data_nascimento = data.data_nascimento
-          messageExtraida.push('Data Nasc.')
-        }
-        if (data.nome_mae) {
-          const maeStr = `Nome da Mãe: ${data.nome_mae}`
-          updates.notas_gerais = updates.notas_gerais
-            ? `${updates.notas_gerais}\n${maeStr}`
-            : maeStr
-          messageExtraida.push('Filiação')
-        }
-        if (data.email) {
-          updates.email = data.email
-          messageExtraida.push('E-mail')
-        }
-        if (data.telefone) {
-          updates.telefone = data.telefone
-          messageExtraida.push('Telefone')
-        }
-        if (data.cep) {
-          updates.cep = data.cep
-          messageExtraida.push('CEP')
-        }
-        if (data.rua) {
-          updates.rua = data.rua
-          messageExtraida.push('Rua')
-        }
-        if (data.numero) {
-          updates.numero = data.numero
-          messageExtraida.push('Número')
-        }
-        if (data.bairro) {
-          updates.bairro = data.bairro
-          messageExtraida.push('Bairro')
-        }
-        if (data.cidade) {
-          updates.cidade = data.cidade
-          messageExtraida.push('Cidade')
-        }
-        if (data.estado) {
-          updates.estado = data.estado
-          messageExtraida.push('UF')
-        }
-        if (data.nacionalidade && tipoDetectado === 'PF') {
-          updates.nacionalidade = data.nacionalidade
-          messageExtraida.push('Nacionalidade')
-        }
-        if (data.estado_civil && tipoDetectado === 'PF') {
-          updates.estado_civil = data.estado_civil
-          messageExtraida.push('Estado Civil')
-        }
-        if (data.profissao && tipoDetectado === 'PF') {
-          updates.profissao = data.profissao
-          messageExtraida.push('Profissão')
-        }
-        return updates
-      })
-
-      if (data.cep && !data.rua) {
-        buscarEnderecoPorCEP(data.cep)
-      }
-
-      if (messageExtraida.length > 0) {
-        toast.success(
-          `Leitura Mágica (IA) concluída! Campos preenchidos: ${messageExtraida.join(', ')}`
-        )
-      } else {
-        toast.info(
-          'Leitura concluída, mas as chaves biométricas não foram identificadas no arquivo submetido.'
-        )
-      }
-    } catch (err) {
-      toast.error(`Falha no OCR: ${err.message}`)
-    } finally {
-      setLoadingOcr(false)
-      e.target.value = null
-    }
-  }
-
   const handleAnonymizar = async () => {
     const ok = await confirm(
       'ATENÇÃO: Esta ação anonimiza dados sensíveis e não pode ser desfeita. Deseja continuar?',
@@ -529,63 +357,6 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
         <h5 className="mb-0">{isEditing ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</h5>
       </div>
       <div className="card-body p-4">
-        {!isEditing && (
-          <div
-            className="alert alert-secondary mb-4"
-            style={{
-              border: isDragOver ? '2px dashed #0d6efd' : '2px dashed #6c757d',
-              backgroundColor: isDragOver ? '#e8f0fe' : '#f8f9fa',
-              transition: 'border-color 0.2s, background-color 0.2s',
-              cursor: loadingOcr ? 'not-allowed' : 'pointer',
-            }}
-            role="alert"
-            onDragOver={(e) => { e.preventDefault(); if (!loadingOcr) setIsDragOver(true) }}
-            onDragLeave={() => setIsDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setIsDragOver(false)
-              if (loadingOcr) return
-              const files = e.dataTransfer.files
-              if (files?.length) handleFileUploadOcr({ target: { files } })
-            }}
-            onClick={() => !loadingOcr && ocrFileRef.current?.click()}
-          >
-            <input
-              ref={ocrFileRef}
-              type="file"
-              multiple
-              accept="application/pdf, .docx, .xlsx, .xls, .txt, image/png, image/jpeg, image/jpg"
-              style={{ display: 'none' }}
-              onChange={handleFileUploadOcr}
-            />
-            <div className="d-flex align-items-center">
-              <div className="me-3">
-                <span className="fs-3">📄✨</span>
-              </div>
-              <div className="flex-grow-1">
-                <h6 className="mb-1 text-dark fw-bold">Auto-Preenchimento Mágico (Leitura IA)</h6>
-                <p className="mb-0 small text-muted">
-                  {isDragOver
-                    ? 'Solte o arquivo aqui...'
-                    : loadingOcr
-                      ? 'Analisando documentos...'
-                      : 'Arraste a procuração aqui ou clique para selecionar. Extrai dados do cliente automaticamente.'}
-                </p>
-              </div>
-              <div>
-                {loadingOcr ? (
-                  <span className="btn btn-primary btn-sm ms-2 mb-0 disabled">
-                    <span className="spinner-border spinner-border-sm me-2"></span> Analisando Lote...
-                  </span>
-                ) : (
-                  <span className="btn btn-primary btn-sm ms-2 mb-0">
-                    Importar Procuração/Documentos
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit}>
           <DadosPessoaisSection
