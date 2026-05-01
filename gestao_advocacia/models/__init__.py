@@ -223,6 +223,7 @@ class Caso(db.Model):
     valor_causa = db.Column(db.Numeric(14, 2), nullable=True)
     data_distribuicao = db.Column(db.Date, nullable=True)
     notas_caso = db.Column(db.Text, nullable=True)
+    descricao = db.Column(db.Text, nullable=True)
     # Timestamps e relações
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -289,6 +290,7 @@ class Caso(db.Model):
                 self.data_distribuicao.isoformat() if self.data_distribuicao else None
             ),
             "notas_caso": self.notas_caso,
+            "descricao": self.descricao,
             "data_criacao": self.data_criacao.isoformat() if self.data_criacao else None,
             "data_atualizacao": (
                 self.data_atualizacao.isoformat() if self.data_atualizacao else None
