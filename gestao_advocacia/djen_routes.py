@@ -777,6 +777,70 @@ def registrar_rotas_djen(
                 "items": itens,
             }, 200
 
+    @djen_ns.route("/triagem/auto-vincular-pendentes")
+    class PublicacaoTriagemAutoVincularAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Reprocessa todas as publicacoes pendentes do tenant aplicando "
+                "auto-vinculo por CPF/CNPJ ou nome de cliente cadastrado. "
+                "Resolve o backlog de pubs ingeridas antes do auto-vinculo expandido."
+            ),
+        )
+        @jwt_required()
+        def post(self):
+            user_id = get_jwt_identity()
+            from app import Cliente, User
+            from djen_triagem import analisar_publicacao, tentar_auto_vincular_a_caso
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, "Módulo DJEN desabilitado para este tenant no rollout atual.")
+
+            tenant_id = user.tenant_id
+            pendentes = PublicacaoDJEN.query.filter(
+                PublicacaoDJEN.tenant_id == tenant_id,
+                PublicacaoDJEN.caso_id.is_(None),
+                PublicacaoDJEN.triagem_ignorada.is_(False),
+            ).all()
+
+            total = len(pendentes)
+            vinculadas = 0
+            ainda_pendentes = 0
+
+            for pub in pendentes:
+                try:
+                    analise = analisar_publicacao(pub)
+                    caso_id_auto = tentar_auto_vincular_a_caso(
+                        db, Cliente, Caso, tenant_id, analise
+                    )
+                    if caso_id_auto:
+                        pub.caso_id = caso_id_auto
+                        pub.status_origem = "criado_automaticamente"
+                        vinculadas += 1
+                    else:
+                        ainda_pendentes += 1
+                except Exception as exc:
+                    current_app.logger.warning(
+                        "djen_auto_vincular_pendente_falha pub_id=%s: %s", pub.id, exc
+                    )
+                    ainda_pendentes += 1
+
+            try:
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                current_app.logger.error("djen_auto_vincular_commit_falha: %s", exc)
+                djen_ns.abort(500, "Falha ao salvar vinculos.")
+
+            return {
+                "total": total,
+                "vinculadas": vinculadas,
+                "ainda_pendentes": ainda_pendentes,
+            }, 200
+
     @djen_ns.route("/triagem/<int:pub_id>/criar-cliente-caso")
     class PublicacaoTriagemCriarCasoAPI(Resource):
         @djen_ns.doc(

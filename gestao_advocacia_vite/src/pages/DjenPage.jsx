@@ -12,6 +12,7 @@ import {
   ignorarTriagem as ignorarTriagemApi,
   listOabs,
   listPublicacoes,
+  autoVincularPendentes as autoVincularPendentesApi,
   listTriagem,
   processarLoteTriagem as processarLoteTriagemApi,
   syncDjen,
@@ -627,6 +628,33 @@ export default function DjenPage() {
 
   const limparSelecaoTriagem = () => {
     setTriagemSelecionadas([])
+  }
+
+  const [autoVinculandoPendentes, setAutoVinculandoPendentes] = useState(false)
+  const autoVincularPendentes = async () => {
+    if (autoVinculandoPendentes) return
+    setAutoVinculandoPendentes(true)
+    try {
+      const payload = await autoVincularPendentesApi()
+      const total = payload.total ?? 0
+      const vinculadas = payload.vinculadas ?? 0
+      const ainda = payload.ainda_pendentes ?? 0
+      if (vinculadas > 0) {
+        toast.success(
+          `${vinculadas} de ${total} publicações vinculadas automaticamente. ${ainda} continuam pendentes.`
+        )
+      } else {
+        toast.info(
+          `Nenhuma publicação pôde ser vinculada automaticamente (${ainda} ainda pendentes — precisam de cliente cadastrado com CPF/CNPJ ou nome compatível).`
+        )
+      }
+      await carregarTriagem()
+      await carregarPublicacoes(0)
+    } catch (err) {
+      toast.error(err?.message || 'Falha ao reprocessar pendentes.')
+    } finally {
+      setAutoVinculandoPendentes(false)
+    }
   }
 
   const processarLoteTriagem = async () => {
@@ -1584,6 +1612,28 @@ export default function DjenPage() {
                       />
                     </div>
                     <div className="d-flex gap-2 flex-wrap">
+                      <button
+                        className="btn btn-warning btn-sm"
+                        title="Reprocessa todas as pendentes vinculando automaticamente quando o CPF/CNPJ ou nome do cliente estiver cadastrado"
+                        disabled={autoVinculandoPendentes || triagemTotal === 0}
+                        onClick={autoVincularPendentes}
+                      >
+                        {autoVinculandoPendentes ? (
+                          <>
+                            <span
+                              className="spinner-border spinner-border-sm me-1"
+                              role="status"
+                              aria-hidden="true"
+                            />
+                            Vinculando...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-magic me-1" />
+                            Vincular automaticamente ({triagemTotal})
+                          </>
+                        )}
+                      </button>
                       <button
                         className="btn btn-outline-secondary btn-sm"
                         onClick={selecionarTodasTriagem}
