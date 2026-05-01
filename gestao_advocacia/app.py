@@ -8,7 +8,6 @@ from flask import (
     Flask,
     current_app,
     g,
-    has_request_context,
     make_response,
     redirect,
     request,
@@ -74,19 +73,27 @@ def _is_public_or_unauthenticated_path(path):
 
 
 def _register_rls_engine_events(engine):
-    """Re-aplica app.current_tenant_id em cada nova transacao dentro de request context.
+    """Re-aplica app.current_tenant_id em cada nova transacao.
 
-    Em jobs/scripts/testes nao ha contexto de request, entao o listener e no-op
-    e o tenant e injetado explicitamente via tenant_session().
+    Le `g._rls_tenant_id` que e setado em duas situacoes:
+    1. Hook before_request (HTTP requests autenticadas): set apos lookup do user
+    2. Jobs/scripts (app_context sem request): set explicitamente pelo caller
+       antes de iniciar queries que tocam tabelas com RLS.
+
+    `flask.g` e app-context-bound desde Flask 0.10, entao funciona em ambos
+    os casos. Listener sai cedo se nao houver app_context (testes em SQLite,
+    boot sem contexto, etc).
     """
 
     @event.listens_for(engine, "begin")
     def _reapply_tenant_on_new_transaction(conn):
-        if not has_request_context():
-            return
         if conn.dialect.name == "sqlite":
             return
-        tid = getattr(g, "_rls_tenant_id", None)
+        try:
+            tid = getattr(g, "_rls_tenant_id", None)
+        except RuntimeError:
+            # Fora de qualquer contexto Flask — boot, scripts CLI sem app_context
+            return
         if tid is None:
             return
         conn.exec_driver_sql(
