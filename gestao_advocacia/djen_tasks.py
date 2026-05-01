@@ -643,6 +643,18 @@ def _consultar_processo_em_todos_tribunais(
 def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
     """Job APScheduler: monitora publicações DJEN por OAB e por processo."""
     with app.app_context():
+        # RLS: se invocado para um tenant especifico (ex: chamada manual via
+        # /api/v1/djen/sync), seta g._rls_tenant_id para que o listener do
+        # engine aplique set_config em cada transacao. Sem isso, as queries
+        # batem nas policies RLS sem current_setting definido (erro
+        # "unrecognized configuration parameter").
+        # Para o caso scheduler com tenant_id=None (cross-tenant), o job
+        # itera por tenant e seta g antes de cada bloco.
+        if tenant_id is not None:
+            from flask import g
+
+            g._rls_tenant_id = int(tenant_id)
+
         logger = _get_logger(app)
 
         if not force and not app.config.get("DJEN_JOB_ENABLED", True):
