@@ -19,7 +19,16 @@ from app import (  # Importa a factory e o objeto db
 )
 from app import db as _db
 from config_test import ConfigTest  # Importa a configuração de teste
-from models import Caso, Cliente, Documento, EventoAgenda, TarefaPrazo, Tenant, User
+from models import (
+    Caso,
+    Cliente,
+    Documento,
+    EventoAgenda,
+    MovimentacaoCNJ,
+    TarefaPrazo,
+    Tenant,
+    User,
+)
 
 _TEST_PASSWORD = "test-password-123"
 
@@ -40,6 +49,8 @@ class TwoTenantsFixture(NamedTuple):
     evento_b: EventoAgenda
     documento_a: Documento
     documento_b: Documento
+    mov_cnj_a: MovimentacaoCNJ
+    mov_cnj_b: MovimentacaoCNJ
 
 
 @pytest.fixture(scope="session")
@@ -256,6 +267,21 @@ def two_tenants(db) -> TwoTenantsFixture:
         caso_id=caso_b.id,
     )
     db.session.add_all([documento_a, documento_b])
+
+    _mov_data = datetime(2026, 1, 5, 12, 0, 0)
+    mov_cnj_a = MovimentacaoCNJ(
+        tenant_id=tenant_a.id,
+        caso_id=caso_a.id,
+        data_movimentacao=_mov_data,
+        descricao="TEST-A-mov-cnj",
+    )
+    mov_cnj_b = MovimentacaoCNJ(
+        tenant_id=tenant_b.id,
+        caso_id=caso_b.id,
+        data_movimentacao=_mov_data,
+        descricao="TEST-B-mov-cnj",
+    )
+    db.session.add_all([mov_cnj_a, mov_cnj_b])
     db.session.commit()
 
     return TwoTenantsFixture(
@@ -274,6 +300,8 @@ def two_tenants(db) -> TwoTenantsFixture:
         evento_b=evento_b,
         documento_a=documento_a,
         documento_b=documento_b,
+        mov_cnj_a=mov_cnj_a,
+        mov_cnj_b=mov_cnj_b,
     )
 
 
