@@ -34,6 +34,7 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
   const [cnjInfo, setCnjInfo] = useState(null)
   const [isSyncingCNJ, setIsSyncingCNJ] = useState(false)
   const [isMagicLoading, setIsMagicLoading] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
   const [magicUploadProgress, setMagicUploadProgress] = useState(0)
   const magicFileRef = useRef(null)
   const [criarEvento, setCriarEvento] = useState(false)
@@ -257,14 +258,29 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
       </div>
       <div className="card-body p-4">
         <div
-          className="alert alert-secondary border-dashed mb-4"
-          style={{ border: '2px dashed #6c757d', backgroundColor: '#f8f9fa' }}
+          className="alert alert-secondary mb-4"
+          style={{
+            border: isDragOver ? '2px dashed #0d6efd' : '2px dashed #6c757d',
+            backgroundColor: isDragOver ? '#e8f0fe' : '#f8f9fa',
+            transition: 'border-color 0.2s, background-color 0.2s',
+            cursor: 'pointer',
+          }}
           role="alert"
+          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setIsDragOver(false)
+            const file = e.dataTransfer.files?.[0]
+            if (file) handleMagicUpload({ target: { files: [file] } })
+          }}
+          onClick={() => !isMagicLoading && magicFileRef.current?.click()}
         >
           <h6 className="alert-heading text-primary fw-bold">Preenchimento Magico (RegEx + IA)</h6>
           <p className="small mb-2">
-            Anexe a copia integral do processo para extrair titulo, valor e numero do CNJ
-            automaticamente.
+            {isDragOver
+              ? 'Solte o arquivo aqui...'
+              : 'Arraste o arquivo aqui ou clique para selecionar. Extrai título, valor e número do CNJ automaticamente.'}
           </p>
 
           {isMagicLoading && (
@@ -294,18 +310,19 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
             onChange={handleMagicUpload}
             accept="application/pdf,image/*,.docx"
           />
-          <button
-            type="button"
-            className="btn btn-outline-primary shadow-sm rounded-pill btn-sm"
-            onClick={() => magicFileRef.current?.click()}
-            disabled={isMagicLoading}
-          >
-            {isMagicLoading ? (
-              <span className="spinner-border spinner-border-sm me-1"></span>
-            ) : (
-              'Carregar Arquivo do Processo'
-            )}
-          </button>
+          {!isMagicLoading && (
+            <button
+              type="button"
+              className="btn btn-outline-primary shadow-sm rounded-pill btn-sm"
+              onClick={(e) => { e.stopPropagation(); magicFileRef.current?.click() }}
+              disabled={isMagicLoading}
+            >
+              Carregar Arquivo do Processo
+            </button>
+          )}
+          {isMagicLoading && (
+            <span className="spinner-border spinner-border-sm text-primary"></span>
+          )}
         </div>
 
         <form onSubmit={handleSubmit}>
