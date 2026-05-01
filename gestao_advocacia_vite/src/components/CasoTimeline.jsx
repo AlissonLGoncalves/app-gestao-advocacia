@@ -81,15 +81,33 @@ function MovimentacaoCnjItem({ item }) {
   const meta = item.metadata || {}
   const dados = meta.dados_integra_cnj || {}
 
-  const complementos = Array.isArray(dados.complementosTabelados)
-    ? dados.complementosTabelados.map((c) => c.nome || c.descricao).filter(Boolean)
+  // complementos tabelados (padronizados CNJ)
+  const complementosTabelados = Array.isArray(dados.complementosTabelados)
+    ? dados.complementosTabelados.map((c) => c.nome || c.descricao || c.valor).filter(Boolean)
     : []
+
+  // complementos livres (texto não-tabelado)
+  const complementosLivres = Array.isArray(dados.complementos)
+    ? dados.complementos
+        .map((c) => (typeof c === 'string' ? c : c.descricao || c.valor || c.nome))
+        .filter(Boolean)
+    : []
+
+  const tipoNome = dados.nome || null
   const orgao = dados.orgaoJulgador?.nome || null
   const nacional = dados.movimentoNacional?.descricao || null
   const local = dados.movimentoLocal?.descricao || null
-  const codigo = dados.codigo || null
+  const codigo = dados.codigo || dados.codigoNacional?.codigo || null
+  const nivelSigilo = dados.nivelSigilo > 0 ? dados.nivelSigilo : null
 
-  const temDetalhe = complementos.length > 0 || orgao || nacional || local || codigo
+  const temDetalhe =
+    complementosTabelados.length > 0 ||
+    complementosLivres.length > 0 ||
+    orgao ||
+    nacional ||
+    local ||
+    codigo ||
+    tipoNome
 
   return (
     <>
@@ -97,6 +115,11 @@ function MovimentacaoCnjItem({ item }) {
         <p className="text-muted small mb-1" style={{ wordBreak: 'break-word' }}>
           {item.descricao}
         </p>
+      )}
+      {nivelSigilo && (
+        <span className="badge bg-warning text-dark me-1" style={{ fontSize: '0.68rem' }}>
+          Sigilo nível {nivelSigilo}
+        </span>
       )}
       {temDetalhe && (
         <div className="mt-1">
@@ -122,13 +145,21 @@ function MovimentacaoCnjItem({ item }) {
               className="mt-2 p-2 rounded border"
               style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
             >
-              <CampoDetalhe label="Código" valor={codigo} />
-              {complementos.length > 0 && (
-                <CampoDetalhe label="Complementos" valor={complementos.join(' | ')} />
+              <CampoDetalhe label="Tipo" valor={tipoNome} />
+              <CampoDetalhe label="Código CNJ" valor={codigo} />
+              {complementosTabelados.length > 0 && (
+                <CampoDetalhe label="Complementos" valor={complementosTabelados.join(' · ')} />
+              )}
+              {complementosLivres.length > 0 && (
+                <CampoDetalhe label="Texto complementar" valor={complementosLivres.join(' · ')} />
               )}
               <CampoDetalhe label="Órgão julgador" valor={orgao} />
               <CampoDetalhe label="Movimento nacional" valor={nacional} />
               <CampoDetalhe label="Movimento local" valor={local} />
+              <p className="mb-0 mt-2" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                * O DataJud fornece apenas metadados da movimentação. Documentos processuais
+                (petições, atas de audiência) estão disponíveis no portal do tribunal.
+              </p>
             </div>
           )}
         </div>
