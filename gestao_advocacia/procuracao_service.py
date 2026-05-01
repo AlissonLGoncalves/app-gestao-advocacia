@@ -2,11 +2,18 @@ import json
 import re
 from typing import Any
 
+from flask import current_app
 from flask_jwt_extended import get_jwt_identity
 
 from extensions import db
 from gemini_service import get_gemini_client
 from models import User
+
+_DEFAULT_GEMINI_MODELS = (
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+)
 
 
 def _strip_json_fences(raw_text: str) -> str:
@@ -37,6 +44,21 @@ def _response_text(response: Any) -> str:
         if collected:
             return "\n".join(collected)
     return ""
+
+
+def _candidate_models() -> list[str]:
+    preferred_model = (current_app.config.get("GEMINI_PROCURACAO_MODEL") or "").strip()
+    models: list[str] = [preferred_model] if preferred_model else []
+    for model in _DEFAULT_GEMINI_MODELS:
+        if model not in models:
+            models.append(model)
+    return models
+
+
+def _is_model_not_found_error(exc: Exception) -> bool:
+    message = str(exc)
+    lowered = message.lower()
+    return "not_found" in lowered or ("not found" in lowered and "models/" in lowered)
 
 
 def _only_digits(value: str | None) -> str:
@@ -154,10 +176,33 @@ Contexto do advogado responsável no sistema:
 - uf_oab: {advogado.get("uf_oab") or ""}
 """
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-exp",
-        contents=[uploaded_file, prompt],
-    )
+    response = None
+    last_error = None
+    for model_name in _candidate_models():
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[uploaded_file, prompt],
+            )
+            break
+        except Exception as exc:
+            last_error = exc
+            if _is_model_not_found_error(exc):
+                current_app.logger.warning(
+                    "procuracao_model_not_found",
+                    extra={
+                        "event": "procuracao_model_not_found",
+                        "model": model_name,
+                    },
+                )
+                continue
+            raise
+
+    if response is None:
+        raise RuntimeError(
+            "Nenhum modelo Gemini disponível para análise de procuração. "
+            f"Último erro: {last_error}"
+        )
 
     raw_text = _strip_json_fences(_response_text(response))
 

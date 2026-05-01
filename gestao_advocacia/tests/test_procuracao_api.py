@@ -179,7 +179,7 @@ def test_extrair_dados_procuracao_com_client_fake(app):
 
     class FakeModels:
         def generate_content(self, model, contents):
-            assert model == "gemini-2.0-flash-exp"
+            assert model in {"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"}
             assert len(contents) == 2
             return FakeResponse()
 
@@ -194,6 +194,51 @@ def test_extrair_dados_procuracao_com_client_fake(app):
                 result = extrair_dados_procuracao(__file__, "application/pdf")
 
     assert result["outorgante"]["nome_completo"] == "Maria da Silva"
+
+
+def test_extrair_dados_procuracao_fallback_modelo_inexistente(app):
+    from procuracao_service import extrair_dados_procuracao
+
+    class FakeUpload:
+        pass
+
+    class FakeFiles:
+        def upload(self, file):
+            return FakeUpload()
+
+    class FakeResponse:
+        text = json.dumps(_fake_dados())
+
+    class FakeModels:
+        def __init__(self):
+            self.calls = []
+
+        def generate_content(self, model, contents):
+            self.calls.append(model)
+            assert len(contents) == 2
+            if model == "gemini-2.0-flash-exp":
+                raise RuntimeError(
+                    "404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-2.0-flash-exp is not found for API version v1beta'}}"
+                )
+            return FakeResponse()
+
+    class FakeClient:
+        def __init__(self):
+            self.files = FakeFiles()
+            self.models = FakeModels()
+
+    fake_client = FakeClient()
+
+    with app.app_context():
+        app.config["GEMINI_API_KEY"] = "fake-key"
+        app.config["GEMINI_PROCURACAO_MODEL"] = "gemini-2.0-flash-exp"
+        with patch("procuracao_service.get_gemini_client", return_value=fake_client):
+            with patch("procuracao_service.get_jwt_identity", return_value=None):
+                result = extrair_dados_procuracao(__file__, "application/pdf")
+
+    assert result["outorgante"]["nome_completo"] == "Maria da Silva"
+    assert fake_client.models.calls[0] == "gemini-2.0-flash-exp"
+    assert fake_client.models.calls[1] == "gemini-2.5-flash"
 
 
 def test_criar_caso_via_procuracao_valida(auth_client, app, tmp_path):

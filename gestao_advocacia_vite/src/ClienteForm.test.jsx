@@ -114,4 +114,20 @@ describe('ClienteForm', () => {
     expect(campoCnpj.value).toBe('12.345.678/0001-90')
     expect(screen.getByLabelText(/razao social \*/i).value).toBe('Empresa XPTO LTDA')
   })
+
+  it('aplica mascara de CPF ao carregar cliente em edicao', async () => {
+    render(
+      <ClienteForm
+        clienteParaEditar={{
+          id: 123,
+          tipo_pessoa: 'PF',
+          nome_razao_social: 'Adriano Basso Marson',
+          cpf_cnpj: '05199800930',
+        }}
+        onClienteChange={vi.fn()}
+      />
+    )
+
+    expect(await screen.findByLabelText(/^cpf \*/i)).toHaveValue('051.998.009-30')
+  })
 })

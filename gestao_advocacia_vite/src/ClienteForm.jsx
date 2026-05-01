@@ -132,9 +132,18 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
         dadosEdit.data_nascimento = ''
       }
 
-      dadosEdit.cnpj_secundario = dadosEdit.cnpj_secundario || ''
+      dadosEdit.cpf_cnpj = formatCPFCNPJ(dadosEdit.cpf_cnpj || '', dadosEdit.tipo_pessoa, false)
+      dadosEdit.cnpj_secundario = formatCPFCNPJ(
+        dadosEdit.cnpj_secundario || '',
+        dadosEdit.tipo_pessoa,
+        true
+      )
       dadosEdit.descricao_cnpj_secundario = dadosEdit.descricao_cnpj_secundario || ''
-      dadosEdit.cnpj_terciario = dadosEdit.cnpj_terciario || ''
+      dadosEdit.cnpj_terciario = formatCPFCNPJ(
+        dadosEdit.cnpj_terciario || '',
+        dadosEdit.tipo_pessoa,
+        true
+      )
       dadosEdit.descricao_cnpj_terciario = dadosEdit.descricao_cnpj_terciario || ''
 
       setFormData(dadosEdit)
