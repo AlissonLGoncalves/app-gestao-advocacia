@@ -279,8 +279,21 @@ def register_auth_routes(
         @auth_ns.expect(user_model_dto)
         @auth_ns.response(201, "Usuário registrado com sucesso.")
         @auth_ns.response(400, "Dados de entrada inválidos.")
+        @auth_ns.response(403, "Cadastro restrito: REGISTRATION_MODE=closed.")
         @auth_ns.response(409, "Nome de usuário ou email já existem.")
         def post(self):
+            # Gate pre-comercial (issue #112): em modo "closed" (padrao), self-signup
+            # via /register e bloqueado. Apenas /register-invite com token valido funciona.
+            # Habilitar "open" so quando houver gate de pagamento integrado.
+            if current_app.config.get("REGISTRATION_MODE", "closed") != "open":
+                return {
+                    "message": (
+                        "Cadastro restrito a convites. Solicite acesso entrando em contato "
+                        "via landing page ou pelo email do administrador."
+                    ),
+                    "code": "registration_closed",
+                }, 403
+
             data = request.get_json() or {}
             username = data.get("username")
             email = data.get("email")
