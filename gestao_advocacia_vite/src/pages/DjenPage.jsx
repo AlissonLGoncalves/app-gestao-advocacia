@@ -373,9 +373,20 @@ export default function DjenPage() {
         } else if (!silencioso) {
           toast.error('Erro ao sincronizar.')
         }
-      } catch {
-        if (!silencioso) {
-          toast.error('Erro de conexão.')
+      } catch (err) {
+        if (silencioso) return
+        // Rate limit do DJEN/CNJ — backend retorna 429 com code djen_rate_limit.
+        // Mostrar toast amigavel orientando aguardar, em vez de "erro generico".
+        if (err?.status === 429 || err?.payload?.code === 'djen_rate_limit') {
+          toast.warning(
+            err?.payload?.message ||
+              'API do DJEN está limitada. Aguarde alguns minutos e tente novamente.',
+            { autoClose: 6000 }
+          )
+        } else if (err?.status === 503) {
+          toast.error('Serviço DJEN indisponível no momento. Tente novamente em alguns minutos.')
+        } else {
+          toast.error(err?.message || 'Erro ao sincronizar.')
         }
       } finally {
         setSyncing(false)

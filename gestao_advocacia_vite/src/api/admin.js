@@ -75,4 +75,15 @@ export const adminApi = {
   criarAnotacao: (id, texto) =>
     adminRequest(`/tenants/${id}/anotacao`, { method: 'POST', body: { texto } }),
   listAnotacoes: (id) => adminRequest(`/tenants/${id}/anotacoes`),
+  // Access Requests (issue #112 v2)
+  listAccessRequests: ({ status = '', page = 1, perPage = 25 } = {}) => {
+    const params = new URLSearchParams()
+    if (status) params.set('status', status)
+    params.set('page', String(page))
+    params.set('per_page', String(perPage))
+    return adminRequest(`/access-requests?${params.toString()}`)
+  },
+  approveAccessRequest: (id) => adminRequest(`/access-requests/${id}/approve`, { method: 'POST' }),
+  rejectAccessRequest: (id, motivo = '') =>
+    adminRequest(`/access-requests/${id}/reject`, { method: 'POST', body: { motivo } }),
 }
