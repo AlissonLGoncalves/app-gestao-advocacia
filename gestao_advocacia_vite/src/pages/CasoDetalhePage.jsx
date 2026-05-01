@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { API_URL } from '../config.js' // Importa API_URL
 import { toast } from 'react-toastify' // Para notificações
-import { atualizarCasoViaCnj, getCaso, listMovimentacoesCaso } from '../api/casos.js'
+import { atualizarCasoViaDjen, getCaso, listMovimentacoesCaso } from '../api/casos.js'
 import HonorariosCasoCard from '../components/HonorariosCasoCard'
 import DocumentosCasoTab from '../components/DocumentosCasoTab'
 import CasoTimeline from '../components/CasoTimeline'
@@ -95,13 +95,12 @@ function CasoDetalhePage() {
     carregarDadosDoCaso()
   }, [carregarDadosDoCaso])
 
-  const handleAtualizarViaCNJ = async () => {
-    const token = localStorage.getItem('token')
-    if (!token || !caso || !caso.numero_processo) {
+  const handleAtualizarViaDJEN = async () => {
+    if (!caso || !caso.numero_processo) {
       setAtualizacaoCNJError(
-        'Não é possível atualizar: Token, dados do caso ou número do processo ausentes.'
+        'Não é possível atualizar: dados do caso ou número do processo ausentes.'
       )
-      toast.warn('Dados insuficientes para atualização via CNJ.')
+      toast.warn('Número de processo ausente.')
       return
     }
 
@@ -110,23 +109,16 @@ function CasoDetalhePage() {
     setAtualizacaoCNJSuccess('')
 
     try {
-      const dataResposta = await atualizarCasoViaCnj(caso.id)
-      const novas = Number(dataResposta?.novas_movimentacoes_registradas || 0)
-      const backfill = Number(dataResposta?.movimentacoes_backfill_registradas || 0)
-
-      let mensagem = dataResposta.message || 'Informações do caso atualizadas com sucesso a partir do CNJ!'
-      if (backfill > 0 && novas === 0) {
-        mensagem = `Nenhuma nova movimentação no CNJ. Histórico sincronizado: ${backfill} registro(s).`
-      }
-
+      const dataResposta = await atualizarCasoViaDjen(caso.id)
+      const mensagem = dataResposta.message || 'Publicações DJEN sincronizadas com sucesso!'
       setAtualizacaoCNJSuccess(mensagem)
       toast.success(mensagem)
       await carregarDadosDoCaso()
       setTimelineRefreshNonce((v) => v + 1)
     } catch (err) {
-      console.error('Erro durante a atualização via CNJ:', err)
+      console.error('Erro durante a atualização via DJEN:', err)
       setAtualizacaoCNJError(err.message)
-      toast.error(`Erro na atualização CNJ: ${err.message}`)
+      toast.error(`Erro na sincronização DJEN: ${err.message}`)
     } finally {
       setIsLoadingAtualizacaoCNJ(false)
     }
@@ -248,7 +240,7 @@ function CasoDetalhePage() {
 
                 {caso.numero_processo ? (
                   <button
-                    onClick={handleAtualizarViaCNJ}
+                    onClick={handleAtualizarViaDJEN}
                     disabled={isLoadingAtualizacaoCNJ || isLoadingCaso}
                     className="btn btn-sm btn-primary w-100 mt-2"
                   >
@@ -259,15 +251,15 @@ function CasoDetalhePage() {
                           role="status"
                           aria-hidden="true"
                         ></span>
-                        Verificando CNJ...
+                        Verificando DJEN...
                       </>
                     ) : (
-                      'Verificar Atualizações no CNJ'
+                      'Verificar Publicações no DJEN'
                     )}
                   </button>
                 ) : (
                   <p className="mt-2 text-xs text-muted fst-italic">
-                    Número do processo não cadastrado. Consulta ao CNJ indisponível.
+                    Número do processo não cadastrado. Consulta ao DJEN indisponível.
                   </p>
                 )}
                 <StatusDisplay

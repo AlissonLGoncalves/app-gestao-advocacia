@@ -24,5 +24,6 @@ export const listMovimentacoesCaso = (id) => api.get(`/casos/${id}/movimentacoes
 export const listAndamentosCaso = (id) => api.get(`/casos/${id}/andamentos`)
 
 export const atualizarCasoViaCnj = (id) => api.post(`/casos/${id}/atualizar-cnj`, {})
+export const atualizarCasoViaDjen = (id) => api.post(`/casos/${id}/atualizar-djen`, {})
 export const consultaPublicaCnj = (numero) =>
   api.get(`/casos/consulta-publica-cnj${toQuery({ numero })}`)

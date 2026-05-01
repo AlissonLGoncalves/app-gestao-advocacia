@@ -5,6 +5,12 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource
 
 from cnj_service import consultar_processo_cnj
+from djen_service import DjenAPIError, DjenRateLimitError, consultar_comunicacoes
+from djen_tasks import (
+    _consultar_processo_com_fallback,
+    _inferir_sigla_tribunal_por_numero_processo,
+    _salvar_publicacao,
+)
 from extensions import db
 from helpers import get_item_or_404, get_tenant_id, query_for_tenant, tenant_scoped
 from models import Caso, Cliente, Documento, MovimentacaoCNJ, PublicacaoDJEN, TarefaPrazo, log_audit
@@ -693,6 +699,85 @@ def register_casos_routes(
                     exc_info=True,
                 )
                 return {"message": "Ocorreu um erro interno inesperado no sistema."}, 500
+
+    @casos_ns.route("/<int:caso_id>/atualizar-djen")
+    @casos_ns.param("caso_id", "ID do caso para buscar publicações no DJEN")
+    class CasoAtualizarDJENAPI(Resource):
+        @casos_ns.doc("atualizar_caso_via_djen", security="jsonWebToken",
+                      description="Consulta o DJEN (ComunicaAPI) pelo número de processo do caso e "
+                                  "registra novas publicações na timeline.")
+        @jwt_required()
+        @tenant_scoped
+        def post(self, caso_id):
+            user_id_atual = get_jwt_identity()
+            tenant_id = get_tenant_id()
+            caso = query_for_tenant(Caso).filter_by(id=caso_id).first()
+
+            if not caso:
+                return {"message": f"Caso {caso_id} não encontrado."}, 404
+
+            numero = (caso.numero_processo or "").strip()
+            if not numero:
+                return {"message": "Este caso não possui número de processo para consulta ao DJEN."}, 400
+
+            app.logger.info(
+                f"DJEN: buscando publicações para caso {caso_id}, processo '{numero}', "
+                f"solicitado por usuário {user_id_atual}."
+            )
+
+            sigla_trib = _inferir_sigla_tribunal_por_numero_processo(numero)
+
+            try:
+                _, items = _consultar_processo_com_fallback(
+                    numero_processo=numero,
+                    sigla_tribunal=sigla_trib,
+                    data_inicio=None,
+                    data_fim=None,
+                    logger=app.logger,
+                )
+            except DjenRateLimitError:
+                return {"message": "DJEN: limite de requisições atingido. Tente novamente em 1 minuto."}, 429
+            except DjenAPIError as e:
+                return {"message": f"Erro ao consultar o DJEN: {str(e)}"}, 502
+
+            novas = 0
+            for item in items:
+                try:
+                    salvo = _salvar_publicacao(
+                        db, PublicacaoDJEN,
+                        user_id=user_id_atual,
+                        tenant_id=tenant_id,
+                        caso_id=caso_id,
+                        item=item,
+                        origem="processo",
+                    )
+                    if salvo:
+                        novas += 1
+                except Exception as e_item:
+                    app.logger.warning(
+                        f"DJEN: erro ao salvar item para caso {caso_id}: {e_item}", exc_info=True
+                    )
+
+            try:
+                db.session.commit()
+            except Exception as e_commit:
+                db.session.rollback()
+                app.logger.error(f"DJEN: erro no commit para caso {caso_id}: {e_commit}", exc_info=True)
+                return {"message": "Erro interno ao salvar publicações."}, 500
+
+            if novas > 0:
+                msg = f"{novas} nova(s) publicação(ões) do DJEN registrada(s) para este caso."
+            elif items:
+                msg = "Nenhuma publicação nova. O DJEN já estava sincronizado."
+            else:
+                msg = "Nenhuma publicação encontrada no DJEN para este número de processo."
+
+            app.logger.info(f"DJEN: caso {caso_id} — {msg}")
+            return {
+                "message": msg,
+                "novas_publicacoes_registradas": novas,
+                "total_retornado_djen": len(items),
+            }, 200
 
     @casos_ns.route("/<int:caso_id>/movimentacoes-cnj")
     @casos_ns.param(
