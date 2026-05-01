@@ -12,6 +12,9 @@ function DadosPessoaisSection({
   onGenericCnpjBlur,
   formatDataParaExibicao,
 }) {
+  const isDjenPlaceholder =
+    isEditing && typeof formData.cpf_cnpj === 'string' && formData.cpf_cnpj.startsWith('DJEN-')
+  const cpfCnpjBloqueado = isEditing && !isDjenPlaceholder
   const renderCamposPF = () => (
     <>
       <div className="col-md-6 mb-3">
@@ -200,7 +203,7 @@ function DadosPessoaisSection({
             className={`form-select form-select-sm ${validationErrors.tipo_pessoa ? 'is-invalid' : ''}`}
             value={formData.tipo_pessoa}
             onChange={onChange}
-            disabled={isEditing}
+            disabled={cpfCnpjBloqueado}
           >
             <option value="PF">Pessoa Fisica (PF)</option>
             <option value="PJ">Pessoa Juridica (PJ)</option>
@@ -220,10 +223,10 @@ function DadosPessoaisSection({
               name="cpf_cnpj"
               id="cpf_cnpj"
               className={`form-control form-control-sm ${validationErrors.cpf_cnpj ? 'is-invalid' : ''}`}
-              value={formData.cpf_cnpj}
+              value={isDjenPlaceholder ? '' : formData.cpf_cnpj}
               onChange={onCpfCnpjChange}
               onBlur={onGenericCnpjBlur}
-              disabled={isEditing}
+              disabled={cpfCnpjBloqueado}
               maxLength={formData.tipo_pessoa === 'PF' ? 14 : 18}
               placeholder={formData.tipo_pessoa === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'}
             />
@@ -235,6 +238,12 @@ function DadosPessoaisSection({
               </span>
             )}
           </div>
+          {isDjenPlaceholder && (
+            <small className="text-muted d-block mt-1">
+              Cliente criado pela triagem DJEN sem CPF/CNPJ. Preencha o documento real para
+              completar o cadastro.
+            </small>
+          )}
           {validationErrors.cpf_cnpj && (
             <div className="invalid-feedback d-block">{validationErrors.cpf_cnpj}</div>
           )}
