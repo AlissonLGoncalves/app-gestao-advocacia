@@ -1125,14 +1125,48 @@ def registrar_rotas_djen(
                 }
 
             partes_estruturadas = []
-            for nome in analise.get("partes_autoras") or []:
-                parte = _enriquecer_parte(nome, "autor")
-                if parte:
-                    partes_estruturadas.append(parte)
-            for nome in analise.get("partes_reus") or []:
-                parte = _enriquecer_parte(nome, "reu")
-                if parte:
-                    partes_estruturadas.append(parte)
+
+            # Caminho preferido: a IA ja retornou objetos estruturados (com
+            # cpf_cnpj associado a cada parte). Nesse caso usamos direto.
+            for parte_obj in analise.get("partes_autoras_estruturadas") or []:
+                nome_obj = (parte_obj.get("nome") or "").strip()
+                if not nome_obj:
+                    continue
+                partes_estruturadas.append(
+                    {
+                        "nome": nome_obj,
+                        "papel": "autor",
+                        "tipo_pessoa": parte_obj.get("tipo_pessoa") or "PF",
+                        "cpf_cnpj_sugerido": parte_obj.get("cpf_cnpj"),
+                        "advogados": parte_obj.get("advogados") or [],
+                        "oabs": parte_obj.get("oabs") or [],
+                    }
+                )
+            for parte_obj in analise.get("partes_reus_estruturadas") or []:
+                nome_obj = (parte_obj.get("nome") or "").strip()
+                if not nome_obj:
+                    continue
+                partes_estruturadas.append(
+                    {
+                        "nome": nome_obj,
+                        "papel": "reu",
+                        "tipo_pessoa": parte_obj.get("tipo_pessoa") or "PF",
+                        "cpf_cnpj_sugerido": parte_obj.get("cpf_cnpj"),
+                        "advogados": parte_obj.get("advogados") or [],
+                        "oabs": parte_obj.get("oabs") or [],
+                    }
+                )
+
+            # Fallback: regex retornou só strings — enriquece com heuristica.
+            if not partes_estruturadas:
+                for nome in analise.get("partes_autoras") or []:
+                    parte = _enriquecer_parte(nome, "autor")
+                    if parte:
+                        partes_estruturadas.append(parte)
+                for nome in analise.get("partes_reus") or []:
+                    parte = _enriquecer_parte(nome, "reu")
+                    if parte:
+                        partes_estruturadas.append(parte)
 
             dados_caso = {
                 "titulo": (
