@@ -163,6 +163,13 @@ def test_leitura_peticao_sucesso(auth_client, db):
             "valor_causa": 1500.50,
             "titulo": "Ação de Cobrança",
             "resumo_fatos": "Resumo de teste.",
+            "parte_contraria": "Empresa Ré Ltda",
+            "vara_juizo": "2ª Vara Cível",
+            "comarca": "Curitiba",
+            "instancia": "1ª Instância",
+            "tipo_acao": "Ação de Cobrança",
+            "fase_processual": "Conhecimento",
+            "data_distribuicao": "2022033018",
             "fonte": "AI Gemini",
         },
     ):
@@ -176,3 +183,7 @@ def test_leitura_peticao_sucesso(auth_client, db):
     payload = json.loads(response.data)
     assert payload["dados"]["numero_processo"] == "0001234-12.2026.8.16.0001"
     assert payload["dados"]["valor_causa"] == 1500.50
+    assert payload["dados"]["parte_contraria"] == "Empresa Ré Ltda"
+    assert payload["dados"]["vara_juizo"] == "2ª Vara Cível"
+    assert payload["dados"]["comarca"] == "Curitiba"
+    assert payload["dados"]["data_distribuicao"] == "2022-03-30"

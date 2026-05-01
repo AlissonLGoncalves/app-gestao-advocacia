@@ -485,7 +485,33 @@ def _extract_case_data_from_text(text):
     Fallback OFFLINE puro usando Expressões Regulares (Regex) Python
     para buscar número de processo, varas e partes em uma petição inicial.
     """
-    extracted = {"numero_processo": "", "valor_causa": 0.0, "titulo": ""}
+    extracted = {
+        "numero_processo": "",
+        "valor_causa": 0.0,
+        "titulo": "",
+        "resumo_fatos": "",
+        "parte_contraria": "",
+        "vara_juizo": "",
+        "comarca": "",
+        "instancia": "",
+        "tipo_acao": "",
+        "fase_processual": "",
+        "data_distribuicao": "",
+    }
+
+    def _normalizar_data_distribuicao(valor):
+        if not valor:
+            return ""
+        bruto = re.sub(r"\D", "", str(valor))
+        if len(bruto) >= 8:
+            ano = bruto[0:4]
+            mes = bruto[4:6]
+            dia = bruto[6:8]
+            return f"{ano}-{mes}-{dia}"
+        match_iso = re.search(r"(\d{4}-\d{2}-\d{2})", str(valor))
+        if match_iso:
+            return match_iso.group(1)
+        return ""
 
     # Busca Padrão CNJ: xxxxxxx-xx.xxxx.x.xx.xxxx
     cnj_match = re.search(r"\b(\d{7}-\d{2}\.\d{4}\.\d{1}\.\d{2}\.\d{4})\b", text)
@@ -504,6 +530,33 @@ def _extract_case_data_from_text(text):
         except ValueError:
             pass
 
+    tipo_acao_match = re.search(
+        r"\b(PROCEDIMENTO\s+DO\s+JUIZADO\s+ESPECIAL\s+C[IÍ]VEL|"
+        r"A[CÇ][AÃ]O\s+[A-Z\s]+|CONTESTA[CÇ][AÃ]O)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if tipo_acao_match:
+        extracted["tipo_acao"] = " ".join(tipo_acao_match.group(1).split()).title()
+
+    vara_match = re.search(
+        r"((?:\d+ª?\s*)?(?:vara|juizado)[^\n\r,;]{0,100})",
+        text,
+        re.IGNORECASE,
+    )
+    if vara_match:
+        extracted["vara_juizo"] = " ".join(vara_match.group(1).split()).title()
+
+    comarca_match = re.search(r"comarca\s+de\s+([^\n\r,;\-]+)", text, re.IGNORECASE)
+    if comarca_match:
+        extracted["comarca"] = " ".join(comarca_match.group(1).split()).title()
+
+    data_match_iso = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
+    if not data_match_iso:
+        data_match_iso = re.search(r"\b(\d{8,14})\b", text)
+    if data_match_iso:
+        extracted["data_distribuicao"] = _normalizar_data_distribuicao(data_match_iso.group(1))
+
     # Titulo Genérico pela primeira linha útil ou Autor X Réu
     autor_match = re.search(r"^\s*([A-Z\s]+),\s*já qualificado", text, re.MULTILINE)
     reu_match = re.search(r"em face de\s*([A-Z\s]+)", text, re.IGNORECASE)
@@ -512,9 +565,19 @@ def _extract_case_data_from_text(text):
         autor = autor_match.group(1).strip().title()
         reu = reu_match.group(1).strip().title()
         extracted["titulo"] = f"AÇÃO: {autor} X {reu}"
+        extracted["parte_contraria"] = autor
     else:
         # Pega a primeira grande linha centralizada como título possivel
         extracted["titulo"] = "Processo Lançado via Petição Autográfica"
+
+    if not extracted["instancia"]:
+        texto_upper = text.upper()
+        if "JUIZADO ESPECIAL" in texto_upper:
+            extracted["instancia"] = "JE"
+        elif "TRIBUNAL DE JUSTI" in texto_upper or "2ª INST" in texto_upper:
+            extracted["instancia"] = "2ª Instância"
+        else:
+            extracted["instancia"] = "1ª Instância"
 
     return extracted
 
@@ -543,6 +606,13 @@ Nenhuma outra palavra. Apenas o JSON cru com estas chaves:
 - "valor_causa" (float)
 - "titulo" (string, geralmente "AUTOR x REU" ou resumo da ação)
 - "resumo_fatos" (string, um parágrafo que resume a tese/fatos do caso para um advogado ler rapidamente)
+    - "parte_contraria" (string)
+    - "vara_juizo" (string)
+    - "comarca" (string)
+    - "instancia" (string: JE, 1ª Instância, 2ª Instância)
+    - "tipo_acao" (string)
+    - "fase_processual" (string)
+    - "data_distribuicao" (string no formato YYYY-MM-DD; vazio se não achar)
 
 TEXTO DA PETIÇÃO:
 """ + text[:15000]  # Limite de texto
@@ -565,7 +635,19 @@ TEXTO DA PETIÇÃO:
             raw_text = raw_text[:-3]
 
         json_data = json.loads(raw_text.strip())
-        return json_data
+        return {
+            "numero_processo": (json_data.get("numero_processo") or "").strip(),
+            "valor_causa": json_data.get("valor_causa") or 0.0,
+            "titulo": (json_data.get("titulo") or "").strip(),
+            "resumo_fatos": (json_data.get("resumo_fatos") or "").strip(),
+            "parte_contraria": (json_data.get("parte_contraria") or "").strip(),
+            "vara_juizo": (json_data.get("vara_juizo") or "").strip(),
+            "comarca": (json_data.get("comarca") or "").strip(),
+            "instancia": (json_data.get("instancia") or "").strip(),
+            "tipo_acao": (json_data.get("tipo_acao") or "").strip(),
+            "fase_processual": (json_data.get("fase_processual") or "").strip(),
+            "data_distribuicao": (json_data.get("data_distribuicao") or "").strip(),
+        }
 
     except Exception as e:
         print(f"[GEMINI_SDK_ERROR] Ocorreu uma falha no motor AI: {e}")

@@ -55,6 +55,30 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
       setLoading,
     })
 
+  const normalizarDataParaInput = (value) => {
+    if (!value) return ''
+    const texto = String(value).trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto
+    const digits = texto.replace(/\D/g, '')
+    if (digits.length >= 8) {
+      return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`
+    }
+    return ''
+  }
+
+  const inferirParteContraria = (titulo, nomeCliente) => {
+    const t = String(titulo || '').trim()
+    if (!t) return ''
+    const separador = t.includes(' x ') ? ' x ' : t.includes(' X ') ? ' X ' : null
+    if (!separador) return ''
+    const [a, b] = t.split(separador).map((v) => v.trim())
+    const cliente = String(nomeCliente || '').trim().toLowerCase()
+    if (!cliente) return a || b || ''
+    if (a.toLowerCase().includes(cliente)) return b || ''
+    if (b.toLowerCase().includes(cliente)) return a || ''
+    return a || b || ''
+  }
+
   const fetchClientes = useCallback(async () => {
     try {
       const token = localStorage.getItem('token')
@@ -176,6 +200,12 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
         try {
           const jsonRes = JSON.parse(xhr.responseText)
           if (jsonRes.dados) {
+            const clienteSelecionado = clientes.find((c) => String(c.id) === String(formData.cliente_id))
+            const parteContrariaInferida = inferirParteContraria(
+              jsonRes.dados.titulo,
+              clienteSelecionado?.nome_razao_social
+            )
+
             setFormData((prev) => ({
               ...prev,
               numero_processo: jsonRes.dados.numero_processo || prev.numero_processo,
@@ -183,6 +213,15 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
                 ? String(jsonRes.dados.valor_causa)
                 : prev.valor_causa,
               titulo: jsonRes.dados.titulo || prev.titulo,
+              tipo_acao: jsonRes.dados.tipo_acao || prev.tipo_acao,
+              fase_processual: jsonRes.dados.fase_processual || prev.fase_processual,
+              vara_juizo: jsonRes.dados.vara_juizo || prev.vara_juizo,
+              comarca: jsonRes.dados.comarca || prev.comarca,
+              instancia: jsonRes.dados.instancia || prev.instancia,
+              data_distribuicao:
+                normalizarDataParaInput(jsonRes.dados.data_distribuicao) || prev.data_distribuicao,
+              parte_contraria:
+                jsonRes.dados.parte_contraria || parteContrariaInferida || prev.parte_contraria,
               notas_caso: jsonRes.dados.resumo_fatos
                 ? prev.notas_caso
                   ? `${prev.notas_caso}\n\n-- Resumo IA dos Fatos:\n${jsonRes.dados.resumo_fatos}`

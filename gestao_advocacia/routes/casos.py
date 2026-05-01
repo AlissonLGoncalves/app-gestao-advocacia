@@ -14,6 +14,17 @@ from ocr_service import extract_case_data_from_file
 def register_casos_routes(
     app, casos_ns, caso_input_model_dto, caso_model_dto, movimentacao_cnj_output_model_dto
 ):
+    def _normalizar_data_yyyy_mm_dd(valor):
+        if not valor:
+            return ""
+        texto = str(valor).strip()
+        if len(texto) >= 10 and texto[4:5] == "-" and texto[7:8] == "-":
+            return texto[:10]
+        digitos = "".join(ch for ch in texto if ch.isdigit())
+        if len(digitos) >= 8:
+            return f"{digitos[0:4]}-{digitos[4:6]}-{digitos[6:8]}"
+        return ""
+
     def _preencher_caso_from_data(caso, data):
         """Helper para preencher campos do caso a partir dos dados recebidos."""
         caso.titulo = data.get("titulo", caso.titulo)
@@ -49,7 +60,7 @@ def register_casos_routes(
         @tenant_scoped
         @casos_ns.doc(
             security="jsonWebToken",
-            description="Extrai dados da petição (CNJ, valor e título) para auto-preenchimento do caso.",
+            description="Extrai dados da petição para auto-preenchimento do caso.",
         )
         def post(self):
             arquivo = request.files.get("documento") or request.files.get("file")
@@ -64,23 +75,26 @@ def register_casos_routes(
 
             if resultado.get("error"):
                 return {
-                    "message": resultado.get("error")
-                    or "Falha ao extrair dados da petição.",
+                    "message": resultado.get("error") or "Falha ao extrair dados da petição.",
                     "dados": None,
                 }, 400
-
-            numero_processo = (resultado.get("numero_processo") or "").strip()
-            valor_causa = resultado.get("valor_causa")
-            titulo = (resultado.get("titulo") or "").strip()
-            resumo_fatos = (resultado.get("resumo_fatos") or "").strip()
 
             return {
                 "message": "Leitura da petição concluída.",
                 "dados": {
-                    "numero_processo": numero_processo,
-                    "valor_causa": valor_causa,
-                    "titulo": titulo,
-                    "resumo_fatos": resumo_fatos,
+                    "numero_processo": (resultado.get("numero_processo") or "").strip(),
+                    "valor_causa": resultado.get("valor_causa"),
+                    "titulo": (resultado.get("titulo") or "").strip(),
+                    "resumo_fatos": (resultado.get("resumo_fatos") or "").strip(),
+                    "parte_contraria": (resultado.get("parte_contraria") or "").strip(),
+                    "vara_juizo": (resultado.get("vara_juizo") or "").strip(),
+                    "comarca": (resultado.get("comarca") or "").strip(),
+                    "instancia": (resultado.get("instancia") or "").strip(),
+                    "tipo_acao": (resultado.get("tipo_acao") or "").strip(),
+                    "fase_processual": (resultado.get("fase_processual") or "").strip(),
+                    "data_distribuicao": _normalizar_data_yyyy_mm_dd(
+                        resultado.get("data_distribuicao")
+                    ),
                     "fonte": resultado.get("fonte") or "OCR",
                 },
             }, 200
@@ -145,7 +159,7 @@ def register_casos_routes(
                 else "2ª Instância" if instancia_raw == "G2" else instancia_raw
             )
 
-            data_distribuicao = dados_processo.get("dataAjuizamento", "")[:10]
+            data_distribuicao = _normalizar_data_yyyy_mm_dd(dados_processo.get("dataAjuizamento", ""))
 
             valor_causa = dados_processo.get("valorAcao")
             resumo = dados_processo.get("resumo", "")
