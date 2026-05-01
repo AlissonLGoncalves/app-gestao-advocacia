@@ -46,6 +46,10 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
   })
   // Eventos sugeridos pela IA (após upload de PDF). Cada um tem `selecionado`.
   const [eventosIA, setEventosIA] = useState([])
+  // Texto extraido do PDF de origem (auto-preenchimento magico).
+  // Persistido como Documento .md ao salvar caso (~50 KB vs ~5 MB do PDF).
+  const [textoExtraido, setTextoExtraido] = useState(null)
+  const [nomeArquivoOrigem, setNomeArquivoOrigem] = useState(null)
 
   const { validationErrors, setValidationErrors, clearValidationErrors, handleSubmit } =
     useCasoForm({
@@ -56,6 +60,8 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
       criarEvento,
       eventoData,
       eventosIA,
+      textoExtraido,
+      nomeArquivoOrigem,
       setLoading,
     })
 
@@ -237,6 +243,12 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
                   : `-- Resumo IA dos Fatos:\n${jsonRes.dados.resumo_fatos}`
                 : prev.notas_caso,
             }))
+            // Guarda o texto extraido (markdown leve) para persistir como
+            // Documento vinculado ao caso quando salvar. ~50 KB vs ~5 MB do PDF.
+            if (jsonRes.texto_extraido) {
+              setTextoExtraido(jsonRes.texto_extraido)
+              setNomeArquivoOrigem(jsonRes.nome_arquivo_original || file.name)
+            }
             toast.success(`Leitura Concluida via ${jsonRes.dados.fonte || 'IA'}!`)
             if (jsonRes.dados.numero_processo && jsonRes.dados.numero_processo.length === 25)
               buscarDadosDataJud(jsonRes.dados.numero_processo)

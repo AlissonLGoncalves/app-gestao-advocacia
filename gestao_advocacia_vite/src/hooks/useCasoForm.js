@@ -27,6 +27,8 @@ function useCasoForm({
   criarEvento,
   eventoData,
   eventosIA = [],
+  textoExtraido = null,
+  nomeArquivoOrigem = null,
   setLoading,
 }) {
   const [validationErrors, setValidationErrors] = useState({})
@@ -127,6 +129,35 @@ function useCasoForm({
     [eventoData, eventosIA, formData.cliente_id]
   )
 
+  // Persiste o texto extraido do PDF de origem como Documento .md vinculado
+  // ao caso. Leve (~50 KB vs ~5 MB do PDF original), reusavel pela IA depois,
+  // e visivel na aba Documentos do CasoDetalhe.
+  const persistirTextoOrigem = useCallback(
+    async (casoId, token) => {
+      if (!textoExtraido || !casoId) return
+      try {
+        const baseName = (nomeArquivoOrigem || 'peca-origem').replace(/\.[^.]+$/, '')
+        const filename = `${baseName} (texto extraído).md`
+        const blob = new Blob([textoExtraido], { type: 'text/markdown' })
+        const fd = new FormData()
+        fd.append('file', blob, filename)
+        fd.append('caso_id', String(casoId))
+        const resp = await fetch(`${API_URL}/documentos/`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        })
+        if (!resp.ok) {
+          // Falha ao persistir nao bloqueia o fluxo principal — caso ja foi salvo
+          console.warn('Falha ao persistir texto de origem:', await resp.text())
+        }
+      } catch (e) {
+        console.warn('Erro ao persistir texto de origem:', e)
+      }
+    },
+    [textoExtraido, nomeArquivoOrigem]
+  )
+
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault()
@@ -153,6 +184,11 @@ function useCasoForm({
           : await createCaso(dadosParaEnviar)
 
         toast.success(`Caso ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`)
+        // Persiste o markdown do auto-preenchimento (se houver) como Documento
+        // vinculado. Acontece em paralelo com a criacao de eventos.
+        if (textoExtraido && responseData.id) {
+          await persistirTextoOrigem(responseData.id, token)
+        }
         if (criarEvento && !isEditing) await criarEventoAgenda(responseData.id, token)
         if (typeof onCasoChange === 'function') onCasoChange()
       } catch (error) {

@@ -722,11 +722,13 @@ def extract_case_data_from_file(file_stream, filename):
         ai_data = _extract_case_data_with_gemini(text)
         if ai_data and (ai_data.get("numero_processo") or ai_data.get("titulo")):
             ai_data["fonte"] = "AI Gemini"
+            ai_data["texto_extraido"] = text  # markdown leve para persistir
             return ai_data
 
         # Fallback Bronze: Regex Nativo
         regex_data = _extract_case_data_from_text(text)
         regex_data["fonte"] = "Regex Offline"
+        regex_data["texto_extraido"] = text  # markdown leve para persistir
         return regex_data
 
     except Exception as e:
