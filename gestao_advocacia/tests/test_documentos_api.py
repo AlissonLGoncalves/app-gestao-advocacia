@@ -96,3 +96,36 @@ def test_delete_documento_sucesso(auth_client, db):
 
     response_get = auth_client.get(f"/api/v1/documentos/download/{doc_id}")
     assert response_get.status_code == 404
+
+
+def test_listar_documentos_por_cliente(auth_client, db):
+    cliente_id = criar_cliente_teste(auth_client, 77)
+
+    caso_resp = auth_client.post(
+        "/api/v1/casos",
+        json={
+            "titulo": "Caso Documento Cliente",
+            "status": "Ativo",
+            "tipo_acao": "Cível",
+            "cliente_id": cliente_id,
+        },
+    )
+    assert caso_resp.status_code == 201, caso_resp.data
+    caso_id = json.loads(caso_resp.data)["id"]
+
+    upload_resp = auth_client.post(
+        "/api/v1/documentos/upload",
+        data={
+            "caso_id": str(caso_id),
+            "file": (BytesIO(_PDF_STUB), "cliente_doc.pdf"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert upload_resp.status_code == 201, upload_resp.data
+
+    listar_resp = auth_client.get(f"/api/v1/documentos/cliente/{cliente_id}")
+    assert listar_resp.status_code == 200, listar_resp.data
+    data = json.loads(listar_resp.data)
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    assert any(item.get("nome_arquivo", "").startswith("cliente_doc") for item in data)

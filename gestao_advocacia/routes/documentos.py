@@ -32,6 +32,24 @@ def register_documentos_routes(app, documentos_ns, documento_model_dto):
             documentos = query.order_by(Documento.data_upload.desc()).all()
             return documentos
 
+    @documentos_ns.route("/cliente/<int:cliente_id>")
+    class DocumentoListByClienteAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @documentos_ns.marshal_list_with(documento_model_dto)
+        @documentos_ns.doc(
+            security="jsonWebToken",
+            description="Lista documentos vinculados a casos de um cliente específico.",
+        )
+        def get(self, cliente_id):
+            query = (
+                query_for_tenant(Documento)
+                .join(Caso, Documento.caso_id == Caso.id)
+                .filter(Caso.cliente_id == cliente_id)
+            )
+            documentos = query.order_by(Documento.data_upload.desc()).all()
+            return documentos
+
     @documentos_ns.route("/upload")
     class DocumentoUploadAPI(Resource):
         @jwt_required()

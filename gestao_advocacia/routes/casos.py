@@ -8,6 +8,7 @@ from cnj_service import consultar_processo_cnj
 from extensions import db
 from helpers import get_item_or_404, get_tenant_id, query_for_tenant, tenant_scoped
 from models import Caso, Cliente, Documento, MovimentacaoCNJ, PublicacaoDJEN, TarefaPrazo, log_audit
+from ocr_service import extract_case_data_from_file
 
 
 def register_casos_routes(
@@ -41,6 +42,48 @@ def register_casos_routes(
             caso.data_distribuicao = None
         caso.notas_caso = data.get("notas_caso", caso.notas_caso)
         return caso
+
+    @casos_ns.route("/leitura-peticao")
+    class CasoLeituraPeticaoAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @casos_ns.doc(
+            security="jsonWebToken",
+            description="Extrai dados da petição (CNJ, valor e título) para auto-preenchimento do caso.",
+        )
+        def post(self):
+            arquivo = request.files.get("documento") or request.files.get("file")
+            if not arquivo or not getattr(arquivo, "filename", ""):
+                return {
+                    "message": 'Nenhum arquivo enviado. Use o campo "documento" (ou "file").'
+                }, 400
+
+            resultado = extract_case_data_from_file(arquivo.stream, arquivo.filename)
+            if not isinstance(resultado, dict):
+                return {"message": "Falha ao processar arquivo enviado."}, 500
+
+            if resultado.get("error"):
+                return {
+                    "message": resultado.get("error")
+                    or "Falha ao extrair dados da petição.",
+                    "dados": None,
+                }, 400
+
+            numero_processo = (resultado.get("numero_processo") or "").strip()
+            valor_causa = resultado.get("valor_causa")
+            titulo = (resultado.get("titulo") or "").strip()
+            resumo_fatos = (resultado.get("resumo_fatos") or "").strip()
+
+            return {
+                "message": "Leitura da petição concluída.",
+                "dados": {
+                    "numero_processo": numero_processo,
+                    "valor_causa": valor_causa,
+                    "titulo": titulo,
+                    "resumo_fatos": resumo_fatos,
+                    "fonte": resultado.get("fonte") or "OCR",
+                },
+            }, 200
 
     @casos_ns.route("/consulta-publica-cnj")
     class CasoConsultaPublicaCNJAPI(Resource):

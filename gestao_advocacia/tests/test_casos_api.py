@@ -3,6 +3,8 @@
 
 import json
 from datetime import date
+from io import BytesIO
+from unittest.mock import patch
 
 from app import Caso
 
@@ -151,3 +153,26 @@ def test_delete_caso_sucesso(auth_client, db):
 
     response_get = auth_client.get(f"/api/v1/casos/{caso_id}")
     assert response_get.status_code == 404
+
+
+def test_leitura_peticao_sucesso(auth_client, db):
+    with patch(
+        "routes.casos.extract_case_data_from_file",
+        return_value={
+            "numero_processo": "0001234-12.2026.8.16.0001",
+            "valor_causa": 1500.50,
+            "titulo": "Ação de Cobrança",
+            "resumo_fatos": "Resumo de teste.",
+            "fonte": "AI Gemini",
+        },
+    ):
+        response = auth_client.post(
+            "/api/v1/casos/leitura-peticao",
+            data={"documento": (BytesIO(b"%PDF-1.4"), "peticao.pdf")},
+            content_type="multipart/form-data",
+        )
+
+    assert response.status_code == 200, response.data
+    payload = json.loads(response.data)
+    assert payload["dados"]["numero_processo"] == "0001234-12.2026.8.16.0001"
+    assert payload["dados"]["valor_causa"] == 1500.50
