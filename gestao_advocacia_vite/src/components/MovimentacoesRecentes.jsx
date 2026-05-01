@@ -1,12 +1,30 @@
 /**
- * MovimentacoesRecentes - Widget de timeline de publicações DJEN dos últimos dias
- * Exibe publicações agrupadas por data com rotulos humanos (Hoje, Ontem, etc)
+ * MovimentacoesRecentes - Widget de timeline de publicacoes DJEN dos ultimos dias.
+ *
+ * Mesmo padrao visual usado na pagina DJEN (DjenPage.jsx):
+ * - Card por publicacao com borda azul a esquerda quando nao lida
+ * - Linha de badges: Nova / sigla_tribunal / tipo_comunicacao / origem
+ * - Numero do processo em destaque
+ * - Linha "nome_orgao · data" em texto muted pequeno
+ * - Botoes: baixar certidao + abrir publicacao
  */
 
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import { API_URL } from '../config.js'
 import { CalendarIcon, ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline'
+import { baixarCertidao as baixarCertidaoApi } from '../api/djen.js'
+
+const fmtData = (iso) => {
+  if (!iso) return ''
+  try {
+    const [y, m, d] = iso.split('-')
+    return `${d}/${m}/${y}`
+  } catch {
+    return iso
+  }
+}
 
 const MovimentacoesRecentes = ({ className = '' }) => {
   const navigate = useNavigate()
@@ -49,24 +67,28 @@ const MovimentacoesRecentes = ({ className = '' }) => {
     setDiasSelecionados(dias)
   }
 
-  const handleNavigateToCaso = (casoId) => {
-    if (casoId) {
-      navigate(`/casos/detalhe/${casoId}`)
+  const abrirPublicacao = (pub) => {
+    if (pub?.id) {
+      navigate(`/djen?publicacao=${pub.id}`)
     }
   }
 
-  const handleOpenPublicacao = (publicacaoId) => {
-    if (publicacaoId) {
-      navigate(`/djen?publicacao=${publicacaoId}`)
+  const baixarCertidao = async (pub) => {
+    if (!pub?.hash_comunicacao) {
+      toast.warn('Esta publicação não possui certidão para download.')
+      return
     }
-  }
-
-  const formatarResumo = (resumo) => {
-    if (!resumo) return ''
-    if (resumo.length > 120) {
-      return resumo.substring(0, 120) + '...'
+    try {
+      const blob = await baixarCertidaoApi(pub.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certidao_djen_${pub.id}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      toast.error(err.message || 'Erro ao baixar certidão.')
     }
-    return resumo
   }
 
   return (
@@ -75,7 +97,7 @@ const MovimentacoesRecentes = ({ className = '' }) => {
       style={{ borderRadius: 'var(--radius-lg)' }}
     >
       {/* Header */}
-      <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center p-4">
+      <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center p-4 flex-wrap gap-2">
         <div className="d-flex align-items-center gap-3">
           <div
             className="p-3 rounded-circle"
@@ -87,8 +109,8 @@ const MovimentacoesRecentes = ({ className = '' }) => {
             <CalendarIcon style={{ width: '24px', height: '24px', color: 'var(--primary)' }} />
           </div>
           <div>
-            <h5 className="mb-0 fw-bold text-dark">Movimentacoes recentes</h5>
-            <p className="mb-0 text-muted small">Publicacoes DJEN dos ultimos dias</p>
+            <h5 className="mb-0 fw-bold text-dark">Movimentações recentes</h5>
+            <p className="mb-0 text-muted small">Publicações DJEN dos últimos dias</p>
           </div>
         </div>
 
@@ -142,179 +164,111 @@ const MovimentacoesRecentes = ({ className = '' }) => {
                 <CalendarIcon
                   style={{ width: '48px', height: '48px', opacity: '0.3', marginBottom: '1rem' }}
                 />
-                <p>Nenhuma publicacao nos ultimos {diasSelecionados} dias</p>
+                <p>Nenhuma publicação nos últimos {diasSelecionados} dias</p>
               </div>
             ) : (
-              <div className="timeline">
-                {publicacoes.grupos.map((grupo, grupoIdx) => (
-                  <div
-                    key={grupo.data}
-                    className={`timeline-group mb-4 ${grupoIdx !== publicacoes.grupos.length - 1 ? 'pb-3' : ''}`}
-                    style={{
-                      borderLeft: '2px solid #e0e0e0',
-                      paddingLeft: '1.5rem',
-                      marginLeft: '1rem',
-                      position: 'relative',
-                    }}
-                  >
-                    {/* Dot on timeline */}
-                    <div
+              publicacoes.grupos.map((grupo) => (
+                <div key={grupo.data} className="mb-4">
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <span
+                      className="badge"
                       style={{
-                        position: 'absolute',
-                        left: '-10px',
-                        top: '0',
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--primary)',
-                        border: '3px solid white',
-                        boxShadow: '0 0 0 2px var(--primary)',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        color: 'var(--primary)',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: 'var(--radius-md)',
                       }}
-                    />
+                    >
+                      {grupo.rotulo}
+                    </span>
+                    <span className="text-muted small">{fmtData(grupo.data)}</span>
+                  </div>
 
-                    {/* Date label */}
-                    <div className="mb-3">
-                      <span
-                        className="badge"
-                        style={{
-                          backgroundColor: 'rgba(79, 70, 229, 0.1)',
-                          color: 'var(--primary)',
-                          fontSize: '0.85rem',
-                          fontWeight: '600',
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: 'var(--radius-md)',
-                        }}
-                      >
-                        {grupo.rotulo}
-                      </span>
-                      <span className="text-muted small ms-2">{grupo.data}</span>
-                    </div>
-
-                    {/* Publications */}
-                    <div className="space-y-2">
-                      {grupo.publicacoes.map((pub) => (
-                        <div
-                          key={pub.id}
-                          className="publication-item p-3 rounded-2"
-                          onClick={() => handleNavigateToCaso(pub.caso_id)}
-                          style={{
-                            backgroundColor: pub.lida ? '#f9f9f9' : '#fafbff',
-                            border: pub.lida ? '1px solid #e0e0e0' : '1px solid #e3e9f3',
-                            cursor: pub.caso_id ? 'pointer' : 'default',
-                            transition: 'all 0.2s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (pub.caso_id) {
-                              e.currentTarget.style.backgroundColor = '#f0f4ff'
-                              e.currentTarget.style.borderColor = 'var(--primary)'
-                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(79, 70, 229, 0.1)'
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = pub.lida ? '#f9f9f9' : '#fafbff'
-                            e.currentTarget.style.borderColor = pub.lida ? '#e0e0e0' : '#e3e9f3'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }}
-                          role={pub.caso_id ? 'button' : undefined}
-                          tabIndex={pub.caso_id ? 0 : undefined}
-                          onKeyDown={(e) => {
-                            if (pub.caso_id && (e.key === 'Enter' || e.key === ' ')) {
-                              handleNavigateToCaso(pub.caso_id)
-                            }
-                          }}
-                        >
-                          <div className="d-flex justify-content-between align-items-start mb-2">
-                            <div className="flex-grow-1">
-                              <p
-                                className="mb-1 fw-bold text-dark"
-                                style={{
-                                  fontSize: '0.95rem',
-                                  fontWeight: pub.lida ? '500' : '600',
-                                }}
-                              >
-                                {pub.cliente_nome}
-                              </p>
-                              {pub.numero_processo && (
-                                <button
-                                  type="button"
-                                  className="btn btn-link p-0 mb-2 text-primary text-start"
-                                  style={{
-                                    fontSize: '0.9rem',
-                                    fontFamily: 'monospace',
-                                    textDecoration: 'underline',
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleOpenPublicacao(pub.id)
-                                  }}
-                                  onKeyDown={(e) => {
-                                    e.stopPropagation()
-                                  }}
-                                  title="Abrir conteúdo da publicação"
-                                >
-                                  {pub.numero_processo}
-                                </button>
+                  {grupo.publicacoes.map((pub) => (
+                    <div
+                      key={pub.id}
+                      className={`card mb-2 border-0 shadow-sm ${!pub.lida ? 'border-start border-4 border-primary' : ''}`}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => abrirPublicacao(pub)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          abrirPublicacao(pub)
+                        }
+                      }}
+                    >
+                      <div className="card-body py-2 px-3">
+                        <div className="d-flex justify-content-between align-items-start">
+                          <div className="flex-grow-1 me-2" style={{ minWidth: 0 }}>
+                            <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                              {!pub.lida && <span className="badge bg-primary">Nova</span>}
+                              <span className="badge bg-secondary">
+                                {pub.sigla_tribunal || pub.tribunal || '—'}
+                              </span>
+                              <span className="badge bg-light text-dark border">
+                                {pub.tipo_comunicacao || 'Comunicação'}
+                              </span>
+                              {pub.origem_busca === 'oab' && (
+                                <span className="badge bg-info text-dark">via OAB</span>
+                              )}
+                              {pub.origem_busca === 'processo' && (
+                                <span className="badge bg-warning text-dark">via Processo</span>
+                              )}
+                              {pub.cliente_nome && pub.cliente_nome !== 'N/A' && (
+                                <span className="badge bg-light text-dark border">
+                                  {pub.cliente_nome}
+                                </span>
                               )}
                             </div>
-
-                            {/* Not read indicator */}
-                            {!pub.lida && (
-                              <div
-                                style={{
-                                  width: '8px',
-                                  height: '8px',
-                                  borderRadius: '50%',
-                                  backgroundColor: 'var(--danger)',
-                                  marginLeft: '0.5rem',
-                                  flexShrink: 0,
-                                }}
-                              />
-                            )}
+                            <div className="fw-semibold text-truncate small">
+                              {pub.numero_processo_mascara ||
+                                pub.numero_processo ||
+                                'Sem nº processo'}
+                            </div>
+                            <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                              {(pub.nome_orgao || pub.orgao) && (
+                                <>
+                                  {pub.nome_orgao || pub.orgao}
+                                  {pub.data_disponibilizacao &&
+                                    ` · ${fmtData(pub.data_disponibilizacao)}`}
+                                </>
+                              )}
+                            </div>
                           </div>
-
-                          <p className="mb-2 text-muted small" style={{ fontSize: '0.85rem' }}>
-                            {pub.tribunal && pub.orgao && (
-                              <>
-                                <span className="fw-500">{pub.tribunal}</span> • {pub.orgao}
-                              </>
-                            )}
-                          </p>
-
-                          <div className="mb-2 d-flex gap-2 flex-wrap">
-                            {pub.tipo_comunicacao && (
-                              <span
-                                className="badge"
-                                style={{
-                                  backgroundColor: 'rgba(79, 70, 229, 0.15)',
-                                  color: 'var(--primary)',
-                                  fontSize: '0.75rem',
-                                  fontWeight: '500',
-                                  padding: '0.35rem 0.6rem',
+                          <div className="d-flex gap-1">
+                            {pub.hash_comunicacao && (
+                              <button
+                                className="btn btn-sm btn-outline-secondary"
+                                title="Baixar certidão PDF"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  baixarCertidao(pub)
                                 }}
                               >
-                                {pub.tipo_comunicacao}
-                              </span>
+                                <i className="bi bi-file-earmark-text" />
+                              </button>
                             )}
-                          </div>
-
-                          {pub.resumo && (
-                            <p
-                              className="mb-0 text-muted small"
-                              style={{
-                                fontSize: '0.85rem',
-                                lineHeight: '1.4',
-                                color: '#666',
+                            <button
+                              className="btn btn-sm btn-outline-primary"
+                              title="Ver completo"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                abrirPublicacao(pub)
                               }}
                             >
-                              {formatarResumo(pub.resumo)}
-                            </p>
-                          )}
+                              <i className="bi bi-arrow-up-right-square" />
+                            </button>
+                          </div>
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ))
             )}
           </>
         )}
@@ -328,10 +282,6 @@ const MovimentacoesRecentes = ({ className = '' }) => {
           to {
             transform: rotate(360deg);
           }
-        }
-
-        .timeline-group .publication-item {
-          transition: all 0.2s ease;
         }
       `}</style>
     </div>
