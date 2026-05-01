@@ -292,6 +292,7 @@ def register_api_routes(app, api, finance_access_required):
             "valor_causa": fields.String,
             "data_distribuicao": fields.String,
             "notas_caso": fields.String,
+            "descricao": fields.String,
             "data_criacao": fields.DateTime(dt_format="iso8601"),
             "data_atualizacao": fields.DateTime(dt_format="iso8601"),
             "cliente_id": fields.Integer,
