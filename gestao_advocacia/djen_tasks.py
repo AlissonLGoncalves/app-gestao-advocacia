@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from flask import current_app
 
 from djen_service import DjenAPIError, DjenRateLimitError, consultar_comunicacoes, listar_tribunais
+from djen_triagem import CPF_CNPJ_REGEX, tentar_auto_vincular_a_caso
 
 RATE_LIMIT_SLEEP = 65  # segundos a aguardar após HTTP 429
 DELAY_ENTRE_REQUISICOES = 3  # segundos entre cada requisição
@@ -457,8 +458,10 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
 
     # enriquecimento-cnj: hot-path — auto-vincular a Caso do MESMO tenant.
     # Caller pode ter passado caso_id explicitamente (ex.: busca por processo);
-    # so vinculamos automaticamente quando caso_id veio None E temos numero_proc.
+    # so vinculamos automaticamente quando caso_id veio None.
     status_origem_default = "pendente"
+
+    # 1) Tentativa por numero de processo exato (caminho original).
     if caso_id is None and numero_proc:
         try:
             from models import Caso  # noqa: PLC0415
@@ -481,12 +484,50 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
                             "djen_id": djen_id,
                             "caso_id": caso_id,
                             "numero_processo": numero_proc,
+                            "estrategia": "numero_processo_exato",
                         },
                     )
                 except Exception:
                     pass
         except Exception:
             # enriquecimento-cnj: nunca derrubar a ingestao por causa do enriquecimento
+            pass
+
+    # 2) Tentativa por CPF/CNPJ ou nome do cliente cadastrado. Resolve o caso
+    # tipico: publicacao chega sem CNJ que bata, mas o cliente ja esta cadastrado
+    # com CPF/CNPJ visivel no texto OU com nome identico ao polo ativo/passivo.
+    if caso_id is None:
+        try:
+            from models import Caso, Cliente  # noqa: PLC0415
+
+            # Monta uma "analise" minima compativel com tentar_auto_vincular_a_caso
+            # usando o que ja temos extraido de polo_ativo/polo_passivo + texto.
+            analise_min = {
+                "partes_autoras": polo_ativo_list,
+                "partes_reus": polo_passivo_list,
+                "documentos_extraidos": list(CPF_CNPJ_REGEX.findall(texto or "")),
+            }
+            caso_id_auto = tentar_auto_vincular_a_caso(db, Cliente, Caso, tenant_id, analise_min)
+            if caso_id_auto:
+                caso_id = caso_id_auto
+                status_origem_default = "criado_automaticamente"
+                try:
+                    from flask import current_app  # noqa: PLC0415
+
+                    current_app.logger.info(
+                        "djen_auto_vinculado_a_caso",
+                        extra={
+                            "event": "djen_auto_vinculado_a_caso",
+                            "tenant_id": tenant_id,
+                            "djen_id": djen_id,
+                            "caso_id": caso_id,
+                            "numero_processo": numero_proc,
+                            "estrategia": "cliente_cadastrado",
+                        },
+                    )
+                except Exception:
+                    pass
+        except Exception:
             pass
 
     pub = PublicacaoDJEN(
