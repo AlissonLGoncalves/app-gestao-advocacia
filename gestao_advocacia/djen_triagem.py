@@ -412,20 +412,38 @@ REGRAS CRITICAS DE EXTRACAO:
 1. NUNCA cole nome de parte com nome de advogado. Se ler "AUTOR: LETICIA CARLA DA SILVA
    ADVOGADO(A): JOSE": parte_autora.nome = "LETICIA CARLA DA SILVA" e
    parte_autora.advogados = ["JOSE"]. NUNCA "LETICIA CARLA DA SILVA ADVOGADO(A): JOSE".
-2. CPF/CNPJ: associe a CADA PARTE o documento que aparece imediatamente proximo a ela
-   no texto (mesmo que sem label "CPF:"). Se a publicacao listar so um CPF e tem so
-   uma parte fisica, atribua a ela. Use formato NNN.NNN.NNN-NN para CPF e
-   NN.NNN.NNN/NNNN-NN para CNPJ. Se nao houver, use null.
-3. tipo_pessoa: PJ se nome contem LTDA/SA/S.A./ME/EIRELI/EPP/Banco/Cooperativa, ou se
-   o documento for CNPJ (14 digitos). PF caso contrario.
-4. Se a publicacao tem multiplos autores ou reus, liste TODOS separadamente como
-   objetos distintos no array.
+
+2. NUNCA cole multiplos reus/autores num unico campo. Exemplo do que NAO FAZER:
+   ENTRADA: "Autor: MINISTERIO PUBLICO Reu(s): Anselmo Luiz Stroparo Drenaplan
+   Terraplenagem Ltda. ME Siliomar Silas Cavaline Vistos."
+   ERRADO: partes_autoras = [{{"nome": "MINISTERIO PUBLICO Reu(s): Anselmo Luiz
+   Stroparo Drenaplan Terraplenagem Ltda. ME Siliomar Silas Cavaline Vistos."}}]
+   CERTO:
+     partes_autoras = [{{"nome": "MINISTERIO PUBLICO DO ESTADO DO PARANA",
+                         "tipo_pessoa": "PJ", ...}}]
+     partes_reus = [
+       {{"nome": "Anselmo Luiz Stroparo", "tipo_pessoa": "PF", ...}},
+       {{"nome": "Drenaplan Terraplenagem Ltda. ME", "tipo_pessoa": "PJ", ...}},
+       {{"nome": "Siliomar Silas Cavaline", "tipo_pessoa": "PF", ...}}
+     ]
+   "Vistos." NAO eh parte — eh inicio da decisao. IGNORE termos como "Vistos",
+   "Vistos etc", "Decido", "Sentenca" — eles marcam o fim da lista de partes.
+
+3. CPF/CNPJ: associe a CADA PARTE o documento que aparece imediatamente proximo a ela
+   no texto. Use formato NNN.NNN.NNN-NN para CPF e NN.NNN.NNN/NNNN-NN para CNPJ.
+
+4. tipo_pessoa: PJ se nome contem LTDA/SA/S.A./ME/EIRELI/EPP/Banco/Cooperativa/
+   MUNICIPIO/ESTADO/UNIAO/MINISTERIO PUBLICO, ou se documento for CNPJ. PF caso contrario.
+
 5. valor_causa: procure literais como "Valor da causa", "Valor atribuido", "Valor:".
    Inclua o R\\$ e numero exatamente como aparece.
+
 6. classe_processual: priorize o nome da classe (ex.: "Procedimento Comum Civel"),
    nao o numero da classe.
+
 7. SEMPRE responda em JSON valido — sem virgula sobrando, sem comentarios,
    sem markdown, sem ```json ```.
+
 8. Liste APENAS o que estiver EXPLICITO no texto. Nao invente.
 
 PUBLICACAO:
@@ -510,6 +528,27 @@ PUBLICACAO:
     autores_objs = [a for a in autores_objs if a.get("nome")]
     reus_objs = [r for r in reus_objs if r.get("nome")]
 
+    # Sanitiza: detecta partes "iaglomeradas" (varios nomes colados num so) e separa.
+    # Resolve casos onde a IA falhou em separar, ex: autor com "Reu(s): X Y Z Vistos."
+    autores_san_a, reus_san_a = _sanitizar_partes_estruturadas(autores_objs, "autor")
+    autores_san_b, reus_san_b = _sanitizar_partes_estruturadas(reus_objs, "reu")
+    autores_objs = autores_san_a + autores_san_b
+    reus_objs = reus_san_a + reus_san_b
+
+    # Dedup por nome normalizado (caso a sanitizacao tenha gerado duplicatas)
+    def _dedup_by_nome(lst):
+        seen = set()
+        out = []
+        for p in lst:
+            k = normalizar_nome(p.get("nome") or "")
+            if k and k not in seen:
+                seen.add(k)
+                out.append(p)
+        return out
+
+    autores_objs = _dedup_by_nome(autores_objs)
+    reus_objs = _dedup_by_nome(reus_objs)
+
     # Listas planas pra retrocompat com codigo antigo (regex/auto-vinculo)
     autores_nomes = [a["nome"] for a in autores_objs]
     reus_nomes = [r["nome"] for r in reus_objs]
@@ -579,6 +618,185 @@ PUBLICACAO:
         "revisao_manual_recomendada": confidence < 0.6,
         "fonte_analise": "ia_gemini",
     }
+
+
+# Padroes que indicam fim da lista de partes (entrada da decisao/sentenca).
+_FIM_PARTES_RE = re.compile(
+    r"\b(?:Vistos|Vistos\s*etc|Decido|Sentenca|"
+    r"Trata-se|Cuida-se|RELATORIO|VOTO|EMENTA|DECISAO|DESPACHO)\b",
+    re.IGNORECASE,
+)
+
+# Marcadores de PJ embutidos no nome
+_MARCADORES_PJ = (
+    "LTDA",
+    "S/A",
+    "S.A",
+    "EIRELI",
+    "EPP",
+    " ME",
+    " ME.",
+    "BANCO ",
+    "COOPERATIVA",
+    "MUNICIPIO",
+    "ESTADO DO",
+    "UNIAO",
+    "MINISTERIO PUBLICO",
+    "PREFEITURA",
+    "FAZENDA",
+)
+
+# Labels de papel que podem aparecer dentro de uma "parte" iaglomerada.
+_LABELS_REU_RE = re.compile(
+    r"\b(?:reu(?:\(s\)|s)?|requerid[oa]s?|executad[oa]s?|polo\s*passivo|impetrad[oa]s?)\s*[:\-]\s*",
+    re.IGNORECASE,
+)
+_LABELS_AUTOR_RE = re.compile(
+    r"\b(?:autor(?:\(s\)|es|a)?|requerente|exequente|polo\s*ativo|impetrante)\s*[:\-]\s*",
+    re.IGNORECASE,
+)
+
+
+def _split_camelcase_concat(s):
+    """Insere espaço entre 'Drenaplan' e 'Terraplenagem' quando colados como
+    'DrenaplanTerraplenagem' (frequente em OCR ruim)."""
+    return re.sub(r"([a-z])([A-Z])", r"\1 \2", s)
+
+
+def _eh_pj(nome):
+    up = nome.upper()
+    return any(m in up for m in _MARCADORES_PJ)
+
+
+def _segmentar_lista_de_nomes(texto):
+    """Tenta separar uma string com varios nomes colados em entries individuais.
+
+    Estrategia: cada nome 'cabe' em ~2-7 tokens. Procura por sequencias de tokens
+    em capslock/title-case separados por marcadores comuns (LTDA, ME, etc.).
+    Retorna lista de strings.
+    """
+    # Remove tudo a partir de "Vistos" / "Decido" / etc.
+    m = _FIM_PARTES_RE.search(texto)
+    if m:
+        texto = texto[: m.start()].strip()
+
+    if not texto:
+        return []
+
+    # Normaliza espaços e splits comuns
+    texto = re.sub(r"[ \t]+", " ", texto).strip(" ;:,.-")
+    texto = _split_camelcase_concat(texto)
+
+    # Heuristica: parte seguinte comeca depois de:
+    # - sufixo PJ (LTDA, ME, EIRELI, S/A, S.A) seguido de espaço e nome em CapsLock
+    # - ponto seguido de nome em CapsLock
+    # - virgula/ponto-e-virgula
+    # Vamos usar split por conectivos + heuristica.
+
+    # Insere separadores explicitos antes de palavras em CAIXA-ALTA seguintes a sufixos PJ
+    sufixos = ["LTDA", "ME", "EIRELI", "EPP", "S/A", "S.A"]
+    for suf in sufixos:
+        # Ex: "Drenaplan Terraplenagem Ltda. ME Siliomar" -> insere "|" antes de "Siliomar"
+        texto = re.sub(
+            rf"({re.escape(suf)})(\.?)(\s+)([A-Z][a-záéíóúâêôãõç]+)",
+            r"\1\2|\3\4",
+            texto,
+        )
+
+    # Insere separador ANTES de uma sequencia que termina em sufixo PJ (empresa).
+    # Heuristica: localiza "Palavra1 [Palavra2] [Palavra3] LTDA/ME/etc" e insere "|"
+    # antes de Palavra1 — desde que tenha texto antes (>=2 palavras).
+    # Resolve: "Anselmo Luiz Stroparo Drenaplan Terraplenagem Ltda" -> separa em
+    # "Anselmo Luiz Stroparo | Drenaplan Terraplenagem Ltda".
+    sufixos_alt = "|".join(re.escape(s) for s in sufixos)
+    # Captura: ... <espaco> (Palavra1 (Palavra2)? (Palavra3)?) <sufixo>
+    # Onde Palavra eh CapsLock ou TitleCase.
+    pj_inicio_re = re.compile(
+        rf"(\w+\s+\w+\s+)((?:[A-Z][a-záéíóúâêôãõç]+\s+){{1,3}})(?={sufixos_alt}\b)",
+        re.IGNORECASE,
+    )
+    texto = pj_inicio_re.sub(r"\1|\2", texto)
+
+    # Quebra tambem em ; ou , quando seguidos de nome
+    texto = re.sub(r"\s*[;,]\s+", "|", texto)
+
+    pedacos = [p.strip(" .,;:-") for p in texto.split("|") if p.strip(" .,;:-")]
+
+    # Filtra: cada pedaco precisa parecer nome (>=2 tokens OU ter marcador PJ OU >=4 chars)
+    out = []
+    for p in pedacos:
+        if len(p) < 4:
+            continue
+        if _FIM_PARTES_RE.search(p):
+            p = _FIM_PARTES_RE.split(p, maxsplit=1)[0].strip(" .,;:-")
+            if not p:
+                continue
+        # Truncar tamanhos absurdos (>120 chars)
+        if len(p) > 120:
+            p = p[:120].strip()
+        out.append(p)
+    return _dedupe_preserving_order(out)
+
+
+def _sanitizar_partes_estruturadas(partes_objs, papel_default):
+    """Recebe lista de objetos de parte (autores ou reus) que pode ter vindo
+    da IA com nomes 'iaglomerados' (varios nomes colados num so), e retorna
+    lista limpa com cada parte separada.
+
+    Tambem detecta se um suposto 'autor' contem 'Reu(s):' embutido e move
+    aquele segmento para o papel correto.
+    """
+    autores = []
+    reus = []
+
+    for parte in partes_objs:
+        nome = (parte.get("nome") or "").strip()
+        if not nome:
+            continue
+
+        # Se o nome contem label de Reu/Requerido/etc, splita em duas partes
+        m_reu = _LABELS_REU_RE.search(nome)
+        m_aut = _LABELS_AUTOR_RE.search(nome)
+
+        antes_reu = nome
+        depois_reu = ""
+        if m_reu:
+            antes_reu = nome[: m_reu.start()].strip(" .,;:-")
+            depois_reu = nome[m_reu.end() :].strip(" .,;:-")
+        elif m_aut and papel_default == "reu":
+            # Caso raro: na lista de reus aparece um "Autor:" embutido
+            antes_reu = nome[: m_aut.start()].strip(" .,;:-")
+            depois_reu = nome[m_aut.end() :].strip(" .,;:-")
+
+        # Antes do label: pertence ao papel original (papel_default)
+        for n in _segmentar_lista_de_nomes(antes_reu):
+            obj = {
+                "nome": n,
+                "tipo_pessoa": "PJ" if _eh_pj(n) else (parte.get("tipo_pessoa") or "PF"),
+                "cpf_cnpj": parte.get("cpf_cnpj") if n == antes_reu else None,
+                "advogados": parte.get("advogados") if n == antes_reu else [],
+                "oabs": parte.get("oabs") if n == antes_reu else [],
+            }
+            if papel_default == "autor":
+                autores.append(obj)
+            else:
+                reus.append(obj)
+
+        # Depois do label: papel oposto (se o label era REU, vai pra reus; se AUTOR, autores)
+        for n in _segmentar_lista_de_nomes(depois_reu):
+            obj = {
+                "nome": n,
+                "tipo_pessoa": "PJ" if _eh_pj(n) else "PF",
+                "cpf_cnpj": None,
+                "advogados": [],
+                "oabs": [],
+            }
+            if m_reu:
+                reus.append(obj)
+            elif m_aut:
+                autores.append(obj)
+
+    return autores, reus
 
 
 def analisar_publicacao_com_fallback_ia(publicacao, limiar=0.5):
