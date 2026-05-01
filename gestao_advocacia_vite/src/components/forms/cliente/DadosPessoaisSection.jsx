@@ -4,17 +4,19 @@ import { ORGAOS_EMISSORES, PROFISSOES, NACIONALIDADES } from '../../../constants
 function DadosPessoaisSection({
   formData,
   isEditing,
+  cpfCnpjLiberadoEdicao,
   loadingCnpj,
   validationErrors,
   onChange,
   onCpfCnpjChange,
+  onToggleCpfCnpjEdicao,
   onDataNascimentoChange,
   onGenericCnpjBlur,
   formatDataParaExibicao,
 }) {
   const isDjenPlaceholder =
     isEditing && typeof formData.cpf_cnpj === 'string' && formData.cpf_cnpj.startsWith('DJEN-')
-  const cpfCnpjBloqueado = isEditing && !isDjenPlaceholder
+  const cpfCnpjBloqueado = isEditing && !isDjenPlaceholder && !cpfCnpjLiberadoEdicao
   const renderCamposPF = () => (
     <>
       <div className="col-md-6 mb-3">
@@ -246,6 +248,17 @@ function DadosPessoaisSection({
           )}
           {validationErrors.cpf_cnpj && (
             <div className="invalid-feedback d-block">{validationErrors.cpf_cnpj}</div>
+          )}
+          {isEditing && !isDjenPlaceholder && (
+            <button
+              type="button"
+              className="btn btn-link btn-sm px-0 mt-1"
+              onClick={onToggleCpfCnpjEdicao}
+            >
+              {cpfCnpjLiberadoEdicao
+                ? `Bloquear ${formData.tipo_pessoa === 'PF' ? 'CPF' : 'CNPJ'}`
+                : `Alterar ${formData.tipo_pessoa === 'PF' ? 'CPF' : 'CNPJ'}`}
+            </button>
           )}
         </div>
       </div>

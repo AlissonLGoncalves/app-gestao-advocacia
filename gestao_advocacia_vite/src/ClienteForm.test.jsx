@@ -130,4 +130,27 @@ describe('ClienteForm', () => {
 
     expect(await screen.findByLabelText(/^cpf \*/i)).toHaveValue('051.998.009-30')
   })
+
+  it('libera edicao de CPF ao clicar no botao Alterar CPF', async () => {
+    render(
+      <ClienteForm
+        clienteParaEditar={{
+          id: 123,
+          tipo_pessoa: 'PF',
+          nome_razao_social: 'Adriano Basso Marson',
+          cpf_cnpj: '05199800930',
+        }}
+        onClienteChange={vi.fn()}
+      />
+    )
+
+    const campoCpf = await screen.findByLabelText(/^cpf \*/i)
+    expect(campoCpf).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: /alterar cpf/i }))
+
+    expect(campoCpf).not.toBeDisabled()
+    fireEvent.change(campoCpf, { target: { value: '12345678901' } })
+    expect(campoCpf).toHaveValue('123.456.789-01')
+  })
 })

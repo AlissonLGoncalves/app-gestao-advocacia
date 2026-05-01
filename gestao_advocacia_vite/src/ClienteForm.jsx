@@ -74,6 +74,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
   const [loadingCep, setLoadingCep] = useState(false)
   const [loadingCnpj, setLoadingCnpj] = useState(false)
   const [loadingOcr, setLoadingOcr] = useState(false)
+  const [cpfCnpjLiberadoEdicao, setCpfCnpjLiberadoEdicao] = useState(false)
 
   const { validationErrors, setValidationErrors, clearValidationErrors, handleSubmit } =
     useClienteForm({ formData, isEditing, clienteParaEditar, onClienteChange, setLoading })
@@ -119,6 +120,7 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
 
   useEffect(() => {
     clearValidationErrors()
+    setCpfCnpjLiberadoEdicao(false)
     if (clienteParaEditar && clienteParaEditar.id) {
       const initialStateForEdit =
         clienteParaEditar.tipo_pessoa === 'PJ' ? initialStatePJ : initialStatePF
@@ -568,10 +570,12 @@ function ClienteForm({ clienteParaEditar, onClienteChange, onCancel }) {
           <DadosPessoaisSection
             formData={formData}
             isEditing={isEditing}
+            cpfCnpjLiberadoEdicao={cpfCnpjLiberadoEdicao}
             loadingCnpj={loadingCnpj}
             validationErrors={validationErrors}
             onChange={handleChange}
             onCpfCnpjChange={handleCpfCnpjChange}
+            onToggleCpfCnpjEdicao={() => setCpfCnpjLiberadoEdicao((prev) => !prev)}
             onDataNascimentoChange={handleDataNascimentoChange}
             onGenericCnpjBlur={handleGenericCnpjBlur}
             formatDataParaExibicao={formatDataParaExibicao}
