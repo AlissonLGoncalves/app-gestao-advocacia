@@ -396,6 +396,15 @@ class AuditLog(db.Model):
 class LoginAudit(db.Model):
     __tablename__ = "login_audit"
     id = db.Column(db.Integer, primary_key=True)
+    # tenant_id denormalizado (Batch 4) — NULLABLE porque tentativas falhas
+    # em email inexistente nao tem tenant resolvido. Esses registros so
+    # sao visiveis via admin_session (RLS policy 'tenant_id = current_setting'
+    # exclui NULL naturalmente).
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_login_audit_tenant_id"),
+        nullable=True,
+    )
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_login_audit_user_id"), nullable=True
     )
@@ -405,12 +414,14 @@ class LoginAudit(db.Model):
     user_agent = db.Column(db.String(500), nullable=True)
     motivo_falha = db.Column(db.String(50), nullable=True)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    __table_args__ = (db.Index("ix_login_audit_tenant_criado", "tenant_id", "criado_em"),)
 
     usuario = db.relationship("User", foreign_keys=[user_id])
 
     def to_dict(self):
         return {
             "id": self.id,
+            "tenant_id": self.tenant_id,
             "user_id": self.user_id,
             "email_tentativa": self.email_tentativa,
             "sucesso": self.sucesso,
@@ -1008,6 +1019,15 @@ class TenantAnotacao(db.Model):
 class ConsentimentoUsuario(db.Model):
     __tablename__ = "consentimento_usuario"
     id = db.Column(db.Integer, primary_key=True)
+    # tenant_id denormalizado (Batch 4) — NOT NULL. Decisao Opcao C do plano
+    # NOTA da decisao #2: policy por tenant_id consistente com resto do schema;
+    # compliance LGPD individual continua na camada de aplicacao
+    # (filter por user_id em /me/consentimentos).
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_consentimento_tenant_id"),
+        nullable=False,
+    )
     user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     tipo = db.Column(db.String(32), nullable=False)  # "termos_uso" | "lgpd"
     versao = db.Column(db.String(16), nullable=False)  # ex: "v1.0"
@@ -1019,6 +1039,7 @@ class ConsentimentoUsuario(db.Model):
     __table_args__ = (
         db.UniqueConstraint("user_id", "tipo", "versao", name="uq_consentimento_user_tipo_versao"),
         db.Index("ix_consentimento_user_tipo", "user_id", "tipo"),
+        db.Index("ix_consentimento_tenant_user", "tenant_id", "user_id"),
     )
 
     user = db.relationship(

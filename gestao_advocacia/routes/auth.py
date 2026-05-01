@@ -12,6 +12,7 @@ from flask_restx import Resource
 from jwt.exceptions import DecodeError, ExpiredSignatureError
 
 from extensions import db, limiter
+from helpers.admin_session import admin_session
 from mail_service import enviar_alerta_email, enviar_email
 from models import ConsentimentoUsuario, LoginAudit, PasswordResetToken, Tenant, User
 from utils.log_sanitizer import mask_email, mask_user_id
@@ -146,18 +147,31 @@ def _user_agent_request_atual(req):
     return (req.headers.get("User-Agent") or "")[:500]
 
 
-def _registrar_login_audit(*, user_id, email_tentativa, sucesso, motivo_falha=None):
-    db.session.add(
-        LoginAudit(
-            user_id=user_id,
-            email_tentativa=(email_tentativa or "")[:120],
-            sucesso=sucesso,
-            ip=_ip_request_atual(request),
-            user_agent=_user_agent_request_atual(request),
-            motivo_falha=motivo_falha,
+def _registrar_login_audit(*, user_id, email_tentativa, sucesso, motivo_falha=None, tenant_id=None):
+    """Persiste registro em login_audit via admin_session (Batch 4).
+
+    Usa admin_session porque /auth/login e endpoints de reset rodam pre-
+    autenticacao (sem tenant_id resolvido na sessao). app_admin tem
+    BYPASSRLS, entao escreve mesmo com a policy restritiva ativa.
+
+    tenant_id pode ser None para tentativas falhas em email inexistente —
+    o registro fica invisivel para app_user (policy 'tenant_id =
+    current_setting' exclui NULL), so admin_session ve.
+    """
+    ip = _ip_request_atual(request)
+    ua = _user_agent_request_atual(request)
+    with admin_session() as s:
+        s.add(
+            LoginAudit(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                email_tentativa=(email_tentativa or "")[:120],
+                sucesso=sucesso,
+                ip=ip,
+                user_agent=ua,
+                motivo_falha=motivo_falha,
+            )
         )
-    )
-    db.session.commit()
 
 
 def _somente_digitos(valor):
@@ -224,16 +238,43 @@ def _normalizar_dados_oab(numero_oab_raw, sigla_raw):
     return numero_final, uf_final, None
 
 
-def _registrar_consentimentos(user, data):
-    """Valida aceites e persiste ConsentimentoUsuario. Retorna (ok, error_response_tuple)."""
+def _validar_consentimentos(data):
+    """Valida payload de aceite de termos/LGPD. Retorna (ok, error_response_or_None,
+    versao_termos_or_None, versao_lgpd_or_None).
+
+    Separado de _registrar_consentimentos para permitir validacao ANTES de
+    abrir transacao (admin_session) — evita commit parcial ao abortar."""
     if not data.get("aceite_termos"):
-        return False, ({"message": "É obrigatório aceitar os Termos de Uso."}, 400)
+        return False, ({"message": "É obrigatório aceitar os Termos de Uso."}, 400), None, None
     if not data.get("aceite_lgpd"):
-        return False, ({"message": "É obrigatório aceitar a Política de Privacidade (LGPD)."}, 400)
+        return (
+            False,
+            ({"message": "É obrigatório aceitar a Política de Privacidade (LGPD)."}, 400),
+            None,
+            None,
+        )
     versao_termos = data.get("versao_termos")
     versao_lgpd = data.get("versao_lgpd")
     if not versao_termos or not versao_lgpd:
-        return False, ({"message": "Versão dos Termos/LGPD é obrigatória."}, 400)
+        return (
+            False,
+            ({"message": "Versão dos Termos/LGPD é obrigatória."}, 400),
+            None,
+            None,
+        )
+    return True, None, versao_termos, versao_lgpd
+
+
+def _registrar_consentimentos(user, data):
+    """Valida aceites e persiste ConsentimentoUsuario via db.session.
+
+    Mantida para compatibilidade — endpoints novos do Batch 4 usam
+    _validar_consentimentos + admin_session inline.
+
+    Retorna (ok, error_response_tuple)."""
+    ok, err, versao_termos, versao_lgpd = _validar_consentimentos(data)
+    if not ok:
+        return False, err
 
     from flask import request as _req
 
@@ -242,6 +283,7 @@ def _registrar_consentimentos(user, data):
 
     db.session.add(
         ConsentimentoUsuario(
+            tenant_id=user.tenant_id,
             user_id=user.id,
             tipo="termos_uso",
             versao=versao_termos,
@@ -252,6 +294,7 @@ def _registrar_consentimentos(user, data):
     )
     db.session.add(
         ConsentimentoUsuario(
+            tenant_id=user.tenant_id,
             user_id=user.id,
             tipo="lgpd",
             versao=versao_lgpd,
@@ -331,42 +374,74 @@ def register_auth_routes(
             if not ok:
                 return {"message": motivo}, 400
 
-            if User.query.filter_by(username=username).first():
-                return {"message": "Nome de usuário já cadastrado."}, 409
-            if User.query.filter_by(email=email).first():
-                return {"message": "Email já cadastrado."}, 409
+            # Validar consentimentos ANTES de abrir transacao (early
+            # return em with admin_session() commitaria writes parciais).
+            ok_c, err_c, versao_termos, versao_lgpd = _validar_consentimentos(data)
+            if not ok_c:
+                return err_c
 
-            # Se for 'admin', significa que é uma criação de NOVO Escritório (Tenant)
-            novo_tenant = None
-            if role == "admin":
-                nome_escritorio = (data.get("razao_social") or "").strip() or username
-                documento_tenant = documento if tipo_pessoa == "PJ" else None
-                novo_tenant = Tenant(nome_escritorio=nome_escritorio, documento=documento_tenant)
-                db.session.add(novo_tenant)
-                db.session.flush()  # Força injeção do ID pro Tenant para atrelar abaixo
+            # Batch 4: User com RLS restritivo. Cadastro de novo tenant
+            # acontece pre-auth (sem current_tenant_id), entao toda a
+            # transacao roda via admin_session (BYPASSRLS).
+            with admin_session() as s:
+                if s.query(User).filter_by(username=username).first():
+                    return {"message": "Nome de usuário já cadastrado."}, 409
+                if s.query(User).filter_by(email=email).first():
+                    return {"message": "Email já cadastrado."}, 409
 
-            # Cria o Super-User
-            new_user = User(
-                username=username,
-                email=email,
-                role=role,
-                tenant_id=novo_tenant.id if novo_tenant else None,
-                nome_completo=nome_completo,
-                cpf=cpf_formatado if tipo_pessoa == "PF" else None,
-                tipo_pessoa=tipo_pessoa,
-                numero_oab=oab_numero,
-                sigla_oab_tribunal=oab_sigla,
-            )
-            new_user.set_password(password)
-            db.session.add(new_user)
-            db.session.flush()
+                # Se for 'admin', significa que é uma criação de NOVO Escritório (Tenant)
+                novo_tenant = None
+                if role == "admin":
+                    nome_escritorio = (data.get("razao_social") or "").strip() or username
+                    documento_tenant = documento if tipo_pessoa == "PJ" else None
+                    novo_tenant = Tenant(
+                        nome_escritorio=nome_escritorio, documento=documento_tenant
+                    )
+                    s.add(novo_tenant)
+                    s.flush()
 
-            ok, err = _registrar_consentimentos(new_user, data)
-            if not ok:
-                db.session.rollback()
-                return err
+                # Cria o Super-User
+                new_user = User(
+                    username=username,
+                    email=email,
+                    role=role,
+                    tenant_id=novo_tenant.id if novo_tenant else None,
+                    nome_completo=nome_completo,
+                    cpf=cpf_formatado if tipo_pessoa == "PF" else None,
+                    tipo_pessoa=tipo_pessoa,
+                    numero_oab=oab_numero,
+                    sigla_oab_tribunal=oab_sigla,
+                )
+                new_user.set_password(password)
+                s.add(new_user)
+                s.flush()
 
-            db.session.commit()
+                # Consentimentos (versao ja validada antes da transacao)
+                ip = _ip_request_atual(request)
+                ua = _user_agent_request_atual(request)
+                s.add(
+                    ConsentimentoUsuario(
+                        tenant_id=new_user.tenant_id,
+                        user_id=new_user.id,
+                        tipo="termos_uso",
+                        versao=versao_termos,
+                        ip=ip,
+                        user_agent=ua,
+                        hash_documento=data.get("hash_termos_uso"),
+                    )
+                )
+                s.add(
+                    ConsentimentoUsuario(
+                        tenant_id=new_user.tenant_id,
+                        user_id=new_user.id,
+                        tipo="lgpd",
+                        versao=versao_lgpd,
+                        ip=ip,
+                        user_agent=ua,
+                        hash_documento=data.get("hash_lgpd"),
+                    )
+                )
+                # commit ao sair do with
 
             app.logger.info(
                 f"Novo Tenant/Escritório registrado: {username} (Logado pelo Master admin ID: {new_user.id})"
@@ -537,29 +612,56 @@ def register_auth_routes(
                 invite_tenant_id = decoded.get("invite_tenant_id")
                 invite_portal_cliente_id = decoded.get("invite_portal_cliente_id")
 
-                if (
-                    User.query.filter_by(email=invite_email).first()
-                    or User.query.filter_by(username=username).first()
-                ):
-                    return {"message": "Usuário ou email já está em uso no sistema."}, 409
+                # Validar consentimentos ANTES de abrir transacao
+                ok_c, err_c, versao_termos, versao_lgpd = _validar_consentimentos(data)
+                if not ok_c:
+                    return err_c
 
-                new_user = User(
-                    username=username,
-                    email=invite_email,
-                    role=invite_role,
-                    tenant_id=invite_tenant_id,
-                    portal_cliente_id=invite_portal_cliente_id,
-                )
-                new_user.set_password(password)
-                db.session.add(new_user)
-                db.session.flush()
+                # Batch 4: User com RLS restritivo. Lookup pre-auth e
+                # criacao do user via admin_session (BYPASSRLS).
+                with admin_session() as s:
+                    if (
+                        s.query(User).filter_by(email=invite_email).first()
+                        or s.query(User).filter_by(username=username).first()
+                    ):
+                        return {"message": "Usuário ou email já está em uso no sistema."}, 409
 
-                ok, err = _registrar_consentimentos(new_user, data)
-                if not ok:
-                    db.session.rollback()
-                    return err
+                    new_user = User(
+                        username=username,
+                        email=invite_email,
+                        role=invite_role,
+                        tenant_id=invite_tenant_id,
+                        portal_cliente_id=invite_portal_cliente_id,
+                    )
+                    new_user.set_password(password)
+                    s.add(new_user)
+                    s.flush()
 
-                db.session.commit()
+                    ip = _ip_request_atual(request)
+                    ua = _user_agent_request_atual(request)
+                    s.add(
+                        ConsentimentoUsuario(
+                            tenant_id=new_user.tenant_id,
+                            user_id=new_user.id,
+                            tipo="termos_uso",
+                            versao=versao_termos,
+                            ip=ip,
+                            user_agent=ua,
+                            hash_documento=data.get("hash_termos_uso"),
+                        )
+                    )
+                    s.add(
+                        ConsentimentoUsuario(
+                            tenant_id=new_user.tenant_id,
+                            user_id=new_user.id,
+                            tipo="lgpd",
+                            versao=versao_lgpd,
+                            ip=ip,
+                            user_agent=ua,
+                            hash_documento=data.get("hash_lgpd"),
+                        )
+                    )
+                    # commit ao sair do with
 
                 app.logger.info(
                     f"Novo usuário entrou via CONVITE: {username} (Logado no Tenant ID: {invite_tenant_id})"
@@ -584,61 +686,90 @@ def register_auth_routes(
             username_or_email = data.get("username_or_email")
             password = data.get("password")
 
-            user = User.query.filter(
-                (User.username == username_or_email) | (User.email == username_or_email)
-            ).first()
+            # Batch 4: User table tem RLS restritivo. Pre-autenticacao nao
+            # ha tenant_id na sessao, entao usamos admin_session (BYPASSRLS)
+            # so para o lookup. Apos identificar o user, capturamos os
+            # campos necessarios e seguimos com a logica fora do contexto admin.
+            with admin_session() as s:
+                user_obj = (
+                    s.query(User)
+                    .filter(
+                        (User.username == username_or_email) | (User.email == username_or_email)
+                    )
+                    .first()
+                )
+                if user_obj is None:
+                    user_data = None
+                    senha_ok = False
+                else:
+                    senha_ok = user_obj.check_password(password)
+                    user_data = {
+                        "id": user_obj.id,
+                        "tenant_id": user_obj.tenant_id,
+                        "role": user_obj.role,
+                        "dict": user_obj.to_dict(),
+                    }
+                # Tenant lookup (para bloqueio de suspenso/cancelado) tambem
+                # via admin: nao temos tenant_id na sessao ainda.
+                tenant_status = None
+                if user_data and user_data["role"] != "superadmin" and user_data["tenant_id"]:
+                    t = s.get(Tenant, user_data["tenant_id"])
+                    tenant_status = t.status if t else None
 
-            if user and user.check_password(password):
-                # admin-fase0: bloqueio de login para tenants suspensos/cancelados.
-                # Superadmin nunca e bloqueado (pode operar com tenant suspenso).
-                if user.role != "superadmin" and user.tenant_id:
-                    tenant = db.session.get(Tenant, user.tenant_id)
-                    if tenant and tenant.status in ("suspenso", "cancelado"):
-                        _registrar_login_audit(
-                            user_id=user.id,
-                            email_tentativa=username_or_email,
-                            sucesso=False,
-                            motivo_falha="tenant_suspenso",
-                        )
-                        app.logger.warning(
-                            "login_blocked_tenant_suspended",
-                            extra={
-                                "event": "login_blocked_tenant_suspended",
-                                "user_id_hash": mask_user_id(user.id),
-                                "tenant_id": user.tenant_id,
-                                "tenant_status": tenant.status,
-                            },
-                        )
-                        return {"message": "Conta suspensa. Contate o suporte."}, 403
+            if user_data and senha_ok:
+                if (
+                    user_data["role"] != "superadmin"
+                    and user_data["tenant_id"]
+                    and tenant_status in ("suspenso", "cancelado")
+                ):
+                    _registrar_login_audit(
+                        user_id=user_data["id"],
+                        email_tentativa=username_or_email,
+                        sucesso=False,
+                        motivo_falha="tenant_suspenso",
+                        tenant_id=user_data["tenant_id"],
+                    )
+                    app.logger.warning(
+                        "login_blocked_tenant_suspended",
+                        extra={
+                            "event": "login_blocked_tenant_suspended",
+                            "user_id_hash": mask_user_id(user_data["id"]),
+                            "tenant_id": user_data["tenant_id"],
+                            "tenant_status": tenant_status,
+                        },
+                    )
+                    return {"message": "Conta suspensa. Contate o suporte."}, 403
 
                 expires = timedelta(days=app.config.get("JWT_ACCESS_TOKEN_EXPIRES_DAYS", 1))
                 access_token = create_access_token(
-                    identity=str(user.id),
-                    additional_claims={"role": user.role},
+                    identity=str(user_data["id"]),
+                    additional_claims={"role": user_data["role"]},
                     expires_delta=expires,
                 )
                 _registrar_login_audit(
-                    user_id=user.id,
+                    user_id=user_data["id"],
                     email_tentativa=username_or_email,
                     sucesso=True,
                     motivo_falha=None,
+                    tenant_id=user_data["tenant_id"],
                 )
                 app.logger.info(
                     "login_success",
                     extra={
                         "event": "login_success",
-                        "user_id_hash": mask_user_id(user.id),
-                        "tenant_id": user.tenant_id,
+                        "user_id_hash": mask_user_id(user_data["id"]),
+                        "tenant_id": user_data["tenant_id"],
                     },
                 )
-                return {"access_token": access_token, "user": user.to_dict()}, 200
+                return {"access_token": access_token, "user": user_data["dict"]}, 200
 
-            motivo = "user_not_found" if not user else "invalid_credentials"
+            motivo = "user_not_found" if not user_data else "invalid_credentials"
             _registrar_login_audit(
-                user_id=user.id if user else None,
+                user_id=user_data["id"] if user_data else None,
                 email_tentativa=username_or_email,
                 sucesso=False,
                 motivo_falha=motivo,
+                tenant_id=user_data["tenant_id"] if user_data else None,
             )
             app.logger.warning(
                 "login_failed",
@@ -676,50 +807,63 @@ def register_auth_routes(
             if not email or "@" not in email:
                 return generic_response
 
-            user = User.query.filter(db.func.lower(User.email) == email).first()
-            if not user:
-                app.logger.info(
-                    "password_reset_requested_unknown_email",
-                    extra={"event": "password_reset_unknown_email", "email": mask_email(email)},
-                )
-                return generic_response
-
+            # Batch 4: User table com RLS restritivo. Lookup pre-auth via
+            # admin_session. PasswordResetToken e categoria C (sem RLS),
+            # mas a tabela esta na mesma conexao admin para minimizar idas
+            # ao DB e simplificar a transacao.
             try:
-                # Invalida tokens anteriores ainda nao usados desse usuario
-                PasswordResetToken.query.filter_by(user_id=user.id, used_at=None).update(
-                    {PasswordResetToken.used_at: datetime.utcnow()}, synchronize_session=False
-                )
+                with admin_session() as s:
+                    user_obj = s.query(User).filter(db.func.lower(User.email) == email).first()
+                    if user_obj is None:
+                        app.logger.info(
+                            "password_reset_requested_unknown_email",
+                            extra={
+                                "event": "password_reset_unknown_email",
+                                "email": mask_email(email),
+                            },
+                        )
+                        return generic_response
 
-                token_plaintext = secrets.token_urlsafe(PASSWORD_RESET_TOKEN_BYTES)
-                novo = PasswordResetToken(
-                    user_id=user.id,
-                    token_hash=_hash_reset_token(token_plaintext),
-                    expires_at=datetime.utcnow() + timedelta(minutes=PASSWORD_RESET_TTL_MINUTES),
-                    requested_ip=_ip_request_atual(request),
-                    requested_user_agent=_user_agent_request_atual(request),
-                )
-                db.session.add(novo)
-                db.session.commit()
+                    user_id = user_obj.id
+                    user_email = user_obj.email
+                    user_nome = user_obj.nome_completo or user_obj.username
+
+                    # Invalida tokens anteriores ainda nao usados desse usuario
+                    s.query(PasswordResetToken).filter_by(user_id=user_id, used_at=None).update(
+                        {PasswordResetToken.used_at: datetime.utcnow()},
+                        synchronize_session=False,
+                    )
+
+                    token_plaintext = secrets.token_urlsafe(PASSWORD_RESET_TOKEN_BYTES)
+                    novo = PasswordResetToken(
+                        user_id=user_id,
+                        token_hash=_hash_reset_token(token_plaintext),
+                        expires_at=datetime.utcnow()
+                        + timedelta(minutes=PASSWORD_RESET_TTL_MINUTES),
+                        requested_ip=_ip_request_atual(request),
+                        requested_user_agent=_user_agent_request_atual(request),
+                    )
+                    s.add(novo)
+                    # commit acontece automaticamente ao sair do with
 
                 base = _frontend_base_url().rstrip("/")
                 link = f"{base}/reset-password?token={token_plaintext}"
 
                 assunto, texto, html = _montar_email_reset(
-                    user.nome_completo or user.username,
+                    user_nome,
                     link,
                     PASSWORD_RESET_TTL_MINUTES,
                 )
-                enviar_email(current_app, user.email, assunto, html, corpo_texto=texto)
+                enviar_email(current_app, user_email, assunto, html, corpo_texto=texto)
 
                 app.logger.info(
                     "password_reset_requested",
                     extra={
                         "event": "password_reset_requested",
-                        "user_id_hash": mask_user_id(user.id),
+                        "user_id_hash": mask_user_id(user_id),
                     },
                 )
             except Exception as exc:
-                db.session.rollback()
                 app.logger.error(f"Falha ao gerar token de reset de senha: {exc}")
 
             return generic_response
@@ -741,60 +885,71 @@ def register_auth_routes(
                 return {"message": motivo}, 400
 
             token_hash = _hash_reset_token(token_plaintext)
-            registro = PasswordResetToken.query.filter_by(token_hash=token_hash).first()
 
-            # Comparacao em tempo constante como defesa em profundidade,
-            # alem do filtro indexado acima.
-            if (
-                not registro
-                or not hmac.compare_digest(registro.token_hash, token_hash)
-                or registro.used_at is not None
-                or registro.expires_at < datetime.utcnow()
-            ):
-                app.logger.warning(
-                    "password_reset_invalid_token",
-                    extra={"event": "password_reset_invalid_token"},
-                )
-                return {"message": "Link inválido ou expirado. Solicite uma nova redefinição."}, 400
-
-            user = db.session.get(User, registro.user_id)
-            if not user:
-                return {"message": "Link inválido ou expirado. Solicite uma nova redefinição."}, 400
-
+            # Batch 4: validacao + update via admin_session (User com RLS
+            # restritivo, nao ha tenant_id pre-auth). LoginAudit do sucesso
+            # passa por _registrar_login_audit (que usa admin_session).
             try:
-                user.set_password(nova_senha)
-                registro.used_at = datetime.utcnow()
-                # Invalida quaisquer outros tokens pendentes desse usuario
-                PasswordResetToken.query.filter(
-                    PasswordResetToken.user_id == user.id,
-                    PasswordResetToken.id != registro.id,
-                    PasswordResetToken.used_at.is_(None),
-                ).update(
-                    {PasswordResetToken.used_at: datetime.utcnow()},
-                    synchronize_session=False,
-                )
-                db.session.add(
-                    LoginAudit(
-                        user_id=user.id,
-                        email_tentativa=(user.email or "")[:120],
-                        sucesso=True,
-                        ip=_ip_request_atual(request),
-                        user_agent=_user_agent_request_atual(request),
-                        motivo_falha="password_reset",
+                with admin_session() as s:
+                    registro = s.query(PasswordResetToken).filter_by(token_hash=token_hash).first()
+                    # Comparacao em tempo constante como defesa em profundidade,
+                    # alem do filtro indexado acima.
+                    if (
+                        not registro
+                        or not hmac.compare_digest(registro.token_hash, token_hash)
+                        or registro.used_at is not None
+                        or registro.expires_at < datetime.utcnow()
+                    ):
+                        app.logger.warning(
+                            "password_reset_invalid_token",
+                            extra={"event": "password_reset_invalid_token"},
+                        )
+                        return {
+                            "message": "Link inválido ou expirado. Solicite uma nova redefinição."
+                        }, 400
+
+                    user_obj = s.get(User, registro.user_id)
+                    if not user_obj:
+                        return {
+                            "message": "Link inválido ou expirado. Solicite uma nova redefinição."
+                        }, 400
+
+                    user_id = user_obj.id
+                    user_tenant_id = user_obj.tenant_id
+                    user_email = user_obj.email
+
+                    user_obj.set_password(nova_senha)
+                    registro.used_at = datetime.utcnow()
+                    # Invalida quaisquer outros tokens pendentes desse usuario
+                    s.query(PasswordResetToken).filter(
+                        PasswordResetToken.user_id == user_id,
+                        PasswordResetToken.id != registro.id,
+                        PasswordResetToken.used_at.is_(None),
+                    ).update(
+                        {PasswordResetToken.used_at: datetime.utcnow()},
+                        synchronize_session=False,
                     )
+                    # commit ao sair do with
+
+                # LoginAudit fora da admin_session — _registrar_login_audit
+                # abre sua propria admin_session.
+                _registrar_login_audit(
+                    user_id=user_id,
+                    email_tentativa=(user_email or "")[:120],
+                    sucesso=True,
+                    motivo_falha="password_reset",
+                    tenant_id=user_tenant_id,
                 )
-                db.session.commit()
 
                 app.logger.info(
                     "password_reset_success",
                     extra={
                         "event": "password_reset_success",
-                        "user_id_hash": mask_user_id(user.id),
+                        "user_id_hash": mask_user_id(user_id),
                     },
                 )
                 return {"message": "Senha redefinida com sucesso. Você já pode fazer login."}, 200
             except Exception as exc:
-                db.session.rollback()
                 app.logger.error(f"Falha ao confirmar reset de senha: {exc}")
                 return {"message": "Falha ao redefinir senha. Tente novamente."}, 500
 
