@@ -22,9 +22,12 @@ from config_test import ConfigTest  # Importa a configuração de teste
 from models import (
     Caso,
     Cliente,
+    ContratoHonorario,
+    Despesa,
     Documento,
     EventoAgenda,
     MovimentacaoCNJ,
+    Recebimento,
     TarefaPrazo,
     Tenant,
     User,
@@ -51,6 +54,12 @@ class TwoTenantsFixture(NamedTuple):
     documento_b: Documento
     mov_cnj_a: MovimentacaoCNJ
     mov_cnj_b: MovimentacaoCNJ
+    despesa_a: Despesa
+    despesa_b: Despesa
+    recebimento_a: Recebimento
+    recebimento_b: Recebimento
+    contrato_a: ContratoHonorario
+    contrato_b: ContratoHonorario
 
 
 @pytest.fixture(scope="session")
@@ -282,6 +291,60 @@ def two_tenants(db) -> TwoTenantsFixture:
         descricao="TEST-B-mov-cnj",
     )
     db.session.add_all([mov_cnj_a, mov_cnj_b])
+
+    _data_financeira = datetime(2026, 1, 10).date()
+    contrato_a = ContratoHonorario(
+        tenant_id=tenant_a.id,
+        tipo_honorario="Fixo",
+        valor_total=10000,
+        caso_id=caso_a.id,
+        cliente_id=cliente_a.id,
+        user_id=admin_a.id,
+    )
+    contrato_b = ContratoHonorario(
+        tenant_id=tenant_b.id,
+        tipo_honorario="Fixo",
+        valor_total=20000,
+        caso_id=caso_b.id,
+        cliente_id=cliente_b.id,
+        user_id=admin_b.id,
+    )
+    db.session.add_all([contrato_a, contrato_b])
+    db.session.flush()
+
+    despesa_a = Despesa(
+        tenant_id=tenant_a.id,
+        descricao="TEST-A-despesa",
+        valor=150,
+        data_despesa=_data_financeira,
+        user_id=admin_a.id,
+    )
+    despesa_b = Despesa(
+        tenant_id=tenant_b.id,
+        descricao="TEST-B-despesa",
+        valor=300,
+        data_despesa=_data_financeira,
+        user_id=admin_b.id,
+    )
+    db.session.add_all([despesa_a, despesa_b])
+
+    recebimento_a = Recebimento(
+        tenant_id=tenant_a.id,
+        descricao="TEST-A-recebimento",
+        valor=500,
+        data_recebimento=_data_financeira,
+        user_id=admin_a.id,
+        contrato_id=contrato_a.id,
+    )
+    recebimento_b = Recebimento(
+        tenant_id=tenant_b.id,
+        descricao="TEST-B-recebimento",
+        valor=800,
+        data_recebimento=_data_financeira,
+        user_id=admin_b.id,
+        contrato_id=contrato_b.id,
+    )
+    db.session.add_all([recebimento_a, recebimento_b])
     db.session.commit()
 
     return TwoTenantsFixture(
@@ -302,6 +365,12 @@ def two_tenants(db) -> TwoTenantsFixture:
         documento_b=documento_b,
         mov_cnj_a=mov_cnj_a,
         mov_cnj_b=mov_cnj_b,
+        despesa_a=despesa_a,
+        despesa_b=despesa_b,
+        recebimento_a=recebimento_a,
+        recebimento_b=recebimento_b,
+        contrato_a=contrato_a,
+        contrato_b=contrato_b,
     )
 
 
