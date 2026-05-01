@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "npm --prefix gestao_advocacia_vite run dev",
     "build": "npm --prefix gestao_advocacia_vite ci && npm --prefix gestao_advocacia_vite run build",
-    "deploy": "npx --yes wrangler deploy --dry-run",
     "lint": "npm --prefix gestao_advocacia_vite run lint",
     "preview": "npm --prefix gestao_advocacia_vite run preview"
   },
