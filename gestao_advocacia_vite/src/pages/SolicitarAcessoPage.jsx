@@ -70,9 +70,8 @@ export default function SolicitarAcessoPage() {
               <div className="card-body p-4">
                 <h2 className="h4 mb-2">Solicitar acesso à beta privada</h2>
                 <p className="text-muted small mb-4">
-                  Estamos selecionando os primeiros escritórios participantes. Preencha o
-                  formulário abaixo e respondemos em até <strong>48h</strong> com um convite
-                  individual.
+                  Estamos selecionando os primeiros escritórios participantes. Preencha o formulário
+                  abaixo e respondemos em até <strong>48h</strong> com um convite individual.
                 </p>
 
                 {resultado?.ok ? (

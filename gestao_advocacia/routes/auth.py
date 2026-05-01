@@ -459,6 +459,85 @@ def register_auth_routes(
                 "lgpd": _carregar_documento_legal("lgpd"),
             }, 200
 
+    @auth_ns.route("/access-request")
+    class AccessRequestSubmit(Resource):
+        """Solicitacao publica de acesso a beta privada (issue #112 v2).
+
+        Substitui o mailto: da landing por fluxo persistido.
+        Resposta sempre 201 generica. Rate limited.
+        """
+
+        @limiter.limit("3 per hour; 20 per day")
+        @auth_ns.doc(description="Cria solicitacao de acesso a beta. Resposta 201 generica.")
+        @auth_ns.response(201, "Solicitacao registrada.")
+        @auth_ns.response(400, "Dados invalidos.")
+        def post(self):
+            from models import AccessRequest
+
+            data = request.get_json(silent=True) or {}
+            nome = (data.get("nome") or "").strip()[:200]
+            email = (data.get("email") or "").strip().lower()[:120]
+            oab = (data.get("oab") or "").strip()[:30] or None
+            sigla_oab = (data.get("sigla_oab") or "").strip().upper()[:10] or None
+            telefone = (data.get("telefone") or "").strip()[:30] or None
+            escritorio = (data.get("escritorio") or "").strip()[:200] or None
+            mensagem = (data.get("mensagem") or "").strip()[:2000] or None
+
+            if not nome or len(nome) < 3:
+                return {"message": "Nome obrigatorio (min 3 caracteres)."}, 400
+            if not email or "@" not in email or "." not in email:
+                return {"message": "Email valido obrigatorio."}, 400
+
+            with admin_session() as s:
+                novo = AccessRequest(
+                    nome=nome,
+                    email=email,
+                    oab=oab,
+                    sigla_oab=sigla_oab,
+                    telefone=telefone,
+                    escritorio=escritorio,
+                    mensagem=mensagem,
+                    status="pending",
+                    ip=_ip_request_atual(request),
+                    user_agent=_user_agent_request_atual(request),
+                )
+                s.add(novo)
+
+            app.logger.info(
+                "access_request_submitted",
+                extra={
+                    "event": "access_request_submitted",
+                    "email": mask_email(email),
+                    "has_oab": bool(oab),
+                },
+            )
+            # Notifica o admin (best-effort)
+            try:
+                admin_email = os.environ.get("ADMIN_NOTIFY_EMAIL")
+                if admin_email:
+                    corpo_html = (
+                        f"<p>Nova solicitacao de acesso Patronus.</p>"
+                        f"<p><strong>Nome:</strong> {nome}<br>"
+                        f"<strong>Email:</strong> {email}<br>"
+                        f"<strong>OAB:</strong> {oab or '-'} {sigla_oab or ''}<br>"
+                        f"<strong>Telefone:</strong> {telefone or '-'}<br>"
+                        f"<strong>Escritorio:</strong> {escritorio or '-'}</p>"
+                        f"<p><strong>Mensagem:</strong><br>{(mensagem or '-')}</p>"
+                        f"<p>Aprovar/rejeitar via /admin/v1/access-requests.</p>"
+                    )
+                    enviar_alerta_email(
+                        current_app,
+                        admin_email,
+                        "Nova solicitacao de acesso Patronus",
+                        corpo_html,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning(f"Falha ao notificar admin sobre access_request: {exc}")
+
+            return {
+                "message": ("Solicitacao recebida. Voce sera notificado por email em ate 48h.")
+            }, 201
+
     @auth_ns.route("/invite-cliente")
     class ClientePortalInvite(Resource):
         @limiter.limit("20 per hour")

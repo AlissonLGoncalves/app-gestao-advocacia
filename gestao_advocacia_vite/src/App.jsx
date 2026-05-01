@@ -24,6 +24,7 @@ import RegisterPage from './pages/auth/RegisterPage.jsx'
 import TermsPage from './pages/auth/TermsPage.jsx'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
+import SolicitarAcessoPage from './pages/SolicitarAcessoPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
 import PerfilPage from './pages/PerfilPage.jsx'
@@ -470,6 +471,7 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/solicitar-acesso" element={<SolicitarAcessoPage />} />
         <Route path="/termos" element={<TermsPage />} />
         <Route path="/portal/registro" element={<PortalRegisterPage />} />
         <Route
