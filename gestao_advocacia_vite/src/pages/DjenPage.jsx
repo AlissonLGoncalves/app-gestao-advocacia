@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { useConfirm } from '../hooks/useConfirm.jsx'
 import DOMPurify from 'dompurify'
@@ -192,6 +192,7 @@ const TRIBUNAIS = [
 
 export default function DjenPage() {
   const { confirm, ConfirmDialog } = useConfirm()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [aba, setAba] = useState('publicacoes')
   const [publicacoes, setPublicacoes] = useState([])
@@ -1612,6 +1613,15 @@ export default function DjenPage() {
                       />
                     </div>
                     <div className="d-flex gap-2 flex-wrap">
+                      <button
+                        className="btn btn-primary btn-sm"
+                        title="Wizard guiado por IA para cadastrar clientes/casos das pendentes"
+                        onClick={() => navigate('/djen/triagem-assistida')}
+                        disabled={triagemTotal === 0}
+                      >
+                        <i className="bi bi-stars me-1" />
+                        Triagem assistida por IA
+                      </button>
                       <button
                         className="btn btn-warning btn-sm"
                         title="Reprocessa todas as pendentes vinculando automaticamente quando o CPF/CNPJ ou nome do cliente estiver cadastrado"

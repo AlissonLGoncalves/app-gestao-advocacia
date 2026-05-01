@@ -48,6 +48,8 @@ export const criarClienteCasoTriagem = (pubId, payload) =>
 
 export const autoVincularPendentes = () => api.post('/djen/triagem/auto-vincular-pendentes', {})
 
+export const getAnaliseIA = (pubId) => api.get(`/djen/triagem/${pubId}/analise-ia`)
+
 // B1 (2026-05-01): /djen/sync agora retorna 202 + job_id (async).
 // Use getSyncJobStatus(id) em polling para acompanhar progresso.
 export const syncDjen = (dias) => api.post('/djen/sync', { dias })
