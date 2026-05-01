@@ -367,9 +367,7 @@ export default function DjenPage() {
         if (!silencioso) {
           const reused = enqueueResp?.reused
           toastId = toast.info(
-            reused
-              ? 'Sync ja em andamento, acompanhando...'
-              : 'Sync iniciado em background...',
+            reused ? 'Sync ja em andamento, acompanhando...' : 'Sync iniciado em background...',
             { autoClose: false, closeButton: false }
           )
         }
