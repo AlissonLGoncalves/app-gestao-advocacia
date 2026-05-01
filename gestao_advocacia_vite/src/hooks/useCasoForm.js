@@ -3,6 +3,22 @@ import { toast } from 'react-toastify'
 import { API_URL } from '../config.js'
 import { createCaso, updateCaso } from '../api/casos.js'
 
+// Mapping local — duplicado de EventoAgendaSection.jsx pra evitar dependência cíclica
+const TIPO_IA_PARA_AGENDA = {
+  audiencia: 'Audiência',
+  prazo_contestacao: 'Prazo',
+  prazo_impugnacao: 'Prazo',
+  prazo_replica: 'Prazo',
+  prazo_treplica: 'Prazo',
+  prazo_recurso: 'Prazo',
+  prazo_embargos: 'Prazo',
+  prazo_alegacoes_finais: 'Prazo',
+  prazo_cumprimento: 'Prazo',
+  pericia: 'Perícia',
+  sustentacao_oral: 'Audiência',
+  outro: 'Outro',
+}
+
 function useCasoForm({
   formData,
   isEditing,
@@ -10,6 +26,7 @@ function useCasoForm({
   onCasoChange,
   criarEvento,
   eventoData,
+  eventosIA = [],
   setLoading,
 }) {
   const [validationErrors, setValidationErrors] = useState({})
@@ -35,31 +52,79 @@ function useCasoForm({
 
   const criarEventoAgenda = useCallback(
     async (casoId, token) => {
-      if (!eventoData.titulo || !eventoData.data_hora) return
+      const cliente_id = formData.cliente_id ? parseInt(formData.cliente_id, 10) : null
+      let totalCriados = 0
+      let totalFalha = 0
 
-      const payload = {
-        titulo: eventoData.titulo,
-        data_hora_inicio: eventoData.data_hora,
-        tipo_evento: eventoData.tipo,
-        notas: eventoData.notas,
-        caso_id: casoId,
-        cliente_id: formData.cliente_id ? parseInt(formData.cliente_id, 10) : null,
+      // 1) Eventos sugeridos pela IA (se o user marcou algum)
+      const eventosIaSelecionados = (eventosIA || []).filter((ev) => ev.selecionado && ev.data)
+      for (const ev of eventosIaSelecionados) {
+        const dataHora = ev.hora ? `${ev.data}T${ev.hora}` : `${ev.data}T09:00`
+        const notasParts = []
+        if (ev.local) notasParts.push(`Local: ${ev.local}`)
+        if (ev.modalidade && ev.modalidade !== 'prazo_so')
+          notasParts.push(`Modalidade: ${ev.modalidade}`)
+        if (ev.link) notasParts.push(`Link: ${ev.link}`)
+        if (ev.base_legal) notasParts.push(`Base legal: ${ev.base_legal}`)
+        if (ev.observacao) notasParts.push(ev.observacao)
+
+        const payload = {
+          titulo: ev.titulo,
+          data_hora_inicio: dataHora,
+          tipo_evento: TIPO_IA_PARA_AGENDA[ev.tipo] || 'Outro',
+          notas: notasParts.join('\n'),
+          caso_id: casoId,
+          cliente_id,
+        }
+
+        try {
+          const resp = await fetch(`${API_URL}/agenda/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload),
+          })
+          if (resp.ok) totalCriados += 1
+          else totalFalha += 1
+        } catch {
+          totalFalha += 1
+        }
       }
 
-      try {
-        const resp = await fetch(`${API_URL}/agenda/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(payload),
-        })
+      // 2) Evento manual (formulário detalhado), se preenchido
+      if (eventoData.titulo && eventoData.data_hora) {
+        const payload = {
+          titulo: eventoData.titulo,
+          data_hora_inicio: eventoData.data_hora,
+          tipo_evento: eventoData.tipo,
+          notas: eventoData.notas,
+          caso_id: casoId,
+          cliente_id,
+        }
+        try {
+          const resp = await fetch(`${API_URL}/agenda/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload),
+          })
+          if (resp.ok) totalCriados += 1
+          else totalFalha += 1
+        } catch {
+          totalFalha += 1
+        }
+      }
 
-        if (resp.ok) toast.success('Evento criado na agenda!')
-        else toast.warning('Caso salvo, mas falha ao criar evento na agenda.')
-      } catch {
-        toast.warning('Caso salvo, mas falha ao criar evento na agenda.')
+      if (totalCriados > 0) {
+        toast.success(
+          totalCriados === 1
+            ? 'Evento criado na agenda!'
+            : `${totalCriados} eventos criados na agenda!`
+        )
+      }
+      if (totalFalha > 0) {
+        toast.warning(`Caso salvo, mas ${totalFalha} evento(s) não foi(ram) criado(s) na agenda.`)
       }
     },
-    [eventoData, formData.cliente_id]
+    [eventoData, eventosIA, formData.cliente_id]
   )
 
   const handleSubmit = useCallback(
