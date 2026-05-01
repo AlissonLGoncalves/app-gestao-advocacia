@@ -799,28 +799,86 @@ def _sanitizar_partes_estruturadas(partes_objs, papel_default):
     return autores, reus
 
 
+def _aplicar_sanitizador_em_analise(analise):
+    """Garante que partes_*_estruturadas existam e estejam sanitizadas (sem
+    nomes 'iaglomerados'). Funciona tanto em retorno de IA quanto regex.
+    """
+    if not isinstance(analise, dict):
+        return analise
+
+    autores_estr = analise.get("partes_autoras_estruturadas")
+    reus_estr = analise.get("partes_reus_estruturadas")
+
+    # Se nao tem estruturadas (caso regex), constroi a partir das listas planas.
+    def _str_para_obj(nomes, papel_default):
+        out = []
+        for nome in nomes or []:
+            if not nome:
+                continue
+            tipo = "PJ" if _eh_pj(nome) else "PF"
+            out.append(
+                {
+                    "nome": nome,
+                    "tipo_pessoa": tipo,
+                    "cpf_cnpj": None,
+                    "advogados": [],
+                    "oabs": [],
+                }
+            )
+        return out
+
+    if not autores_estr:
+        autores_estr = _str_para_obj(analise.get("partes_autoras"), "autor")
+    if not reus_estr:
+        reus_estr = _str_para_obj(analise.get("partes_reus"), "reu")
+
+    # Aplica sanitizador (separa nomes iaglomerados, remove "Vistos./Decido.").
+    autores_a, reus_a = _sanitizar_partes_estruturadas(autores_estr, "autor")
+    autores_b, reus_b = _sanitizar_partes_estruturadas(reus_estr, "reu")
+    autores_final = autores_a + autores_b
+    reus_final = reus_a + reus_b
+
+    # Dedup
+    seen_a, autores_dedup = set(), []
+    for p in autores_final:
+        k = normalizar_nome(p.get("nome") or "")
+        if k and k not in seen_a:
+            seen_a.add(k)
+            autores_dedup.append(p)
+    seen_r, reus_dedup = set(), []
+    for p in reus_final:
+        k = normalizar_nome(p.get("nome") or "")
+        if k and k not in seen_r:
+            seen_r.add(k)
+            reus_dedup.append(p)
+
+    analise["partes_autoras_estruturadas"] = autores_dedup
+    analise["partes_reus_estruturadas"] = reus_dedup
+    # Atualiza listas planas pra ficarem alinhadas com as estruturadas
+    analise["partes_autoras"] = [p["nome"] for p in autores_dedup]
+    analise["partes_reus"] = [p["nome"] for p in reus_dedup]
+    return analise
+
+
 def analisar_publicacao_com_fallback_ia(publicacao, limiar=0.5):
     """Combina regex + Gemini: roda regex primeiro (rapido, gratis), e quando
     a confianca fica abaixo de `limiar` aciona o Gemini como segundo passo.
 
     Retorna sempre um dict com a mesma estrutura de `analisar_publicacao`,
     com chave extra `fonte_analise` ('regex' ou 'ia_gemini').
+
+    Sanitizador eh aplicado SEMPRE no resultado final, garantindo que partes
+    iaglomeradas sejam separadas independente da fonte (IA ou regex).
     """
     analise = analisar_publicacao(publicacao)
     analise["fonte_analise"] = "regex"
 
-    if (analise.get("confianca") or 0.0) >= limiar:
-        return analise
+    if (analise.get("confianca") or 0.0) < limiar:
+        analise_ia = analisar_com_ia(publicacao)
+        if analise_ia and (analise_ia.get("confianca") or 0.0) > (analise.get("confianca") or 0.0):
+            analise = analise_ia
 
-    analise_ia = analisar_com_ia(publicacao)
-    if not analise_ia:
-        return analise
-
-    # Se a IA tem confianca maior, usa ela
-    if (analise_ia.get("confianca") or 0.0) > (analise.get("confianca") or 0.0):
-        return analise_ia
-
-    return analise
+    return _aplicar_sanitizador_em_analise(analise)
 
 
 def montar_grupos_pendentes(db, Cliente, Caso, PublicacaoDJEN, tenant_id):
