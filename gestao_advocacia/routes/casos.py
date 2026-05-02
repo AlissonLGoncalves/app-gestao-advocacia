@@ -122,8 +122,9 @@ def register_casos_routes(
             ),
         )
         def post(self, documento_id):
-            from eventos_extractor_service import extrair_eventos
             from werkzeug.datastructures import FileStorage
+
+            from eventos_extractor_service import extrair_eventos
 
             tenant_id = get_tenant_id()
             documento = Documento.query.filter_by(id=documento_id, tenant_id=tenant_id).first()
