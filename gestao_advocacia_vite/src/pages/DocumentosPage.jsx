@@ -49,6 +49,12 @@ function DocumentosPage() {
   }
 
   const handleEditarDocumento = (documento) => {
+    // Quando documento eh null (botao 'Novo Documento' do empty state),
+    // redireciona pro fluxo de criacao em vez de quebrar.
+    if (!documento) {
+      handleAdicionarClick()
+      return
+    }
     // Para documentos, o DocumentoForm lidará principalmente com metadados.
     // A navegação acionará o useEffect para buscar os metadados se necessário.
     navigate(`/documentos/editar/${documento.id}`)

@@ -297,6 +297,12 @@ def register_api_routes(app, api, finance_access_required):
             "data_atualizacao": fields.DateTime(dt_format="iso8601"),
             "cliente_id": fields.Integer,
             "cliente": fields.Raw(description="Objeto cliente {id, nome_razao_social}"),
+            # Nome do cliente serializado direto pelo relationship — frontend
+            # usa esse campo na lista/coluna 'Cliente' (mais simples que
+            # depender do objeto cliente serializado).
+            "cliente_nome": fields.String(
+                attribute=lambda c: getattr(getattr(c, "cliente", None), "nome_razao_social", None)
+            ),
             "user_id": fields.Integer,
             "data_ultima_verificacao_cnj": fields.DateTime(dt_format="iso8601", nullable=True),
             "movimentacoes_cnj_count": fields.Integer,

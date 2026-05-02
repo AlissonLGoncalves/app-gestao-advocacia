@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
 import { criarClienteCasoTriagem, vincularDecisao } from '../../api/djen.js'
+import { API_URL } from '../../config.js'
 import useArrastavel from '../../hooks/useArrastavel.js'
 
 const AI_BADGE = (
@@ -43,6 +44,8 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
   )
   const [carregando, setCarregando] = useState(false)
   const [erroDuplicata, setErroDuplicata] = useState(null)
+  // Lista TOTAL de clientes do tenant (alem das sugestoes da IA)
+  const [todosClientes, setTodosClientes] = useState([])
 
   const [formCliente, setFormCliente] = useState({
     nome_razao_social: papelInicial === 'autor' ? autorPadrao : reuPadrao,
@@ -86,6 +89,23 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
     storageKey: 'djen-painel-criar-pos',
     bounds: { margin: 80 },
   })
+
+  // Carrega TODOS os clientes do tenant para permitir vincular a qualquer um
+  // (nao so as sugestoes do auto-match). Resolve: 'aparece so 3 clientes,
+  // nao consigo escolher um existente que nao foi sugerido'.
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${API_URL}/clientes/?sort_by=nome_razao_social&order=asc`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data?.clientes || []
+        setTodosClientes(list)
+      })
+      .catch(() => setTodosClientes([]))
+  }, [])
 
   // Esc fecha o painel
   useEffect(() => {
@@ -316,11 +336,31 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
             value={clienteSelecionado}
             onChange={(e) => setClienteSelecionado(e.target.value)}
           >
-            {(sugestoes.clientes || []).map((cli) => (
-              <option key={cli.id} value={String(cli.id)}>
-                {cli.nome_razao_social} ({Math.round((cli.score || 0) * 100)}%)
-              </option>
-            ))}
+            {(sugestoes.clientes || []).length > 0 && (
+              <optgroup label="🎯 Sugestões (match automático)">
+                {(sugestoes.clientes || []).map((cli) => (
+                  <option key={`sug-${cli.id}`} value={String(cli.id)}>
+                    {cli.nome_razao_social} ({Math.round((cli.score || 0) * 100)}%)
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {todosClientes.length > 0 && (
+              <optgroup label="📋 Todos os clientes cadastrados">
+                {todosClientes
+                  .filter(
+                    (cli) =>
+                      // evita duplicar com sugestoes ja exibidas acima
+                      !(sugestoes.clientes || []).some((s) => s.id === cli.id)
+                  )
+                  .map((cli) => (
+                    <option key={`all-${cli.id}`} value={String(cli.id)}>
+                      {cli.nome_razao_social}
+                      {cli.cpf_cnpj ? ` — ${cli.cpf_cnpj}` : ''}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
             <option value="novo">+ Criar novo cliente</option>
           </select>
         </div>
