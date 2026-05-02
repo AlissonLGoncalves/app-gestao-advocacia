@@ -308,10 +308,11 @@ function Dashboard({ mudarSecao }) {
     eventosHoje.length > 0 ||
     syncing
 
+  // Busca local primeiro (Caso/Publicacao). DataJud so vira opcional como fallback.
   const handleConsultaRapida = async () => {
-    const limpo = consultaCnjInput.replace(/\D/g, '')
-    if (limpo.length !== 20) {
-      setResultadoConsulta({ erro: 'Por favor, insira um número CNJ válido de 20 dígitos.' })
+    const inputTrimmed = consultaCnjInput.trim()
+    if (!inputTrimmed) {
+      setResultadoConsulta({ erro: 'Digite o número do processo (com ou sem máscara).' })
       return
     }
 
@@ -319,38 +320,54 @@ function Dashboard({ mudarSecao }) {
     setResultadoConsulta(null)
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(
-        `${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(limpo)}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const resp = await fetch(
+        `${API_URL}/casos/buscar-processo-local?numero=${encodeURIComponent(inputTrimmed)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
       )
-
-      let data = {}
-      const isJson = (response.headers.get('content-type') || '').includes('application/json')
-      if (isJson) {
-        data = await response.json()
-      } else {
-        const text = await response.text()
-        data = { message: text || `Erro HTTP ${response.status}` }
+      const data = await resp.json()
+      if (!resp.ok) {
+        setResultadoConsulta({ erro: data?.message || 'Falha ao buscar.' })
+        return
       }
-
-      if (!response.ok) {
-        const detalhe =
-          data?.detalhes?.erro || data?.detalhes?.detalhes_servico_cnj || data?.detalhes || ''
-        let mensagem = data.message || 'Falha ao buscar processo.'
-        if (response.status === 503) {
-          mensagem = 'Servico CNJ/DataJud indisponivel no momento.'
-        }
-        if (detalhe && typeof detalhe === 'string') {
-          mensagem = `${mensagem} ${detalhe}`.trim()
-        }
-        setResultadoConsulta({ erro: mensagem })
-      } else {
-        setResultadoConsulta(data)
-      }
+      setResultadoConsulta({ ...data, fonte: 'local' })
     } catch {
-      setResultadoConsulta({ erro: 'Erro de conexão ao acessar o Tribunal/DataJud.' })
+      setResultadoConsulta({ erro: 'Erro de conexão.' })
+    } finally {
+      setBuscandoConsulta(false)
+    }
+  }
+
+  // Fallback: tenta DataJud quando local nao retornou nada.
+  const handleConsultarDataJud = async () => {
+    const limpo = consultaCnjInput.replace(/\D/g, '')
+    if (limpo.length !== 20) {
+      setResultadoConsulta((prev) => ({
+        ...prev,
+        erroDataJud: 'CNJ inválido. O DataJud exige 20 dígitos.',
+      }))
+      return
+    }
+    setBuscandoConsulta(true)
+    try {
+      const token = localStorage.getItem('token')
+      const resp = await fetch(
+        `${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(limpo)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      const data = await resp.json()
+      if (!resp.ok) {
+        setResultadoConsulta((prev) => ({
+          ...prev,
+          erroDataJud: data?.message || 'Não localizado no DataJud.',
+        }))
+        return
+      }
+      setResultadoConsulta({ ...data, fonte: 'datajud' })
+    } catch {
+      setResultadoConsulta((prev) => ({
+        ...prev,
+        erroDataJud: 'Erro de conexão com DataJud.',
+      }))
     } finally {
       setBuscandoConsulta(false)
     }
@@ -561,17 +578,18 @@ function Dashboard({ mudarSecao }) {
           <div className="card shadow-sm h-100 border-primary">
             <div className="card-header bg-primary text-white d-flex align-items-center">
               <MagnifyingGlassIcon style={{ width: '20px', height: '20px' }} className="me-2" />
-              <h2 className="h6 mb-0 text-white">Consulta Rápida Processual (DataJud)</h2>
+              <h2 className="h6 mb-0 text-white">Buscar processo</h2>
             </div>
             <div className="card-body">
               <p className="small text-muted mb-3">
-                Pesquise informações gratuitas ao vivo no tribunal sem salvar na sua base local.
+                Busca primeiro nos seus Casos e publicações DJEN. Se não achar, oferece consulta ao
+                DataJud do CNJ (cobertura limitada em 2ª instância).
               </p>
               <div className="input-group mb-3">
                 <input
                   type="text"
                   className="form-control form-control-sm"
-                  placeholder="Cole aqui o número do processo..."
+                  placeholder="Número do processo (com ou sem máscara)"
                   value={consultaCnjInput}
                   onChange={(e) => setConsultaCnjInput(formatCNJ(e.target.value))}
                   maxLength={25}
@@ -584,14 +602,119 @@ function Dashboard({ mudarSecao }) {
                   onClick={handleConsultaRapida}
                   disabled={buscandoConsulta}
                 >
-                  {buscandoConsulta ? 'Buscando...' : 'Consultar'}
+                  {buscandoConsulta ? 'Buscando...' : 'Buscar'}
                 </button>
               </div>
 
-              {resultadoConsulta && !resultadoConsulta.erro && (
+              {resultadoConsulta?.erro && (
+                <div className="alert alert-danger small py-2 mb-0">
+                  <strong>Erro:</strong> {resultadoConsulta.erro}
+                </div>
+              )}
+
+              {/* Resultado da busca local */}
+              {resultadoConsulta?.fonte === 'local' && (
+                <div
+                  className="border rounded p-2 bg-light"
+                  style={{ maxHeight: 320, overflowY: 'auto' }}
+                >
+                  {resultadoConsulta.total_local === 0 ? (
+                    <>
+                      <p className="small text-muted mb-2 mb-0">
+                        <i className="bi bi-info-circle me-1" />
+                        Nada encontrado nos seus Casos ou publicações DJEN para{' '}
+                        <strong>{resultadoConsulta.numero_consultado}</strong>.
+                      </p>
+                      <button
+                        className="btn btn-outline-primary btn-sm mt-2 w-100"
+                        onClick={handleConsultarDataJud}
+                        disabled={buscandoConsulta}
+                      >
+                        <i className="bi bi-globe me-1" />
+                        Tentar consultar DataJud (CNJ)
+                      </button>
+                      <p className="small text-muted mt-2 mb-0">
+                        Cobertura limitada em 2ª instância e Justiça Federal.
+                      </p>
+                      {resultadoConsulta.erroDataJud && (
+                        <div className="alert alert-warning small py-2 mt-2 mb-0">
+                          {resultadoConsulta.erroDataJud}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {resultadoConsulta.casos?.length > 0 && (
+                        <>
+                          <strong className="small d-block mb-2">
+                            <i className="bi bi-folder me-1 text-primary" />
+                            Casos ({resultadoConsulta.casos.length})
+                          </strong>
+                          {resultadoConsulta.casos.map((c) => (
+                            <button
+                              key={c.id}
+                              className="card border-0 shadow-sm w-100 text-start mb-2"
+                              onClick={() => navigate(`/casos/detalhe/${c.id}`)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <div className="card-body py-2 px-2">
+                                <div className="d-flex align-items-center gap-2 flex-wrap">
+                                  <span className="badge bg-primary">{c.status || '—'}</span>
+                                  <span className="small font-monospace">{c.numero_processo}</span>
+                                </div>
+                                <div className="small fw-semibold mt-1">{c.titulo}</div>
+                                <div className="small text-muted">
+                                  {c.cliente_nome} · {c.vara_juizo || '—'}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {resultadoConsulta.publicacoes?.length > 0 && (
+                        <>
+                          <strong className="small d-block mt-2 mb-2">
+                            <i className="bi bi-newspaper me-1 text-warning" />
+                            Publicações DJEN ({resultadoConsulta.publicacoes.length})
+                          </strong>
+                          {resultadoConsulta.publicacoes.slice(0, 5).map((p) => (
+                            <button
+                              key={p.id}
+                              className="card border-0 shadow-sm w-100 text-start mb-2"
+                              onClick={() => navigate(`/djen?publicacao=${p.id}`)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <div className="card-body py-2 px-2">
+                                <div className="d-flex align-items-center gap-2 flex-wrap">
+                                  <span className="badge bg-secondary">
+                                    {p.sigla_tribunal || '—'}
+                                  </span>
+                                  <span className="badge bg-light text-dark border">
+                                    {p.tipo_comunicacao || 'Comunicação'}
+                                  </span>
+                                  {!p.lida && <span className="badge bg-danger">Não lida</span>}
+                                </div>
+                                <div className="small font-monospace mt-1">
+                                  {p.numero_processo_mascara || p.numero_processo}
+                                </div>
+                                <div className="small text-muted">
+                                  {p.nome_orgao} · {p.data_disponibilizacao}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Resultado DataJud (fallback) */}
+              {resultadoConsulta?.fonte === 'datajud' && (
                 <div
                   className="border rounded p-3 bg-light"
-                  style={{ maxHeight: '300px', overflowY: 'auto' }}
+                  style={{ maxHeight: 300, overflowY: 'auto' }}
                 >
                   <div className="d-flex justify-content-between mb-2">
                     <span className="badge bg-secondary">{resultadoConsulta.instancia}</span>
@@ -607,14 +730,8 @@ function Dashboard({ mudarSecao }) {
                     className="small text-dark mb-0"
                     style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}
                   >
-                    {resultadoConsulta.resumo_andamentos || 'Sem andamentos disponíveis recente.'}
+                    {resultadoConsulta.resumo_andamentos || 'Sem andamentos recentes.'}
                   </pre>
-                </div>
-              )}
-
-              {resultadoConsulta && resultadoConsulta.erro && (
-                <div className="alert alert-danger small py-2 mb-0">
-                  <strong>Erro na busca:</strong> {resultadoConsulta.erro}
                 </div>
               )}
             </div>

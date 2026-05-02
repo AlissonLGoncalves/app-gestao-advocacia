@@ -159,6 +159,119 @@ def register_casos_routes(
                 "nome_arquivo_original": arquivo.filename,
             }, 200
 
+    @casos_ns.route("/buscar-processo-local")
+    class CasoBuscarProcessoLocalAPI(Resource):
+        @jwt_required()
+        @casos_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Busca um processo dentro do tenant (Caso cadastrado e/ou "
+                "Publicacoes DJEN) por numero_processo. Antes de cair no "
+                "DataJud (que tem cobertura limitada em 2a instancia/JF), "
+                "verifica se ja existe localmente."
+            ),
+        )
+        @casos_ns.param("numero", "Numero do processo (com ou sem mascara)")
+        def get(self):
+            from helpers import get_tenant_id
+            from models import Caso, PublicacaoDJEN
+
+            user_id = get_jwt_identity()
+            numero = (request.args.get("numero") or "").strip()
+            if not numero:
+                return {"message": "Informe o número do processo."}, 400
+
+            tenant_id = get_tenant_id()
+            digitos = "".join(filter(str.isdigit, numero))
+
+            # Casos: match exato (com mascara) OU match por digitos
+            casos_query = Caso.query.filter(Caso.tenant_id == tenant_id)
+            if digitos:
+                # Compara apenas digitos pra casar com/sem mascara
+                from sqlalchemy import func
+
+                casos = (
+                    casos_query.filter(
+                        func.regexp_replace(Caso.numero_processo, "[^0-9]", "", "g").contains(
+                            digitos
+                        )
+                    )
+                    .limit(20)
+                    .all()
+                )
+            else:
+                casos = (
+                    casos_query.filter(Caso.numero_processo.ilike(f"%{numero}%")).limit(20).all()
+                )
+
+            casos_out = [
+                {
+                    "id": c.id,
+                    "titulo": c.titulo,
+                    "numero_processo": c.numero_processo,
+                    "status": c.status,
+                    "tipo_acao": c.tipo_acao,
+                    "vara_juizo": c.vara_juizo,
+                    "cliente_id": c.cliente_id,
+                    "cliente_nome": (
+                        c.cliente.nome_razao_social if getattr(c, "cliente", None) else None
+                    ),
+                }
+                for c in casos
+            ]
+
+            # Publicacoes DJEN: match por digitos
+            pubs_query = PublicacaoDJEN.query.filter(
+                PublicacaoDJEN.tenant_id == tenant_id, PublicacaoDJEN.ativo.is_(True)
+            )
+            if digitos:
+                from sqlalchemy import func
+
+                pubs = (
+                    pubs_query.filter(
+                        func.regexp_replace(
+                            PublicacaoDJEN.numero_processo, "[^0-9]", "", "g"
+                        ).contains(digitos)
+                    )
+                    .order_by(PublicacaoDJEN.data_disponibilizacao.desc())
+                    .limit(10)
+                    .all()
+                )
+            else:
+                pubs = []
+
+            pubs_out = [
+                {
+                    "id": p.id,
+                    "numero_processo": p.numero_processo,
+                    "numero_processo_mascara": p.numero_processo_mascara,
+                    "sigla_tribunal": p.sigla_tribunal,
+                    "nome_orgao": p.nome_orgao,
+                    "tipo_comunicacao": p.tipo_comunicacao,
+                    "data_disponibilizacao": (
+                        p.data_disponibilizacao.isoformat() if p.data_disponibilizacao else None
+                    ),
+                    "caso_id": p.caso_id,
+                    "lida": p.lida,
+                }
+                for p in pubs
+            ]
+
+            app.logger.info(
+                "buscar_processo_local user=%s numero=%s casos=%d pubs=%d",
+                user_id,
+                numero,
+                len(casos_out),
+                len(pubs_out),
+            )
+
+            return {
+                "numero_consultado": numero,
+                "casos": casos_out,
+                "publicacoes": pubs_out,
+                "total_local": len(casos_out) + len(pubs_out),
+            }, 200
+
     @casos_ns.route("/consulta-publica-cnj")
     class CasoConsultaPublicaCNJAPI(Resource):
         @jwt_required()
@@ -203,8 +316,27 @@ def register_casos_routes(
 
             hits = dados_resposta_cnj.get("hits", {}).get("hits", [])
             if not hits:
+                # Detecta 2a instancia (segmento 4 do CNJ NNNNNNN-DD.AAAA.J.TR.OOOO)
+                # Codigos de orgao terminados em 0000 ou >= 9000 sao tipicamente
+                # Camaras/Turmas (2a inst). DataJud tem cobertura limitada nesses.
+                seg_orgao = numero_limpo[-4:] if len(numero_limpo) == 20 else ""
+                eh_2a_instancia = seg_orgao == "0000" or (
+                    seg_orgao.isdigit() and int(seg_orgao) >= 9000
+                )
+                msg_extra = ""
+                if eh_2a_instancia:
+                    msg_extra = (
+                        " Este número parece ser de 2ª instância (Câmara/Turma) — "
+                        "a base do DataJud/CNJ tem cobertura limitada nesses casos. "
+                        "O processo pode existir; verifique no portal do tribunal "
+                        "ou cadastre manualmente."
+                    )
                 return {
-                    "message": "Nenhum caso encontrado no sistema do Tribunal/CNJ com este número."
+                    "message": (
+                        "Nenhum caso encontrado no sistema do Tribunal/CNJ com este número."
+                        + msg_extra
+                    ),
+                    "eh_2a_instancia": eh_2a_instancia,
                 }, 404
 
             dados_processo = hits[0].get("_source", {})
