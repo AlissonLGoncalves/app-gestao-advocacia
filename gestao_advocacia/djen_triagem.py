@@ -755,11 +755,126 @@ def _eh_pj(nome):
     return any(m in up for m in _MARCADORES_PJ)
 
 
-def _segmentar_lista_de_nomes(texto):
+def _refinar_split_com_ia(texto):
+    """Micro-chamada Gemini focada: recebe uma string com varios nomes
+    iaglomerados e retorna lista de partes corretamente separadas.
+
+    Usado quando o regex deteta string suspeita (PJ marker no meio +
+    texto antes >5 tokens). Custo: ~\\$0.0003 por chamada (poucos tokens).
+
+    Retorna lista de strings ou None se IA indisponivel/falhou.
+    """
+    try:
+        from gemini_service import get_gemini_client, is_enabled  # noqa: PLC0415
+    except Exception:
+        return None
+
+    if not is_enabled():
+        return None
+    client = get_gemini_client()
+    if client is None:
+        return None
+
+    texto = (texto or "").strip()
+    if not texto or len(texto) < 20:
+        return None
+
+    prompt = f"""Voce eh um analista juridico. A string abaixo contem MULTIPLOS NOMES
+DE PARTES processuais COLADOS sem separadores claros (problema comum de OCR/extracao).
+
+Sua tarefa: identificar e separar cada parte. Retorne APENAS JSON valido no formato:
+{{"partes": ["Nome 1", "Nome 2", "Nome 3"]}}
+
+REGRAS:
+1. Cada parte vira UM item da lista. Pode ser pessoa fisica (3-6 palavras) ou
+   pessoa juridica (termina em LTDA/ME/EIRELI/EPP/S.A./Ltda/Cooperativa/Banco/etc).
+2. NAO inclua palavras como "Vistos", "Decido", "Sentenca", "Ementa" — sao inicio
+   da decisao, nao nome de parte.
+3. NAO invente nomes. Use SOMENTE o que esta na string.
+4. Se a string for so 1 nome, retorne lista com 1 item.
+5. Se nao for possivel separar com confianca, retorne lista vazia.
+
+EXEMPLOS:
+ENTRADA: "Anselmo Luiz Stroparo Drenaplan Terraplenagem Ltda. ME Siliomar Silas Cavaline"
+SAIDA: {{"partes": ["Anselmo Luiz Stroparo", "Drenaplan Terraplenagem Ltda. ME", "Siliomar Silas Cavaline"]}}
+
+ENTRADA: "Maria da Silva"
+SAIDA: {{"partes": ["Maria da Silva"]}}
+
+STRING A SEPARAR:
+{texto}
+"""
+
+    try:
+        from flask import current_app  # noqa: PLC0415
+
+        model = current_app.config.get("GEMINI_TRIAGEM_MODEL", "gemini-2.5-flash")
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config={"response_mime_type": "application/json"},
+        )
+    except Exception:
+        return None
+
+    raw = (getattr(response, "text", None) or "").strip()
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    if raw.endswith("```"):
+        raw = raw[:-3].strip()
+
+    try:
+        import json  # noqa: PLC0415
+
+        parsed = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    partes = parsed.get("partes") or []
+    if not isinstance(partes, list):
+        return None
+    out = []
+    for p in partes:
+        s = str(p).strip()
+        if 3 <= len(s) <= 200:
+            out.append(s)
+    return out or None
+
+
+def _string_suspeita_de_iaglomeracao(texto):
+    """Heuristica: detecta se uma string tem provavel iaglomeracao de nomes.
+
+    Sinais:
+    - Contem marker PJ (LTDA/ME/EIRELI/etc) E texto antes >= 4 tokens
+    - Tem >40 chars E tem 2+ palavras CapsLock seguidas que poderiam ser
+      inicio de novo nome
+    """
+    if not texto or len(texto) < 30:
+        return False
+    pj_markers = ("LTDA", " ME ", " ME.", "EIRELI", "EPP", "S/A", "S.A.")
+    up = texto.upper()
+    for m in pj_markers:
+        idx = up.find(m)
+        if idx > 0:
+            # Tem marker PJ. Conta palavras ANTES dele.
+            tokens_antes = texto[:idx].strip().split()
+            if len(tokens_antes) >= 4:
+                return True
+    return False
+
+
+def _segmentar_lista_de_nomes(texto, usar_ia=True):
     """Tenta separar uma string com varios nomes colados em entries individuais.
 
-    Estrategia: cada nome 'cabe' em ~2-7 tokens. Procura por sequencias de tokens
-    em capslock/title-case separados por marcadores comuns (LTDA, ME, etc.).
+    Estrategia em 2 camadas:
+    1. Heuristica regex (PJ markers, sufixos, capitalizacao) — gratuita
+    2. Quando string eh "suspeita" (PJ marker no meio + texto antes longo),
+       chama Gemini pra refinar. Caso falhe, usa fallback do regex.
+
     Retorna lista de strings.
     """
     # Remove tudo a partir de "Vistos" / "Decido" / etc.
@@ -769,6 +884,13 @@ def _segmentar_lista_de_nomes(texto):
 
     if not texto:
         return []
+
+    # Camada 1.5: micro-IA pra strings suspeitas (resolve casos onde a heuristica
+    # de regex separa errado, ex.: "Anselmo Luiz Stroparo Drenaplan ... LTDA").
+    if usar_ia and _string_suspeita_de_iaglomeracao(texto):
+        partes_ia = _refinar_split_com_ia(texto)
+        if partes_ia and len(partes_ia) >= 2:
+            return partes_ia
 
     # Normaliza espaços e splits comuns
     texto = re.sub(r"[ \t]+", " ", texto).strip(" ;:,.-")
