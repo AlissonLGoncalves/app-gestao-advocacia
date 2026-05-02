@@ -37,7 +37,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.14.2",
     "react-toastify": "^11.1.0",
-    "recharts": "2.15.4",
+    "recharts": "3.8.1",
     "web-vitals": "^5.2.0"
   },
   "devDependencies": {
@@ -49,13 +49,13 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.5",
-    "eslint": "^10.2.1",
+    "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.5.0",
-    "jsdom": "^29.0.2",
-    "prettier": "^3.3.3",
-    "vite": "^8.0.9",
+    "globals": "^17.6.0",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.8.3",
+    "vite": "^8.0.10",
     "vitest": "^4.1.4"
   }
 }
