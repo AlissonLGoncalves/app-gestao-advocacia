@@ -275,6 +275,84 @@ def analisar_publicacao(publicacao):
     }
 
 
+def construir_indices_auto_vinculo(Cliente, Caso, tenant_id):
+    """Pre-carrega clientes + casos ativos do tenant em estruturas otimizadas
+    para chamadas em massa de auto-vinculo. Use esta funcao UMA VEZ antes de
+    iterar muitas publicacoes — evita N+1 queries.
+
+    Retorna dict com:
+    - cpf_to_caso_id: {cpf_digitos: caso_id}
+    - nome_norm_to_caso_id: {nome_normalizado: caso_id}
+    """
+    status_inativos = ("Concluido", "Concluído", "Arquivado", "Encerrado")
+
+    # 1 query: todos os casos ativos do tenant (com cliente eager)
+    casos_ativos = (
+        Caso.query.filter(
+            Caso.tenant_id == tenant_id,
+            ~Caso.status.in_(status_inativos),
+        )
+        .order_by(Caso.id.desc())
+        .all()
+    )
+
+    # Mapa cliente_id -> caso_id (mais recente)
+    cliente_to_caso = {}
+    for caso in casos_ativos:
+        if caso.cliente_id and caso.cliente_id not in cliente_to_caso:
+            cliente_to_caso[caso.cliente_id] = caso.id
+
+    # 1 query: todos os clientes do tenant
+    clientes = Cliente.query.filter(Cliente.tenant_id == tenant_id).all()
+
+    cpf_to_caso_id = {}
+    nome_norm_to_caso_id = {}
+    for cliente in clientes:
+        caso_id = cliente_to_caso.get(cliente.id)
+        if not caso_id:
+            continue  # cliente sem caso ativo nao serve pra auto-vinculo
+        if cliente.cpf_cnpj:
+            cpf_dig = re.sub(r"\D", "", cliente.cpf_cnpj)
+            if cpf_dig:
+                cpf_to_caso_id[cpf_dig] = caso_id
+        if cliente.nome_razao_social:
+            nome_norm = normalizar_nome(cliente.nome_razao_social)
+            if nome_norm:
+                nome_norm_to_caso_id[nome_norm] = caso_id
+
+    return {
+        "cpf_to_caso_id": cpf_to_caso_id,
+        "nome_norm_to_caso_id": nome_norm_to_caso_id,
+    }
+
+
+def tentar_auto_vincular_via_indices(analise, indices):
+    """Versao otimizada de tentar_auto_vincular_a_caso que recebe indices
+    pre-calculados (via construir_indices_auto_vinculo). Sem queries.
+
+    Retorna caso_id ou None.
+    """
+    cpf_to_caso = indices.get("cpf_to_caso_id") or {}
+    nome_to_caso = indices.get("nome_norm_to_caso_id") or {}
+
+    # 1) CPF/CNPJ exato
+    documentos = [re.sub(r"\D", "", d) for d in (analise.get("documentos_extraidos") or []) if d]
+    for doc in documentos:
+        if doc and doc in cpf_to_caso:
+            return cpf_to_caso[doc]
+
+    # 2) Nome exato (normalizado)
+    nomes = (analise.get("partes_autoras") or []) + (analise.get("partes_reus") or [])
+    for nome in nomes:
+        if not nome or len(nome) < 4:
+            continue
+        nome_norm = normalizar_nome(nome)
+        if nome_norm and nome_norm in nome_to_caso:
+            return nome_to_caso[nome_norm]
+
+    return None
+
+
 def tentar_auto_vincular_a_caso(db, Cliente, Caso, tenant_id, analise):
     """Tenta encontrar um Caso ativo do tenant para vincular automaticamente.
 
