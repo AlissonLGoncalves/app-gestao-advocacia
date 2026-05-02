@@ -23,7 +23,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 
-import { getAnaliseIA, listGruposPendentes, vincularEmLote } from '../api/djen.js'
+import {
+  getAnaliseIA,
+  listCasosCompativeis,
+  listGruposPendentes,
+  vincularEmLote,
+} from '../api/djen.js'
 
 const STEP_LIST = 0
 const STEP_CONFIRM_EXISTING = 1
@@ -85,6 +90,9 @@ function TriagemAssistidaPage() {
   })
   const [salvando, setSalvando] = useState(false)
   const [tratadas, setTratadas] = useState(0)
+  // Casos compativeis pra reuso (em vez de criar novo)
+  const [casosCompativeis, setCasosCompativeis] = useState([])
+  const [casoEscolhidoId, setCasoEscolhidoId] = useState(null) // null = criar novo
 
   const carregarGrupos = useCallback(async () => {
     setLoadingLista(true)
@@ -188,6 +196,35 @@ function TriagemAssistidaPage() {
     setStep(STEP_CLIENT_FORM)
   }
 
+  // Busca casos compativeis ao entrar no step CASE_FORM (ou CONFIRM_EXISTING)
+  // pra oferecer reuso em vez de criar duplicata.
+  const carregarCasosCompativeis = useCallback(async ({ numero_processo, cliente_id }) => {
+    try {
+      const data = await listCasosCompativeis({ numero_processo, cliente_id })
+      setCasosCompativeis(data.casos || [])
+    } catch {
+      setCasosCompativeis([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (step !== STEP_CASE_FORM && step !== STEP_CONFIRM_EXISTING) {
+      setCasosCompativeis([])
+      setCasoEscolhidoId(null)
+      return
+    }
+    const numero = casoForm.numero_processo
+    const clienteId = grupoAtual?.cliente_existente_id || null
+    if (!numero && !clienteId) {
+      setCasosCompativeis([])
+      return
+    }
+    carregarCasosCompativeis({
+      numero_processo: numero,
+      cliente_id: clienteId,
+    })
+  }, [step, casoForm.numero_processo, grupoAtual, carregarCasosCompativeis])
+
   const salvarLote = async ({ usarClienteExistente }) => {
     if (!grupoAtual) return
     setSalvando(true)
@@ -195,7 +232,13 @@ function TriagemAssistidaPage() {
       const payload = {
         pub_ids: grupoAtual.pub_ids,
         papel_cliente: parteEscolhida?.papel || 'autor',
-        caso_payload: {
+      }
+      // Se usuario escolheu reusar caso existente, manda caso_id (backend pula
+      // a criacao). Caso contrario, manda caso_payload pra criar novo.
+      if (casoEscolhidoId) {
+        payload.caso_id = casoEscolhidoId
+      } else {
+        payload.caso_payload = {
           titulo: casoForm.titulo,
           numero_processo: casoForm.numero_processo || null,
           tipo_acao: casoForm.tipo_acao || null,
@@ -204,7 +247,7 @@ function TriagemAssistidaPage() {
           valor_causa: casoForm.valor_causa || null,
           parte_contraria: casoForm.parte_contraria || null,
           notas_caso: casoForm.notas_caso || null,
-        },
+        }
       }
       if (usarClienteExistente && grupoAtual.cliente_existente_id) {
         payload.cliente_id = grupoAtual.cliente_existente_id
@@ -659,11 +702,108 @@ function TriagemAssistidaPage() {
           <div className="card-header bg-white">
             <strong>Revisar dados do caso</strong>
             <p className="text-muted small mb-0 mt-1">
-              Vamos criar 1 caso e vincular as {grupoAtual?.count} publicação(ões) do grupo.
+              {casoEscolhidoId
+                ? `Vincular as ${grupoAtual?.count} publicação(ões) ao caso existente abaixo.`
+                : `Vamos criar 1 caso e vincular as ${grupoAtual?.count} publicação(ões) do grupo.`}
             </p>
           </div>
           <div className="card-body">
-            <div className="row g-3">
+            {/* Casos compativeis (reuso) */}
+            {casosCompativeis.length > 0 && (
+              <div className="alert alert-info border mb-3">
+                <strong className="d-block mb-2">
+                  <i className="bi bi-folder-check me-1" />
+                  {casosCompativeis.length} caso(s) compatível(eis) já existe(m)
+                </strong>
+                <p className="small text-muted mb-2">
+                  Selecione um pra vincular as publicações sem criar novo, ou mantenha "Criar caso
+                  novo" abaixo.
+                </p>
+                <div className="d-grid gap-2">
+                  {casosCompativeis.map((c) => (
+                    <label
+                      key={c.id}
+                      className="card border-0 shadow-sm p-2"
+                      style={{
+                        cursor: 'pointer',
+                        background: casoEscolhidoId === c.id ? '#e3f2fd' : '#fff',
+                        border:
+                          casoEscolhidoId === c.id
+                            ? '2px solid var(--primary)'
+                            : '1px solid #e0e0e0',
+                      }}
+                    >
+                      <div className="d-flex align-items-start gap-2">
+                        <input
+                          type="radio"
+                          name="caso_compativel"
+                          checked={casoEscolhidoId === c.id}
+                          onChange={() => setCasoEscolhidoId(c.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-grow-1">
+                          <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+                            <span className="badge bg-success">{c.motivo}</span>
+                            <span className="badge bg-light text-dark border">
+                              {c.status || '—'}
+                            </span>
+                            {c.numero_processo && (
+                              <span className="small font-monospace text-muted">
+                                {c.numero_processo}
+                              </span>
+                            )}
+                          </div>
+                          <div className="fw-semibold small">{c.titulo}</div>
+                          {(c.cliente_nome || c.vara_juizo) && (
+                            <div className="small text-muted">
+                              {c.cliente_nome && <>👤 {c.cliente_nome}</>}
+                              {c.cliente_nome && c.vara_juizo && ' · '}
+                              {c.vara_juizo && <>⚖ {c.vara_juizo}</>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                  <label
+                    className="card border-0 shadow-sm p-2"
+                    style={{
+                      cursor: 'pointer',
+                      background: !casoEscolhidoId ? '#fff3e0' : '#fff',
+                      border: !casoEscolhidoId
+                        ? '2px solid var(--warning, #ff9800)'
+                        : '1px solid #e0e0e0',
+                    }}
+                  >
+                    <div className="d-flex align-items-center gap-2">
+                      <input
+                        type="radio"
+                        name="caso_compativel"
+                        checked={!casoEscolhidoId}
+                        onChange={() => setCasoEscolhidoId(null)}
+                      />
+                      <div>
+                        <span className="fw-semibold">
+                          <i className="bi bi-plus-circle me-1" />
+                          Criar caso novo
+                        </span>
+                        <div className="small text-muted">
+                          Use o formulário abaixo. Será criado um novo Caso com esses dados.
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div
+              className="row g-3"
+              style={{
+                opacity: casoEscolhidoId ? 0.4 : 1,
+                pointerEvents: casoEscolhidoId ? 'none' : 'auto',
+              }}
+            >
               <div className="col-md-12">
                 <label className="form-label small fw-semibold">
                   Título do caso <span className="text-danger">*</span>
@@ -739,7 +879,7 @@ function TriagemAssistidaPage() {
             </button>
             <button
               className="btn btn-success"
-              disabled={salvando || !casoForm.titulo.trim()}
+              disabled={salvando || (!casoEscolhidoId && !casoForm.titulo.trim())}
               onClick={() => salvarLote({ usarClienteExistente: false })}
             >
               {salvando ? (
@@ -750,7 +890,9 @@ function TriagemAssistidaPage() {
               ) : (
                 <>
                   <i className="bi bi-check-circle me-1" />
-                  Criar e vincular {grupoAtual?.count} publicação(ões)
+                  {casoEscolhidoId
+                    ? `Vincular ${grupoAtual?.count} publicação(ões) ao caso existente`
+                    : `Criar e vincular ${grupoAtual?.count} publicação(ões)`}
                 </>
               )}
             </button>

@@ -52,6 +52,14 @@ export const getAnaliseIA = (pubId) => api.get(`/djen/triagem/${pubId}/analise-i
 
 export const listGruposPendentes = () => api.get('/djen/triagem/grupos')
 
+export const listCasosCompativeis = ({ numero_processo, cliente_id } = {}) => {
+  const params = new URLSearchParams()
+  if (numero_processo) params.set('numero_processo', numero_processo)
+  if (cliente_id) params.set('cliente_id', String(cliente_id))
+  const qs = params.toString()
+  return api.get(`/djen/triagem/casos-compativeis${qs ? `?${qs}` : ''}`)
+}
+
 export const vincularEmLote = (payload) => api.post('/djen/triagem/vincular-em-lote', payload)
 
 // B1 (2026-05-01): /djen/sync agora retorna 202 + job_id (async).
