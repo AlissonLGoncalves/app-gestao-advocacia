@@ -18,13 +18,6 @@ ALLOWED_MIME = {
     "image/jpeg",
     "image/png",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    # Markdown e texto puro: usado pelo fluxo de "texto extraido" (PR #129)
-    # quando o auto-preenchimento magico le um PDF e persiste o conteudo
-    # como .md leve (~50 KB) vinculado ao Caso. Seguro: texto puro sem
-    # script/macro.
-    "text/markdown",
-    "text/plain",
-    "text/x-markdown",
 }
 
 

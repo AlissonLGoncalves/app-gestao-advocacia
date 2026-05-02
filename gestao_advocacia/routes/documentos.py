@@ -50,6 +50,75 @@ def register_documentos_routes(app, documentos_ns, documento_model_dto):
             documentos = query.order_by(Documento.data_upload.desc()).all()
             return documentos
 
+    @documentos_ns.route("/upload-texto-extraido")
+    class DocumentoUploadTextoExtraidoAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @documentos_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Upload dedicado para texto extraido de PDFs (markdown gerado "
+                "internamente pelo fluxo de auto-preenchimento). Pula a "
+                "validacao mime generica porque o conteudo eh texto puro "
+                "gerado pelo sistema, nao upload arbitrario do usuario."
+            ),
+        )
+        def post(self):
+            user_id = get_jwt_identity()
+            if "file" not in request.files:
+                return {"message": "Campo 'file' ausente."}, 400
+            file_storage = request.files["file"]
+            if not file_storage.filename:
+                return {"message": "Nome do arquivo vazio."}, 400
+            # Restringe extensao a .md/.txt (defesa em profundidade)
+            nome_lower = file_storage.filename.lower()
+            if not (nome_lower.endswith(".md") or nome_lower.endswith(".txt")):
+                return {"message": "Apenas arquivos .md ou .txt sao aceitos aqui."}, 400
+            # Tamanho maximo 1 MB (texto extraido eh leve)
+            file_storage.stream.seek(0, 2)
+            size = file_storage.stream.tell()
+            file_storage.stream.seek(0)
+            if size > 1024 * 1024:
+                return {"message": "Arquivo muito grande (limite 1 MB)."}, 400
+
+            original_filename = secure_filename(file_storage.filename)
+            user_upload_folder_path = os.path.join(app.config["UPLOAD_FOLDER"], str(user_id))
+            os.makedirs(user_upload_folder_path, exist_ok=True)
+            file_base, file_ext = os.path.splitext(original_filename)
+            counter = 1
+            final_filename = original_filename
+            full_path = os.path.join(user_upload_folder_path, final_filename)
+            while os.path.exists(full_path):
+                final_filename = f"{file_base}_{counter}{file_ext}"
+                full_path = os.path.join(user_upload_folder_path, final_filename)
+                counter += 1
+            file_storage.save(full_path)
+
+            caso_id_form = request.form.get("caso_id")
+            db_caso_id = None
+            if caso_id_form:
+                try:
+                    db_caso_id = int(caso_id_form)
+                    if not query_for_tenant(Caso).filter_by(id=db_caso_id).first():
+                        os.remove(full_path)
+                        return {
+                            "message": f"Caso ID {db_caso_id} nao encontrado neste tenant."
+                        }, 400
+                except ValueError:
+                    os.remove(full_path)
+                    return {"message": "caso_id invalido."}, 400
+
+            doc = Documento(
+                nome_arquivo=final_filename,
+                path_arquivo=full_path,
+                user_id=user_id,
+                caso_id=db_caso_id,
+                tenant_id=get_tenant_id(),
+            )
+            db.session.add(doc)
+            db.session.commit()
+            return doc.to_dict(), 201
+
     @documentos_ns.route("/upload")
     class DocumentoUploadAPI(Resource):
         @jwt_required()

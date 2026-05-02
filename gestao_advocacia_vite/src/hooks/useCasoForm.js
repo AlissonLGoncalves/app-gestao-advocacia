@@ -142,10 +142,11 @@ function useCasoForm({
         const fd = new FormData()
         fd.append('file', blob, filename)
         fd.append('caso_id', String(casoId))
-        // Endpoint correto eh /documentos/upload (POST). /documentos/ raiz so
-        // aceita GET (listagem). Bug latente do PR #129 — silenciava porque
-        // a falha so virava console.warn (nao bloqueante).
-        const resp = await fetch(`${API_URL}/documentos/upload`, {
+        // Endpoint dedicado pra texto extraido (.md). O /upload generico
+        // rejeita text/markdown via validar_upload (so PDF/imagem/DOCX).
+        // Este endpoint dedicado pula a validacao mime porque o conteudo
+        // eh gerado internamente (nao upload arbitrario).
+        const resp = await fetch(`${API_URL}/documentos/upload-texto-extraido`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: fd,
