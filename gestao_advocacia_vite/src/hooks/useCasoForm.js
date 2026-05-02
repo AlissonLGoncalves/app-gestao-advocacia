@@ -142,7 +142,10 @@ function useCasoForm({
         const fd = new FormData()
         fd.append('file', blob, filename)
         fd.append('caso_id', String(casoId))
-        const resp = await fetch(`${API_URL}/documentos/`, {
+        // Endpoint correto eh /documentos/upload (POST). /documentos/ raiz so
+        // aceita GET (listagem). Bug latente do PR #129 — silenciava porque
+        // a falha so virava console.warn (nao bloqueante).
+        const resp = await fetch(`${API_URL}/documentos/upload`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: fd,
