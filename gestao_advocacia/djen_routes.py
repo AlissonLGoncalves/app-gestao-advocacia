@@ -799,10 +799,12 @@ def registrar_rotas_djen(
         @jwt_required()
         def post(self):
             user_id = get_jwt_identity()
-            import re as _re
-
             from app import Cliente, User
-            from djen_triagem import analisar_publicacao, normalizar_nome
+            from djen_triagem import (
+                analisar_publicacao,
+                construir_indices_auto_vinculo,
+                tentar_auto_vincular_via_indices,
+            )
 
             user = User.query.get(int(user_id))
             if not user:
@@ -811,6 +813,12 @@ def registrar_rotas_djen(
                 djen_ns.abort(403, "Módulo DJEN desabilitado para este tenant no rollout atual.")
 
             tenant_id = user.tenant_id
+
+            # OTIMIZACAO: pre-carrega clientes + casos UMA VEZ (2 queries) e
+            # monta indices em memoria. Para 200 pendentes, reduz de ~600
+            # queries pra 3 (clientes, casos, pubs).
+            indices = construir_indices_auto_vinculo(Cliente, Caso, tenant_id)
+
             pendentes = PublicacaoDJEN.query.filter(
                 PublicacaoDJEN.tenant_id == tenant_id,
                 PublicacaoDJEN.caso_id.is_(None),
@@ -821,62 +829,10 @@ def registrar_rotas_djen(
             vinculadas = 0
             ainda_pendentes = 0
 
-            # OTIMIZACAO: pre-carrega TODOS os clientes e casos do tenant uma
-            # unica vez, monta indices em memoria. Antes: 2-N queries POR pub.
-            # Agora: 2 queries no total + lookup O(1) em memoria.
-            todos_clientes = Cliente.query.filter_by(tenant_id=tenant_id).all()
-            cliente_por_doc = {}
-            cliente_por_nome = {}
-            for c in todos_clientes:
-                if c.cpf_cnpj:
-                    d = _re.sub(r"\D", "", c.cpf_cnpj)
-                    if d:
-                        cliente_por_doc[d] = c
-                if c.nome_razao_social:
-                    cliente_por_nome[normalizar_nome(c.nome_razao_social)] = c
-
-            status_inativos = ("Concluido", "Concluído", "Arquivado", "Encerrado")
-            todos_casos_ativos = Caso.query.filter(
-                Caso.tenant_id == tenant_id,
-                ~Caso.status.in_(status_inativos),
-            ).all()
-            # Indice: cliente_id -> caso_ativo_mais_recente
-            caso_ativo_por_cliente = {}
-            for caso in sorted(todos_casos_ativos, key=lambda c: c.id):
-                caso_ativo_por_cliente[caso.cliente_id] = caso  # ultimo (id maior) sobrescreve
-
             for pub in pendentes:
                 try:
                     analise = analisar_publicacao(pub)
-                    documentos = [
-                        _re.sub(r"\D", "", d)
-                        for d in (analise.get("documentos_extraidos") or [])
-                        if d
-                    ]
-                    nomes = (analise.get("partes_autoras") or []) + (
-                        analise.get("partes_reus") or []
-                    )
-
-                    # Busca cliente em memoria
-                    cliente_match = None
-                    for d in documentos:
-                        if d and d in cliente_por_doc:
-                            cliente_match = cliente_por_doc[d]
-                            break
-                    if not cliente_match:
-                        for nome in nomes:
-                            if nome and len(nome) >= 4:
-                                ck = normalizar_nome(nome)
-                                if ck and ck in cliente_por_nome:
-                                    cliente_match = cliente_por_nome[ck]
-                                    break
-
-                    caso_id_auto = None
-                    if cliente_match:
-                        caso = caso_ativo_por_cliente.get(cliente_match.id)
-                        if caso:
-                            caso_id_auto = caso.id
-
+                    caso_id_auto = tentar_auto_vincular_via_indices(analise, indices)
                     if caso_id_auto:
                         pub.caso_id = caso_id_auto
                         pub.status_origem = "criado_automaticamente"
