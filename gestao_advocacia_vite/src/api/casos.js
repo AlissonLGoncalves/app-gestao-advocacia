@@ -29,3 +29,6 @@ export const atualizarCasoViaDjen = (id) => api.post(`/casos/${id}/atualizar-dje
 export const gerarResumoCaso = (id) => api.post(`/casos/${id}/gerar-resumo`, {})
 export const consultaPublicaCnj = (numero) =>
   api.get(`/casos/consulta-publica-cnj${toQuery({ numero })}`)
+
+export const buscarProcessoLocal = (numero) =>
+  api.get(`/casos/buscar-processo-local${toQuery({ numero })}`)
