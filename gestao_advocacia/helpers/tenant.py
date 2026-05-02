@@ -68,6 +68,53 @@ def tenant_session(tenant_id):
         yield
 
 
+def projudi_agent_required(fn):
+    """Decorator que valida o header Authorization: Bearer <token> contra
+    o hash sha256 armazenado em projudi_agent_token.
+
+    Em sucesso, popula g.user_id, g.tenant_id e g.projudi_token_id, alem
+    de atualizar last_used_at do token. Usado pelas rotas /api/projudi/*
+    chamadas pelo agent local (que nao tem JWT do usuario).
+    """
+    import hashlib as _hashlib
+    from datetime import datetime as _dt
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        from models import ProjudiAgentToken  # noqa: PLC0415
+
+        auth_header = (request.headers.get("Authorization") or "").strip()
+        if not auth_header.lower().startswith("bearer "):
+            abort(401, "Bearer token obrigatorio.")
+        token_raw = auth_header.split(" ", 1)[1].strip()
+        if not token_raw:
+            abort(401, "Token vazio.")
+
+        token_hash = _hashlib.sha256(token_raw.encode("utf-8")).hexdigest()
+        token = ProjudiAgentToken.query.filter_by(token_hash=token_hash).first()
+        if not token or not token.ativo or token.revoked_at is not None:
+            abort(401, "Token invalido ou revogado.")
+
+        g.user_id = token.user_id
+        g.tenant_id = token.tenant_id
+        g.projudi_token_id = token.id
+
+        # Atualiza last_used_at sem bloquear request (best effort)
+        try:
+            token.last_used_at = _dt.utcnow()
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        # Em Postgres, set_config pra RLS respeitar tenant
+        if db.engine.dialect.name != "sqlite":
+            set_current_tenant_id(token.tenant_id)
+
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
 def tenant_scoped(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):

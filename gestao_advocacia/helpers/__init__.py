@@ -11,6 +11,9 @@ from .tenant import (
     get_tenant_id as get_tenant_id,
 )
 from .tenant import (
+    projudi_agent_required as projudi_agent_required,
+)
+from .tenant import (
     query_for_tenant as query_for_tenant,
 )
 from .tenant import (
