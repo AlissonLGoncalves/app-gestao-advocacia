@@ -277,7 +277,7 @@ function CasoList({ onEditCaso, refreshKey }) {
     const headers = ['Título do Caso', 'Cliente', 'Nº Processo', 'Status', 'Criação', 'Atualização']
     const dados = casos.map((caso) => [
       caso.titulo || '-',
-      caso.cliente?.nome_razao_social || 'N/A',
+      caso.cliente_nome || caso.cliente?.nome_razao_social || 'N/A',
       caso.numero_processo || '-',
       caso.status || '-',
       caso.data_criacao ? new Date(caso.data_criacao).toLocaleDateString() : '-',
@@ -643,7 +643,9 @@ function CasoList({ onEditCaso, refreshKey }) {
                     {caso.titulo}
                   </span>
                 </td>
-                <td className="px-3 py-2">{caso.cliente?.nome_razao_social || 'N/A'}</td>
+                <td className="px-3 py-2">
+                  {caso.cliente_nome || caso.cliente?.nome_razao_social || 'N/A'}
+                </td>
                 <td className="px-3 py-2">
                   {caso.numero_processo ? (
                     <span
