@@ -902,6 +902,124 @@ def registrar_rotas_djen(
                 "ainda_pendentes": ainda_pendentes,
             }, 200
 
+    @djen_ns.route("/triagem/casos-compativeis")
+    class PublicacaoTriagemCasosCompativeisAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Lista Casos do tenant que sao candidatos a receber a publicacao "
+                "(em vez de criar caso novo). Match por CNJ exato/aproximado e/ou "
+                "por cliente_id."
+            ),
+            params={
+                "numero_processo": "CNJ extraido (com ou sem mascara)",
+                "cliente_id": "(opcional) ID do cliente escolhido — lista outros casos dele",
+            },
+        )
+        @jwt_required()
+        def get(self):
+            user_id = get_jwt_identity()
+            from app import User
+
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, "Módulo DJEN desabilitado para este tenant no rollout atual.")
+
+            tenant_id = user.tenant_id
+            numero_processo = (request.args.get("numero_processo") or "").strip()
+            cliente_id_raw = request.args.get("cliente_id")
+            cliente_id = None
+            if cliente_id_raw:
+                try:
+                    cliente_id = int(cliente_id_raw)
+                except (TypeError, ValueError):
+                    cliente_id = None
+
+            casos_dict = {}
+
+            # 1) Match por CNJ — exato (com mascara) e por digitos
+            if numero_processo:
+                exato = Caso.query.filter_by(
+                    tenant_id=tenant_id, numero_processo=numero_processo
+                ).all()
+                for c in exato:
+                    casos_dict[c.id] = {
+                        "id": c.id,
+                        "titulo": c.titulo,
+                        "numero_processo": c.numero_processo,
+                        "status": c.status,
+                        "vara_juizo": c.vara_juizo,
+                        "cliente_id": c.cliente_id,
+                        "cliente_nome": (
+                            c.cliente.nome_razao_social if getattr(c, "cliente", None) else None
+                        ),
+                        "motivo": "Mesmo numero CNJ",
+                        "score": 1.0,
+                    }
+                digitos = "".join(filter(str.isdigit, numero_processo))
+                if digitos:
+                    from sqlalchemy import func
+
+                    aprox = (
+                        Caso.query.filter(
+                            Caso.tenant_id == tenant_id,
+                            func.regexp_replace(Caso.numero_processo, "[^0-9]", "", "g").contains(
+                                digitos
+                            ),
+                        )
+                        .limit(20)
+                        .all()
+                    )
+                    for c in aprox:
+                        if c.id in casos_dict:
+                            continue
+                        casos_dict[c.id] = {
+                            "id": c.id,
+                            "titulo": c.titulo,
+                            "numero_processo": c.numero_processo,
+                            "status": c.status,
+                            "vara_juizo": c.vara_juizo,
+                            "cliente_id": c.cliente_id,
+                            "cliente_nome": (
+                                c.cliente.nome_razao_social if getattr(c, "cliente", None) else None
+                            ),
+                            "motivo": "CNJ aproximado",
+                            "score": 0.85,
+                        }
+
+            # 2) Match por cliente — outros casos do mesmo cliente
+            if cliente_id:
+                outros = (
+                    Caso.query.filter(Caso.tenant_id == tenant_id, Caso.cliente_id == cliente_id)
+                    .order_by(Caso.id.desc())
+                    .limit(20)
+                    .all()
+                )
+                for c in outros:
+                    if c.id in casos_dict:
+                        # Sobe o score se ja era CNJ exato + mesmo cliente
+                        casos_dict[c.id]["motivo"] += " + cliente correspondente"
+                        casos_dict[c.id]["score"] = max(casos_dict[c.id]["score"], 0.95)
+                        continue
+                    casos_dict[c.id] = {
+                        "id": c.id,
+                        "titulo": c.titulo,
+                        "numero_processo": c.numero_processo,
+                        "status": c.status,
+                        "vara_juizo": c.vara_juizo,
+                        "cliente_id": c.cliente_id,
+                        "cliente_nome": (
+                            c.cliente.nome_razao_social if getattr(c, "cliente", None) else None
+                        ),
+                        "motivo": "Outro caso do cliente",
+                        "score": 0.5,
+                    }
+
+            casos_out = sorted(casos_dict.values(), key=lambda x: -x["score"])[:10]
+            return {"casos": casos_out, "total": len(casos_out)}, 200
+
     @djen_ns.route("/triagem/grupos")
     class PublicacaoTriagemGruposAPI(Resource):
         @djen_ns.doc(
