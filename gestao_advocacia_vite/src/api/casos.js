@@ -32,3 +32,6 @@ export const consultaPublicaCnj = (numero) =>
 
 export const buscarProcessoLocal = (numero) =>
   api.get(`/casos/buscar-processo-local${toQuery({ numero })}`)
+
+export const extrairEventosDeDocumento = (documentoId) =>
+  api.post(`/casos/extrair-eventos-de-documento/${documentoId}`, {})
