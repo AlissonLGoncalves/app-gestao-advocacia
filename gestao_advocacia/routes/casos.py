@@ -109,6 +109,86 @@ def register_casos_routes(
                 "eventos": resultado["eventos"],
             }, 200
 
+    @casos_ns.route("/extrair-eventos-de-documento/<int:documento_id>")
+    class CasoExtrairEventosDeDocumentoAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @casos_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Extrai eventos juridicos de um Documento JA ANEXADO ao caso "
+                "(sem precisar fazer re-upload). Le o arquivo do storage e "
+                "passa para o extrator de eventos."
+            ),
+        )
+        def post(self, documento_id):
+            from werkzeug.datastructures import FileStorage
+
+            from eventos_extractor_service import extrair_eventos
+
+            tenant_id = get_tenant_id()
+            documento = Documento.query.filter_by(id=documento_id, tenant_id=tenant_id).first()
+            if not documento:
+                return {"message": "Documento não encontrado neste tenant."}, 404
+
+            # Le o arquivo do storage (caminho local em produção)
+            try:
+                from os.path import exists
+
+                if not documento.path_arquivo or not exists(documento.path_arquivo):
+                    return {
+                        "message": "Arquivo físico do documento não encontrado no storage."
+                    }, 404
+                with open(documento.path_arquivo, "rb") as fh:
+                    conteudo = fh.read()
+                from io import BytesIO
+
+                file_storage = FileStorage(
+                    stream=BytesIO(conteudo),
+                    filename=documento.nome_arquivo or f"documento-{documento_id}.pdf",
+                )
+            except Exception as exc:
+                app.logger.error("Erro lendo documento %s: %s", documento_id, exc)
+                return {"message": "Falha ao ler arquivo do documento."}, 500
+
+            # Contexto opcional via query params (se Caso vinculado)
+            contexto = {}
+            if documento.caso_id:
+                caso = Caso.query.filter_by(id=documento.caso_id, tenant_id=tenant_id).first()
+                if caso:
+                    contexto = {
+                        "data_distribuicao": (
+                            caso.data_distribuicao.isoformat() if caso.data_distribuicao else ""
+                        ),
+                        "tipo_acao": caso.tipo_acao or "",
+                        "vara_juizo": caso.vara_juizo or "",
+                    }
+
+            resultado = extrair_eventos(file_storage, contexto=contexto)
+            if not resultado.get("ok"):
+                code = resultado.get("code", "")
+                if code == "rate_limit":
+                    status = 429
+                elif code in ("ai_overloaded", "ai_disabled", "ai_unavailable"):
+                    status = 503
+                elif code in ("no_file", "parse_error"):
+                    status = 400
+                else:
+                    status = 502
+                return {
+                    "message": resultado.get("error", "Falha ao extrair eventos."),
+                    "code": code,
+                }, status
+
+            return {
+                "message": f"{len(resultado['eventos'])} evento(s) detectado(s).",
+                "eventos": resultado["eventos"],
+                "documento": {
+                    "id": documento.id,
+                    "nome_arquivo": documento.nome_arquivo,
+                },
+            }, 200
+
     @casos_ns.route("/leitura-peticao")
     class CasoLeituraPeticaoAPI(Resource):
         @jwt_required()
