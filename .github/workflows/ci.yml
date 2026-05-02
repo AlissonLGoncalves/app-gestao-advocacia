@@ -26,10 +26,10 @@ jobs:
         working-directory: gestao_advocacia
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
@@ -52,10 +52,10 @@ jobs:
         working-directory: gestao_advocacia
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
@@ -83,7 +83,7 @@ jobs:
         run: pytest tests --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=50
 
       - name: Upload backend coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-coverage
           path: gestao_advocacia/coverage.xml
@@ -117,10 +117,10 @@ jobs:
       DJEN_JOB_ENABLED: "false"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
@@ -149,10 +149,10 @@ jobs:
         working-directory: gestao_advocacia_vite
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
@@ -182,7 +182,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload frontend coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-coverage
           path: gestao_advocacia_vite/coverage
