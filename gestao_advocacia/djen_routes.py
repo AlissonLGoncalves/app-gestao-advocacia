@@ -306,31 +306,65 @@ def registrar_rotas_djen(
                 djen_ns.abort(400, "cliente_payload.tipo_pessoa deve ser PF ou PJ.")
 
             cpf_cnpj = (cliente_payload.get("cpf_cnpj") or "").strip()[:20] or None
-            if not cpf_cnpj:
-                documento_base = f"DJEN-{pub.id}"
-                documento = documento_base
-                contador = 1
-                while Cliente.query.filter_by(
+
+            # ANTI-DUPLICATA: busca cliente existente por CPF/CNPJ (digitos)
+            # ou por nome normalizado. Reusa em vez de duplicar.
+            from djen_triagem import normalizar_nome  # noqa: PLC0415
+
+            cliente_existente = None
+            if cpf_cnpj:
+                digitos_novo = re.sub(r"\D", "", cpf_cnpj)
+                if digitos_novo and not digitos_novo.startswith("DJEN"):
+                    cands = Cliente.query.filter(
+                        Cliente.tenant_id == user.tenant_id,
+                        Cliente.cpf_cnpj.isnot(None),
+                        Cliente.cpf_cnpj != "",
+                    ).all()
+                    for c in cands:
+                        d = re.sub(r"\D", "", c.cpf_cnpj or "")
+                        if d == digitos_novo:
+                            cliente_existente = c
+                            break
+            if not cliente_existente and nome_cliente:
+                nome_norm = normalizar_nome(nome_cliente)
+                if nome_norm:
+                    cands = Cliente.query.filter(
+                        Cliente.tenant_id == user.tenant_id,
+                    ).all()
+                    for c in cands:
+                        if normalizar_nome(c.nome_razao_social or "") == nome_norm:
+                            cliente_existente = c
+                            break
+
+            if cliente_existente:
+                cliente = cliente_existente
+                cliente_criado = False
+            else:
+                if not cpf_cnpj:
+                    documento_base = f"DJEN-{pub.id}"
+                    documento = documento_base
+                    contador = 1
+                    while Cliente.query.filter_by(
+                        tenant_id=user.tenant_id,
+                        user_id=user.id,
+                        cpf_cnpj=documento,
+                    ).first():
+                        contador += 1
+                        documento = f"{documento_base}-{contador}"[:20]
+                    cpf_cnpj = documento
+
+                cliente = Cliente(
                     tenant_id=user.tenant_id,
                     user_id=user.id,
-                    cpf_cnpj=documento,
-                ).first():
-                    contador += 1
-                    documento = f"{documento_base}-{contador}"[:20]
-                cpf_cnpj = documento
-
-            cliente = Cliente(
-                tenant_id=user.tenant_id,
-                user_id=user.id,
-                nome_razao_social=nome_cliente[:200],
-                tipo_pessoa=tipo_pessoa,
-                cpf_cnpj=cpf_cnpj,
-                email=(cliente_payload.get("email") or "").strip()[:120] or None,
-                notas_gerais="Criado manualmente pela triagem DJEN.",
-            )
-            db.session.add(cliente)
-            db.session.flush()
-            cliente_criado = True
+                    nome_razao_social=nome_cliente[:200],
+                    tipo_pessoa=tipo_pessoa,
+                    cpf_cnpj=cpf_cnpj,
+                    email=(cliente_payload.get("email") or "").strip()[:120] or None,
+                    notas_gerais="Criado manualmente pela triagem DJEN.",
+                )
+                db.session.add(cliente)
+                db.session.flush()
+                cliente_criado = True
 
         numero_processo = (
             caso_payload.get("numero_processo") or analise.get("numero_processo") or ""
@@ -1058,29 +1092,64 @@ def registrar_rotas_djen(
                 if tipo_pessoa not in {"PF", "PJ"}:
                     djen_ns.abort(400, "tipo_pessoa deve ser PF ou PJ.")
                 cpf_cnpj = (cliente_payload.get("cpf_cnpj") or "").strip()[:20] or None
-                if not cpf_cnpj:
-                    base = f"DJEN-LOTE-{pubs[0].id}"
-                    documento = base
-                    contador = 1
-                    while Cliente.query.filter_by(
-                        tenant_id=user.tenant_id, user_id=user.id, cpf_cnpj=documento
-                    ).first():
-                        contador += 1
-                        documento = f"{base}-{contador}"[:20]
-                    cpf_cnpj = documento
 
-                cliente = Cliente(
-                    tenant_id=user.tenant_id,
-                    user_id=user.id,
-                    nome_razao_social=nome_cliente[:200],
-                    tipo_pessoa=tipo_pessoa,
-                    cpf_cnpj=cpf_cnpj,
-                    email=(cliente_payload.get("email") or "").strip()[:120] or None,
-                    notas_gerais="Criado via triagem em lote (DJEN).",
-                )
-                db.session.add(cliente)
-                db.session.flush()
-                cliente_criado = True
+                # ANTI-DUPLICATA: antes de criar, busca cliente existente do
+                # tenant que bata por (a) CPF/CNPJ exato (digitos) ou
+                # (b) nome normalizado. Reusa o existente em vez de criar novo.
+                from djen_triagem import normalizar_nome  # noqa: PLC0415
+
+                cliente_existente = None
+                if cpf_cnpj:
+                    digitos_novo = re.sub(r"\D", "", cpf_cnpj)
+                    if digitos_novo and not digitos_novo.startswith("DJEN"):
+                        cands = Cliente.query.filter(
+                            Cliente.tenant_id == user.tenant_id,
+                            Cliente.cpf_cnpj.isnot(None),
+                            Cliente.cpf_cnpj != "",
+                        ).all()
+                        for c in cands:
+                            d = re.sub(r"\D", "", c.cpf_cnpj or "")
+                            if d == digitos_novo:
+                                cliente_existente = c
+                                break
+                if not cliente_existente and nome_cliente:
+                    nome_norm = normalizar_nome(nome_cliente)
+                    if nome_norm:
+                        cands = Cliente.query.filter(
+                            Cliente.tenant_id == user.tenant_id,
+                        ).all()
+                        for c in cands:
+                            if normalizar_nome(c.nome_razao_social or "") == nome_norm:
+                                cliente_existente = c
+                                break
+
+                if cliente_existente:
+                    cliente = cliente_existente
+                    cliente_criado = False
+                else:
+                    if not cpf_cnpj:
+                        base = f"DJEN-LOTE-{pubs[0].id}"
+                        documento = base
+                        contador = 1
+                        while Cliente.query.filter_by(
+                            tenant_id=user.tenant_id, user_id=user.id, cpf_cnpj=documento
+                        ).first():
+                            contador += 1
+                            documento = f"{base}-{contador}"[:20]
+                        cpf_cnpj = documento
+
+                    cliente = Cliente(
+                        tenant_id=user.tenant_id,
+                        user_id=user.id,
+                        nome_razao_social=nome_cliente[:200],
+                        tipo_pessoa=tipo_pessoa,
+                        cpf_cnpj=cpf_cnpj,
+                        email=(cliente_payload.get("email") or "").strip()[:120] or None,
+                        notas_gerais="Criado via triagem em lote (DJEN).",
+                    )
+                    db.session.add(cliente)
+                    db.session.flush()
+                    cliente_criado = True
             else:
                 djen_ns.abort(400, "Informe cliente_id ou cliente_payload.")
 
