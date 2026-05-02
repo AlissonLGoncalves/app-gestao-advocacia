@@ -15,6 +15,7 @@ from .eventos import register_eventos_routes
 from .financeiro_registry import register_financeiro_api
 from .portal import register_portal_routes
 from .procuracoes import register_procuracoes_routes
+from .projudi import register_projudi_routes
 from .relatorios import register_relatorios_routes
 from .tarefas import register_tarefas_routes
 from .tenant import register_tenant_routes
@@ -42,6 +43,7 @@ def register_api_routes(app, api, finance_access_required):
     tenant_ns = Namespace("tenant", description="Dados do Escritorio (Tenant)")
     relatorios_ns = Namespace("relatorios", description="Relatorios Gerenciais")
     portal_ns = Namespace("portal", description="Portal do Cliente (acesso simplificado)")
+    projudi_ns = Namespace("projudi", description="Integracao com projudi-agent (scraper local)")
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -56,6 +58,7 @@ def register_api_routes(app, api, finance_access_required):
     api.add_namespace(tenant_ns)
     api.add_namespace(relatorios_ns)
     api.add_namespace(portal_ns)
+    api.add_namespace(projudi_ns)
 
     user_model_dto = auth_ns.model(
         "UserRegistration",
@@ -455,3 +458,4 @@ def register_api_routes(app, api, finance_access_required):
     register_tenant_routes(tenant_ns)
     register_relatorios_routes(relatorios_ns, finance_access_required)
     register_portal_routes(portal_ns)
+    register_projudi_routes(app, projudi_ns)
