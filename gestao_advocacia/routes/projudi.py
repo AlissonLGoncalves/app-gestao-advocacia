@@ -213,6 +213,16 @@ def register_projudi_routes(app, projudi_ns):
         except ValueError:
             return None
 
+    def _parse_data_br(value):
+        """Parse data BR (DD/MM/YYYY) -> datetime.date | None."""
+        if not value:
+            return None
+        s = str(value).strip()[:10]
+        try:
+            return datetime.strptime(s, "%d/%m/%Y").date()
+        except ValueError:
+            return None
+
     def _trim(v, n):
         if v is None:
             return None
@@ -769,6 +779,133 @@ def register_projudi_routes(app, projudi_ns):
 
     # =====================================================================
     # FASE 6 — Status / observabilidade da integracao
+    # =====================================================================
+    # FASE 5 — Sync de intimacoes em aberto -> TarefaPrazo no Kanban
+    # =====================================================================
+
+    @projudi_ns.route("/intimacoes")
+    class ProjudiIntimacoes(Resource):
+        @projudi_ns.doc(
+            description=(
+                "Recebe lista de intimacoes em 'Aguardando Cumprimento' (ja-lidas, "
+                "prazo correndo) coletadas pelo projudi-agent e cria/atualiza "
+                "TarefaPrazo no Kanban. Idempotente por origem_id "
+                "'projudi_intim:<cnj>:<final_prazo>'. "
+                "NAO recebe 'Aguardando Ciencia' — agente nao captura essas."
+            ),
+        )
+        @projudi_agent_required
+        def post(self):
+            payload = request.get_json(silent=True) or {}
+            intimacoes = payload.get("intimacoes") or []
+            if not isinstance(intimacoes, list):
+                return {"message": "Campo 'intimacoes' deve ser uma lista."}, 400
+
+            tenant_id = g.tenant_id
+            user_id = g.user_id
+
+            criadas = 0
+            atualizadas = 0
+            sem_caso = []
+            erros = []
+
+            for it in intimacoes:
+                if not isinstance(it, dict):
+                    continue
+                cnj = (it.get("numero_cnj") or "").strip()
+                final_prazo_raw = (it.get("final_prazo") or "").strip()
+                if not cnj or not final_prazo_raw:
+                    erros.append({"erro": "numero_cnj/final_prazo obrigatorios", "raw": it})
+                    continue
+
+                # Parse data DD/MM/YYYY
+                data_venc = _parse_data_br(final_prazo_raw)
+                if not data_venc:
+                    erros.append({"cnj": cnj, "erro": f"final_prazo invalido: {final_prazo_raw!r}"})
+                    continue
+
+                # Acha Caso (cnj precisa existir — agente envia /processos antes)
+                caso = Caso.query.filter_by(
+                    tenant_id=tenant_id, numero_processo=cnj
+                ).first()
+                if not caso:
+                    sem_caso.append({
+                        "numero_cnj": cnj,
+                        "tipo_evento": it.get("tipo_evento"),
+                        "final_prazo": final_prazo_raw,
+                    })
+                    continue
+
+                # Identifica idempotencia: origem_id = 'projudi_intim:<cnj>:<final_prazo>'
+                # (mesma intimacao = mesmo final_prazo no mesmo processo)
+                origem_id = f"projudi_intim:{cnj}:{final_prazo_raw}"
+
+                # Calcula prioridade pela proximidade do vencimento
+                prioridade = prioridade_por_dias_ate_vencer(data_venc)
+
+                # Titulo legivel
+                tipo_evento = (it.get("tipo_evento") or "Intimação").strip()[:120]
+                titulo = f"Intimação: {tipo_evento} — {cnj}"[:250]
+
+                # Descricao detalhada
+                desc_parts = []
+                if it.get("descricao"):
+                    desc_parts.append(it["descricao"])
+                if it.get("prazo_dias") and it.get("prazo_unidade"):
+                    desc_parts.append(
+                        f"Prazo: {it['prazo_dias']} dias {it['prazo_unidade']}"
+                    )
+                if it.get("juizo"):
+                    desc_parts.append(f"Juízo: {it['juizo']}")
+                if it.get("parte_destino"):
+                    desc_parts.append(f"Parte: {it['parte_destino']}")
+                desc_parts.append(f"Origem: PROJUDI (Aguardando Cumprimento)")
+                descricao = "\n".join(desc_parts)[:4000]
+
+                # Idempotencia: origem_id ja existe?
+                existente = TarefaPrazo.query.filter_by(
+                    tenant_id=tenant_id, origem_id=origem_id
+                ).first()
+                if existente:
+                    # Atualiza prioridade (pode ter mudado conforme aproxima vencimento)
+                    # NAO sobrescreve titulo/descricao/status — usuario pode ter editado.
+                    if existente.prioridade != prioridade and (existente.status or "").lower() != "concluído":
+                        existente.prioridade = prioridade
+                    if not existente.data_vencimento:
+                        existente.data_vencimento = datetime.combine(data_venc, datetime.min.time())
+                    atualizadas += 1
+                else:
+                    novo = TarefaPrazo(
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        caso_id=caso.id,
+                        titulo=titulo,
+                        descricao=descricao,
+                        status="A Fazer",
+                        prioridade=prioridade,
+                        data_vencimento=datetime.combine(data_venc, datetime.min.time()),
+                        tipo_tarefa="Prazo",
+                        origem_id=origem_id,
+                    )
+                    db.session.add(novo)
+                    criadas += 1
+
+            try:
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                return {"message": "Falha ao salvar.", "erro": str(exc)}, 500
+
+            resposta = {
+                "criadas": criadas,
+                "atualizadas": atualizadas,
+                "sem_caso": sem_caso,
+                "total_recebidas": len(intimacoes),
+                "erros": erros,
+            }
+            _registrar_sync("intimacoes", resposta)
+            return resposta, 200
+
     # =====================================================================
 
     @projudi_ns.route("/sync/status")
