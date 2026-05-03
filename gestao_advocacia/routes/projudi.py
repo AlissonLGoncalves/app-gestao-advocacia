@@ -26,11 +26,28 @@ from models import (
     ProjudiSyncLog,
     TarefaPrazo,
     User,
+    log_audit,
 )
 from prazo_detector import detectar_prazo, prioridade_por_dias_ate_vencer, titulo_prazo
 
 
 def register_projudi_routes(app, projudi_ns):
+
+    # =====================================================================
+    # GUARD — gestao de tokens API restrita a admin/superadmin
+    # =====================================================================
+    # Tokens projudi-agent dao acesso TOTAL a carteira do tenant. Permitir
+    # qualquer usuario gera-los seria risco (assistente/cliente do portal
+    # poderiam exfiltrar dados). Padrao: so admin do escritorio gerencia.
+
+    ROLES_GERENCIAM_TOKEN = ("admin", "superadmin")
+
+    def _admin_required():
+        """Bloqueia 403 se user logado nao for admin/superadmin do tenant."""
+        user = User.query.get(g.user_id)
+        if not user or user.role not in ROLES_GERENCIAM_TOKEN:
+            projudi_ns.abort(403, "Apenas administradores podem gerenciar tokens do projudi-agent.")
+
     @projudi_ns.route("/auth/me")
     class ProjudiAuthMe(Resource):
         @projudi_ns.doc(
@@ -61,6 +78,8 @@ def register_projudi_routes(app, projudi_ns):
             ),
         )
         def get(self):
+            # Listar tambem so admin — informacao sensivel (datas, last_used_at).
+            _admin_required()
             tokens = (
                 ProjudiAgentToken.query.filter_by(tenant_id=g.tenant_id)
                 .order_by(ProjudiAgentToken.created_at.desc())
@@ -73,11 +92,12 @@ def register_projudi_routes(app, projudi_ns):
         @projudi_ns.doc(
             security="jsonWebToken",
             description=(
-                "Gera novo token API. Retorna o valor cru UMA UNICA VEZ — "
-                "depois so o hash fica no banco. Use no .env do projudi-agent."
+                "Gera novo token API (apenas admin/superadmin). Retorna o "
+                "valor cru UMA UNICA VEZ — depois so o hash fica no banco."
             ),
         )
         def post(self):
+            _admin_required()
             payload = request.get_json(silent=True) or {}
             nome = (payload.get("nome") or "").strip()[:100] or None
 
@@ -93,6 +113,13 @@ def register_projudi_routes(app, projudi_ns):
                 ativo=True,
             )
             db.session.add(token)
+
+            # Audit log antes do commit pra atrelar na mesma transacao
+            log_audit(
+                acao="projudi_token_create",
+                tabela_afetada="projudi_agent_token",
+                detalhes=f"nome={nome or '(sem nome)'}",
+            )
             db.session.commit()
 
             return {
@@ -110,14 +137,21 @@ def register_projudi_routes(app, projudi_ns):
         @tenant_scoped
         @projudi_ns.doc(
             security="jsonWebToken",
-            description="Revoga um token API (corte de acesso imediato pro agent).",
+            description="Revoga um token API (apenas admin/superadmin).",
         )
         def delete(self, token_id):
+            _admin_required()
             token = ProjudiAgentToken.query.filter_by(id=token_id, tenant_id=g.tenant_id).first()
             if not token:
                 return {"message": "Token nao encontrado neste tenant."}, 404
             token.ativo = False
             token.revoked_at = datetime.utcnow()
+            log_audit(
+                acao="projudi_token_revoke",
+                tabela_afetada="projudi_agent_token",
+                registro_id=token.id,
+                detalhes=f"nome={token.nome or '(sem nome)'}",
+            )
             db.session.commit()
             return {"message": "Token revogado.", "info": token.to_dict()}, 200
 
@@ -275,8 +309,8 @@ def register_projudi_routes(app, projudi_ns):
 
             criados = 0
             atualizados = 0
-            clientes_criados = 0   # cascade A: auto-criados a partir da Capa
-            sem_cliente = []       # cascade B: para triagem manual
+            clientes_criados = 0  # cascade A: auto-criados a partir da Capa
+            sem_cliente = []  # cascade B: para triagem manual
             erros = []
 
             for p in processos:
