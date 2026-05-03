@@ -17,7 +17,15 @@ from flask_restx import Resource
 
 from extensions import db
 from helpers import projudi_agent_required, tenant_scoped
-from models import Caso, Cliente, MovimentacaoCNJ, ProjudiAgentToken, TarefaPrazo, User
+from models import (
+    Caso,
+    Cliente,
+    Documento,
+    MovimentacaoCNJ,
+    ProjudiAgentToken,
+    TarefaPrazo,
+    User,
+)
 from prazo_detector import detectar_prazo, prioridade_por_dias_ate_vencer, titulo_prazo
 
 
@@ -488,3 +496,140 @@ def register_projudi_routes(app, projudi_ns):
                 "total_recebidas": len(movs),
                 "erros": erros[:20],  # limita resposta
             }, 200
+
+    # =====================================================================
+    # FASE 4 — Upload de pecas (PDF) exportadas do PROJUDI
+    # =====================================================================
+
+    @projudi_ns.route("/pecas")
+    class ProjudiPecas(Resource):
+        @projudi_ns.doc(
+            description=(
+                "Upload de PDF consolidado exportado do PROJUDI. Cria Documento "
+                "vinculado ao Caso. Idempotencia por hash SHA-256: re-envio do "
+                "mesmo arquivo ao mesmo caso nao duplica. Multipart/form-data "
+                "com campos: file (PDF), numero_cnj, escopo (tudo|capa|...), "
+                "data_exportacao (YYYY-MM-DD opcional)."
+            ),
+        )
+        @projudi_agent_required
+        def post(self):
+            import os
+            from io import BytesIO
+
+            from werkzeug.utils import secure_filename
+
+            from app import app as flask_app
+
+            file_storage = request.files.get("file")
+            if not file_storage or not getattr(file_storage, "filename", ""):
+                return {"message": "Campo 'file' (multipart) obrigatorio."}, 400
+
+            cnj = (request.form.get("numero_cnj") or "").strip()
+            if not cnj:
+                return {"message": "Campo 'numero_cnj' obrigatorio."}, 400
+
+            escopo = (request.form.get("escopo") or "tudo").strip().lower()[:20]
+            data_exp = (request.form.get("data_exportacao") or "").strip()[:10]
+
+            tenant_id = g.tenant_id
+            user_id = g.user_id
+
+            # Acha o Caso (precisa existir — Fase 2 deve ter criado)
+            caso = Caso.query.filter_by(tenant_id=tenant_id, numero_processo=cnj).first()
+            if not caso:
+                return {
+                    "message": (
+                        f"Caso com numero_processo '{cnj}' nao encontrado neste tenant. "
+                        "Envie /processos primeiro pra criar o Caso."
+                    ),
+                }, 404
+
+            # Le conteudo + valida tipo + tamanho
+            conteudo = file_storage.stream.read()
+            file_storage.stream.seek(0)
+
+            # Limite 50 MB (autos consolidados PROJUDI podem ser pesados)
+            limite_bytes = 50 * 1024 * 1024
+            if len(conteudo) > limite_bytes:
+                mb = len(conteudo) / (1024 * 1024)
+                return {"message": f"Arquivo muito grande ({mb:.1f} MB). Limite 50 MB."}, 400
+
+            # Valida MIME via libmagic (header bytes)
+            try:
+                import magic  # type: ignore
+
+                mime = magic.from_buffer(conteudo[:2048], mime=True)
+                if mime != "application/pdf":
+                    return {
+                        "message": f"Tipo invalido (detectado: {mime}). Apenas PDF aceito."
+                    }, 400
+            except ImportError:
+                # Fallback: assume PDF se nome termina .pdf E primeiros bytes %PDF
+                nome_lower = file_storage.filename.lower()
+                if not nome_lower.endswith(".pdf") or not conteudo[:4] == b"%PDF":
+                    return {"message": "Apenas PDF aceito."}, 400
+
+            # Calcula hash pra dedup
+            hash_arquivo = hashlib.sha256(conteudo).hexdigest()
+
+            # Idempotencia: se ja existe doc com mesmo hash + caso, skipa
+            existente = Documento.query.filter_by(
+                tenant_id=tenant_id, caso_id=caso.id, hash_arquivo=hash_arquivo
+            ).first()
+            if existente:
+                return {
+                    "message": "Peca ja foi enviada antes (mesmo hash).",
+                    "documento_id": existente.id,
+                    "duplicado": True,
+                }, 200
+
+            # Salva arquivo no storage local (mesmo padrao do /documentos/upload)
+            user_folder = os.path.join(flask_app.config["UPLOAD_FOLDER"], str(user_id))
+            os.makedirs(user_folder, exist_ok=True)
+
+            data_label = data_exp or datetime.utcnow().strftime("%Y-%m-%d")
+            nome_padronizado = f"PROJUDI - {escopo} - {cnj} - {data_label}.pdf"
+            safe_name = secure_filename(nome_padronizado)
+            file_path = os.path.join(user_folder, safe_name)
+            counter = 1
+            while os.path.exists(file_path):
+                base, ext = os.path.splitext(safe_name)
+                file_path = os.path.join(user_folder, f"{base}_{counter}{ext}")
+                counter += 1
+
+            try:
+                with open(file_path, "wb") as fh:
+                    fh.write(conteudo)
+            except Exception as exc:
+                return {"message": f"Falha ao gravar arquivo: {exc}"}, 500
+
+            # Cria Documento
+            doc = Documento(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                caso_id=caso.id,
+                nome_arquivo=os.path.basename(file_path),
+                path_arquivo=file_path,
+                hash_arquivo=hash_arquivo,
+            )
+            db.session.add(doc)
+            try:
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                # Tenta apagar o arquivo orfão
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
+                return {"message": f"Falha ao salvar registro: {exc}"}, 500
+
+            return {
+                "message": "Peca importada do PROJUDI.",
+                "documento_id": doc.id,
+                "caso_id": caso.id,
+                "nome_arquivo": doc.nome_arquivo,
+                "hash_arquivo": hash_arquivo,
+                "duplicado": False,
+            }, 201

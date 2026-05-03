@@ -527,13 +527,20 @@ class Documento(db.Model):
     nome_arquivo = db.Column(db.String(255), nullable=False)
     path_arquivo = db.Column(db.String(500), nullable=False)
     data_upload = db.Column(db.DateTime, default=datetime.utcnow)
+    # Hash SHA-256 do conteudo do arquivo. Usado pra dedup idempotente quando
+    # o mesmo PDF eh re-enviado (ex: agent PROJUDI roda sync 2x). Nullable
+    # porque docs antigos nao tinham esse campo populado.
+    hash_arquivo = db.Column(db.String(64), nullable=True, index=True)
     caso_id = db.Column(
         db.Integer, db.ForeignKey("caso.id", name="fk_documento_caso_id"), nullable=True
     )
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_documento_user_id"), nullable=False
     )
-    __table_args__ = (db.Index("ix_documento_tenant_created", "tenant_id", "data_upload"),)
+    __table_args__ = (
+        db.Index("ix_documento_tenant_created", "tenant_id", "data_upload"),
+        db.Index("ix_documento_caso_hash", "caso_id", "hash_arquivo"),
+    )
 
     def to_dict(self):
         return {
@@ -542,6 +549,7 @@ class Documento(db.Model):
             "data_upload": self.data_upload.isoformat(),
             "caso_id": self.caso_id,
             "user_id": self.user_id,
+            "hash_arquivo": self.hash_arquivo,
             "url_download": f"/api/documentos/download/{self.id}",
         }
 
