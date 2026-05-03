@@ -825,15 +825,15 @@ def register_projudi_routes(app, projudi_ns):
                     continue
 
                 # Acha Caso (cnj precisa existir — agente envia /processos antes)
-                caso = Caso.query.filter_by(
-                    tenant_id=tenant_id, numero_processo=cnj
-                ).first()
+                caso = Caso.query.filter_by(tenant_id=tenant_id, numero_processo=cnj).first()
                 if not caso:
-                    sem_caso.append({
-                        "numero_cnj": cnj,
-                        "tipo_evento": it.get("tipo_evento"),
-                        "final_prazo": final_prazo_raw,
-                    })
+                    sem_caso.append(
+                        {
+                            "numero_cnj": cnj,
+                            "tipo_evento": it.get("tipo_evento"),
+                            "final_prazo": final_prazo_raw,
+                        }
+                    )
                     continue
 
                 # Identifica idempotencia: origem_id = 'projudi_intim:<cnj>:<final_prazo>'
@@ -852,14 +852,12 @@ def register_projudi_routes(app, projudi_ns):
                 if it.get("descricao"):
                     desc_parts.append(it["descricao"])
                 if it.get("prazo_dias") and it.get("prazo_unidade"):
-                    desc_parts.append(
-                        f"Prazo: {it['prazo_dias']} dias {it['prazo_unidade']}"
-                    )
+                    desc_parts.append(f"Prazo: {it['prazo_dias']} dias {it['prazo_unidade']}")
                 if it.get("juizo"):
                     desc_parts.append(f"Juízo: {it['juizo']}")
                 if it.get("parte_destino"):
                     desc_parts.append(f"Parte: {it['parte_destino']}")
-                desc_parts.append(f"Origem: PROJUDI (Aguardando Cumprimento)")
+                desc_parts.append("Origem: PROJUDI (Aguardando Cumprimento)")
                 descricao = "\n".join(desc_parts)[:4000]
 
                 # Idempotencia: origem_id ja existe?
@@ -869,7 +867,10 @@ def register_projudi_routes(app, projudi_ns):
                 if existente:
                     # Atualiza prioridade (pode ter mudado conforme aproxima vencimento)
                     # NAO sobrescreve titulo/descricao/status — usuario pode ter editado.
-                    if existente.prioridade != prioridade and (existente.status or "").lower() != "concluído":
+                    if (
+                        existente.prioridade != prioridade
+                        and (existente.status or "").lower() != "concluído"
+                    ):
                         existente.prioridade = prioridade
                     if not existente.data_vencimento:
                         existente.data_vencimento = datetime.combine(data_venc, datetime.min.time())
@@ -925,7 +926,7 @@ def register_projudi_routes(app, projudi_ns):
 
             tenant_id = get_tenant_id()
             ultimos = {}
-            for tipo in ("processos", "movimentacoes", "pecas"):
+            for tipo in ("processos", "movimentacoes", "pecas", "intimacoes"):
                 log = (
                     ProjudiSyncLog.query.filter_by(tenant_id=tenant_id, tipo=tipo)
                     .order_by(ProjudiSyncLog.created_at.desc())

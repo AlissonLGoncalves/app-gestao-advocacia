@@ -751,7 +751,9 @@ class TarefaPrazo(db.Model):
             # Frontend espera 'YYYY-MM-DD' (split('-') + <input type=date>);
             # mandar isoformat() completo ('2026-05-04T00:00:00') quebrava o
             # parser e o input ficava vazio. Retornamos so a parte da data.
-            "data_vencimento": self.data_vencimento.date().isoformat() if self.data_vencimento else None,
+            "data_vencimento": (
+                self.data_vencimento.date().isoformat() if self.data_vencimento else None
+            ),
             "tipo_tarefa": self.tipo_tarefa,
             "origem_id": self.origem_id,
             "posicao": self.posicao,

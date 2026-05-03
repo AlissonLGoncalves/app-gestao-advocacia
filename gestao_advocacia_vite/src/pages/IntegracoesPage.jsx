@@ -151,10 +151,10 @@ function IntegracoesPage() {
             <>
               {/* Status detalhado */}
               <div className="row g-3 mb-4">
-                {['processos', 'movimentacoes', 'pecas'].map((tipo) => {
+                {['processos', 'movimentacoes', 'pecas', 'intimacoes'].map((tipo) => {
                   const u = status?.ultimo_por_tipo?.[tipo]
                   return (
-                    <div key={tipo} className="col-md-4">
+                    <div key={tipo} className="col-sm-6 col-md-3">
                       <div className="border rounded p-3 h-100">
                         <div className="text-muted small text-uppercase mb-1">{tipo}</div>
                         <div className="fw-bold">{formatDate(u?.created_at)}</div>
