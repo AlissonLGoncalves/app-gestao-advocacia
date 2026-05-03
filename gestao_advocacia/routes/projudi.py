@@ -23,6 +23,7 @@ from models import (
     Documento,
     MovimentacaoCNJ,
     ProjudiAgentToken,
+    ProjudiSyncLog,
     TarefaPrazo,
     User,
 )
@@ -119,6 +120,25 @@ def register_projudi_routes(app, projudi_ns):
             token.revoked_at = datetime.utcnow()
             db.session.commit()
             return {"message": "Token revogado.", "info": token.to_dict()}, 200
+
+    # =====================================================================
+    # Helper compartilhado pra registrar log de sync
+    # =====================================================================
+
+    def _registrar_sync(tipo, counts, duracao_ms=None):
+        """Registra ProjudiSyncLog com counts do request. Best-effort."""
+        try:
+            log = ProjudiSyncLog(
+                tenant_id=g.tenant_id,
+                token_id=getattr(g, "projudi_token_id", None),
+                tipo=tipo,
+                counts=counts or {},
+                duracao_ms=duracao_ms,
+            )
+            db.session.add(log)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     # =====================================================================
     # FASE 2 — Sync de processos da carteira do PROJUDI
@@ -311,13 +331,15 @@ def register_projudi_routes(app, projudi_ns):
                 db.session.rollback()
                 return {"message": "Falha ao salvar.", "erro": str(exc)}, 500
 
-            return {
+            resposta = {
                 "criados": criados,
                 "atualizados": atualizados,
                 "sem_cliente": sem_cliente,
                 "total_recebidos": len(processos),
                 "erros": erros,
-            }, 200
+            }
+            _registrar_sync("processos", resposta)
+            return resposta, 200
 
     # =====================================================================
     # FASE 3 — Sync de movimentacoes do PROJUDI + deteccao de prazos
@@ -488,14 +510,16 @@ def register_projudi_routes(app, projudi_ns):
                 db.session.rollback()
                 return {"message": "Falha ao salvar.", "erro": str(exc)}, 500
 
-            return {
+            resposta = {
                 "movimentacoes_criadas": mov_criadas,
                 "movimentacoes_duplicadas": mov_duplicadas,
                 "movimentacoes_sem_caso": mov_sem_caso,
                 "prazos_criados": prazos_criados,
                 "total_recebidas": len(movs),
-                "erros": erros[:20],  # limita resposta
-            }, 200
+                "erros": erros[:20],
+            }
+            _registrar_sync("movimentacoes", resposta)
+            return resposta, 200
 
     # =====================================================================
     # FASE 4 — Upload de pecas (PDF) exportadas do PROJUDI
@@ -624,11 +648,66 @@ def register_projudi_routes(app, projudi_ns):
                     pass
                 return {"message": f"Falha ao salvar registro: {exc}"}, 500
 
-            return {
+            resposta = {
                 "message": "Peca importada do PROJUDI.",
                 "documento_id": doc.id,
                 "caso_id": caso.id,
                 "nome_arquivo": doc.nome_arquivo,
                 "hash_arquivo": hash_arquivo,
                 "duplicado": False,
-            }, 201
+            }
+            _registrar_sync("pecas", {"enviadas": 1, "duplicadas": 0})
+            return resposta, 201
+
+    # =====================================================================
+    # FASE 6 — Status / observabilidade da integracao
+    # =====================================================================
+
+    @projudi_ns.route("/sync/status")
+    class ProjudiSyncStatus(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @projudi_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Retorna status do ultimo sync por tipo (processos, "
+                "movimentacoes, pecas). Usado pelo Dashboard pra mostrar "
+                "'PROJUDI: sync ha X minutos'."
+            ),
+        )
+        def get(self):
+            from helpers import get_tenant_id
+
+            tenant_id = get_tenant_id()
+            ultimos = {}
+            for tipo in ("processos", "movimentacoes", "pecas"):
+                log = (
+                    ProjudiSyncLog.query.filter_by(tenant_id=tenant_id, tipo=tipo)
+                    .order_by(ProjudiSyncLog.created_at.desc())
+                    .first()
+                )
+                ultimos[tipo] = log.to_dict() if log else None
+
+            # Calcula tempo desde ultimo sync de qualquer tipo
+            datas = [
+                datetime.fromisoformat(u["created_at"])
+                for u in ultimos.values()
+                if u and u.get("created_at")
+            ]
+            ultimo_sync_iso = max(datas).isoformat() if datas else None
+            minutos_desde = None
+            if datas:
+                delta = datetime.utcnow() - max(datas)
+                minutos_desde = int(delta.total_seconds() / 60)
+
+            # Conta tokens ativos
+            tokens_ativos = ProjudiAgentToken.query.filter_by(
+                tenant_id=tenant_id, ativo=True
+            ).count()
+
+            return {
+                "tokens_ativos": tokens_ativos,
+                "ultimo_sync_iso": ultimo_sync_iso,
+                "minutos_desde_ultimo_sync": minutos_desde,
+                "ultimo_por_tipo": ultimos,
+            }, 200

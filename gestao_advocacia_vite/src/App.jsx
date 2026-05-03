@@ -26,6 +26,7 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
 import SolicitarAcessoPage from './pages/SolicitarAcessoPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
+import IntegracoesPage from './pages/IntegracoesPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
 import TriagemAssistidaPage from './pages/TriagemAssistidaPage.jsx'
 import PerfilPage from './pages/PerfilPage.jsx'
@@ -397,6 +398,9 @@ const MainLayout = () => {
           <SidebarLink to="/configuracoes" icon={Cog6ToothIcon}>
             Configurações SaaS
           </SidebarLink>
+          <SidebarLink to="/integracoes" icon={Cog6ToothIcon}>
+            Integrações
+          </SidebarLink>
           <SidebarLink to="/perfil" icon={UserCircleIcon}>
             Meu Perfil
           </SidebarLink>
@@ -544,6 +548,7 @@ function App() {
           <Route path="relatorios" element={<RelatoriosPage />} />
 
           <Route path="configuracoes" element={<SettingsPage />} />
+          <Route path="integracoes" element={<IntegracoesPage />} />
           <Route path="perfil" element={<PerfilPage />} />
 
           {/* admin-fase0: rotas do backoffice (gated por SuperAdminRoute) */}
