@@ -30,10 +30,10 @@
   --shadow-sm: 0 10px 30px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 16px 42px rgba(15, 23, 42, 0.1);
   --ease: 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui,
-    sans-serif;
-  --font-title: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', system-ui,
-    sans-serif;
+  --font-body:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-title:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 *,
@@ -57,11 +57,8 @@ body {
   letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: radial-gradient(
-      80% 50% at 10% 0%,
-      rgba(10, 132, 255, 0.11) 0%,
-      rgba(10, 132, 255, 0) 66%
-    ),
+  background:
+    radial-gradient(80% 50% at 10% 0%, rgba(10, 132, 255, 0.11) 0%, rgba(10, 132, 255, 0) 66%),
     radial-gradient(70% 50% at 95% 5%, rgba(6, 182, 212, 0.1) 0%, rgba(6, 182, 212, 0) 66%),
     linear-gradient(115deg, rgba(255, 255, 255, 0.38) 5%, rgba(255, 255, 255, 0) 35%),
     linear-gradient(180deg, var(--canvas-top) 0%, var(--canvas-bottom) 100%);
@@ -92,11 +89,8 @@ body {
   overflow-x: hidden;
   border-radius: var(--radius-lg);
   border: 1px solid var(--sidebar-line);
-  background: radial-gradient(
-      150% 90% at 10% 0%,
-      rgba(10, 132, 255, 0.22) 0%,
-      rgba(10, 132, 255, 0) 38%
-    ),
+  background:
+    radial-gradient(150% 90% at 10% 0%, rgba(10, 132, 255, 0.22) 0%, rgba(10, 132, 255, 0) 38%),
     linear-gradient(180deg, var(--sidebar-bg) 0%, var(--sidebar-bg-soft) 100%);
   backdrop-filter: blur(18px) saturate(180%);
   -webkit-backdrop-filter: blur(18px) saturate(180%);
@@ -473,11 +467,8 @@ body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: radial-gradient(
-      70% 55% at 18% 8%,
-      rgba(10, 132, 255, 0.22),
-      rgba(10, 132, 255, 0) 68%
-    ),
+  background:
+    radial-gradient(70% 55% at 18% 8%, rgba(10, 132, 255, 0.22), rgba(10, 132, 255, 0) 68%),
     radial-gradient(70% 50% at 100% 100%, rgba(6, 182, 212, 0.26), rgba(6, 182, 212, 0) 72%),
     linear-gradient(165deg, #f3f7ff 0%, #dce7f8 60%, #d4e2f5 100%);
 }
