@@ -386,7 +386,7 @@ function CasoDetalhePage() {
                       </td>
                       <td>
                         {t.data_vencimento
-                          ? new Date(t.data_vencimento).toLocaleDateString('pt-BR')
+                          ? new Date(t.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')
                           : '-'}
                       </td>
                     </tr>

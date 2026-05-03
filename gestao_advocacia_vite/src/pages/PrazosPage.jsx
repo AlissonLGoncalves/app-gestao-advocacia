@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
 import {
@@ -429,7 +430,7 @@ export default function PrazosPage() {
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           tabIndex="-1"
         >
-          <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content shadow-lg border-0">
               <form onSubmit={handleSalvarTarefa}>
                 <div className="modal-header border-bottom-0 pb-0">
@@ -531,7 +532,8 @@ export default function PrazosPage() {
                     <label className="form-label small fw-semibold">Descrição (Opcional)</label>
                     <textarea
                       className="form-control"
-                      rows="2"
+                      rows="6"
+                      style={{ resize: 'vertical' }}
                       value={novaTarefa.descricao}
                       onChange={(e) => setNovaTarefa({ ...novaTarefa, descricao: e.target.value })}
                     />
@@ -694,16 +696,19 @@ function KanbanCardVisual({ tarefa, casos, onEditar, arrastando }) {
         </div>
 
         {casoVinculado && (
-          <p
-            className="small text-muted mb-0 text-truncate mt-1"
-            style={{ fontSize: '0.72rem' }}
-            title={`${casoVinculado.titulo} (${casoVinculado.numero_processo})`}
+          <Link
+            to={`/casos/${casoVinculado.id}`}
+            className="small text-decoration-none mb-0 text-truncate mt-1 d-block"
+            style={{ fontSize: '0.72rem', color: 'var(--bs-primary)' }}
+            title={`Abrir caso: ${casoVinculado.titulo} (${casoVinculado.numero_processo})`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <BriefcaseIcon
               style={{ width: 11, marginRight: 3, display: 'inline', marginTop: '-2px' }}
             />
             {casoVinculado.titulo}
-          </p>
+          </Link>
         )}
 
         {tarefa.data_vencimento && (
