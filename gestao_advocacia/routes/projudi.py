@@ -515,7 +515,6 @@ def register_projudi_routes(app, projudi_ns):
         @projudi_agent_required
         def post(self):
             import os
-            from io import BytesIO
 
             from werkzeug.utils import secure_filename
 
