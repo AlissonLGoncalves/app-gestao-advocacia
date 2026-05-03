@@ -857,7 +857,7 @@ def register_projudi_routes(app, projudi_ns):
                     desc_parts.append(f"Juízo: {it['juizo']}")
                 if it.get("parte_destino"):
                     desc_parts.append(f"Parte: {it['parte_destino']}")
-                desc_parts.append(f"Origem: PROJUDI (Aguardando Cumprimento)")
+                desc_parts.append("Origem: PROJUDI (Aguardando Cumprimento)")
                 descricao = "\n".join(desc_parts)[:4000]
 
                 # Idempotencia: origem_id ja existe?
