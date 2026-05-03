@@ -705,6 +705,10 @@ def register_projudi_routes(app, projudi_ns):
                 tenant_id=tenant_id, caso_id=caso.id, hash_arquivo=hash_arquivo
             ).first()
             if existente:
+                # IMPORTANTE: registra no sync log mesmo em duplicado, senao
+                # /integracoes mostra '—' quando o agent so re-envia idempotente
+                # (cenario comum quando rodando cron 1x/h sem novidades).
+                _registrar_sync("pecas", {"enviadas": 0, "duplicadas": 1})
                 return {
                     "message": "Peca ja foi enviada antes (mesmo hash).",
                     "documento_id": existente.id,
