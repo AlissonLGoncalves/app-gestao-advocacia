@@ -41,18 +41,36 @@ function IntegracoesPage() {
   const [novoTokenInfo, setNovoTokenInfo] = useState(null)
   const [nomeNovo, setNomeNovo] = useState('Projudi Agent')
 
+  // Permissao: so admin/superadmin podem gerar/listar/revogar tokens.
+  // Le user.role do localStorage (mesmo padrao usado no App.jsx).
+  const isAdmin = (() => {
+    try {
+      const userStr = localStorage.getItem('user')
+      if (!userStr) return false
+      const role = JSON.parse(userStr).role
+      return role === 'admin' || role === 'superadmin'
+    } catch {
+      return false
+    }
+  })()
+
   const carregar = useCallback(async () => {
     setLoading(true)
     try {
-      const [tks, st] = await Promise.all([listTokensProjudi(), getProjudiSyncStatus()])
-      setTokens(Array.isArray(tks) ? tks : [])
+      // Status eh visivel pra todos (read-only — nao expoe valor de token).
+      const st = await getProjudiSyncStatus()
       setStatus(st)
+      // Lista de tokens so pra admin (endpoint retorna 403 caso contrario).
+      if (isAdmin) {
+        const tks = await listTokensProjudi()
+        setTokens(Array.isArray(tks) ? tks : [])
+      }
     } catch (err) {
       toast.error(err?.message || 'Falha ao carregar.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isAdmin])
 
   useEffect(() => {
     carregar()
@@ -158,8 +176,24 @@ function IntegracoesPage() {
                 })}
               </div>
 
+              {/* Mensagem pra nao-admin: nao consegue gerar/listar tokens */}
+              {!isAdmin && (
+                <div className="alert alert-info border">
+                  <strong>
+                    <i className="bi bi-shield-lock me-2" />
+                    Apenas administradores podem gerenciar tokens
+                  </strong>
+                  <p className="small mb-0 mt-1">
+                    A integração com o PROJUDI Agent dá acesso completo aos processos do escritório.
+                    Por isso só usuários com perfil <code>admin</code> podem gerar ou revogar
+                    tokens. Você ainda pode acompanhar o status acima. Para mudanças, contate o(a)
+                    responsável.
+                  </p>
+                </div>
+              )}
+
               {/* Token recém-criado (mostra UMA vez) */}
-              {novoTokenInfo && (
+              {isAdmin && novoTokenInfo && (
                 <div className="alert alert-warning border-warning">
                   <strong>
                     <i className="bi bi-key me-2" />
@@ -190,89 +224,92 @@ function IntegracoesPage() {
                 </div>
               )}
 
-              {/* Gerar novo token */}
-              <div className="border rounded p-3 mb-3 bg-light">
-                <strong className="d-block mb-2">Gerar novo token API</strong>
-                <div className="input-group">
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder='Nome do dispositivo (ex: "Notebook Escritório")'
-                    value={nomeNovo}
-                    onChange={(e) => setNomeNovo(e.target.value)}
-                    maxLength={100}
-                  />
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleGerar}
-                    disabled={gerando || !nomeNovo.trim()}
-                  >
-                    {gerando ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-1" />
-                        Gerando...
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-plus-lg me-1" />
-                        Gerar
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
+              {/* Gerar + Lista de tokens (so admin) */}
+              {isAdmin && (
+                <>
+                  <div className="border rounded p-3 mb-3 bg-light">
+                    <strong className="d-block mb-2">Gerar novo token API</strong>
+                    <div className="input-group">
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder='Nome do dispositivo (ex: "Notebook Escritório")'
+                        value={nomeNovo}
+                        onChange={(e) => setNomeNovo(e.target.value)}
+                        maxLength={100}
+                      />
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleGerar}
+                        disabled={gerando || !nomeNovo.trim()}
+                      >
+                        {gerando ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-1" />
+                            Gerando...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-plus-lg me-1" />
+                            Gerar
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Lista de tokens */}
-              <strong className="d-block mb-2">
-                Tokens ativos ({tokens.filter((t) => t.ativo).length})
-              </strong>
-              {tokens.length === 0 ? (
-                <p className="text-muted small">Nenhum token criado ainda.</p>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Nome</th>
-                        <th>Criado em</th>
-                        <th>Último uso</th>
-                        <th>Status</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tokens.map((t) => (
-                        <tr key={t.id}>
-                          <td>
-                            <strong>{t.nome || `Token #${t.id}`}</strong>
-                          </td>
-                          <td className="small text-muted">{formatDate(t.created_at)}</td>
-                          <td className="small text-muted">
-                            {t.last_used_at ? formatDate(t.last_used_at) : '—'}
-                          </td>
-                          <td>
-                            {t.ativo ? (
-                              <span className="badge bg-success">Ativo</span>
-                            ) : (
-                              <span className="badge bg-secondary">Revogado</span>
-                            )}
-                          </td>
-                          <td>
-                            {t.ativo && (
-                              <button
-                                className="btn btn-sm btn-outline-danger"
-                                onClick={() => handleRevogar(t)}
-                              >
-                                <i className="bi bi-x-circle me-1" />
-                                Revogar
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                  <strong className="d-block mb-2">
+                    Tokens ativos ({tokens.filter((t) => t.ativo).length})
+                  </strong>
+                  {tokens.length === 0 ? (
+                    <p className="text-muted small">Nenhum token criado ainda.</p>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table table-sm">
+                        <thead>
+                          <tr>
+                            <th>Nome</th>
+                            <th>Criado em</th>
+                            <th>Último uso</th>
+                            <th>Status</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tokens.map((t) => (
+                            <tr key={t.id}>
+                              <td>
+                                <strong>{t.nome || `Token #${t.id}`}</strong>
+                              </td>
+                              <td className="small text-muted">{formatDate(t.created_at)}</td>
+                              <td className="small text-muted">
+                                {t.last_used_at ? formatDate(t.last_used_at) : '—'}
+                              </td>
+                              <td>
+                                {t.ativo ? (
+                                  <span className="badge bg-success">Ativo</span>
+                                ) : (
+                                  <span className="badge bg-secondary">Revogado</span>
+                                )}
+                              </td>
+                              <td>
+                                {t.ativo && (
+                                  <button
+                                    className="btn btn-sm btn-outline-danger"
+                                    onClick={() => handleRevogar(t)}
+                                  >
+                                    <i className="bi bi-x-circle me-1" />
+                                    Revogar
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="alert alert-info small mt-3 mb-0">
