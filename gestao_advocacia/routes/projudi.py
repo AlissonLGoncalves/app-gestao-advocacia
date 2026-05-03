@@ -185,6 +185,54 @@ def register_projudi_routes(app, projudi_ns):
         s = str(v).strip()
         return s[:n] if s else None
 
+    def _so_digitos(s):
+        return re.sub(r"\D+", "", s or "")
+
+    def _achar_cliente_por_doc(tenant_id, cpf_cnpj):
+        """Match exato por CPF/CNPJ — comparacao apenas pelos digitos
+        (ignora pontuacao). Cobre casos onde o advogado representa um
+        terceiro/arrematante e o nome dele NAO aparece em polo_ativo/passivo."""
+        if not cpf_cnpj:
+            return None
+        digits = _so_digitos(cpf_cnpj)
+        if len(digits) not in (11, 14):
+            return None
+        # SQLite/Postgres-agnostic: busca todos do tenant e compara em Python.
+        # (Em volume alto, vale otimizar com REPLACE() no SQL — futuro.)
+        for c in Cliente.query.filter_by(tenant_id=tenant_id).all():
+            if _so_digitos(c.cpf_cnpj or "") == digits:
+                return c
+        return None
+
+    def _criar_cliente_da_capa(tenant_id, user_id, dados):
+        """Cria Cliente automaticamente a partir dos dados extraidos da Capa
+        do PROJUDI (cliente_nome + cliente_doc + cliente_tipo). Retorna o
+        Cliente criado, ou None se faltam dados minimos / falhar."""
+        nome = (dados.get("cliente_nome") or "").strip()
+        doc = (dados.get("cliente_doc") or "").strip()
+        if not nome or not doc:
+            return None
+        digits = _so_digitos(doc)
+        if len(digits) not in (11, 14):
+            return None
+        # tipo_pessoa: PF se 11 digitos, PJ se 14 (sobrescreve hint do agent
+        # se inconsistente).
+        tipo_pessoa = "PF" if len(digits) == 11 else "PJ"
+        try:
+            novo = Cliente(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                nome_razao_social=nome[:200],
+                cpf_cnpj=doc[:20],
+                tipo_pessoa=tipo_pessoa,
+            )
+            db.session.add(novo)
+            db.session.flush()  # garante novo.id sem commit
+            return novo
+        except Exception:
+            db.session.rollback()
+            return None
+
     def _achar_cliente_por_partes(tenant_id, partes):
         """Tenta casar nome de cliente cadastrado com qualquer das partes
         (polo ativo + polo passivo). Match exato por nome normalizado."""
@@ -227,7 +275,8 @@ def register_projudi_routes(app, projudi_ns):
 
             criados = 0
             atualizados = 0
-            sem_cliente = []  # lista de {numero_cnj, partes_polo_ativo, partes_polo_passivo}
+            clientes_criados = 0   # cascade A: auto-criados a partir da Capa
+            sem_cliente = []       # cascade B: para triagem manual
             erros = []
 
             for p in processos:
@@ -290,8 +339,26 @@ def register_projudi_routes(app, projudi_ns):
                         atualizados += 1
                     continue
 
-                # Caso novo — precisa de cliente_id (NOT NULL)
-                cliente = _achar_cliente_por_partes(tenant_id, partes)
+                # Caso novo — precisa de cliente_id (NOT NULL).
+                # Cascade C -> A -> B:
+                #   C) match exato por CPF/CNPJ se cliente_doc enviado
+                #   C') match por nome em polo_ativo/passivo (fallback legado)
+                #   A) auto-criar Cliente se cliente_nome+doc presentes e
+                #      payload['auto_criar_cliente'] true (default true)
+                #   B) sem_cliente — triagem manual
+                auto_criar = bool(payload.get("auto_criar_cliente", True))
+
+                cliente = _achar_cliente_por_doc(tenant_id, p.get("cliente_doc"))
+                if not cliente:
+                    cliente = _achar_cliente_por_partes(tenant_id, partes)
+
+                criado_auto = False
+                if not cliente and auto_criar:
+                    cliente = _criar_cliente_da_capa(tenant_id, user_id, p)
+                    criado_auto = cliente is not None
+                    if criado_auto:
+                        clientes_criados += 1
+
                 if not cliente:
                     sem_cliente.append(
                         {
@@ -299,6 +366,8 @@ def register_projudi_routes(app, projudi_ns):
                             "polo_ativo": polo_ativo,
                             "polo_passivo": polo_passivo,
                             "categoria_projudi": p.get("categoria_projudi"),
+                            "cliente_doc_recebido": p.get("cliente_doc"),
+                            "cliente_nome_recebido": p.get("cliente_nome"),
                         }
                     )
                     continue
@@ -334,6 +403,7 @@ def register_projudi_routes(app, projudi_ns):
             resposta = {
                 "criados": criados,
                 "atualizados": atualizados,
+                "clientes_criados": clientes_criados,
                 "sem_cliente": sem_cliente,
                 "total_recebidos": len(processos),
                 "erros": erros,
