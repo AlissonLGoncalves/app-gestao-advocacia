@@ -18,7 +18,8 @@
 .lp-hero {
   position: relative;
   isolation: isolate;
-  background: radial-gradient(ellipse 60% 50% at 15% 0%, rgba(37, 99, 235, 0.18), transparent 60%),
+  background:
+    radial-gradient(ellipse 60% 50% at 15% 0%, rgba(37, 99, 235, 0.18), transparent 60%),
     radial-gradient(ellipse 50% 50% at 100% 20%, rgba(22, 163, 74, 0.12), transparent 60%),
     radial-gradient(ellipse 60% 50% at 50% 100%, rgba(99, 102, 241, 0.1), transparent 60%),
     linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
@@ -81,7 +82,8 @@
 .lp-section-mesh {
   position: relative;
   isolation: isolate;
-  background: radial-gradient(ellipse 50% 40% at 80% 20%, rgba(37, 99, 235, 0.08), transparent 60%),
+  background:
+    radial-gradient(ellipse 50% 40% at 80% 20%, rgba(37, 99, 235, 0.08), transparent 60%),
     radial-gradient(ellipse 40% 40% at 20% 100%, rgba(22, 163, 74, 0.06), transparent 60%), #ffffff;
 }
 
@@ -465,7 +467,8 @@
 .lp-cta-final {
   position: relative;
   isolation: isolate;
-  background: radial-gradient(ellipse 60% 80% at 50% 0%, rgba(37, 99, 235, 0.2), transparent 60%),
+  background:
+    radial-gradient(ellipse 60% 80% at 50% 0%, rgba(37, 99, 235, 0.2), transparent 60%),
     linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
   color: #fff;
   overflow: hidden;
