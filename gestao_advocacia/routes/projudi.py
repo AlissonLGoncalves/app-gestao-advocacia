@@ -17,7 +17,8 @@ from flask_restx import Resource
 
 from extensions import db
 from helpers import projudi_agent_required, tenant_scoped
-from models import Caso, Cliente, ProjudiAgentToken, User
+from models import Caso, Cliente, MovimentacaoCNJ, ProjudiAgentToken, TarefaPrazo, User
+from prazo_detector import detectar_prazo, prioridade_por_dias_ate_vencer, titulo_prazo
 
 
 def register_projudi_routes(app, projudi_ns):
@@ -308,4 +309,182 @@ def register_projudi_routes(app, projudi_ns):
                 "sem_cliente": sem_cliente,
                 "total_recebidos": len(processos),
                 "erros": erros,
+            }, 200
+
+    # =====================================================================
+    # FASE 3 — Sync de movimentacoes do PROJUDI + deteccao de prazos
+    # =====================================================================
+
+    @projudi_ns.route("/movimentacoes")
+    class ProjudiMovimentacoes(Resource):
+        @projudi_ns.doc(
+            description=(
+                "Recebe movimentacoes processuais (delta incremental) e: "
+                "(1) cria MovimentacaoCNJ no log do Caso (idempotente por "
+                "fingerprint), (2) detecta prazo via regex+IA e cria "
+                "TarefaPrazo no Kanban quando aplicavel."
+            ),
+        )
+        @projudi_agent_required
+        def post(self):
+            payload = request.get_json(silent=True) or {}
+            movs = payload.get("movimentacoes") or []
+            if not isinstance(movs, list):
+                return {"message": "Campo 'movimentacoes' deve ser uma lista."}, 400
+
+            tenant_id = g.tenant_id
+            user_id = g.user_id
+
+            # Cache de Caso por numero_processo (evita query por movimentacao)
+            casos_cache = {}
+
+            def _achar_caso(cnj):
+                if not cnj:
+                    return None
+                cnj = cnj.strip()
+                if cnj in casos_cache:
+                    return casos_cache[cnj]
+                caso = Caso.query.filter_by(tenant_id=tenant_id, numero_processo=cnj).first()
+                casos_cache[cnj] = caso
+                return caso
+
+            mov_criadas = 0
+            mov_duplicadas = 0
+            mov_sem_caso = 0
+            prazos_criados = 0
+            erros = []
+
+            for m in movs:
+                if not isinstance(m, dict):
+                    continue
+                cnj = (m.get("numero_cnj") or "").strip()
+                fingerprint = (m.get("fingerprint") or "").strip()
+                descricao = (m.get("descricao") or "").strip()
+                data_str = (m.get("data") or "").strip()
+
+                caso = _achar_caso(cnj)
+                if not caso:
+                    mov_sem_caso += 1
+                    continue
+
+                # Parse da data (aceita YYYY-MM-DD e ISO completo)
+                data_mov = None
+                if data_str:
+                    try:
+                        data_mov = datetime.fromisoformat(data_str.replace("Z", "+00:00"))
+                    except ValueError:
+                        try:
+                            data_mov = datetime.strptime(data_str[:10], "%Y-%m-%d")
+                        except ValueError:
+                            erros.append({"erro": "data invalida", "mov": m})
+                            continue
+                if not data_mov:
+                    data_mov = datetime.utcnow()
+
+                # IDEMPOTENCIA: dedup por fingerprint dentro de dados_integra_cnj
+                # (campo JSON do MovimentacaoCNJ). Para 1a fase usa query simples.
+                # Otimizacao futura: indice GIN em (caso_id, fingerprint).
+                if fingerprint:
+                    existente = (
+                        MovimentacaoCNJ.query.filter(
+                            MovimentacaoCNJ.tenant_id == tenant_id,
+                            MovimentacaoCNJ.caso_id == caso.id,
+                        )
+                        .filter(
+                            MovimentacaoCNJ.dados_integra_cnj.op("->>")("fingerprint")
+                            == fingerprint
+                        )
+                        .first()
+                        if db.engine.dialect.name == "postgresql"
+                        else MovimentacaoCNJ.query.filter_by(
+                            tenant_id=tenant_id,
+                            caso_id=caso.id,
+                            descricao=descricao,
+                        )
+                        .filter(MovimentacaoCNJ.data_movimentacao == data_mov)
+                        .first()
+                    )
+                    if existente:
+                        mov_duplicadas += 1
+                        continue
+
+                # Cria a movimentacao no log
+                nova_mov = MovimentacaoCNJ(
+                    tenant_id=tenant_id,
+                    caso_id=caso.id,
+                    data_movimentacao=data_mov,
+                    descricao=descricao[:5000] if descricao else "(sem descricao)",
+                    dados_integra_cnj={
+                        "fonte": "projudi",
+                        "fingerprint": fingerprint,
+                        "seq": m.get("seq"),
+                        "tipo": m.get("tipo"),
+                        "raw": m.get("raw"),
+                    },
+                )
+                db.session.add(nova_mov)
+                mov_criadas += 1
+
+                # DETECCAO DE PRAZO — gera TarefaPrazo se houver
+                try:
+                    info = detectar_prazo(descricao, data_referencia=data_mov.date())
+                except Exception as exc:
+                    info = None
+                    erros.append({"erro": f"detector falhou: {exc}", "mov_id": cnj})
+
+                if info and info.get("vencimento_iso"):
+                    try:
+                        venc = datetime.strptime(info["vencimento_iso"], "%Y-%m-%d")
+                    except ValueError:
+                        venc = None
+                    if venc:
+                        # Idempotencia do prazo: nao cria se ja existe um prazo
+                        # com mesmo (caso_id, vencimento, tipo) — evita
+                        # duplicar quando o agent re-envia mov antiga.
+                        ja_existe = (
+                            TarefaPrazo.query.filter_by(
+                                tenant_id=tenant_id,
+                                caso_id=caso.id,
+                                tipo_tarefa="Prazo",
+                                data_vencimento=venc,
+                            )
+                            .filter(TarefaPrazo.titulo.like(f"%{titulo_prazo(info['tipo'])[:30]}%"))
+                            .first()
+                        )
+                        if not ja_existe:
+                            tarefa = TarefaPrazo(
+                                tenant_id=tenant_id,
+                                user_id=user_id,
+                                caso_id=caso.id,
+                                titulo=titulo_prazo(info["tipo"], cnj)[:250],
+                                descricao=(
+                                    f"Detectado automaticamente do PROJUDI.\n\n"
+                                    f"Tipo: {info['tipo']}\n"
+                                    f"Dias: {info.get('dias') or '?'} "
+                                    f"({'úteis' if info.get('uteis') else 'corridos'})\n"
+                                    f"Fonte: {info.get('fonte', 'regex')}\n\n"
+                                    f"Movimentação:\n{descricao[:500]}"
+                                ),
+                                status="A Fazer",
+                                prioridade=prioridade_por_dias_ate_vencer(venc.date()),
+                                data_vencimento=venc,
+                                tipo_tarefa="Prazo",
+                                origem_id=f"projudi:{fingerprint}" if fingerprint else None,
+                            )
+                            db.session.add(tarefa)
+                            prazos_criados += 1
+
+            try:
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                return {"message": "Falha ao salvar.", "erro": str(exc)}, 500
+
+            return {
+                "movimentacoes_criadas": mov_criadas,
+                "movimentacoes_duplicadas": mov_duplicadas,
+                "movimentacoes_sem_caso": mov_sem_caso,
+                "prazos_criados": prazos_criados,
+                "total_recebidas": len(movs),
+                "erros": erros[:20],  # limita resposta
             }, 200
