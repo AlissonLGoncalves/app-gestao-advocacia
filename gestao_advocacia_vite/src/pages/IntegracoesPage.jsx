@@ -95,7 +95,7 @@ function IntegracoesPage() {
 
   return (
     <div className="container-fluid py-4" style={{ maxWidth: 1100 }}>
-      <ConfirmDialog />
+      {ConfirmDialog}
 
       <h3 className="fw-bold mb-1">
         <i className="bi bi-puzzle me-2 text-primary" />
