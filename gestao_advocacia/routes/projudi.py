@@ -1,14 +1,15 @@
 """Rotas /api/projudi/* — integracao com o projudi-agent (scraper local).
 
-Fase 1: gestao de tokens API (gerar, listar, revogar) + endpoint /me
-para o agent confirmar autenticacao.
-
-Fases 2-4 (a vir): /processos, /movimentacoes, /pecas.
+Fase 1: gestao de tokens API (gerar, listar, revogar) + endpoint /me.
+Fase 2: POST /processos — recebe carteira do advogado e cria/sync Casos.
+Fases 3-4 (a vir): /movimentacoes, /pecas.
 """
 
 import hashlib
+import re
 import secrets
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 from flask import g, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -16,7 +17,7 @@ from flask_restx import Resource
 
 from extensions import db
 from helpers import projudi_agent_required, tenant_scoped
-from models import ProjudiAgentToken, User
+from models import Caso, Cliente, ProjudiAgentToken, User
 
 
 def register_projudi_routes(app, projudi_ns):
@@ -109,3 +110,202 @@ def register_projudi_routes(app, projudi_ns):
             token.revoked_at = datetime.utcnow()
             db.session.commit()
             return {"message": "Token revogado.", "info": token.to_dict()}, 200
+
+    # =====================================================================
+    # FASE 2 — Sync de processos da carteira do PROJUDI
+    # =====================================================================
+
+    def _normalizar_nome(s):
+        """Normaliza nome para comparacao: lowercase, sem acentos, espacos."""
+        import unicodedata as _ud  # noqa: PLC0415
+
+        s = (s or "").strip()
+        s = _ud.normalize("NFD", s)
+        s = "".join(c for c in s if _ud.category(c) != "Mn")
+        s = re.sub(r"\s+", " ", s)
+        return s.lower().strip()
+
+    def _parse_decimal_or_none(value):
+        if value in (None, ""):
+            return None
+        if isinstance(value, (int, float, Decimal)):
+            try:
+                return Decimal(str(value))
+            except InvalidOperation:
+                return None
+        v = str(value).strip().replace("R$", "").replace(" ", "")
+        if "," in v:
+            v = v.replace(".", "").replace(",", ".")
+        try:
+            return Decimal(v)
+        except (InvalidOperation, ValueError):
+            return None
+
+    def _parse_date_or_none(value):
+        if not value:
+            return None
+        s = str(value).strip()[:10]
+        try:
+            return datetime.strptime(s, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    def _trim(v, n):
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s[:n] if s else None
+
+    def _achar_cliente_por_partes(tenant_id, partes):
+        """Tenta casar nome de cliente cadastrado com qualquer das partes
+        (polo ativo + polo passivo). Match exato por nome normalizado."""
+        if not partes:
+            return None
+        nomes_norm = set()
+        for p in partes:
+            for sub in re.split(r"\s*[|;,]\s*", str(p or "")):
+                k = _normalizar_nome(sub)
+                if k and len(k) >= 4:
+                    nomes_norm.add(k)
+        if not nomes_norm:
+            return None
+        clientes = Cliente.query.filter_by(tenant_id=tenant_id).all()
+        for c in clientes:
+            if _normalizar_nome(c.nome_razao_social or "") in nomes_norm:
+                return c
+        return None
+
+    @projudi_ns.route("/processos")
+    class ProjudiProcessos(Resource):
+        @projudi_ns.doc(
+            description=(
+                "Recebe lista de processos da carteira do PROJUDI e cria/sincroniza "
+                "Casos no tenant. Idempotente: re-envio nao duplica. Vincula "
+                "automaticamente ao Cliente quando alguma das partes (polo ativo "
+                "ou passivo) bate por nome normalizado. Caso nao haja match, "
+                "retorna o processo na lista 'sem_cliente' para triagem manual."
+            ),
+        )
+        @projudi_agent_required
+        def post(self):
+            payload = request.get_json(silent=True) or {}
+            processos = payload.get("processos") or []
+            if not isinstance(processos, list):
+                return {"message": "Campo 'processos' deve ser uma lista."}, 400
+
+            tenant_id = g.tenant_id
+            user_id = g.user_id
+
+            criados = 0
+            atualizados = 0
+            sem_cliente = []  # lista de {numero_cnj, partes_polo_ativo, partes_polo_passivo}
+            erros = []
+
+            for p in processos:
+                if not isinstance(p, dict):
+                    continue
+                cnj = (p.get("numero_cnj") or "").strip()
+                if not cnj:
+                    erros.append({"erro": "numero_cnj vazio", "raw": p})
+                    continue
+
+                # Idempotencia: busca Caso por (tenant_id, numero_processo)
+                caso = Caso.query.filter_by(tenant_id=tenant_id, numero_processo=cnj).first()
+
+                polo_ativo = p.get("polo_ativo") or ""
+                polo_passivo = p.get("polo_passivo") or ""
+                partes = []
+                if isinstance(polo_ativo, list):
+                    partes.extend(polo_ativo)
+                elif polo_ativo:
+                    partes.append(polo_ativo)
+                if isinstance(polo_passivo, list):
+                    partes.extend(polo_passivo)
+                elif polo_passivo:
+                    partes.append(polo_passivo)
+
+                if caso:
+                    # Atualiza SO campos vazios — nao sobrescreve trabalho manual
+                    mudou = False
+                    if not caso.tipo_acao and p.get("classe"):
+                        caso.tipo_acao = _trim(p["classe"], 100)
+                        mudou = True
+                    if not caso.vara_juizo and p.get("vara"):
+                        caso.vara_juizo = _trim(p["vara"], 100)
+                        mudou = True
+                    if not caso.valor_causa and p.get("valor_causa") is not None:
+                        v = _parse_decimal_or_none(p["valor_causa"])
+                        if v is not None:
+                            caso.valor_causa = v
+                            mudou = True
+                    if not caso.data_distribuicao and p.get("data_distribuicao"):
+                        d = _parse_date_or_none(p["data_distribuicao"])
+                        if d:
+                            caso.data_distribuicao = d
+                            mudou = True
+                    if not caso.parte_contraria and partes:
+                        # Se cliente vinculado bate com algum, parte_contraria eh a outra
+                        if caso.cliente_id:
+                            cli = Cliente.query.get(caso.cliente_id)
+                            if cli:
+                                cli_norm = _normalizar_nome(cli.nome_razao_social or "")
+                                outras = [
+                                    pt for pt in partes if _normalizar_nome(str(pt)) != cli_norm
+                                ]
+                                if outras:
+                                    caso.parte_contraria = _trim(
+                                        " | ".join(str(o) for o in outras), 200
+                                    )
+                                    mudou = True
+                    if mudou:
+                        atualizados += 1
+                    continue
+
+                # Caso novo — precisa de cliente_id (NOT NULL)
+                cliente = _achar_cliente_por_partes(tenant_id, partes)
+                if not cliente:
+                    sem_cliente.append(
+                        {
+                            "numero_cnj": cnj,
+                            "polo_ativo": polo_ativo,
+                            "polo_passivo": polo_passivo,
+                            "categoria_projudi": p.get("categoria_projudi"),
+                        }
+                    )
+                    continue
+
+                # Define parte_contraria como a outra parte do polo oposto
+                cli_norm = _normalizar_nome(cliente.nome_razao_social or "")
+                outras = [pt for pt in partes if _normalizar_nome(str(pt)) != cli_norm]
+                parte_contraria = " | ".join(str(o) for o in outras) if outras else None
+
+                novo = Caso(
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    cliente_id=cliente.id,
+                    titulo=_trim(f"Processo {cnj}", 200),
+                    numero_processo=_trim(cnj, 30),
+                    status="Ativo",
+                    tipo_acao=_trim(p.get("classe"), 100),
+                    vara_juizo=_trim(p.get("vara"), 100),
+                    valor_causa=_parse_decimal_or_none(p.get("valor_causa")),
+                    data_distribuicao=_parse_date_or_none(p.get("data_distribuicao")),
+                    parte_contraria=_trim(parte_contraria, 200),
+                    notas_caso="Importado automaticamente do PROJUDI.",
+                )
+                db.session.add(novo)
+                criados += 1
+
+            try:
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                return {"message": "Falha ao salvar.", "erro": str(exc)}, 500
+
+            return {
+                "criados": criados,
+                "atualizados": atualizados,
+                "sem_cliente": sem_cliente,
+                "total_recebidos": len(processos),
+                "erros": erros,
+            }, 200
