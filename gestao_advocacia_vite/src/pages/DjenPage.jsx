@@ -22,17 +22,34 @@ import {
 } from '../api/djen.js'
 import { listCasos } from '../api/casos.js'
 
+// Decodifica entidades HTML por substituicao direta de string. Antes usava
+// `textarea.innerHTML = ...` para forcar o browser a decodificar — funcionava
+// mas atribuia HTML bruto (vindo de tribunal) a um elemento detached. Mesmo
+// que <textarea> nao execute scripts, isso e um vetor de parsing desnecessario
+// antes do DOMPurify. Aqui fazemos so a decodificacao das entidades comuns
+// que tribunais enviam em camada (&amp;lt;, &amp;gt;, &amp;amp;, &amp;quot;,
+// &amp;#39;, numericas e nomeadas mais frequentes).
+const HTML_ENTITY_MAP = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&apos;': "'",
+  '&nbsp;': ' ',
+}
+
 const decodeHtmlEntities = (texto = '') => {
   if (!texto) return ''
 
   // Alguns tribunais enviam HTML com codificacao em camadas
   // (ex.: &amp;lt;table&amp;gt;), entao decodificamos em ate 5 passagens.
-  const textarea = document.createElement('textarea')
   let atual = texto
-
   for (let i = 0; i < 5; i += 1) {
-    textarea.innerHTML = atual
-    const decodificado = textarea.value
+    const decodificado = atual
+      .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+      .replace(/&[a-zA-Z]+;/g, (m) => HTML_ENTITY_MAP[m] ?? m)
     if (decodificado === atual) break
     atual = decodificado
   }
