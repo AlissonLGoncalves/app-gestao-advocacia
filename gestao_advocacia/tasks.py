@@ -26,13 +26,11 @@ def job_verificar_processos_cnj():
     # e garantir que o contexto da aplicação Flask esteja disponível.
     # Flask-APScheduler geralmente cuida de executar o job com um contexto de app.
     try:
-        # Assume que app.py (onde db, Caso, MovimentacaoCNJ são definidos/inicializados)
-        # está no mesmo diretório que tasks.py.
-        # Se app.py está em um nível acima, o import seria 'from ..app import ...'
-        # mas dado o erro original, é mais provável que estejam no mesmo nível
-        # ou que a estrutura do projeto precise ser ajustada para ser um pacote.
-        # Para execução direta de app.py, a importação direta 'from app import ...' é usada.
-        from app import Caso, MovimentacaoCNJ, db
+        # Importar de 'extensions' / 'models' diretamente — 'app' nao reexporta
+        # MovimentacaoCNJ (so re-exporta um subset). Bug historico que deixava o
+        # job CNJ caindo com ImportError silencioso a cada execucao do scheduler.
+        from extensions import db
+        from models import Caso, MovimentacaoCNJ
     except ImportError as e:
         # Log crítico se a importação falhar em tempo de execução do job.
         logger = logging.getLogger(__name__)  # Fallback logger
