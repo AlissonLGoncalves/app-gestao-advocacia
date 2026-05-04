@@ -23,10 +23,23 @@ def configure_cors_origins():
     import re
 
     origins.append(re.compile(r"https://app-gestao-advocacia-[\w-]+\.vercel\.app$"))
-    # Permite adicionar origens extras via env var (CSV), ex.: para staging
+    # Origens extras via env var (CSV) — staging, dominios customizados, etc.
+    # Validamos cada entrada: precisa ser http(s)://host[:porta] absoluto, sem
+    # wildcards, sem path. Uma origem mal-formada (ex.: "*", " ", URL com path)
+    # eh ignorada com aviso, NAO injetada na lista. Sem essa validacao um
+    # CORS_ALLOWED_ORIGINS=* via deploy errado abria CORS pra qualquer origem.
+    valid_origin = re.compile(r"^https?://[A-Za-z0-9._-]+(?::\d+)?$")
     extra_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
     if extra_origins:
-        origins.extend([o.strip() for o in extra_origins.split(",") if o.strip()])
+        for raw in extra_origins.split(","):
+            o = raw.strip()
+            if not o:
+                continue
+            if not valid_origin.match(o):
+                # Print direto pq ainda nao temos app.logger configurado aqui.
+                print(f"[CORS] ignorando origem invalida em CORS_ALLOWED_ORIGINS: {o!r}")
+                continue
+            origins.append(o)
     return origins
 
 

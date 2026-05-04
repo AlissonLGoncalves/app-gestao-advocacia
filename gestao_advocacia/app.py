@@ -148,8 +148,13 @@ def create_app(config_class=Config):
     configure_request_context(app)
     configure_error_handlers(app)
 
+    # Swagger UI: gateado por var dedicada SWAGGER_ENABLED (default false).
+    # Confiar em FLASK_ENV != "production" e perigoso — se a var nao for setada
+    # em deploy novo, swagger fica exposto. Var explicita falha fechada.
+    _swagger_enabled = os.environ.get("SWAGGER_ENABLED", "false").strip().lower() == "true"
+
     api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
-    swagger_doc_path = "/api/v1/docs" if os.environ.get("FLASK_ENV") != "production" else False
+    swagger_doc_path = "/api/v1/docs" if _swagger_enabled else False
     api = Api(
         api_bp,
         version="1.0",
@@ -175,7 +180,7 @@ def create_app(config_class=Config):
     from flask_restx import Namespace as _Namespace
 
     admin_bp = Blueprint("admin_api", __name__, url_prefix="/admin/v1")
-    admin_swagger_doc = "/admin/v1/docs" if os.environ.get("FLASK_ENV") != "production" else False
+    admin_swagger_doc = "/admin/v1/docs" if _swagger_enabled else False
     admin_api = Api(
         admin_bp,
         version="1.0",

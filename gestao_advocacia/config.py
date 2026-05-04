@@ -14,6 +14,21 @@ def _normalize_sqlalchemy_db_url(db_url: str) -> str:
     return db_url
 
 
+def is_production() -> bool:
+    """Indica se estamos em producao.
+
+    Prefere APP_ENV (var dedicada, nova). Cai em FLASK_ENV por compat
+    (deprecado pelo Flask). Sem var setada, assume DESENVOLVIMENTO — preserva
+    o comportamento historico pre-existente. As protecoes criticas (Swagger,
+    SECRET_KEY) tem suas proprias vars dedicadas (SWAGGER_ENABLED, exigencia
+    explicita em prod), entao nao precisamos fail-closed aqui.
+    """
+    app_env = (os.environ.get("APP_ENV") or "").strip().lower()
+    if app_env:
+        return app_env == "production"
+    return (os.environ.get("FLASK_ENV") or "").strip().lower() == "production"
+
+
 # Determina o diretório base do projeto (um nível acima de 'gestao_advocacia')
 # Isso garante que o .env seja encontrado corretamente, mesmo que config.py esteja em uma subpasta.
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -44,7 +59,7 @@ class Config:
     if not SECRET_KEY:
         import warnings
 
-        if os.environ.get("FLASK_ENV") == "production":
+        if is_production():
             raise RuntimeError(
                 "CRITICAL: SECRET_KEY environment variable is not set. "
                 "Refusing to start in production without a strong secret key."
@@ -58,7 +73,7 @@ class Config:
     if not JWT_SECRET_KEY:
         import warnings
 
-        if os.environ.get("FLASK_ENV") == "production":
+        if is_production():
             raise RuntimeError(
                 "CRITICAL: JWT_SECRET_KEY environment variable is not set. "
                 "Refusing to start in production without a strong JWT secret key."
@@ -91,7 +106,11 @@ class Config:
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER") or os.path.join(
         os.path.abspath(os.path.dirname(__file__)), "uploads"
     )
-    MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
+    # Limite global do Flask: alinhado ao maior endpoint legitimo (POST /projudi/pecas
+    # = 50 MB). Endpoints de documento comum continuam validando 10 MB no
+    # upload_validator (camada de aplicacao). Sem este alinhamento, o Flask
+    # carregava ate 100 MB em memoria antes de qualquer validacao — vetor de DoS.
+    MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50 MB
 
     CNJ_API_KEY = os.environ.get("CNJ_API_KEY", "")
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")

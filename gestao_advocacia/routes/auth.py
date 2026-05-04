@@ -11,6 +11,7 @@ from flask_jwt_extended import create_access_token, decode_token, get_jwt_identi
 from flask_restx import Resource
 from jwt.exceptions import DecodeError, ExpiredSignatureError
 
+from config import is_production
 from extensions import db, limiter
 from helpers.admin_session import admin_session
 from mail_service import enviar_alerta_email, enviar_email
@@ -515,14 +516,22 @@ def register_auth_routes(
             try:
                 admin_email = os.environ.get("ADMIN_NOTIFY_EMAIL")
                 if admin_email:
+                    # Escapa todos os campos enviados pelo solicitante — sem isso,
+                    # nome/mensagem com HTML rendem injecao no inbox do admin
+                    # (phishing visual, redirecao oculta).
+                    import html as _html
+
+                    def _e(v):
+                        return _html.escape(str(v)) if v else "-"
+
                     corpo_html = (
                         f"<p>Nova solicitacao de acesso Patronus.</p>"
-                        f"<p><strong>Nome:</strong> {nome}<br>"
-                        f"<strong>Email:</strong> {email}<br>"
-                        f"<strong>OAB:</strong> {oab or '-'} {sigla_oab or ''}<br>"
-                        f"<strong>Telefone:</strong> {telefone or '-'}<br>"
-                        f"<strong>Escritorio:</strong> {escritorio or '-'}</p>"
-                        f"<p><strong>Mensagem:</strong><br>{(mensagem or '-')}</p>"
+                        f"<p><strong>Nome:</strong> {_e(nome)}<br>"
+                        f"<strong>Email:</strong> {_e(email)}<br>"
+                        f"<strong>OAB:</strong> {_e(oab)} {_e(sigla_oab)}<br>"
+                        f"<strong>Telefone:</strong> {_e(telefone)}<br>"
+                        f"<strong>Escritorio:</strong> {_e(escritorio)}</p>"
+                        f"<p><strong>Mensagem:</strong><br>{_e(mensagem)}</p>"
                         f"<p>Aprovar/rejeitar via /admin/v1/access-requests.</p>"
                     )
                     enviar_alerta_email(
@@ -604,7 +613,13 @@ def register_auth_routes(
                 corpo_email,
             )
 
-            return {"message": "Convite enviado para o cliente!", "link_simulado": link}, 200
+            # link_simulado expoe o token de convite na resposta — util em dev
+            # mas vetor de vazamento em prod (proxy log, painel de monitoramento).
+            # Em prod o link vai SO por email.
+            resposta = {"message": "Convite enviado para o cliente!"}
+            if not is_production():
+                resposta["link_simulado"] = link
+            return resposta, 200
 
     @auth_ns.route("/invite")
     class UserInvite(Resource):
@@ -662,7 +677,11 @@ def register_auth_routes(
                 corpo_email,
             )
 
-            return {"message": "Convite disparado com sucesso!", "link_simulado": link}, 200
+            # Idem: link_simulado so em dev — em prod vai exclusivamente por email.
+            resposta = {"message": "Convite disparado com sucesso!"}
+            if not is_production():
+                resposta["link_simulado"] = link
+            return resposta, 200
 
     @auth_ns.route("/register-invite")
     class RegisterInvite(Resource):
