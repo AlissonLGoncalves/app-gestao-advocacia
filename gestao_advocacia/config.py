@@ -17,26 +17,16 @@ def _normalize_sqlalchemy_db_url(db_url: str) -> str:
 def is_production() -> bool:
     """Indica se estamos em producao.
 
-    Prefere APP_ENV (var dedicada). Cai em FLASK_ENV por compat. Sem nada
-    setado, assume PRODUCAO por seguranca (fail-closed) — testes locais
-    devem setar APP_ENV=development explicitamente.
+    Prefere APP_ENV (var dedicada, nova). Cai em FLASK_ENV por compat
+    (deprecado pelo Flask). Sem var setada, assume DESENVOLVIMENTO — preserva
+    o comportamento historico pre-existente. As protecoes criticas (Swagger,
+    SECRET_KEY) tem suas proprias vars dedicadas (SWAGGER_ENABLED, exigencia
+    explicita em prod), entao nao precisamos fail-closed aqui.
     """
     app_env = (os.environ.get("APP_ENV") or "").strip().lower()
     if app_env:
         return app_env == "production"
-    flask_env = (os.environ.get("FLASK_ENV") or "").strip().lower()
-    if flask_env:
-        return flask_env == "production"
-    # Sem nenhuma var setada: fail-closed (assume prod). Testes/CI configuram
-    # PYTEST_CURRENT_TEST automaticamente — abaixo damos free pass pra eles.
-    if os.environ.get("PYTEST_CURRENT_TEST"):
-        return False
-    return True
-
-
-def _is_dev() -> bool:
-    """Inverso semantico de is_production() pra leitura."""
-    return not is_production()
+    return (os.environ.get("FLASK_ENV") or "").strip().lower() == "production"
 
 
 # Determina o diretório base do projeto (um nível acima de 'gestao_advocacia')
