@@ -12,12 +12,25 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: [
-        'src/ClienteForm.jsx',
-        'src/CasoForm.jsx',
-        'src/components/HonorariosCasoCard.jsx',
-        'src/pages/auth/LoginPage.jsx',
+      // Mede todo src/ (antes era whitelist de 4 arquivos — ineficaz como gate).
+      include: ['src/**/*.{js,jsx}'],
+      exclude: [
+        'src/setupTests.js',
+        'src/main.jsx',
+        '**/*.test.{js,jsx}',
+        '**/__tests__/**',
+        'src/api/**',
       ],
+      // Threshold inicial baixo (medido: 15% lines / 11.5% functions / 15.2% branches).
+      // Trava regressao sem forcar maratona retroativa. Sobe ~3pp por trimestre
+      // conforme adicionamos teste em paginas novas (PortalPage, IntegracoesPage,
+      // PrazosPage, RelatoriosPage atuais com 0%).
+      thresholds: {
+        lines: 12,
+        statements: 12,
+        functions: 10,
+        branches: 12,
+      },
     },
   },
   server: {

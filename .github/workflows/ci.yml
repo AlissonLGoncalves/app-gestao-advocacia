@@ -80,7 +80,10 @@ jobs:
         run: pip install pytest-cov
 
       - name: Run backend tests with coverage
-        run: pytest tests --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=50
+        # Threshold subiu de 50->60 (medido em 64.8% no merge de #163, ~5% de folga).
+        # Sobe gradualmente conforme adicionarmos teste em routes/projudi.py,
+        # prazo_detector.py, routes/portal.py e routes/relatorios.py (atuais piores).
+        run: pytest tests --cov=. --cov-report=term-missing:skip-covered --cov-report=xml --cov-fail-under=60
 
       - name: Upload backend coverage artifact
         uses: actions/upload-artifact@v7
