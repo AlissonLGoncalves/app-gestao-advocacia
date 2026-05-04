@@ -129,9 +129,38 @@ def detectar_prazo_regex(texto: str, data_referencia: date | None = None) -> dic
 
 
 def detectar_prazo_ia(texto: str, data_referencia: date | None = None) -> dict | None:
-    """Fallback Gemini. Custo: ~\\$0.0003/chamada. So roda quando o texto
-    tem >100 chars e regex nao retornou nada."""
+    """Fallback Gemini. Custo: ~\\$0.0015/chamada (gemini-2.5-pro). So roda
+    quando o texto tem >100 chars e regex nao retornou nada.
+
+    Short-circuits adicionais (gratis) pra reduzir gasto a medida que escalamos:
+    - Textos puramente operacionais (Conclusos, Juntada, Certidao) sao log puro
+      sem prazo — pula IA inteira.
+    - Textos sem nenhuma das palavras-gatilho ("prazo", "dias", "intimad",
+      "ciencia", "manifest", "contestac") tipicamente nao tem prazo processual.
+    """
     if not texto or len(texto) < 100:
+        return None
+
+    txt_lower = texto.lower()
+    # Skip: log operacional puro (conclusos, juntadas) sem palavra-gatilho.
+    sem_gatilho = not any(
+        kw in txt_lower
+        for kw in (
+            "prazo",
+            "dias",
+            "intimad",
+            "ciencia",
+            "ciência",
+            "manifest",
+            "contestac",
+            "contestaç",
+            "recurso",
+            "embargo",
+            "alegac",
+            "alegaç",
+        )
+    )
+    if sem_gatilho:
         return None
 
     try:

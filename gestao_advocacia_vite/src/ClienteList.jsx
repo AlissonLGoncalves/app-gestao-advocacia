@@ -419,8 +419,22 @@ function ClienteList({ onEditCliente, refreshKey }) {
                           title={`CNPJs Adicionais: ${[cliente.cnpj_secundario, cliente.cnpj_terciario].filter(Boolean).join(', ')}`}
                         />
                       )}
+                    {cliente.dados_pendentes && (
+                      <span
+                        className="badge bg-warning text-dark ms-2"
+                        title="Cliente criado automaticamente (DJEN/PROJUDI). CPF/CNPJ é placeholder — edite para completar os dados."
+                      >
+                        Dados pendentes
+                      </span>
+                    )}
                   </td>
-                  <td className="px-3 py-2">{cliente.cpf_cnpj}</td>
+                  <td className="px-3 py-2">
+                    {cliente.dados_pendentes ? (
+                      <span className="text-muted fst-italic">— pendente —</span>
+                    ) : (
+                      cliente.cpf_cnpj
+                    )}
+                  </td>
                   <td className="px-3 py-2">{cliente.tipo_pessoa}</td>
                   <td className="px-3 py-2">{cliente.email || '-'}</td>
                   <td className="px-3 py-2">{cliente.telefone || '-'}</td>

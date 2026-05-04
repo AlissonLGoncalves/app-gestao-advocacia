@@ -205,6 +205,12 @@ class Cliente(db.Model):
             "pais": self.pais,
             "notas_gerais": self.notas_gerais,
             "user_id": self.user_id,
+            # Flag derivada: True quando o cpf_cnpj eh placeholder gerado por
+            # backfill DJEN ou Projudi (sem documento real). Frontend usa pra
+            # exibir badge "Dados pendentes" e priorizar complemento manual.
+            "dados_pendentes": bool(
+                self.cpf_cnpj and self.cpf_cnpj.startswith(("DJEN-", "PROJUDI-"))
+            ),
         }
 
 
