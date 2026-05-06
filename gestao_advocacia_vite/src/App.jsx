@@ -219,6 +219,42 @@ const MainLayout = () => {
   useEffect(() => {
     fetchSidebarCounts()
   }, [fetchSidebarCounts, location.pathname])
+
+  // Sync DJEN automatico na primeira renderizacao do dia. O backend ja faz a
+  // checagem de "ja sincronizou hoje?" — frontend so dispara uma vez por sessao
+  // (sessionStorage evita refire em cada navegacao SPA). Se o servidor decide
+  // skipar (status 200 + skipped=true), zero overhead.
+  useEffect(() => {
+    if (sessionStorage.getItem('djen_diario_disparado') === 'true') return
+    const userStr = localStorage.getItem('user')
+    let role = ''
+    try {
+      role = userStr ? JSON.parse(userStr).role : ''
+    } catch {
+      /* */
+    }
+    // Cliente do portal e super-admin nao tem DJEN proprio.
+    if (role === 'cliente' || role === 'superadmin') {
+      sessionStorage.setItem('djen_diario_disparado', 'true')
+      return
+    }
+    api
+      .post('/djen/sync/diario', {})
+      .then((data) => {
+        sessionStorage.setItem('djen_diario_disparado', 'true')
+        if (!data?.skipped) {
+          // Toast discreto so quando realmente disparamos um sync novo.
+          toast.info('Sincronizando publicacoes do DJEN em segundo plano...', {
+            autoClose: 4000,
+          })
+        }
+      })
+      .catch(() => {
+        // Falha nao deve impedir o usuario de usar o app — silencia. Tenta
+        // novamente na proxima sessao (sessionStorage so seta em sucesso).
+      })
+  }, [])
+
   const dataAtual = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'short',
     day: '2-digit',
