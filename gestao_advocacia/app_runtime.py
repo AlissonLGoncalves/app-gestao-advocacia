@@ -113,6 +113,14 @@ def configure_scheduler(app):
         )
         return
 
+    # Idempotencia: se o scheduler ja foi inicializado nesta mesma maquina
+    # (create_app() em app.py chama configure_scheduler, e o scheduler_runner.py
+    # chama de novo apos bootstrap), uma segunda init_app() em scheduler ja
+    # rodando levanta SchedulerAlreadyRunningError. Pula reinit silenciosamente.
+    if scheduler.running:
+        app.logger.info("APScheduler ja em execucao — skip reconfiguracao.")
+        return
+
     if app.config.get("CNJ_JOB_ENABLED", False):
         if not app.config.get("TESTING", False):
             scheduler.init_app(app)
