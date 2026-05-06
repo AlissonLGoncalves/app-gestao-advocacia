@@ -1884,7 +1884,12 @@ def registrar_rotas_djen(
                 DjenSyncJob.query.filter(
                     DjenSyncJob.tenant_id == user.tenant_id,
                     DjenSyncJob.criado_em >= inicio_dia_utc,
-                    DjenSyncJob.status.in_(["pending", "running", "success"]),
+                    # Status reais do DjenSyncJob: pending | running | done | failed.
+                    # Bug original usava "success" — dedup nunca matched, cada visita
+                    # criava job novo (gasto de chamada DJEN). Inclui "failed" pra
+                    # NAO refazer um sync que falhou hoje (deixa o user clicar manual
+                    # no botao se quiser tentar de novo).
+                    DjenSyncJob.status.in_(["pending", "running", "done", "failed"]),
                 )
                 .order_by(DjenSyncJob.criado_em.desc())
                 .first()
