@@ -83,6 +83,14 @@ def build_openapi_from_blueprints(app) -> dict:
 
 
 def register_openapi_docs(app):
+    # Gateado por SWAGGER_ENABLED (mesma var que controla o swagger do
+    # flask-restx). Sem isso, este blueprint paralelo expunha /api/v1/docs e
+    # /api/v1/openapi.json em prod independente da flag.
+    import os as _os
+
+    if _os.environ.get("SWAGGER_ENABLED", "false").strip().lower() != "true":
+        return
+
     docs_bp = Blueprint("openapi_docs", __name__, url_prefix="/api/v1")
 
     @docs_bp.get("/openapi.json")

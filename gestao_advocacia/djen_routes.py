@@ -1839,6 +1839,86 @@ def registrar_rotas_djen(
                 "status": "pending",
             }, 202
 
+    @djen_ns.route("/sync/diario")
+    class DjenSyncDiarioAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Sync DJEN automatico do dia. Se ja houve um job concluido com "
+                "sucesso para este tenant em qualquer hora do dia atual (timezone "
+                "America/Sao_Paulo), retorna 200 com skipped=true. Caso contrario, "
+                "enfileira novo sync (lookback default 7 dias) e retorna 202. "
+                "Frontend deve chamar este endpoint na primeira renderizacao do dia."
+            ),
+        )
+        @jwt_required()
+        def post(self):
+            from datetime import datetime as _dt
+            from zoneinfo import ZoneInfo
+
+            from app import User
+            from models import DjenSyncJob
+
+            user_id = get_jwt_identity()
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                # Nao e erro: tenants sem DJEN habilitado simplesmente skipam.
+                return {"skipped": True, "motivo": "djen_nao_habilitado"}, 200
+
+            # Ja teve sync hoje? Considera "hoje" no fuso de Sao Paulo (cliente
+            # tem expectativa de "primeira vez no dia" pelo dia LOCAL, nao UTC).
+            try:
+                tz = ZoneInfo("America/Sao_Paulo")
+            except Exception:
+                tz = None
+            agora_local = _dt.now(tz=tz) if tz else _dt.utcnow()
+            inicio_dia = agora_local.replace(hour=0, minute=0, second=0, microsecond=0)
+            # criado_em e UTC naive no banco — converte inicio_dia local pra UTC.
+            inicio_dia_utc = (
+                inicio_dia.astimezone(ZoneInfo("UTC")).replace(tzinfo=None) if tz else inicio_dia
+            )
+
+            ja_hoje = (
+                DjenSyncJob.query.filter(
+                    DjenSyncJob.tenant_id == user.tenant_id,
+                    DjenSyncJob.criado_em >= inicio_dia_utc,
+                    DjenSyncJob.status.in_(["pending", "running", "success"]),
+                )
+                .order_by(DjenSyncJob.criado_em.desc())
+                .first()
+            )
+            if ja_hoje:
+                return {
+                    "skipped": True,
+                    "motivo": "ja_sincronizado_hoje",
+                    "job_id": ja_hoje.id,
+                    "status": ja_hoje.status,
+                }, 200
+
+            job = DjenSyncJob(
+                tenant_id=user.tenant_id,
+                user_id=user.id,
+                status="pending",
+                lookback_days=7,
+            )
+            db.session.add(job)
+            db.session.commit()
+            logger.info(
+                "djen_sync_diario_enqueued",
+                extra={
+                    "event": "djen_sync_diario_enqueued",
+                    "job_id": job.id,
+                    "tenant_id": user.tenant_id,
+                },
+            )
+            return {
+                "skipped": False,
+                "job_id": job.id,
+                "status": "pending",
+            }, 202
+
     @djen_ns.route("/sync/<int:job_id>")
     class DjenSyncJobStatusAPI(Resource):
         @djen_ns.doc(
