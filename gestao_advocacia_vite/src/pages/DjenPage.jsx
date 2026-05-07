@@ -2,7 +2,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { useConfirm } from '../hooks/useConfirm.jsx'
-import DOMPurify from 'dompurify'
+import {
+  decodeHtmlEntities,
+  sanitizarHtmlTribunal,
+  extrairTextoPlano,
+} from '../utils/htmlTribunal.js'
 import ModalCriarClienteCaso from '../components/djen/ModalCriarClienteCaso.jsx'
 import {
   baixarCertidao as baixarCertidaoApi,
@@ -21,89 +25,6 @@ import {
   vincularDecisao,
 } from '../api/djen.js'
 import { listCasos } from '../api/casos.js'
-
-// Decodifica entidades HTML por substituicao direta de string. Antes usava
-// `textarea.innerHTML = ...` para forcar o browser a decodificar — funcionava
-// mas atribuia HTML bruto (vindo de tribunal) a um elemento detached. Mesmo
-// que <textarea> nao execute scripts, isso e um vetor de parsing desnecessario
-// antes do DOMPurify. Aqui fazemos so a decodificacao das entidades comuns
-// que tribunais enviam em camada (&amp;lt;, &amp;gt;, &amp;amp;, &amp;quot;,
-// &amp;#39;, numericas e nomeadas mais frequentes).
-const HTML_ENTITY_MAP = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&apos;': "'",
-  '&nbsp;': ' ',
-}
-
-const decodeHtmlEntities = (texto = '') => {
-  if (!texto) return ''
-
-  // Alguns tribunais enviam HTML com codificacao em camadas
-  // (ex.: &amp;lt;table&amp;gt;), entao decodificamos em ate 5 passagens.
-  let atual = texto
-  for (let i = 0; i < 5; i += 1) {
-    const decodificado = atual
-      .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
-      .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCodePoint(parseInt(code, 16)))
-      .replace(/&[a-zA-Z]+;/g, (m) => HTML_ENTITY_MAP[m] ?? m)
-    if (decodificado === atual) break
-    atual = decodificado
-  }
-
-  return atual
-}
-
-const sanitizarHtmlTribunal = (texto = '') => {
-  if (!texto) return ''
-  return DOMPurify.sanitize(texto, {
-    // Preserva ao maximo a formatacao do CNJ (cores, tamanhos, tabelas, classes)
-    // sem permitir execucao de scripts/eventos inseguros.
-    USE_PROFILES: { html: true },
-    ADD_TAGS: [
-      'style',
-      'font',
-      'center',
-      'table',
-      'thead',
-      'tbody',
-      'tfoot',
-      'tr',
-      'th',
-      'td',
-      'colgroup',
-      'col',
-      'caption',
-      'br',
-    ],
-    ADD_ATTR: [
-      'style',
-      'class',
-      'align',
-      'bgcolor',
-      'cellpadding',
-      'cellspacing',
-      'border',
-      'width',
-      'height',
-      'valign',
-      'colspan',
-      'rowspan',
-    ],
-    FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
-    FORBID_ATTR: [/^on/i],
-  })
-}
-
-const extrairTextoPlano = (html = '') => {
-  if (!html) return ''
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(html, 'text/html')
-  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
-}
 
 // ── Lista completa de tribunais brasileiros ────────────────────────────────
 const TRIBUNAIS = [
