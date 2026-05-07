@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import { api } from '../api/client.js'
 import { getPublicacao, baixarCertidao as baixarCertidaoApi } from '../api/djen.js'
+import { prepararHtmlTribunal, extrairTextoPlano } from '../utils/htmlTribunal.js'
 import {
   ScaleIcon,
   NewspaperIcon,
@@ -225,19 +226,37 @@ function PublicacaoDjenItem({ item }) {
     }
   }
 
-  // Texto exibido: o que veio de "descricao" (truncado a 500), ou o completo se carregado
-  const texto = expandido && textoCompleto !== null ? textoCompleto : item.descricao || ''
+  // Texto exibido: 'descricao' (truncado a 500) por padrao, ou texto completo
+  // quando expandido. Tribunais enviam em HTML (TRT9/TST mandam <html><head>...
+  // com tabelas e estilos), entao precisamos sanitizar + renderizar como HTML.
+  // Quando colapsado, mostramos preview em texto plano (sem markup).
+  const textoBruto = expandido && textoCompleto !== null ? textoCompleto : item.descricao || ''
+  const ehHtml = /<\s*(html|body|article|section|table|p|div|br)\b/i.test(textoBruto)
 
   return (
     <>
       {item.descricao && (
-        <p
-          className="text-muted small mb-1"
-          style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-        >
-          {carregando ? 'Carregando texto completo...' : texto}
-          {!expandido && temMaisTexto && <span className="text-muted fst-italic"> (...)</span>}
-        </p>
+        <>
+          {expandido && ehHtml ? (
+            <div
+              className="text-muted small mb-1 djen-html-content"
+              style={{ wordBreak: 'break-word', maxWidth: '100%', overflowX: 'auto' }}
+              dangerouslySetInnerHTML={{ __html: prepararHtmlTribunal(textoBruto) }}
+            />
+          ) : (
+            <p
+              className="text-muted small mb-1"
+              style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+            >
+              {carregando
+                ? 'Carregando texto completo...'
+                : ehHtml
+                  ? extrairTextoPlano(textoBruto).slice(0, 500)
+                  : textoBruto}
+              {!expandido && temMaisTexto && <span className="text-muted fst-italic"> (...)</span>}
+            </p>
+          )}
+        </>
       )}
 
       {meta.sigla_tribunal && (
