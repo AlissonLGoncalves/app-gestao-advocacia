@@ -13,6 +13,7 @@ import ClientesPage from './pages/ClientesPage.jsx'
 import CasosPage from './pages/CasosPage.jsx'
 import CasoDetalhePage from './pages/CasoDetalhePage.jsx'
 import RecebimentosPage from './pages/RecebimentosPage.jsx'
+import ContratosPage from './pages/ContratosPage.jsx'
 import DespesasPage from './pages/DespesasPage.jsx'
 import AgendaPage from './pages/AgendaPage.jsx'
 import PrazosPage from './pages/PrazosPage.jsx'
@@ -414,6 +415,9 @@ const MainLayout = () => {
               <SidebarLink to="/recebimentos" icon={CurrencyDollarIcon}>
                 Recebimentos
               </SidebarLink>
+              <SidebarLink to="/contratos" icon={CurrencyDollarIcon}>
+                Contratos
+              </SidebarLink>
               <SidebarLink to="/despesas" icon={CreditCardIcon}>
                 Despesas
               </SidebarLink>
@@ -565,6 +569,8 @@ function App() {
           <Route path="recebimentos" element={<RecebimentosPage />} />
           <Route path="recebimentos/novo" element={<RecebimentosPage />} />
           <Route path="recebimentos/editar/:recebimentoId" element={<RecebimentosPage />} />
+
+          <Route path="contratos" element={<ContratosPage />} />
 
           <Route path="despesas" element={<DespesasPage />} />
           <Route path="despesas/novo" element={<DespesasPage />} />

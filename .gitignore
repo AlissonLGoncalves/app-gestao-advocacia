@@ -5,3 +5,5 @@ __pycache__/
 *.db
 backups/
 .claude/worktrees/
+.claude/scheduled_tasks.lock
+gestao_advocacia/out/

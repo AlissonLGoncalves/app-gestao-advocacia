@@ -172,6 +172,28 @@ def create_app(config_class=Config):
         security="jsonWebToken",
     )
 
+    # Error handlers pro Api principal — espelha os do admin_api (linhas mais
+    # abaixo). Sem isso, JWT expirado ou mal-formado caia no default do
+    # flask-restx e voltava 500 "Internal Server Error" no dashboard, em vez
+    # de 401 que o frontend traduz pra redirect login.
+    from flask_jwt_extended.exceptions import (
+        NoAuthorizationError as _NoAuthError,
+    )
+    from jwt.exceptions import PyJWTError as _PyJWTError
+
+    @api.errorhandler(_NoAuthError)
+    def _api_handle_no_auth(error):
+        return {"message": "Sessao expirada."}, 401
+
+    @api.errorhandler(JWTExtendedException)
+    def _api_handle_jwt(error):
+        return {"message": "Sessao expirada."}, 401
+
+    @api.errorhandler(_PyJWTError)
+    def _api_handle_pyjwt(error):
+        # ExpiredSignatureError, DecodeError, InvalidTokenError, etc.
+        return {"message": "Sessao expirada."}, 401
+
     register_api_routes(app, api, finance_access_required)
     app.register_blueprint(api_bp)
 

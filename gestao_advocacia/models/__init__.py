@@ -612,12 +612,18 @@ class ContratoHonorario(db.Model):
     tipo_honorario = db.Column(db.String(50), nullable=False)  # Fixo, Êxito, Mensal, Horas
     valor_total = db.Column(db.Numeric(14, 2), nullable=True)
     percentual_exito = db.Column(db.Numeric(5, 2), nullable=True)
+    percentual_recurso = db.Column(db.Numeric(5, 2), nullable=True)
     data_assinatura = db.Column(db.Date, nullable=True)
     status = db.Column(db.String(30), nullable=True, default="Ativo")
     notas_condicoes = db.Column(db.Text, nullable=True)
+    objeto = db.Column(db.Text, nullable=True)
+    vigencia_condicao = db.Column(db.Text, nullable=True)
+    arquivo_hash = db.Column(db.String(64), nullable=True)
+    arquivo_nome = db.Column(db.String(255), nullable=True)
+    parcelas_json = db.Column(db.Text, nullable=True)
 
     caso_id = db.Column(
-        db.Integer, db.ForeignKey("caso.id", name="fk_contrato_caso_id"), nullable=False
+        db.Integer, db.ForeignKey("caso.id", name="fk_contrato_caso_id"), nullable=True
     )
     cliente_id = db.Column(
         db.Integer, db.ForeignKey("cliente.id", name="fk_contrato_cliente_id"), nullable=False
@@ -639,9 +645,16 @@ class ContratoHonorario(db.Model):
             "tipo_honorario": self.tipo_honorario,
             "valor_total": str(self.valor_total) if self.valor_total else None,
             "percentual_exito": str(self.percentual_exito) if self.percentual_exito else None,
+            "percentual_recurso": (
+                str(self.percentual_recurso) if self.percentual_recurso else None
+            ),
             "data_assinatura": self.data_assinatura.isoformat() if self.data_assinatura else None,
             "status": self.status,
             "notas_condicoes": self.notas_condicoes,
+            "objeto": self.objeto,
+            "vigencia_condicao": self.vigencia_condicao,
+            "arquivo_nome": self.arquivo_nome,
+            "parcelas_json": self.parcelas_json,
             "caso_id": self.caso_id,
             "cliente_id": self.cliente_id,
             "user_id": self.user_id,
