@@ -3,6 +3,12 @@ import uuid
 
 from flask import g, jsonify, request
 from flask_jwt_extended.exceptions import JWTExtendedException, NoAuthorizationError
+from jwt.exceptions import (
+    ExpiredSignatureError as PyJWTExpiredSignatureError,
+)
+from jwt.exceptions import (
+    InvalidTokenError as PyJWTInvalidTokenError,
+)
 from werkzeug.exceptions import HTTPException
 
 from extensions import scheduler
@@ -60,6 +66,17 @@ def configure_error_handlers(app):
     def handle_unhandled_exception(error):
         if isinstance(error, NoAuthorizationError):
             return jsonify({"message": str(error)}), 401
+
+        # PyJWT exceptions (vem de jwt.exceptions, NAO de flask_jwt_extended).
+        # ExpiredSignatureError e InvalidTokenError vazam de _decode_jwt antes
+        # de virarem flask_jwt_extended.exceptions, entao o handler abaixo
+        # nao pegava — caia em "Erro interno (500)" no dashboard ao expirar
+        # JWT, em vez de 401 -> redirect login. Tratado explicitamente aqui.
+        if isinstance(error, PyJWTExpiredSignatureError):
+            return jsonify({"message": "Token expirado."}), 401
+
+        if isinstance(error, PyJWTInvalidTokenError):
+            return jsonify({"message": "Token invalido."}), 401
 
         if isinstance(error, JWTExtendedException):
             return jsonify({"message": str(error)}), 422
