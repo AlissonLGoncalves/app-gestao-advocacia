@@ -631,109 +631,131 @@ function CasoList({ onEditCaso, refreshKey }) {
                 </td>
               </tr>
             )}
-            {casos.map((caso) => (
-              <tr key={caso.id}>
-                <td className="px-3 py-2">
-                  <span
-                    role="button"
-                    className="text-primary text-decoration-underline"
-                    style={{ cursor: 'pointer' }}
-                    title="Abrir detalhes do caso (linha do tempo, publicações vinculadas, etc.)"
-                    onClick={() => navigate(`/casos/detalhe/${caso.id}`)}
-                  >
-                    {caso.titulo}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  {caso.cliente_nome || caso.cliente?.nome_razao_social || 'N/A'}
-                </td>
-                <td className="px-3 py-2">
-                  {caso.numero_processo ? (
+            {casos.map((caso) => {
+              // Estilo Astrea: "Autor × Réu" na coluna Título.
+              // Sem campo de polo do cliente, assumimos cliente = autor e
+              // parte_contraria = réu (pode estar invertido em casos onde o
+              // cliente é réu, mas é a heuristica mais útil até termos polo
+              // explícito no modelo Caso).
+              const clienteNome = caso.cliente_nome || caso.cliente?.nome_razao_social || ''
+              const parteContraria = (caso.parte_contraria || '').trim()
+              const partesLabel =
+                clienteNome && parteContraria
+                  ? `${clienteNome} × ${parteContraria}`
+                  : clienteNome || parteContraria || caso.titulo
+              return (
+                <tr key={caso.id}>
+                  <td className="px-3 py-2">
                     <span
                       role="button"
-                      className="text-primary text-decoration-underline"
-                      style={{ cursor: 'pointer' }}
-                      title="Ver publicações DJEN deste processo"
-                      onClick={() =>
-                        navigate(`/djen?processo=${encodeURIComponent(caso.numero_processo)}`)
-                      }
+                      className="text-primary text-decoration-underline d-block"
+                      style={{ cursor: 'pointer', fontWeight: 500 }}
+                      title={`Abrir detalhes do caso · Título interno: ${caso.titulo || '(sem título)'}`}
+                      onClick={() => navigate(`/casos/detalhe/${caso.id}`)}
                     >
-                      {caso.numero_processo}
+                      {partesLabel}
                     </span>
-                  ) : (
-                    '-'
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  <span className={`badge fs-xs ${getStatusBadge(caso.status)}`}>
-                    {caso.status}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  {caso.data_criacao ? new Date(caso.data_criacao).toLocaleDateString() : '-'}
-                </td>
-                <td className="px-3 py-2">
-                  {caso.data_atualizacao
-                    ? new Date(caso.data_atualizacao).toLocaleDateString()
-                    : '-'}
-                </td>
-                <td className="px-3 py-2 text-center">
-                  <button
-                    onClick={() => navigate(`/casos/detalhe/${caso.id}`)}
-                    className="btn btn-sm btn-outline-info me-1 p-1 lh-1"
-                    title="Ver detalhes do caso (linha do tempo, publicações)"
-                    disabled={deletingId === caso.id}
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <EyeIcon style={{ width: '16px', height: '16px' }} />
-                  </button>
-                  <button
-                    onClick={() => onEditCaso(caso)}
-                    className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
-                    title="Editar Caso"
-                    disabled={deletingId === caso.id}
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <PencilSquareIcon style={{ width: '16px', height: '16px' }} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteClick(caso.id)}
-                    className="btn btn-sm btn-outline-danger p-1 lh-1"
-                    title="Deletar Caso"
-                    disabled={deletingId === caso.id}
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {deletingId === caso.id ? (
-                      <div
-                        className="spinner-border spinner-border-sm"
-                        role="status"
-                        style={{ width: '1rem', height: '1rem' }}
-                      ></div>
-                    ) : (
-                      <TrashIcon style={{ width: '16px', height: '16px' }} />
+                    {caso.titulo && partesLabel !== caso.titulo && (
+                      <small
+                        className="text-muted d-block text-truncate"
+                        style={{ maxWidth: '320px', fontSize: '0.72rem' }}
+                        title={caso.titulo}
+                      >
+                        {caso.titulo}
+                      </small>
                     )}
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-3 py-2">
+                    {caso.cliente_nome || caso.cliente?.nome_razao_social || 'N/A'}
+                  </td>
+                  <td className="px-3 py-2">
+                    {caso.numero_processo ? (
+                      <span
+                        role="button"
+                        className="text-primary text-decoration-underline"
+                        style={{ cursor: 'pointer' }}
+                        title="Ver publicações DJEN deste processo"
+                        onClick={() =>
+                          navigate(`/djen?processo=${encodeURIComponent(caso.numero_processo)}`)
+                        }
+                      >
+                        {caso.numero_processo}
+                      </span>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`badge fs-xs ${getStatusBadge(caso.status)}`}>
+                      {caso.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    {caso.data_criacao ? new Date(caso.data_criacao).toLocaleDateString() : '-'}
+                  </td>
+                  <td className="px-3 py-2">
+                    {caso.data_atualizacao
+                      ? new Date(caso.data_atualizacao).toLocaleDateString()
+                      : '-'}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => navigate(`/casos/detalhe/${caso.id}`)}
+                      className="btn btn-sm btn-outline-info me-1 p-1 lh-1"
+                      title="Ver detalhes do caso (linha do tempo, publicações)"
+                      disabled={deletingId === caso.id}
+                      style={{
+                        width: '30px',
+                        height: '30px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <EyeIcon style={{ width: '16px', height: '16px' }} />
+                    </button>
+                    <button
+                      onClick={() => onEditCaso(caso)}
+                      className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
+                      title="Editar Caso"
+                      disabled={deletingId === caso.id}
+                      style={{
+                        width: '30px',
+                        height: '30px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <PencilSquareIcon style={{ width: '16px', height: '16px' }} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(caso.id)}
+                      className="btn btn-sm btn-outline-danger p-1 lh-1"
+                      title="Deletar Caso"
+                      disabled={deletingId === caso.id}
+                      style={{
+                        width: '30px',
+                        height: '30px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {deletingId === caso.id ? (
+                        <div
+                          className="spinner-border spinner-border-sm"
+                          role="status"
+                          style={{ width: '1rem', height: '1rem' }}
+                        ></div>
+                      ) : (
+                        <TrashIcon style={{ width: '16px', height: '16px' }} />
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
