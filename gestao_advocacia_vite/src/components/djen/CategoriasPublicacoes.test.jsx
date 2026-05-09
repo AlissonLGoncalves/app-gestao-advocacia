@@ -39,18 +39,20 @@ describe('CategoriasPublicacoes', () => {
     expect(onChange).toHaveBeenCalledWith('pendentes')
   })
 
-  it('NAO chama onChange ao clicar em "Importantes" (em breve)', () => {
+  it('Importantes esta habilitado e dispara onChange (Epic #2 / #176)', () => {
     const onChange = vi.fn()
-    render(<CategoriasPublicacoes ativa="todas" contagens={CONTAGENS} onChange={onChange} />)
+    const contagens = { ...CONTAGENS, importantes: 5 }
+    render(<CategoriasPublicacoes ativa="todas" contagens={contagens} onChange={onChange} />)
     const btn = screen.getByTestId('djen-cat-importantes')
-    expect(btn).toBeDisabled()
+    expect(btn).not.toBeDisabled()
     fireEvent.click(btn)
-    expect(onChange).not.toHaveBeenCalled()
+    expect(onChange).toHaveBeenCalledWith('importantes')
   })
 
-  it('Importantes mostra "—" no badge enquanto nao classifica', () => {
-    render(<CategoriasPublicacoes ativa="todas" contagens={CONTAGENS} onChange={vi.fn()} />)
-    expect(screen.getByTestId('djen-cat-importantes')).toHaveTextContent('—')
+  it('Importantes mostra contagem real do tenant', () => {
+    const contagens = { ...CONTAGENS, importantes: 5 }
+    render(<CategoriasPublicacoes ativa="todas" contagens={contagens} onChange={vi.fn()} />)
+    expect(screen.getByTestId('djen-cat-importantes')).toHaveTextContent('5')
   })
 
   it('aceita contagens=undefined sem quebrar (mostra 0)', () => {

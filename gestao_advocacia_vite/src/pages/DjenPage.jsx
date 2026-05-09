@@ -23,6 +23,7 @@ import {
   syncDjen,
   getSyncJobStatus,
   updatePublicacao,
+  reclassificarPublicacao,
   vincularDecisao,
 } from '../api/djen.js'
 import { listCasos } from '../api/casos.js'
@@ -202,6 +203,8 @@ export default function DjenPage() {
 
   // Detalhe
   const [pubSelecionada, setPubSelecionada] = useState(null)
+  // Epic #2 (#176): estado de "classificando" pra desabilitar botao durante chamada
+  const [reclassificandoPub, setReclassificandoPub] = useState(false)
   const [casos, setCasos] = useState([])
   const publicacaoAlvo = searchParams.get('publicacao')
 
@@ -219,6 +222,8 @@ export default function DjenPage() {
         const lidaFiltro = f.lida !== '' ? f.lida : lidaFromCat
         const vinculacao =
           cat === 'pendentes' ? 'sem_caso' : cat === 'vinculadas' ? 'com_caso' : undefined
+        // Epic #2: categoria "Importantes" filtra por classificacao IA
+        const importante = cat === 'importantes' ? 'true' : undefined
 
         const data = await listPublicacoes({
           limit: limitParam,
@@ -233,6 +238,7 @@ export default function DjenPage() {
           origem: f.origem || undefined,
           ordenar: f.ordenar || 'data_desc',
           vinculacao,
+          importante,
         })
 
         setPublicacoes(data.items || [])
@@ -481,6 +487,28 @@ export default function DjenPage() {
     novosParams.delete('publicacao')
     setSearchParams(novosParams, { replace: true })
   }, [searchParams, setSearchParams])
+
+  // Epic #2 (#176): forca reclassificacao IA da publicacao selecionada.
+  // Atualiza otimisticamente o detalhe + a lista (mesmo id na lista) sem
+  // refazer fetch completo. Em caso de erro, toast e mantem estado anterior.
+  const reclassificarPub = useCallback(async (pub) => {
+    if (!pub?.id) return
+    setReclassificandoPub(true)
+    try {
+      const atualizada = await reclassificarPublicacao(pub.id)
+      setPubSelecionada((cur) => (cur && cur.id === atualizada.id ? atualizada : cur))
+      setPublicacoes((prev) =>
+        prev.map((p) => (p.id === atualizada.id ? { ...p, ...atualizada } : p))
+      )
+      toast.success(
+        atualizada.importante ? '⭐ Classificada como importante.' : 'Classificada como rotina.'
+      )
+    } catch (err) {
+      toast.error(err?.message || 'Falha ao reclassificar.')
+    } finally {
+      setReclassificandoPub(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (!publicacaoAlvo) {
@@ -1057,6 +1085,29 @@ export default function DjenPage() {
                           <div className="flex-grow-1 me-2" style={{ minWidth: 0 }}>
                             <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                               {!pub.lida && <span className="badge bg-primary">Nova</span>}
+                              {/* Epic #2 (#176): selo IA "Importante" — tooltip
+                                  mostra o motivo da classificacao. */}
+                              {pub.importante === true && (
+                                <span
+                                  className="badge bg-danger d-flex align-items-center gap-1"
+                                  title={
+                                    pub.classificacao_motivo ||
+                                    'Classificada como importante pela IA.'
+                                  }
+                                  data-testid={`pub-${pub.id}-selo-importante`}
+                                >
+                                  <span aria-hidden="true">⭐</span> Importante
+                                  <span
+                                    className="ms-1 px-1 rounded"
+                                    style={{
+                                      fontSize: '0.6rem',
+                                      background: 'rgba(255,255,255,0.25)',
+                                    }}
+                                  >
+                                    IA
+                                  </span>
+                                </span>
+                              )}
                               <span className="badge bg-secondary">
                                 {pub.sigla_tribunal || '—'}
                               </span>
@@ -1187,6 +1238,45 @@ export default function DjenPage() {
                               : pubSelecionada.meio === 'E'
                                 ? 'Edital'
                                 : '—'}
+                          </td>
+                        </tr>
+                        {/* Epic #2 (#176): linha de classificacao IA com motivo
+                            + botao reclassificar manual. */}
+                        <tr>
+                          <td className="text-muted small fw-semibold">Classificação IA</td>
+                          <td className="small">
+                            <div className="d-flex align-items-center gap-2 flex-wrap">
+                              {pubSelecionada.importante === true && (
+                                <span className="badge bg-danger">⭐ Importante</span>
+                              )}
+                              {pubSelecionada.importante === false && (
+                                <span className="badge bg-secondary">Rotina</span>
+                              )}
+                              {pubSelecionada.importante === null && (
+                                <span className="badge bg-light text-muted border">
+                                  Não classificada
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary py-0 px-2"
+                                style={{ fontSize: '0.72rem' }}
+                                disabled={reclassificandoPub}
+                                onClick={() => reclassificarPub(pubSelecionada)}
+                                title="Forçar reclassificação via Gemini (ignora cache)"
+                                data-testid="btn-reclassificar-ia"
+                              >
+                                {reclassificandoPub ? 'Classificando...' : 'Reclassificar'}
+                              </button>
+                            </div>
+                            {pubSelecionada.classificacao_motivo && (
+                              <div
+                                className="text-muted mt-1"
+                                style={{ fontSize: '0.72rem', fontStyle: 'italic' }}
+                              >
+                                {pubSelecionada.classificacao_motivo}
+                              </div>
+                            )}
                           </td>
                         </tr>
                         {pubSelecionada.nome_juiz && (
