@@ -772,6 +772,16 @@ class TarefaPrazo(db.Model):
     caso_id = db.Column(
         db.Integer, db.ForeignKey("caso.id", name="fk_tarefaprazo_caso_id"), nullable=True
     )
+    # Epic #3 (#177): vinculo bidirecional com a publicacao DJEN que originou
+    # a tarefa. Permite a UI marcar a publicacao como "tratada" e linkar de
+    # volta da tarefa pra publicacao. Nullable: tarefas criadas manualmente
+    # (sem origem DJEN) ficam com NULL.
+    publicacao_djen_id = db.Column(
+        db.Integer,
+        db.ForeignKey("publicacao_djen.id", name="fk_tarefaprazo_publicacao_djen_id"),
+        nullable=True,
+        index=True,
+    )
     __table_args__ = (
         db.Index("ix_tarefa_prazo_tenant_created", "tenant_id", "data_criacao"),
         db.Index("ix_tarefa_prazo_tenant_status_posicao", "tenant_id", "status", "posicao"),
@@ -795,6 +805,7 @@ class TarefaPrazo(db.Model):
             "posicao": self.posicao,
             "user_id": self.user_id,
             "caso_id": self.caso_id,
+            "publicacao_djen_id": self.publicacao_djen_id,
             "data_criacao": self.data_criacao.isoformat() if self.data_criacao else None,
         }
 

@@ -7,7 +7,7 @@ from sqlalchemy import func
 
 from extensions import db
 from helpers import get_item_or_404, get_list_query, get_tenant_id, tenant_scoped
-from models import TarefaPrazo
+from models import PublicacaoDJEN, TarefaPrazo
 
 
 def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto):
@@ -57,6 +57,24 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
             )
             proxima_posicao = (max_posicao or 0) + 1
 
+            # Epic #3 (#177): se vier publicacao_djen_id, valida que pertence
+            # ao tenant, deriva caso_id automaticamente quando nao informado
+            # explicitamente, e marca a publicacao como 'lida' (tratada).
+            publicacao_djen_id = data.get("publicacao_djen_id")
+            caso_id = data.get("caso_id")
+            pub_djen = None
+            if publicacao_djen_id:
+                pub_djen = PublicacaoDJEN.query.filter_by(
+                    id=int(publicacao_djen_id), tenant_id=tenant_id
+                ).first()
+                if not pub_djen:
+                    abort(404, "Publicacao DJEN nao encontrada.")
+                # Auto-derivacao: se a pub esta vinculada a um caso e o user
+                # nao escolheu outro caso, herda. Mantem flexibilidade pra
+                # criar tarefa noutro caso (usuario sobreescreve via UI).
+                if not caso_id and pub_djen.caso_id:
+                    caso_id = pub_djen.caso_id
+
             nova_tarefa = TarefaPrazo(
                 titulo=data["titulo"],
                 descricao=data.get("descricao"),
@@ -65,13 +83,21 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
                 tipo_tarefa=data.get("tipo_tarefa", "Prazo"),
                 data_vencimento=data_vencimento_obj,
                 origem_id=data.get("origem_id"),
-                caso_id=data.get("caso_id"),
+                caso_id=caso_id,
+                publicacao_djen_id=int(publicacao_djen_id) if publicacao_djen_id else None,
                 posicao=proxima_posicao,
                 user_id=user_id,
                 tenant_id=tenant_id,
             )
 
             db.session.add(nova_tarefa)
+
+            # Marca publicacao como tratada (lida=true) — segue o padrao do
+            # botao "marcar como lida" existente. Se a pub ja estava lida,
+            # idempotente.
+            if pub_djen and not pub_djen.lida:
+                pub_djen.lida = True
+
             db.session.commit()
             return nova_tarefa, 201
 
