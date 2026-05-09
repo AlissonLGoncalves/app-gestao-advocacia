@@ -362,6 +362,181 @@ def register_casos_routes(
                 "total_local": len(casos_out) + len(pubs_out),
             }, 200
 
+    @casos_ns.route("/importar-cnjs")
+    class CasoImportarCNJsAPI(Resource):
+        """Epic #5: triagem em lote de CNJs (paste de ate 40 numeros).
+
+        Inspirado no fluxo "Busca de processo automatica > Pelo numero CNJ"
+        do Astrea, que aceita varios CNJs separados por virgula. Aqui retornamos
+        o status de cada um para que o usuario decida quais adicionar/buscar
+        em seguida (a busca real fica para Epic #12).
+        """
+
+        MAX_CNJS_POR_REQUISICAO = 40
+
+        @jwt_required()
+        @tenant_scoped
+        @casos_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Triagem de varios CNJs de uma vez. Aceita ate 40 numeros por "
+                "requisicao. Para cada CNJ retorna status: valido | invalido | "
+                "duplicado (ja existe Caso no tenant). Nao cria casos — apenas "
+                "informa o status para o usuario decidir o proximo passo."
+            ),
+        )
+        def post(self):
+            from utils.cnj import (  # noqa: PLC0415
+                CNJ_REGEX_STRICT,
+                somente_digitos_cnj,
+                validar_dv_cnj,
+            )
+
+            data = request.get_json(silent=True) or {}
+            cnjs_brutos = data.get("cnjs")
+            if not isinstance(cnjs_brutos, list):
+                return {
+                    "message": (
+                        "Campo 'cnjs' deve ser uma lista de strings. "
+                        "Envie ate 40 numeros CNJ por requisicao."
+                    ),
+                    "code": "invalid_payload",
+                }, 400
+
+            if len(cnjs_brutos) == 0:
+                return {
+                    "message": "Lista vazia. Envie pelo menos um numero CNJ.",
+                    "code": "empty_list",
+                }, 400
+
+            if len(cnjs_brutos) > self.MAX_CNJS_POR_REQUISICAO:
+                return {
+                    "message": (
+                        f"Maximo de {self.MAX_CNJS_POR_REQUISICAO} CNJs por requisicao. "
+                        f"Recebidos: {len(cnjs_brutos)}."
+                    ),
+                    "code": "too_many",
+                }, 400
+
+            tenant_id = get_tenant_id()
+            resultados = []
+            stats = {"valido": 0, "invalido": 0, "duplicado": 0}
+            cnjs_vistos_neste_lote: set[str] = set()
+
+            for cnj_input in cnjs_brutos:
+                if not isinstance(cnj_input, str):
+                    resultados.append(
+                        {
+                            "cnj_input": str(cnj_input),
+                            "cnj_normalizado": None,
+                            "status": "invalido",
+                            "motivo": "tipo_invalido",
+                            "caso_id": None,
+                        }
+                    )
+                    stats["invalido"] += 1
+                    continue
+
+                # Tenta extrair numero formatado ou de digitos puros
+                cnj_strip = cnj_input.strip()
+                cnj_digits = somente_digitos_cnj(cnj_strip)
+                if len(cnj_digits) != 20:
+                    resultados.append(
+                        {
+                            "cnj_input": cnj_strip,
+                            "cnj_normalizado": None,
+                            "status": "invalido",
+                            "motivo": "tamanho_invalido",
+                            "caso_id": None,
+                        }
+                    )
+                    stats["invalido"] += 1
+                    continue
+
+                cnj_canonico = (
+                    f"{cnj_digits[0:7]}-{cnj_digits[7:9]}.{cnj_digits[9:13]}."
+                    f"{cnj_digits[13:14]}.{cnj_digits[14:16]}.{cnj_digits[16:20]}"
+                )
+
+                if not CNJ_REGEX_STRICT.match(cnj_canonico):
+                    resultados.append(
+                        {
+                            "cnj_input": cnj_strip,
+                            "cnj_normalizado": None,
+                            "status": "invalido",
+                            "motivo": "formato_invalido",
+                            "caso_id": None,
+                        }
+                    )
+                    stats["invalido"] += 1
+                    continue
+
+                if not validar_dv_cnj(cnj_canonico):
+                    resultados.append(
+                        {
+                            "cnj_input": cnj_strip,
+                            "cnj_normalizado": cnj_canonico,
+                            "status": "invalido",
+                            "motivo": "dv_invalido",
+                            "caso_id": None,
+                        }
+                    )
+                    stats["invalido"] += 1
+                    continue
+
+                # Duplicado dentro do mesmo payload
+                if cnj_canonico in cnjs_vistos_neste_lote:
+                    resultados.append(
+                        {
+                            "cnj_input": cnj_strip,
+                            "cnj_normalizado": cnj_canonico,
+                            "status": "duplicado",
+                            "motivo": "duplicado_no_lote",
+                            "caso_id": None,
+                        }
+                    )
+                    stats["duplicado"] += 1
+                    continue
+                cnjs_vistos_neste_lote.add(cnj_canonico)
+
+                # Duplicado em relacao ao tenant
+                caso_existente = (
+                    Caso.query.filter_by(tenant_id=tenant_id, numero_processo=cnj_canonico)
+                    .order_by(Caso.id.asc())
+                    .first()
+                )
+                if caso_existente:
+                    resultados.append(
+                        {
+                            "cnj_input": cnj_strip,
+                            "cnj_normalizado": cnj_canonico,
+                            "status": "duplicado",
+                            "motivo": "ja_existe_no_tenant",
+                            "caso_id": caso_existente.id,
+                            "caso_titulo": caso_existente.titulo,
+                        }
+                    )
+                    stats["duplicado"] += 1
+                    continue
+
+                # Tudo OK — pronto para usuario decidir buscar/criar
+                resultados.append(
+                    {
+                        "cnj_input": cnj_strip,
+                        "cnj_normalizado": cnj_canonico,
+                        "status": "valido",
+                        "motivo": "pronto_para_adicionar",
+                        "caso_id": None,
+                    }
+                )
+                stats["valido"] += 1
+
+            return {
+                "total": len(cnjs_brutos),
+                "stats": stats,
+                "resultados": resultados,
+            }, 200
+
     @casos_ns.route("/consulta-publica-cnj")
     class CasoConsultaPublicaCNJAPI(Resource):
         @jwt_required()

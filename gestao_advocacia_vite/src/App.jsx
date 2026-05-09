@@ -12,6 +12,7 @@ import DashboardPage from './pages/DashboardPage.jsx'
 import ClientesPage from './pages/ClientesPage.jsx'
 import CasosPage from './pages/CasosPage.jsx'
 import CasoDetalhePage from './pages/CasoDetalhePage.jsx'
+import ImportarCnjsPage from './pages/ImportarCnjsPage.jsx'
 import RecebimentosPage from './pages/RecebimentosPage.jsx'
 import ContratosPage from './pages/ContratosPage.jsx'
 import DespesasPage from './pages/DespesasPage.jsx'
@@ -565,6 +566,7 @@ function App() {
 
           <Route path="casos" element={<CasosPage />} />
           <Route path="casos/novo" element={<CasosPage />} />
+          <Route path="casos/importar" element={<ImportarCnjsPage />} />
           <Route path="casos/editar/:casoId" element={<CasosPage />} />
           <Route path="casos/detalhe/:casoId" element={<CasoDetalhePage />} />
 
