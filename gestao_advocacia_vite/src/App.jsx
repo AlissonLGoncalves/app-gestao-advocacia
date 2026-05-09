@@ -43,6 +43,7 @@ import AdminAccessRequestsPage from './pages/admin/AdminAccessRequestsPage.jsx'
 import { adminApi } from './api/admin.js'
 import { APP_VERSION } from './version.js'
 import GlobalSearch from './components/GlobalSearch.jsx'
+import HeaderQuickAdd from './components/HeaderQuickAdd.jsx'
 
 // Importação dos ícones
 import {
@@ -491,8 +492,11 @@ const MainLayout = () => {
               </small>
             </div>
           </div>
-          <GlobalSearch />
-          <div className="app-header-date text-capitalize d-none d-lg-block">{dataAtual}</div>
+          <div className="d-flex align-items-center gap-2 ms-auto">
+            <HeaderQuickAdd />
+            <GlobalSearch />
+            <div className="app-header-date text-capitalize d-none d-lg-block">{dataAtual}</div>
+          </div>
         </header>
         <main className="app-main">
           <Outlet />
