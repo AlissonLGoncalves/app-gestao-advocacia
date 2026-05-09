@@ -36,9 +36,34 @@ def _build_app():
 
 
 _STOP = {
-    "de", "do", "da", "dos", "das", "e", "a", "o", "os", "as", "um", "uma",
-    "para", "por", "no", "na", "nos", "nas", "em", "com", "sem", "ao", "aos",
-    "sobre", "que", "se", "ou", "como",
+    "de",
+    "do",
+    "da",
+    "dos",
+    "das",
+    "e",
+    "a",
+    "o",
+    "os",
+    "as",
+    "um",
+    "uma",
+    "para",
+    "por",
+    "no",
+    "na",
+    "nos",
+    "nas",
+    "em",
+    "com",
+    "sem",
+    "ao",
+    "aos",
+    "sobre",
+    "que",
+    "se",
+    "ou",
+    "como",
 }
 
 
@@ -96,14 +121,13 @@ def main():
             raise SystemExit(f"User {args.user_id} nao encontrado")
         tenant_id = user.tenant_id
 
-        contratos_sem = (
-            ContratoHonorario.query.filter(
-                ContratoHonorario.caso_id.is_(None),
-                ContratoHonorario.tenant_id == tenant_id,
-            )
-            .all()
+        contratos_sem = ContratoHonorario.query.filter(
+            ContratoHonorario.caso_id.is_(None),
+            ContratoHonorario.tenant_id == tenant_id,
+        ).all()
+        print(
+            f"Contratos sem caso: {len(contratos_sem)} (modo {'APPLY' if args.apply else 'DRY-RUN'})"
         )
-        print(f"Contratos sem caso: {len(contratos_sem)} (modo {'APPLY' if args.apply else 'DRY-RUN'})")
         print()
 
         stats = {"auto": 0, "match_score": 0, "ambiguo": 0, "sem_caso": 0}
@@ -118,7 +142,9 @@ def main():
             )
 
             if not casos:
-                print(f"[contrato {c.id}] {cliente_nome}: 0 casos do cliente -- crie um caso depois")
+                print(
+                    f"[contrato {c.id}] {cliente_nome}: 0 casos do cliente -- crie um caso depois"
+                )
                 stats["sem_caso"] += 1
                 continue
 
@@ -162,7 +188,9 @@ def main():
         if stats["ambiguo"]:
             print()
             print("Para vincular ambiguos manualmente:")
-            print("  python -m scripts.import_contratos.vincular_casos --contrato-id N --caso-id M --apply")
+            print(
+                "  python -m scripts.import_contratos.vincular_casos --contrato-id N --caso-id M --apply"
+            )
 
 
 if __name__ == "__main__":
