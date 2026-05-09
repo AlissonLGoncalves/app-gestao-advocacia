@@ -29,6 +29,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
 import SolicitarAcessoPage from './pages/SolicitarAcessoPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import IntegracoesPage from './pages/IntegracoesPage.jsx'
+import ModelosDocumentoPage from './pages/ModelosDocumentoPage.jsx'
 import DjenPage from './pages/DjenPage.jsx'
 import TriagemAssistidaPage from './pages/TriagemAssistidaPage.jsx'
 import PerfilPage from './pages/PerfilPage.jsx'
@@ -431,6 +432,9 @@ const MainLayout = () => {
           <SidebarLink to="/documentos" icon={DocumentTextIcon}>
             Documentos
           </SidebarLink>
+          <SidebarLink to="/modelos" icon={DocumentTextIcon}>
+            Modelos
+          </SidebarLink>
           <SidebarLink to="/djen" icon={NewspaperIcon} badge={sidebarCounts.djenPendentes}>
             DJEN — Publicações
           </SidebarLink>
@@ -597,6 +601,7 @@ function App() {
 
           <Route path="configuracoes" element={<SettingsPage />} />
           <Route path="integracoes" element={<IntegracoesPage />} />
+          <Route path="modelos" element={<ModelosDocumentoPage />} />
           <Route path="perfil" element={<PerfilPage />} />
 
           {/* admin-fase0: rotas do backoffice (gated por SuperAdminRoute) */}

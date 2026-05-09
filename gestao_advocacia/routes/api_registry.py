@@ -44,6 +44,7 @@ def register_api_routes(app, api, finance_access_required):
     relatorios_ns = Namespace("relatorios", description="Relatorios Gerenciais")
     portal_ns = Namespace("portal", description="Portal do Cliente (acesso simplificado)")
     projudi_ns = Namespace("projudi", description="Integracao com projudi-agent (scraper local)")
+    modelos_ns = Namespace("modelos", description="Modelos editaveis de documentos juridicos")
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -59,6 +60,7 @@ def register_api_routes(app, api, finance_access_required):
     api.add_namespace(relatorios_ns)
     api.add_namespace(portal_ns)
     api.add_namespace(projudi_ns)
+    api.add_namespace(modelos_ns)
 
     user_model_dto = auth_ns.model(
         "UserRegistration",
@@ -466,3 +468,6 @@ def register_api_routes(app, api, finance_access_required):
     register_relatorios_routes(relatorios_ns, finance_access_required)
     register_portal_routes(portal_ns)
     register_projudi_routes(app, projudi_ns)
+    from .modelos_documento import register_modelos_routes  # noqa: PLC0415
+
+    register_modelos_routes(modelos_ns)
