@@ -1385,6 +1385,195 @@ def register_casos_routes(
                 "contratos": [c.to_dict() for c in contratos],
             }, 200
 
+    @casos_ns.route("/<int:caso_id>/apensar")
+    @casos_ns.param("caso_id", "ID do caso que sera APENSADO ao caso principal")
+    class CasoApensarAPI(Resource):
+        """Epic #8 (#182): apensar este caso a outro processo principal.
+
+        Inspirado no Astrea ("Apensar este processo a outro"). Ao apensar,
+        o caso passa a apontar para o caso_principal_id e a UI passa a
+        mostrar essa relacao.
+        """
+
+        @casos_ns.doc("apensar_caso_endpoint", security="jsonWebToken")
+        @jwt_required()
+        @tenant_scoped
+        def post(self, caso_id):
+            data = request.get_json(silent=True) or {}
+            caso_principal_id = data.get("caso_principal_id")
+
+            if not caso_principal_id or not isinstance(caso_principal_id, int):
+                return {
+                    "message": "Campo 'caso_principal_id' (int) e obrigatorio.",
+                    "code": "missing_caso_principal_id",
+                }, 400
+
+            if caso_principal_id == caso_id:
+                return {
+                    "message": "Um caso nao pode ser apensado a si mesmo.",
+                    "code": "self_apensar",
+                }, 400
+
+            caso = query_for_tenant(Caso).filter_by(id=caso_id).first()
+            if not caso:
+                casos_ns.abort(404, message=f"Caso {caso_id} nao encontrado.")
+
+            principal = query_for_tenant(Caso).filter_by(id=caso_principal_id).first()
+            if not principal:
+                return {
+                    "message": (f"Caso principal {caso_principal_id} nao encontrado neste tenant."),
+                    "code": "principal_nao_encontrado",
+                }, 404
+
+            # Evita ciclos: principal nao pode estar apensado ao caso atual
+            if principal.caso_principal_id == caso.id:
+                return {
+                    "message": (
+                        "Apensar criaria ciclo: o caso principal indicado ja esta "
+                        "apensado a este caso."
+                    ),
+                    "code": "ciclo_detectado",
+                }, 400
+
+            # Se o principal indicado tambem e apenso de outro, apensa ao topo da cadeia
+            principal_efetivo = principal
+            visitados = {principal.id}
+            while principal_efetivo.caso_principal_id is not None:
+                if principal_efetivo.caso_principal_id in visitados:
+                    return {
+                        "message": "Cadeia de apensos contem ciclo. Verifique os dados.",
+                        "code": "cadeia_com_ciclo",
+                    }, 400
+                proximo = (
+                    query_for_tenant(Caso).filter_by(id=principal_efetivo.caso_principal_id).first()
+                )
+                if not proximo:
+                    break
+                visitados.add(proximo.id)
+                principal_efetivo = proximo
+
+            caso.caso_principal_id = principal_efetivo.id
+            log_audit(
+                "UPDATE",
+                "Caso",
+                caso.id,
+                f"Caso {caso.id} apensado ao caso principal {principal_efetivo.id}.",
+            )
+            db.session.commit()
+
+            return {
+                "message": "Caso apensado com sucesso.",
+                "caso": caso.to_dict(),
+                "caso_principal": {
+                    "id": principal_efetivo.id,
+                    "titulo": principal_efetivo.titulo,
+                    "numero_processo": principal_efetivo.numero_processo,
+                },
+            }, 200
+
+        @casos_ns.doc("desapensar_caso_endpoint", security="jsonWebToken")
+        @jwt_required()
+        @tenant_scoped
+        def delete(self, caso_id):
+            """Desapensa o caso (set caso_principal_id = NULL)."""
+            tenant_id = get_tenant_id()  # noqa: F841 — usado pelo @tenant_scoped
+            caso = query_for_tenant(Caso).filter_by(id=caso_id).first()
+            if not caso:
+                casos_ns.abort(404, message=f"Caso {caso_id} nao encontrado.")
+
+            if caso.caso_principal_id is None:
+                return {
+                    "message": "Este caso nao esta apensado a nenhum outro.",
+                    "code": "nao_apensado",
+                }, 400
+
+            principal_anterior = caso.caso_principal_id
+            caso.caso_principal_id = None
+            log_audit(
+                "UPDATE",
+                "Caso",
+                caso.id,
+                f"Caso {caso.id} desapensado (era apenso de {principal_anterior}).",
+            )
+            db.session.commit()
+
+            return {"message": "Caso desapensado com sucesso.", "caso": caso.to_dict()}, 200
+
+    @casos_ns.route("/<int:caso_id>/apensos")
+    @casos_ns.param("caso_id", "ID do caso PRINCIPAL para listar seus apensos")
+    class CasoListarApensosAPI(Resource):
+        """Lista os casos apensados ao caso indicado."""
+
+        @casos_ns.doc("listar_apensos_endpoint", security="jsonWebToken")
+        @jwt_required()
+        @tenant_scoped
+        def get(self, caso_id):
+            principal = query_for_tenant(Caso).filter_by(id=caso_id).first()
+            if not principal:
+                casos_ns.abort(404, message=f"Caso {caso_id} nao encontrado.")
+
+            apensos = (
+                query_for_tenant(Caso)
+                .filter_by(caso_principal_id=caso_id)
+                .order_by(Caso.id.asc())
+                .all()
+            )
+            return {
+                "caso_principal_id": caso_id,
+                "total": len(apensos),
+                "apensos": [a.to_dict() for a in apensos],
+            }, 200
+
+    @casos_ns.route("/<int:caso_id>/instancia")
+    @casos_ns.param("caso_id", "ID do caso para alterar instancia")
+    class CasoAlterarInstanciaAPI(Resource):
+        """Epic #8 (#182): atualizar a instancia atual do caso.
+
+        Inspirado no menu "Alterar instancia atual" do Astrea, usado quando
+        um processo sobe de 1a para 2a instancia (recurso).
+        """
+
+        @casos_ns.doc("alterar_instancia_endpoint", security="jsonWebToken")
+        @jwt_required()
+        @tenant_scoped
+        def patch(self, caso_id):
+            data = request.get_json(silent=True) or {}
+            nova_instancia = data.get("instancia")
+
+            if not nova_instancia or not isinstance(nova_instancia, str):
+                return {
+                    "message": "Campo 'instancia' (string) e obrigatorio.",
+                    "code": "missing_instancia",
+                }, 400
+
+            nova_instancia = nova_instancia.strip()
+            if not nova_instancia:
+                return {
+                    "message": "Instancia nao pode ser vazia.",
+                    "code": "instancia_vazia",
+                }, 400
+
+            caso = query_for_tenant(Caso).filter_by(id=caso_id).first()
+            if not caso:
+                casos_ns.abort(404, message=f"Caso {caso_id} nao encontrado.")
+
+            instancia_anterior = caso.instancia
+            caso.instancia = nova_instancia
+            log_audit(
+                "UPDATE",
+                "Caso",
+                caso.id,
+                f"Instancia alterada de '{instancia_anterior}' para '{nova_instancia}'.",
+            )
+            db.session.commit()
+
+            return {
+                "message": "Instancia atualizada com sucesso.",
+                "instancia_anterior": instancia_anterior,
+                "instancia_atual": caso.instancia,
+                "caso": caso.to_dict(),
+            }, 200
+
     @casos_ns.route("/<int:caso_id>/gerar-resumo")
     @casos_ns.param("caso_id", "ID do caso para gerar resumo via IA")
     class CasoGerarResumoAPI(Resource):
