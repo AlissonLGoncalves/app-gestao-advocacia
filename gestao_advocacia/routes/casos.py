@@ -628,12 +628,14 @@ def register_casos_routes(
             response = {
                 "tribunal": tribunal_info,
                 "resultado": resultado.to_dict(),
-                "ja_cadastrado": {
-                    "caso_id": existente.id if existente else None,
-                    "titulo": existente.titulo if existente else None,
-                }
-                if existente
-                else None,
+                "ja_cadastrado": (
+                    {
+                        "caso_id": existente.id if existente else None,
+                        "titulo": existente.titulo if existente else None,
+                    }
+                    if existente
+                    else None
+                ),
             }
             return response, 200 if resultado.sucesso else 200  # 200 mesmo em erro de adapter
 
