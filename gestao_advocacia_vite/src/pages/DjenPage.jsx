@@ -9,6 +9,7 @@ import {
 } from '../utils/htmlTribunal.js'
 import ModalCriarClienteCaso from '../components/djen/ModalCriarClienteCaso.jsx'
 import CategoriasPublicacoes from '../components/djen/CategoriasPublicacoes.jsx'
+import ModalNovaTarefaInline from '../components/djen/ModalNovaTarefaInline.jsx'
 import {
   baixarCertidao as baixarCertidaoApi,
   createOab,
@@ -205,6 +206,8 @@ export default function DjenPage() {
   const [pubSelecionada, setPubSelecionada] = useState(null)
   // Epic #2 (#176): estado de "classificando" pra desabilitar botao durante chamada
   const [reclassificandoPub, setReclassificandoPub] = useState(false)
+  // Epic #3 (#177): pub-alvo do modal "criar tarefa inline" (null = fechado)
+  const [pubParaTarefa, setPubParaTarefa] = useState(null)
   const [casos, setCasos] = useState([])
   const publicacaoAlvo = searchParams.get('publicacao')
 
@@ -1195,7 +1198,20 @@ export default function DjenPage() {
                 <div className="card shadow-sm border-0 h-100">
                   <div className="card-header bg-white d-flex justify-content-between align-items-center">
                     <strong className="small">Detalhe da Publicação</strong>
-                    <button className="btn-close btn-sm" onClick={fecharDetalhePublicacao} />
+                    <div className="d-flex align-items-center gap-2">
+                      {/* Epic #3 (#177): atalho pra criar tarefa vinculada a esta pub */}
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary py-0 px-2"
+                        style={{ fontSize: '0.75rem' }}
+                        onClick={() => setPubParaTarefa(pubSelecionada)}
+                        title="Criar tarefa a partir desta publicação (Epic #3)"
+                        data-testid="btn-criar-tarefa-pub"
+                      >
+                        <i className="bi bi-plus-circle me-1" /> Criar tarefa
+                      </button>
+                      <button className="btn-close btn-sm" onClick={fecharDetalhePublicacao} />
+                    </div>
                   </div>
                   <div className="card-body overflow-auto" style={{ maxHeight: '75vh' }}>
                     <table className="table table-sm table-borderless mb-3">
@@ -2087,6 +2103,26 @@ export default function DjenPage() {
             publicacao={itemModalCriar}
             onClose={() => setItemModalCriar(null)}
             onSuccess={onSucessoModalCriar}
+          />
+        )}
+
+        {/* Epic #3 (#177): modal de criação rápida de tarefa a partir da pub.
+            Após criar, marca a pub como lida (refletido localmente) e fecha. */}
+        {pubParaTarefa && (
+          <ModalNovaTarefaInline
+            pub={pubParaTarefa}
+            casos={casos}
+            onClose={() => setPubParaTarefa(null)}
+            onCriada={() => {
+              // Otimisticamente marca a pub como lida na lista + detalhe
+              setPublicacoes((prev) =>
+                prev.map((p) => (p.id === pubParaTarefa.id ? { ...p, lida: true } : p))
+              )
+              if (pubSelecionada?.id === pubParaTarefa.id) {
+                setPubSelecionada({ ...pubSelecionada, lida: true })
+              }
+              setNaoLidas((prev) => Math.max(0, prev - (pubParaTarefa.lida ? 0 : 1)))
+            }}
           />
         )}
       </div>

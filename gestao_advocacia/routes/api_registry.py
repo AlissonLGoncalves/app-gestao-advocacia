@@ -410,6 +410,12 @@ def register_api_routes(app, api, finance_access_required):
             "tipo_tarefa": fields.String(description="Tipo"),
             "origem_id": fields.String(description="ID na integracao"),
             "caso_id": fields.Integer(description="ID do caso associado"),
+            # Epic #3 (#177): permite criar tarefa diretamente a partir de
+            # uma publicacao DJEN. Quando informado, marca a pub como lida
+            # e deriva caso_id automaticamente se nao foi explicitado.
+            "publicacao_djen_id": fields.Integer(
+                description="ID da publicacao DJEN que originou a tarefa"
+            ),
         },
     )
 
@@ -428,6 +434,7 @@ def register_api_routes(app, api, finance_access_required):
             "data_criacao": fields.DateTime(dt_format="iso8601"),
             "user_id": fields.Integer,
             "caso_id": fields.Integer,
+            "publicacao_djen_id": fields.Integer,
         },
     )
 
