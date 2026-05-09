@@ -86,7 +86,17 @@ function CasosPage() {
   }
   return (
     <>
-      <BotaoAdicionar texto="Adicionar Novo Caso" onClick={handleAdicionarClick} />
+      <div className="d-flex gap-2 flex-wrap mb-3">
+        <BotaoAdicionar texto="Adicionar Novo Caso" onClick={handleAdicionarClick} />
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-secondary"
+          onClick={() => navigate('/casos/importar')}
+          title="Triagem em lote: cole até 40 CNJs e veja o status de cada um"
+        >
+          Importar CNJs em lote
+        </button>
+      </div>
       <CasoList key={refreshKey} onEditCaso={handleEditarCaso} />
     </>
   )
