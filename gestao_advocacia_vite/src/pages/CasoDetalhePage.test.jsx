@@ -45,7 +45,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   getCaso.mockResolvedValue(CASO_MOCK)
   listPublicacoesDjenCaso.mockResolvedValue([])
-  global.fetch = vi.fn().mockResolvedValue({
+  globalThis.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: () => Promise.resolve([]),
   })
