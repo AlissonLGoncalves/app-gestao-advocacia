@@ -14,6 +14,7 @@ import DocumentosCasoTab from '../components/DocumentosCasoTab'
 import DocumentosVinculadosCard from '../components/DocumentosVinculadosCard'
 import ApensarMenuCaso from '../components/ApensarMenuCaso.jsx'
 import CasoTimeline from '../components/CasoTimeline'
+import ProximasAtividadesCard from '../components/ProximasAtividadesCard.jsx'
 
 // Componente auxiliar para exibir mensagens de status (loading, error, success)
 const StatusDisplay = ({ isLoading, error, successMessage, className = '' }) => {
@@ -284,137 +285,161 @@ function CasoDetalhePage() {
       {/* ── TAB RESUMO: dados estruturais + honorários + apensos ──────────── */}
       {tabAtiva === 'resumo' && (
         <div role="tabpanel" data-testid="painel-resumo">
-          <div className="card shadow-lg mb-4">
-            <div className="card-body p-4">
-              <div className="row g-4 mb-4">
-                <div className="col-md-6">
-                  <div className="border p-3 rounded h-100">
-                    <h6 className="text-secondary border-bottom pb-2 mb-3">Informações Gerais</h6>
-                    <p className="small mb-1">
-                      <strong>Número do Processo:</strong>{' '}
-                      <span className="text-dark">{caso.numero_processo || 'Não informado'}</span>
-                    </p>
-                    <p className="small mb-1">
-                      <strong>Status (Sistema):</strong>{' '}
-                      <span className="text-dark">{caso.status || 'Não definido'}</span>
-                    </p>
-                    <p className="small mb-1">
-                      <strong>Cliente:</strong>{' '}
-                      <span className="text-dark">
-                        {caso.nome_cliente || `ID ${caso.cliente_id}`}
-                      </span>
-                    </p>
-                    <p className="small mb-1">
-                      <strong>Descrição:</strong>
-                    </p>
-                    <p
-                      className="small text-dark bg-light p-2 rounded"
-                      style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                    >
-                      {caso.descricao || 'Nenhuma descrição fornecida.'}
-                    </p>
-                    <button
-                      onClick={handleGerarResumo}
-                      disabled={isLoadingResumo || publicacoesDjen.length === 0}
-                      className="btn btn-sm btn-outline-secondary mt-2 w-100"
-                      title={
-                        publicacoesDjen.length === 0
-                          ? 'Sincronize o DJEN primeiro'
-                          : 'Usa IA para resumir as publicações DJEN'
-                      }
-                    >
-                      {isLoadingResumo ? (
-                        <>
-                          <span
-                            className="spinner-border spinner-border-sm me-2"
-                            role="status"
-                            aria-hidden="true"
-                          ></span>
-                          Gerando resumo...
-                        </>
-                      ) : (
-                        '✨ Gerar Resumo com IA'
-                      )}
-                    </button>
-                    {resumoError && <p className="small text-danger mt-1">{resumoError}</p>}
-                  </div>
-                </div>
+          {/* Epic #7 (#181): layout 2 colunas — conteúdo principal à esq.
+              (col-lg-8) + sidebar com cards compactos à dir. (col-lg-4).
+              Em mobile (<lg) empilha vertical naturalmente. */}
+          <div className="row g-3">
+            <div className="col-lg-8" data-testid="caso-coluna-principal">
+              <div className="card shadow-lg mb-4">
+                <div className="card-body p-4">
+                  <div className="row g-4 mb-4">
+                    <div className="col-md-6">
+                      <div className="border p-3 rounded h-100">
+                        <h6 className="text-secondary border-bottom pb-2 mb-3">
+                          Informações Gerais
+                        </h6>
+                        <p className="small mb-1">
+                          <strong>Número do Processo:</strong>{' '}
+                          <span className="text-dark">
+                            {caso.numero_processo || 'Não informado'}
+                          </span>
+                        </p>
+                        <p className="small mb-1">
+                          <strong>Status (Sistema):</strong>{' '}
+                          <span className="text-dark">{caso.status || 'Não definido'}</span>
+                        </p>
+                        <p className="small mb-1">
+                          <strong>Cliente:</strong>{' '}
+                          <span className="text-dark">
+                            {caso.nome_cliente || `ID ${caso.cliente_id}`}
+                          </span>
+                        </p>
+                        <p className="small mb-1">
+                          <strong>Descrição:</strong>
+                        </p>
+                        <p
+                          className="small text-dark bg-light p-2 rounded"
+                          style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                        >
+                          {caso.descricao || 'Nenhuma descrição fornecida.'}
+                        </p>
+                        <button
+                          onClick={handleGerarResumo}
+                          disabled={isLoadingResumo || publicacoesDjen.length === 0}
+                          className="btn btn-sm btn-outline-secondary mt-2 w-100"
+                          title={
+                            publicacoesDjen.length === 0
+                              ? 'Sincronize o DJEN primeiro'
+                              : 'Usa IA para resumir as publicações DJEN'
+                          }
+                        >
+                          {isLoadingResumo ? (
+                            <>
+                              <span
+                                className="spinner-border spinner-border-sm me-2"
+                                role="status"
+                                aria-hidden="true"
+                              ></span>
+                              Gerando resumo...
+                            </>
+                          ) : (
+                            '✨ Gerar Resumo com IA'
+                          )}
+                        </button>
+                        {resumoError && <p className="small text-danger mt-1">{resumoError}</p>}
+                      </div>
+                    </div>
 
-                <div className="col-md-6">
-                  <div className="border p-3 rounded h-100">
-                    <h6 className="text-secondary border-bottom pb-2 mb-3">
-                      Datas e Sincronização CNJ
-                    </h6>
-                    <p className="small mb-1">
-                      <strong>Criado em:</strong>{' '}
-                      <span className="text-dark">{formatarDataLegivel(caso.data_criacao)}</span>
-                    </p>
-                    <p className="small mb-1">
-                      <strong>Última Atualização (Sistema):</strong>{' '}
-                      <span className="text-dark">
-                        {formatarDataLegivel(caso.data_atualizacao)}
-                      </span>
-                    </p>
-                    <p className="small mb-2">
-                      <strong>Última Verificação CNJ:</strong>{' '}
-                      <span className="text-dark">
-                        {formatarDataLegivel(caso.data_ultima_verificacao_cnj)}
-                      </span>
-                    </p>
+                    <div className="col-md-6">
+                      <div className="border p-3 rounded h-100">
+                        <h6 className="text-secondary border-bottom pb-2 mb-3">
+                          Datas e Sincronização CNJ
+                        </h6>
+                        <p className="small mb-1">
+                          <strong>Criado em:</strong>{' '}
+                          <span className="text-dark">
+                            {formatarDataLegivel(caso.data_criacao)}
+                          </span>
+                        </p>
+                        <p className="small mb-1">
+                          <strong>Última Atualização (Sistema):</strong>{' '}
+                          <span className="text-dark">
+                            {formatarDataLegivel(caso.data_atualizacao)}
+                          </span>
+                        </p>
+                        <p className="small mb-2">
+                          <strong>Última Verificação CNJ:</strong>{' '}
+                          <span className="text-dark">
+                            {formatarDataLegivel(caso.data_ultima_verificacao_cnj)}
+                          </span>
+                        </p>
 
-                    {caso.numero_processo ? (
-                      <button
-                        onClick={handleAtualizarViaDJEN}
-                        disabled={isLoadingAtualizacaoCNJ || isLoadingCaso}
-                        className="btn btn-sm btn-primary w-100 mt-2"
-                      >
-                        {isLoadingAtualizacaoCNJ ? (
-                          <>
-                            <span
-                              className="spinner-border spinner-border-sm me-2"
-                              role="status"
-                              aria-hidden="true"
-                            ></span>
-                            Verificando DJEN...
-                          </>
+                        {caso.numero_processo ? (
+                          <button
+                            onClick={handleAtualizarViaDJEN}
+                            disabled={isLoadingAtualizacaoCNJ || isLoadingCaso}
+                            className="btn btn-sm btn-primary w-100 mt-2"
+                          >
+                            {isLoadingAtualizacaoCNJ ? (
+                              <>
+                                <span
+                                  className="spinner-border spinner-border-sm me-2"
+                                  role="status"
+                                  aria-hidden="true"
+                                ></span>
+                                Verificando DJEN...
+                              </>
+                            ) : (
+                              'Verificar Publicações no DJEN'
+                            )}
+                          </button>
                         ) : (
-                          'Verificar Publicações no DJEN'
+                          <p className="mt-2 text-xs text-muted fst-italic">
+                            Número do processo não cadastrado. Consulta ao DJEN indisponível.
+                          </p>
                         )}
-                      </button>
-                    ) : (
-                      <p className="mt-2 text-xs text-muted fst-italic">
-                        Número do processo não cadastrado. Consulta ao DJEN indisponível.
-                      </p>
-                    )}
-                    <StatusDisplay
-                      isLoading={isLoadingAtualizacaoCNJ}
-                      error={atualizacaoCNJError}
-                      successMessage={atualizacaoCNJSuccess}
-                      className="mt-2 text-center small"
-                    />
+                        <StatusDisplay
+                          isLoading={isLoadingAtualizacaoCNJ}
+                          error={atualizacaoCNJError}
+                          successMessage={atualizacaoCNJSuccess}
+                          className="mt-2 text-center small"
+                        />
+                      </div>
+                    </div>
                   </div>
+                  {/* /row.g-4 */}
+                </div>
+                {/* /card-body */}
+              </div>
+              {/* /card "Detalhes do Caso" */}
+              {/* HONORÁRIOS continua coluna principal (precisa de espaço) */}
+              <HonorariosCasoCard casoId={casoId} clienteId={caso.cliente_id} />
+              {/* DRIVE do processo (full-width principal) */}
+              <div className="card shadow-lg mb-4">
+                <div className="card-body p-4 pt-2">
+                  <DocumentosCasoTab casoId={casoId} />
                 </div>
               </div>
-              {/* /row.g-4 */}
             </div>
-            {/* /card-body */}
-          </div>
-          {/* /card "Detalhes do Caso" */}
-          {/* HONORÁRIOS na tab Resumo */}
-          <HonorariosCasoCard casoId={casoId} clienteId={caso.cliente_id} />
-          {/* Epic #8 (#182): apensar processo + alterar instancia */}
-          <ApensarMenuCaso
-            caso={caso}
-            onCasoAtualizado={(novoCaso) => setCaso((prev) => ({ ...prev, ...novoCaso }))}
-          />
-          {/* DOCUMENTOS VINCULADOS (procurações + contratos com viewer/download) */}
-          <DocumentosVinculadosCard casoId={casoId} />
-          {/* DRIVE do processo */}
-          <div className="card shadow-lg mb-4">
-            <div className="card-body p-4 pt-2">
-              <DocumentosCasoTab casoId={casoId} />
+            {/* /coluna principal */}
+
+            {/* Sidebar com cards compactos */}
+            <div className="col-lg-4" data-testid="caso-sidebar">
+              {/* Próximas atividades — usa as `prazos` já carregadas */}
+              <ProximasAtividadesCard prazos={prazos} />
+
+              {/* Documentos vinculados (procurações + contratos) */}
+              <DocumentosVinculadosCard casoId={casoId} />
+
+              {/* Apensar processo + alterar instância */}
+              <ApensarMenuCaso
+                caso={caso}
+                onCasoAtualizado={(novoCaso) => setCaso((prev) => ({ ...prev, ...novoCaso }))}
+              />
             </div>
+            {/* /sidebar */}
           </div>
+          {/* /row.g-3 (2 colunas) */}
         </div>
       )}
 
