@@ -729,6 +729,13 @@ def registrar_rotas_djen(
             elif vinculacao == "com_caso":
                 q = q.filter(PublicacaoDJEN.caso_id.isnot(None))
 
+            # Epic #2 (#176): filtro de classificacao IA (Importantes vs todas).
+            importante_param = (request.args.get("importante") or "").strip().lower()
+            if importante_param == "true":
+                q = q.filter(PublicacaoDJEN.importante.is_(True))
+            elif importante_param == "false":
+                q = q.filter(PublicacaoDJEN.importante.is_(False))
+
             limit = min(int(request.args.get("limit", 50)), 200)
             offset = int(request.args.get("offset", 0))
             total = q.count()
@@ -757,6 +764,9 @@ def registrar_rotas_djen(
             nao_lidas = base_q.filter_by(lida=False).count()
             pendentes = base_q.filter(PublicacaoDJEN.caso_id.is_(None)).count()
             vinculadas = base_q.filter(PublicacaoDJEN.caso_id.isnot(None)).count()
+            # Epic #2 (#176): conta importantes (importante=True; NULL nao
+            # entra — sao publicacoes ainda nao classificadas).
+            importantes = base_q.filter(PublicacaoDJEN.importante.is_(True)).count()
             total_geral = base_q.count()
 
             return {
@@ -770,10 +780,7 @@ def registrar_rotas_djen(
                     "nao_lidas": nao_lidas,
                     "pendentes": pendentes,
                     "vinculadas": vinculadas,
-                    # Reservado pra Epic #2 (#176 — classificacao IA).
-                    # Quando a coluna PublicacaoDJEN.importante existir,
-                    # incrementa aqui sem mudar o frontend.
-                    "importantes": 0,
+                    "importantes": importantes,
                 },
             }
 
@@ -1761,6 +1768,39 @@ def registrar_rotas_djen(
                 pub.caso_id = caso_id
             if "notas" in data:
                 pub.notas = data["notas"]
+            db.session.commit()
+            return pub.to_dict()
+
+    @djen_ns.route("/publicacoes/<int:pub_id>/reclassificar")
+    class PublicacaoReclassificarAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Epic #2 (#176): força reclassificação via IA da publicação, "
+                "ignorando short-circuit. Util quando o usuario discorda da "
+                "classificacao automatica e quer empurrar pro Gemini de novo."
+            ),
+        )
+        @jwt_required()
+        def post(self, pub_id):
+            user = _get_user_or_401()
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, "Módulo DJEN desabilitado para este tenant no rollout atual.")
+            pub = _get_scoped_or_404(
+                PublicacaoDJEN, user, pub_id, "PublicacaoDJEN", "Publicação não encontrada."
+            )
+            from djen_classifier import classificar_publicacao  # noqa: PLC0415
+            from gemini_service import get_gemini_client, is_enabled  # noqa: PLC0415
+
+            if not is_enabled():
+                djen_ns.abort(503, "Servico IA indisponivel.")
+            modelo = current_app.config.get("GEMINI_TRIAGEM_MODEL", "gemini-2.5-flash")
+            resultado = classificar_publicacao(pub, get_gemini_client(), modelo)
+            if resultado["importante"] is None:
+                djen_ns.abort(502, "Falha ao classificar via IA. Tente novamente.")
+            pub.importante = resultado["importante"]
+            pub.classificado_em = resultado["classificado_em"]
+            pub.classificacao_motivo = resultado["motivo"]
             db.session.commit()
             return pub.to_dict()
 

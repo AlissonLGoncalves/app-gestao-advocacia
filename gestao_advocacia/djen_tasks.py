@@ -929,6 +929,43 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             time.sleep(DELAY_ENTRE_REQUISICOES)
 
         logger.info(f"JOB DJEN: concluído. {total_novas} nova(s) publicação(ões) salva(s).")
+
+        # Epic #2 (#176): classifica publicacoes pendentes (importante IS NULL)
+        # via Gemini + short-circuit por tipo/keyword. Roda DEPOIS do save pra
+        # nao atrasar o sync; se falhar parcial, pubs ficam com importante=NULL
+        # pra retry no proximo sync (idempotente).
+        total_classificadas = 0
+        try:
+            from djen_classifier import classificar_publicacao  # noqa: PLC0415
+            from gemini_service import get_gemini_client, is_enabled  # noqa: PLC0415
+
+            # Limite por execucao pra evitar runaway de custo. Configuravel.
+            classificar_max = int(app.config.get("DJEN_CLASSIFICAR_MAX_POR_RUN", 100))
+            modelo = app.config.get("GEMINI_TRIAGEM_MODEL", "gemini-2.5-flash")
+            gemini_client = get_gemini_client() if is_enabled() else None
+
+            q_pendentes = PublicacaoDJEN.query.filter(PublicacaoDJEN.importante.is_(None))
+            if tenant_id is not None:
+                q_pendentes = q_pendentes.filter_by(tenant_id=tenant_id)
+            pendentes = q_pendentes.limit(classificar_max).all()
+
+            for pub in pendentes:
+                resultado = classificar_publicacao(pub, gemini_client, modelo)
+                if resultado["importante"] is None:
+                    continue  # falhou — deixa NULL pra retry
+                pub.importante = resultado["importante"]
+                pub.classificado_em = resultado["classificado_em"]
+                pub.classificacao_motivo = resultado["motivo"]
+                total_classificadas += 1
+            if total_classificadas:
+                db.session.commit()
+                logger.info(
+                    f"JOB DJEN: classificou {total_classificadas} publicacao(oes) "
+                    f"pendente(s) via IA + short-circuit."
+                )
+        except Exception as e:
+            logger.warning(f"JOB DJEN: classificacao IA falhou ({e}). Continuando.")
+
         return {
             "ok": True,
             "lookback_days": janela_dias,
@@ -936,6 +973,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             "casos_processados": total_casos_processados,
             "itens_encontrados": total_itens_encontrados,
             "publicacoes_salvas": total_novas,
+            "publicacoes_classificadas": total_classificadas,
             "erros": erros,
         }
 

@@ -21,9 +21,9 @@ const CATEGORIAS = [
   { key: 'nao_lidas', label: 'Não lidas', cor: 'primary' },
   { key: 'pendentes', label: 'Pendentes', cor: 'warning' },
   { key: 'vinculadas', label: 'Vinculadas', cor: 'success' },
-  // Placeholder até Epic #2 (#176). Mostra disabled com tooltip pra preparar
-  // o usuário pra feature que vem por aí.
-  { key: 'importantes', label: 'Importantes', cor: 'danger', em_breve: true },
+  // Epic #2 (#176): classificacao IA. Habilitado quando ha pubs classificadas
+  // como importantes. Marca visual: danger (vermelho) pra chamar atencao.
+  { key: 'importantes', label: 'Importantes', cor: 'danger' },
 ]
 
 export default function CategoriasPublicacoes({ ativa, contagens, onChange }) {
@@ -37,33 +37,26 @@ export default function CategoriasPublicacoes({ ativa, contagens, onChange }) {
       {CATEGORIAS.map((cat) => {
         const ehAtiva = ativa === cat.key
         const total = contagens?.[cat.key] ?? 0
-        const desabilitada = cat.em_breve === true
         const cls = ehAtiva
           ? `btn btn-sm btn-${cat.cor} d-flex align-items-center gap-2 px-3`
           : `btn btn-sm btn-outline-${cat.cor} d-flex align-items-center gap-2 px-3`
-        const title = desabilitada
-          ? 'Em breve — classificação automática por IA'
-          : `Mostrar ${cat.label.toLowerCase()}`
         return (
           <button
             key={cat.key}
             type="button"
             role="tab"
             aria-selected={ehAtiva}
-            aria-disabled={desabilitada}
-            disabled={desabilitada}
             className={cls}
-            title={title}
-            onClick={() => !desabilitada && onChange(cat.key)}
+            title={`Mostrar ${cat.label.toLowerCase()}`}
+            onClick={() => onChange(cat.key)}
             data-testid={`djen-cat-${cat.key}`}
-            style={desabilitada ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
           >
             <span style={{ fontSize: '0.85rem' }}>{cat.label}</span>
             <span
               className={`badge ${ehAtiva ? 'bg-light text-dark' : `bg-${cat.cor}-subtle text-${cat.cor}-emphasis`}`}
               style={{ fontSize: '0.72rem' }}
             >
-              {desabilitada ? '—' : total}
+              {total}
             </span>
           </button>
         )

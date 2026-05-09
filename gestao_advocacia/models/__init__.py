@@ -879,6 +879,12 @@ class PublicacaoDJEN(db.Model):
     nome_juiz = db.Column(db.String(200), nullable=True)
     raw_json = db.Column(db.JSON, nullable=True)
     data_captura = db.Column(db.DateTime, default=datetime.utcnow)
+    # Epic #2 (#176): classificacao via IA (Gemini). Marca publicacoes
+    # 'importantes' (decisoes, intimacoes, sentencas) vs 'rotina' (juntada,
+    # vista, conclusos, expedicoes). NULL = ainda nao classificado.
+    importante = db.Column(db.Boolean, nullable=True, index=True)
+    classificado_em = db.Column(db.DateTime, nullable=True)
+    classificacao_motivo = db.Column(db.Text, nullable=True)
     __table_args__ = (
         db.UniqueConstraint("tenant_id", "djen_id", name="uq_pub_djen_tenant_djenid"),
         db.Index("ix_publicacao_djen_tenant_created", "tenant_id", "data_captura"),
@@ -915,6 +921,11 @@ class PublicacaoDJEN(db.Model):
             "polo_passivo": self.polo_passivo,
             "nome_juiz": self.nome_juiz,
             "data_captura": self.data_captura.isoformat() if self.data_captura else None,
+            # Epic #2 (#176): exposto pra UI desenhar selo "Importante"
+            # e tooltip do motivo. None = ainda nao classificado.
+            "importante": self.importante,
+            "classificado_em": (self.classificado_em.isoformat() if self.classificado_em else None),
+            "classificacao_motivo": self.classificacao_motivo,
         }
 
 

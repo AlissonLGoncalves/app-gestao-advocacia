@@ -21,6 +21,8 @@ export function listPublicacoes(params = {}) {
 
 export const getPublicacao = (id) => api.get(`/djen/publicacoes/${id}`)
 export const updatePublicacao = (id, payload) => api.patch(`/djen/publicacoes/${id}`, payload)
+// Epic #2 (#176): forca reclassificacao manual via IA (ignora short-circuit).
+export const reclassificarPublicacao = (id) => api.post(`/djen/publicacoes/${id}/reclassificar`, {})
 
 export const vincularDecisao = (pubId, casoId) =>
   api.post(`/djen/triagem/${pubId}/vincular-caso`, { caso_id: casoId })
