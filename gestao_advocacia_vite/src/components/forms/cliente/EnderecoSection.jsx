@@ -1,4 +1,5 @@
 import React from 'react'
+import FormInput from '../../FormInput.jsx'
 
 const UFS_BRASIL = [
   'AC',
@@ -88,60 +89,40 @@ function EnderecoSection({ formData, loadingCep, onChange, onCepBlur }) {
             )}
           </div>
         </div>
-        <div className="col-md-8 mb-3">
-          <label htmlFor="rua" className="form-label form-label-sm">
-            Rua / Logradouro
-          </label>
-          <input
-            type="text"
-            name="rua"
-            id="rua"
-            className="form-control form-control-sm"
-            value={formData.rua || ''}
-            onChange={onChange}
-          />
-        </div>
+        <FormInput
+          label="Rua / Logradouro"
+          name="rua"
+          id="rua"
+          value={formData.rua || ''}
+          onChange={onChange}
+          containerClassName="col-md-8 mb-3"
+        />
       </div>
       <div className="row">
-        <div className="col-md-3 mb-3">
-          <label htmlFor="numero" className="form-label form-label-sm">
-            Número
-          </label>
-          <input
-            type="text"
-            name="numero"
-            id="numero"
-            className="form-control form-control-sm"
-            value={formData.numero || ''}
-            onChange={onChange}
-          />
-        </div>
-        <div className="col-md-5 mb-3">
-          <label htmlFor="bairro" className="form-label form-label-sm">
-            Bairro
-          </label>
-          <input
-            type="text"
-            name="bairro"
-            id="bairro"
-            className="form-control form-control-sm"
-            value={formData.bairro || ''}
-            onChange={onChange}
-          />
-        </div>
-        <div className="col-md-4 mb-3">
-          <label htmlFor="cidade" className="form-label form-label-sm">
-            Cidade
-          </label>
-          <input
-            type="text"
-            name="cidade"
-            id="cidade"
-            className="form-control form-control-sm"
-            value={formData.cidade || ''}
-            onChange={onChange}
-          />
-        </div>
+        <FormInput
+          label="Número"
+          name="numero"
+          id="numero"
+          value={formData.numero || ''}
+          onChange={onChange}
+          containerClassName="col-md-3 mb-3"
+        />
+        <FormInput
+          label="Bairro"
+          name="bairro"
+          id="bairro"
+          value={formData.bairro || ''}
+          onChange={onChange}
+          containerClassName="col-md-5 mb-3"
+        />
+        <FormInput
+          label="Cidade"
+          name="cidade"
+          id="cidade"
+          value={formData.cidade || ''}
+          onChange={onChange}
+          containerClassName="col-md-4 mb-3"
+        />
       </div>
       <div className="row">
         <div className="col-md-3 mb-3">
@@ -164,26 +145,21 @@ function EnderecoSection({ formData, loadingCep, onChange, onCepBlur }) {
             <option value="EX">EX (Exterior)</option>
           </select>
         </div>
-        <div className="col-md-5 mb-3">
-          <label htmlFor="pais" className="form-label form-label-sm">
-            País
-          </label>
-          <input
-            type="text"
-            name="pais"
-            id="pais"
-            className="form-control form-control-sm"
-            value={formData.pais || ''}
-            onChange={onChange}
-            list="paises-list"
-            autoComplete="off"
-          />
+        <FormInput
+          label="País"
+          name="pais"
+          id="pais"
+          value={formData.pais || ''}
+          onChange={onChange}
+          list="paises-list"
+          autoComplete="off"
+          containerClassName="col-md-5 mb-3"
+        />
           <datalist id="paises-list">
             {PAISES.map((p) => (
               <option key={p} value={p} />
             ))}
           </datalist>
-        </div>
       </div>
     </>
   )

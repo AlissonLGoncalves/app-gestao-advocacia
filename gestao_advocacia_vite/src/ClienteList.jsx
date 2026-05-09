@@ -20,14 +20,12 @@ import {
 import { toast } from 'react-toastify'
 import GerarDocumentoModal from './components/GerarDocumentoModal.jsx'
 import { useConfirm } from './hooks/useConfirm.jsx'
+import useListData from './hooks/useListData.js'
 import EmptyState from './components/EmptyState.jsx'
 
 function ClienteList({ onEditCliente, refreshKey }) {
   const navigate = useNavigate()
   const { confirm, ConfirmDialog } = useConfirm()
-  const [clientes, setClientes] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState(null)
   const [clienteDocumento, setClienteDocumento] = useState(null) // cliente selecionado para gerar doc
 
@@ -51,35 +49,38 @@ function ClienteList({ onEditCliente, refreshKey }) {
   }
 
   const fetchClientes = useCallback(async () => {
-    setLoading(true)
-    setError('')
-
-    try {
-      const data = await listClientes({
-        sort_by: sortConfig.key,
-        sort_order: sortConfig.direction,
-        search: appliedSearchTerm,
-        tipo_pessoa: tipoPessoaFilter,
-        cidade: cidadeFilter,
-        estado: estadoFilter,
-        profissao: profissaoFilter,
-      })
-      setClientes(Array.isArray(data) ? data : data.clientes || [])
-    } catch (err) {
-      console.error('ClienteList: Erro detalhado ao buscar clientes:', err)
-      setError(`Erro ao carregar clientes: ${err.message}`)
-      if (!err.message.includes('Autenticação')) {
-        // Evita duplicar toast se já foi de token
-        toast.error(`Erro ao carregar clientes: ${err.message}`)
-      }
-    } finally {
-      setLoading(false)
-    }
+    return listClientes({
+      sort_by: sortConfig.key,
+      sort_order: sortConfig.direction,
+      search: appliedSearchTerm,
+      tipo_pessoa: tipoPessoaFilter,
+      cidade: cidadeFilter,
+      estado: estadoFilter,
+      profissao: profissaoFilter,
+    })
   }, [appliedSearchTerm, tipoPessoaFilter, cidadeFilter, estadoFilter, profissaoFilter, sortConfig])
 
-  useEffect(() => {
-    fetchClientes()
-  }, [fetchClientes, refreshKey])
+  const handleFetchError = useCallback((err) => {
+    console.error('ClienteList: Erro detalhado ao buscar clientes:', err)
+    if (!err.message.includes('Autenticação')) {
+      // Evita duplicar toast se já foi de token
+      toast.error(`Erro ao carregar clientes: ${err.message}`)
+    }
+  }, [])
+
+  const {
+    items: clientes,
+    loading,
+    error,
+    setError,
+    refetch: fetchClientesLista,
+  } = useListData({
+    fetcher: fetchClientes,
+    mapData: (data) => (Array.isArray(data) ? data : data.clientes || []),
+    errorPrefix: 'Erro ao carregar clientes',
+    onError: handleFetchError,
+    refreshKey,
+  })
 
   const handleToggleExpand = async (clienteId) => {
     if (expandedRowId === clienteId) {
@@ -118,7 +119,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
       try {
         await deleteCliente(id)
         toast.success(`Cliente ID ${id} excluído com sucesso!`)
-        fetchClientes()
+        fetchClientesLista()
       } catch (err) {
         const resData = err.payload || {}
         console.error(`ClienteList: Erro ao deletar cliente ${id}:`, err)

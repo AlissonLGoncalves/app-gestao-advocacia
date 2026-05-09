@@ -1,4 +1,5 @@
 import React from 'react'
+import FormInput from '../../FormInput.jsx'
 
 function DadosProcessoSection({
   formData,
@@ -11,20 +12,18 @@ function DadosProcessoSection({
 }) {
   return (
     <>
+      <FormInput
+        label="Número do Processo (CNJ)"
+        type="text"
+        name="numero_processo"
+        id="numero_processo_caso"
+        value={formData.numero_processo || ''}
+        onChange={onNumeroProcessoChange}
+        placeholder="0000000-00.0000.0.00.0000"
+        maxLength={25}
+        containerClassName="mb-1"
+      />
       <div className="mb-3">
-        <label htmlFor="numero_processo_caso" className="form-label form-label-sm">
-          Número do Processo (CNJ)
-        </label>
-        <input
-          type="text"
-          name="numero_processo"
-          id="numero_processo_caso"
-          className="form-control form-control-sm"
-          placeholder="0000000-00.0000.0.00.0000"
-          value={formData.numero_processo || ''}
-          onChange={onNumeroProcessoChange}
-          maxLength={25}
-        />
         {cnjInfo && (
           <div className="alert alert-info py-1 px-2 mt-1 mb-0 small d-flex gap-3 flex-wrap align-items-center">
             <span>
@@ -53,22 +52,15 @@ function DadosProcessoSection({
         )}
       </div>
 
-      <div className="mb-3">
-        <label htmlFor="titulo_caso" className="form-label form-label-sm">
-          Título do Caso *
-        </label>
-        <input
-          type="text"
-          name="titulo"
-          id="titulo_caso"
-          className={`form-control form-control-sm ${validationErrors.titulo ? 'is-invalid' : ''}`}
-          value={formData.titulo}
-          onChange={onChange}
-        />
-        {validationErrors.titulo && (
-          <div className="invalid-feedback d-block">{validationErrors.titulo}</div>
-        )}
-      </div>
+      <FormInput
+        label="Título do Caso"
+        name="titulo"
+        id="titulo_caso"
+        value={formData.titulo}
+        onChange={onChange}
+        error={validationErrors.titulo}
+        required
+      />
 
       <div className="row">
         <div className="col-md-6 mb-3">
@@ -113,19 +105,14 @@ function DadosProcessoSection({
       </div>
 
       <div className="row">
-        <div className="col-md-6 mb-3">
-          <label htmlFor="tipo_acao_caso" className="form-label form-label-sm">
-            Tipo de Ação
-          </label>
-          <input
-            type="text"
-            name="tipo_acao"
-            id="tipo_acao_caso"
-            className="form-control form-control-sm"
-            value={formData.tipo_acao || ''}
-            onChange={onChange}
-          />
-        </div>
+        <FormInput
+          label="Tipo de Ação"
+          name="tipo_acao"
+          id="tipo_acao_caso"
+          value={formData.tipo_acao || ''}
+          onChange={onChange}
+          containerClassName="col-md-6 mb-3"
+        />
         <div className="col-md-6 mb-3">
           <label htmlFor="area_direito_caso" className="form-label form-label-sm">
             Área do Direito
@@ -157,38 +144,27 @@ function DadosProcessoSection({
         </div>
       </div>
 
-      <div className="mb-3">
-        <label htmlFor="valor_causa_caso" className="form-label form-label-sm">
-          Valor da Causa (R$)
-        </label>
-        <input
-          type="number"
-          name="valor_causa"
-          id="valor_causa_caso"
-          className={`form-control form-control-sm ${validationErrors.valor_causa ? 'is-invalid' : ''}`}
-          value={formData.valor_causa}
-          onChange={onChange}
-          step="0.01"
-          placeholder="Ex: 1500.50"
-        />
-        {validationErrors.valor_causa && (
-          <div className="invalid-feedback d-block">{validationErrors.valor_causa}</div>
-        )}
-      </div>
+      <FormInput
+        label="Valor da Causa (R$)"
+        type="number"
+        name="valor_causa"
+        id="valor_causa_caso"
+        value={formData.valor_causa}
+        onChange={onChange}
+        error={validationErrors.valor_causa}
+        step="0.01"
+        placeholder="Ex: 1500.50"
+      />
 
-      <div className="mb-3">
-        <label htmlFor="notas_caso_form" className="form-label form-label-sm">
-          Notas sobre o Caso
-        </label>
-        <textarea
-          name="notas_caso"
-          id="notas_caso_form"
-          className="form-control form-control-sm"
-          value={formData.notas_caso || ''}
-          onChange={onChange}
-          rows="3"
-        />
-      </div>
+      <FormInput
+        as="textarea"
+        label="Notas sobre o Caso"
+        name="notas_caso"
+        id="notas_caso_form"
+        value={formData.notas_caso || ''}
+        onChange={onChange}
+        rows="3"
+      />
     </>
   )
 }

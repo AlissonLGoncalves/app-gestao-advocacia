@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  callbackGoogleAgenda,
-  connectGoogleAgenda,
   createEvento,
   deleteEvento,
   getEvento,
@@ -131,17 +129,4 @@ describe('api/agenda', () => {
     expect(proximos[0].titulo).toBe('Hoje')
   })
 
-  it('mantem endpoints json do google calendar', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ url: 'https://google.com' }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
-    vi.stubGlobal('fetch', fetchMock)
-
-    await connectGoogleAgenda()
-    await callbackGoogleAgenda({ code: 'abc123' })
-
-    expect(fetchMock.mock.calls[0][0]).toContain('/agenda/google/connect')
-    expect(fetchMock.mock.calls[1][0]).toContain('/agenda/google/callback?code=abc123')
-  })
 })

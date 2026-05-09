@@ -15,15 +15,13 @@ import { exportarParaPDF } from './utils/pdfGenerator.js'
 import { api } from './api/client.js'
 import { deleteRecebimento, listRecebimentos } from './api/financeiro.js'
 import { useConfirm } from './hooks/useConfirm.jsx'
+import useListData from './hooks/useListData.js'
 import EmptyState from './components/EmptyState.jsx'
 
 function RecebimentoList({ onEditRecebimento, refreshKey }) {
   const { confirm, ConfirmDialog } = useConfirm()
-  const [recebimentos, setRecebimentos] = useState([])
   const [clientes, setClientes] = useState([])
   const [casos, setCasos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState(null)
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -62,43 +60,29 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
   }, [clienteFilter])
 
   const fetchRecebimentos = useCallback(async () => {
-    setLoading(true)
-    setError('')
     const hasToken =
       localStorage.getItem('token') ||
       localStorage.getItem('access_token') ||
       localStorage.getItem('auth_token')
     if (!hasToken) {
-      setError('Autenticação necessária.')
-      setLoading(false)
       toast.error('Sessão expirada. Faça login.')
-      return
+      throw new Error('Autenticação necessária.')
     }
 
-    try {
-      const params = {
-        sort_by: sortConfig.key,
-        sort_order: sortConfig.direction,
-        search: searchTerm,
-        cliente_id: clienteFilter,
-        caso_id: casoFilter,
-        status: statusFilter,
-        data_vencimento_inicio: dataVencimentoInicio,
-        data_vencimento_fim: dataVencimentoFim,
-        data_recebimento_inicio: dataRecebimentoInicio,
-        data_recebimento_fim: dataRecebimentoFim,
-      }
-      const data = await listRecebimentos(params)
-      setRecebimentos(data)
-    } catch (err) {
-      console.error('Erro ao buscar recebimentos:', err)
-      setError(`Erro ao carregar recebimentos: ${err.message}`)
-      if (!err.message.includes('Autenticação')) {
-        toast.error(`Erro ao carregar recebimentos: ${err.message}`)
-      }
-    } finally {
-      setLoading(false)
+    const params = {
+      sort_by: sortConfig.key,
+      sort_order: sortConfig.direction,
+      search: searchTerm,
+      cliente_id: clienteFilter,
+      caso_id: casoFilter,
+      status: statusFilter,
+      data_vencimento_inicio: dataVencimentoInicio,
+      data_vencimento_fim: dataVencimentoFim,
+      data_recebimento_inicio: dataRecebimentoInicio,
+      data_recebimento_fim: dataRecebimentoFim,
     }
+
+    return listRecebimentos(params)
   }, [
     searchTerm,
     clienteFilter,
@@ -111,13 +95,30 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
     sortConfig,
   ])
 
+  const handleFetchError = useCallback((err) => {
+    console.error('Erro ao buscar recebimentos:', err)
+    if (!err.message.includes('Autenticação')) {
+      toast.error(`Erro ao carregar recebimentos: ${err.message}`)
+    }
+  }, [])
+
+  const {
+    items: recebimentos,
+    loading,
+    error,
+    setError,
+    refetch: fetchRecebimentosLista,
+  } = useListData({
+    fetcher: fetchRecebimentos,
+    mapData: (data) => data,
+    errorPrefix: 'Erro ao carregar recebimentos',
+    onError: handleFetchError,
+    refreshKey,
+  })
+
   useEffect(() => {
     fetchClientesECasosParaFiltro()
   }, [fetchClientesECasosParaFiltro])
-
-  useEffect(() => {
-    fetchRecebimentos()
-  }, [fetchRecebimentos, refreshKey])
 
   const handleDeleteClick = async (id) => {
     const hasToken =
@@ -139,7 +140,7 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
       try {
         await deleteRecebimento(id)
         toast.success(`Recebimento ID ${id} excluído com sucesso!`)
-        fetchRecebimentos()
+        fetchRecebimentosLista()
       } catch (err) {
         console.error(`Erro ao deletar recebimento ${id}:`, err)
         setError(`Erro ao deletar recebimento: ${err.message}`)

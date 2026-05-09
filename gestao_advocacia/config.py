@@ -36,15 +36,11 @@ dotenv_path = os.path.join(BASE_DIR, ".env")
 
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
-    # print(f"INFO: Arquivo .env carregado de: {dotenv_path}") # Para depuração
 else:
     # Fallback se o .env não estiver na raiz, mas isso geralmente não é o ideal.
     env_local_path = os.path.join(os.path.dirname(__file__), ".env")
     if os.path.exists(env_local_path):
         load_dotenv(env_local_path)
-        # print(f"INFO: Arquivo .env carregado de: {env_local_path}") # Para depuração
-    # else:
-    # print(f"AVISO: Arquivo .env não encontrado em '{dotenv_path}' nem em '{env_local_path}'. Usando valores padrão ou de ambiente do sistema.")
 
 
 class Config:

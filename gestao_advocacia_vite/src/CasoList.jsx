@@ -18,15 +18,13 @@ import {
 import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
 import { useConfirm } from './hooks/useConfirm.jsx'
+import useListData from './hooks/useListData.js'
 import EmptyState from './components/EmptyState.jsx'
 
 function CasoList({ onEditCaso, refreshKey }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [casos, setCasos] = useState([])
   const [clientes, setClientes] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState(null)
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -78,39 +76,25 @@ function CasoList({ onEditCaso, refreshKey }) {
   }, [])
 
   const fetchCasos = useCallback(async () => {
-    setLoading(true)
-    setError('')
-
-    try {
-      const data = await listCasos({
-        sort_by: sortConfig.key,
-        sort_order: sortConfig.direction,
-        search: searchTerm,
-        status: statusFilter,
-        cliente_id: clienteFilter,
-        data_criacao_inicio: dataCriacaoInicioFilter,
-        data_criacao_fim: dataCriacaoFimFilter,
-        data_atualizacao_inicio: dataAtualizacaoInicioFilter,
-        data_atualizacao_fim: dataAtualizacaoFimFilter,
-        area_direito: areaDireitoFilter,
-        fase_processual: faseProcessualFilter,
-        vara_juizo: varaJuizoFilter,
-        instancia: instanciaFilter,
-        valor_causa_min: valorCausaMinFilter,
-        valor_causa_max: valorCausaMaxFilter,
-        data_distribuicao_inicio: dataDistribuicaoInicioFilter,
-        data_distribuicao_fim: dataDistribuicaoFimFilter,
-      })
-      setCasos(Array.isArray(data) ? data : data.casos || [])
-    } catch (err) {
-      console.error('CasoList: Erro detalhado ao buscar casos:', err)
-      setError(`Erro ao carregar casos: ${err.message}`)
-      if (!err.message.includes('Autenticação')) {
-        toast.error(`Erro ao carregar casos: ${err.message}`)
-      }
-    } finally {
-      setLoading(false)
-    }
+    return listCasos({
+      sort_by: sortConfig.key,
+      sort_order: sortConfig.direction,
+      search: searchTerm,
+      status: statusFilter,
+      cliente_id: clienteFilter,
+      data_criacao_inicio: dataCriacaoInicioFilter,
+      data_criacao_fim: dataCriacaoFimFilter,
+      data_atualizacao_inicio: dataAtualizacaoInicioFilter,
+      data_atualizacao_fim: dataAtualizacaoFimFilter,
+      area_direito: areaDireitoFilter,
+      fase_processual: faseProcessualFilter,
+      vara_juizo: varaJuizoFilter,
+      instancia: instanciaFilter,
+      valor_causa_min: valorCausaMinFilter,
+      valor_causa_max: valorCausaMaxFilter,
+      data_distribuicao_inicio: dataDistribuicaoInicioFilter,
+      data_distribuicao_fim: dataDistribuicaoFimFilter,
+    })
   }, [
     searchTerm,
     statusFilter,
@@ -130,13 +114,30 @@ function CasoList({ onEditCaso, refreshKey }) {
     sortConfig,
   ])
 
+  const handleFetchError = useCallback((err) => {
+    console.error('CasoList: Erro detalhado ao buscar casos:', err)
+    if (!err.message.includes('Autenticação')) {
+      toast.error(`Erro ao carregar casos: ${err.message}`)
+    }
+  }, [])
+
+  const {
+    items: casos,
+    loading,
+    error,
+    setError,
+    refetch: fetchCasosLista,
+  } = useListData({
+    fetcher: fetchCasos,
+    mapData: (data) => (Array.isArray(data) ? data : data.casos || []),
+    errorPrefix: 'Erro ao carregar casos',
+    onError: handleFetchError,
+    refreshKey,
+  })
+
   useEffect(() => {
     fetchClientesParaFiltro()
   }, [fetchClientesParaFiltro])
-
-  useEffect(() => {
-    fetchCasos()
-  }, [fetchCasos, refreshKey])
 
   const { confirm, ConfirmDialog } = useConfirm()
 
@@ -151,7 +152,7 @@ function CasoList({ onEditCaso, refreshKey }) {
       try {
         await deleteCaso(id)
         toast.success(`Caso ID ${id} excluído com sucesso!`)
-        fetchCasos()
+        fetchCasosLista()
       } catch (err) {
         console.error(`CasoList: Erro ao deletar caso ${id}:`, err)
         setError(`Erro ao deletar caso: ${err.message}`)
