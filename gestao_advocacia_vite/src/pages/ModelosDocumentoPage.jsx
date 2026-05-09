@@ -21,6 +21,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { listModelos, createModelo, updateModelo, deleteModelo } from '../api/modelos.js'
 import { useConfirm } from '../hooks/useConfirm.jsx'
+import PreviewModeloModal from '../components/PreviewModeloModal.jsx'
 
 const TIPOS = [
   { value: 'procuracao_pf', label: 'Procuração — PF' },
@@ -39,6 +40,8 @@ export default function ModelosDocumentoPage() {
   const [editando, setEditando] = useState(null) // modelo em edição (ou null)
   const [salvando, setSalvando] = useState(false)
   const [criando, setCriando] = useState(false)
+  // Epic #9 fase 2: modelo selecionado pra preview/print (null = modal fechado)
+  const [previewing, setPreviewing] = useState(null)
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -313,12 +316,9 @@ export default function ModelosDocumentoPage() {
                         </button>
                         <button
                           className="btn btn-sm btn-outline-secondary me-1"
-                          onClick={() =>
-                            navigate(`/clientes`, {
-                              state: { gerarDocumentoModelo: m },
-                            })
-                          }
-                          title="Gerar a partir de um cliente"
+                          onClick={() => setPreviewing(m)}
+                          title="Pré-visualizar e imprimir/salvar PDF"
+                          data-testid={`btn-preview-${m.id}`}
                         >
                           <EyeIcon style={{ width: 14, height: 14 }} />
                         </button>
@@ -339,6 +339,9 @@ export default function ModelosDocumentoPage() {
           </div>
         </div>
       )}
+
+      {/* Epic #9 fase 2: modal de preview com window.print() */}
+      {previewing && <PreviewModeloModal modelo={previewing} onClose={() => setPreviewing(null)} />}
     </div>
   )
 }
