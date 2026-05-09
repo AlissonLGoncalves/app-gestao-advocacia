@@ -18,7 +18,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
-import GerarDocumentoModal from './components/GerarDocumentoModal.jsx'
+import EscolherModeloModal from './components/EscolherModeloModal.jsx'
 import { useConfirm } from './hooks/useConfirm.jsx'
 import useListData from './hooks/useListData.js'
 import EmptyState from './components/EmptyState.jsx'
@@ -589,7 +589,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
       )}
 
       {clienteDocumento && (
-        <GerarDocumentoModal cliente={clienteDocumento} onClose={() => setClienteDocumento(null)} />
+        <EscolherModeloModal cliente={clienteDocumento} onClose={() => setClienteDocumento(null)} />
       )}
     </div>
   )
