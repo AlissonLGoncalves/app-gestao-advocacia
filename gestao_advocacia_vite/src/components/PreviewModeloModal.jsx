@@ -43,10 +43,12 @@ const PRINT_CSS = `
   }
 `
 
-export default function PreviewModeloModal({ modelo, onClose }) {
+export default function PreviewModeloModal({ modelo, onClose, clientePreSelecionadoId = null }) {
   const [clientes, setClientes] = useState([])
   const [casos, setCasos] = useState([])
-  const [clienteId, setClienteId] = useState('')
+  const [clienteId, setClienteId] = useState(
+    clientePreSelecionadoId ? String(clientePreSelecionadoId) : ''
+  )
   const [casoId, setCasoId] = useState('')
   const [htmlRenderizado, setHtmlRenderizado] = useState('')
   const [carregandoListas, setCarregandoListas] = useState(true)
