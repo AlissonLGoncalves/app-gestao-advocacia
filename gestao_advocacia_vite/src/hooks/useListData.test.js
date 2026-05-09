@@ -93,4 +93,32 @@ describe('useListData', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.items).toEqual([])
   })
+
+  it('NAO causa loop infinito quando consumer passa callbacks inline (regressao 2026-05-09)', async () => {
+    // Simula o uso real (CasoList/RecebimentoList/etc.): props sao recriadas
+    // a cada render. Com a versao antiga (callbacks nas deps do useCallback),
+    // useEffect disparava refetch indefinidamente.
+    const fetcher = vi.fn().mockResolvedValue([{ id: 1 }])
+
+    const { result, rerender } = renderHook(() =>
+      useListData({
+        fetcher: () => fetcher(),
+        mapData: (data) => data,
+        onError: () => {},
+        errorPrefix: 'Erro',
+      })
+    )
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(fetcher).toHaveBeenCalledTimes(1)
+
+    // 5 re-renders: cada um recria fetcher/mapData/onError. Nao deve refetchar.
+    rerender()
+    rerender()
+    rerender()
+    rerender()
+    rerender()
+    // Aguarda evento microtask + useEffect
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
+  })
 })
