@@ -1132,6 +1132,25 @@ export default function DjenPage() {
                             <div className="text-muted" style={{ fontSize: '0.78rem' }}>
                               {pub.nome_orgao} · {fmtData(pub.data_disponibilizacao)}
                             </div>
+                            {/* Trecho do texto da publicação (2 linhas, ellipsis).
+                                Tribunais mandam HTML — sanitizamos pra texto plano
+                                via extrairTextoPlano antes de exibir. */}
+                            {pub.texto && (
+                              <div
+                                className="text-muted small mt-1"
+                                style={{
+                                  fontSize: '0.78rem',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  lineHeight: 1.35,
+                                }}
+                              >
+                                {extrairTextoPlano(pub.texto).slice(0, 280)}
+                              </div>
+                            )}
                           </div>
                           <div className="d-flex gap-1">
                             {pub.hash_comunicacao && (
