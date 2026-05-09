@@ -11,6 +11,7 @@ import {
 } from '../api/casos.js'
 import HonorariosCasoCard from '../components/HonorariosCasoCard'
 import DocumentosCasoTab from '../components/DocumentosCasoTab'
+import DocumentosVinculadosCard from '../components/DocumentosVinculadosCard'
 import CasoTimeline from '../components/CasoTimeline'
 
 // Componente auxiliar para exibir mensagens de status (loading, error, success)
@@ -338,6 +339,8 @@ function CasoDetalhePage() {
       </div>
       {/* SEÇÃO DE HONORÁRIOS ADVOCATÍCIOS FINANCEIROS */}
       <HonorariosCasoCard casoId={casoId} clienteId={caso.cliente_id} />
+      {/* PROCURAÇÕES E CONTRATOS VINCULADOS (viewer + download) */}
+      <DocumentosVinculadosCard casoId={casoId} />
       {/* SEÇÃO DO DRIVE DO PROCESSO */}
       <div className="card shadow-lg mb-4">
         <div className="card-body p-4 pt-2">

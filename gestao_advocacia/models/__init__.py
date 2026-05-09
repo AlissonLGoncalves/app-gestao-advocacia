@@ -574,6 +574,18 @@ class ProcuracaoAnalise(db.Model):
         db.ForeignKey("user.id", name="fk_procuracao_analise_user_id"),
         nullable=False,
     )
+    cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cliente.id", name="fk_procuracao_analise_cliente_id"),
+        nullable=True,
+        index=True,
+    )
+    caso_id = db.Column(
+        db.Integer,
+        db.ForeignKey("caso.id", name="fk_procuracao_analise_caso_id"),
+        nullable=True,
+        index=True,
+    )
     arquivo_path = db.Column(db.String(500), nullable=False)
     arquivo_hash = db.Column(db.String(64), nullable=False)
     status = db.Column(
@@ -593,8 +605,11 @@ class ProcuracaoAnalise(db.Model):
             "id": self.id,
             "tenant_id": self.tenant_id,
             "user_id": self.user_id,
+            "cliente_id": self.cliente_id,
+            "caso_id": self.caso_id,
             "arquivo_path": self.arquivo_path,
             "arquivo_hash": self.arquivo_hash,
+            "tem_pdf": bool(self.arquivo_path),
             "status": self.status,
             "dados_extraidos": self.dados_extraidos,
             "erro": self.erro,
@@ -620,6 +635,7 @@ class ContratoHonorario(db.Model):
     vigencia_condicao = db.Column(db.Text, nullable=True)
     arquivo_hash = db.Column(db.String(64), nullable=True)
     arquivo_nome = db.Column(db.String(255), nullable=True)
+    arquivo_path = db.Column(db.String(500), nullable=True)
     parcelas_json = db.Column(db.Text, nullable=True)
 
     caso_id = db.Column(
@@ -654,6 +670,7 @@ class ContratoHonorario(db.Model):
             "objeto": self.objeto,
             "vigencia_condicao": self.vigencia_condicao,
             "arquivo_nome": self.arquivo_nome,
+            "tem_pdf": bool(self.arquivo_path),
             "parcelas_json": self.parcelas_json,
             "caso_id": self.caso_id,
             "cliente_id": self.cliente_id,

@@ -1,7 +1,8 @@
+import os
 from datetime import date, datetime
 
 from dateutil.relativedelta import relativedelta
-from flask import request
+from flask import request, send_from_directory
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from flask_restx import Resource
 
@@ -111,6 +112,33 @@ def register_contratos_routes(
             db.session.delete(contrato)
             db.session.commit()
             return "", 204
+
+    @contratos_ns.route("/<int:id>/arquivo")
+    class ContratoArquivoAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @contratos_ns.doc(
+            security="jsonWebToken",
+            description="Baixa o arquivo PDF original do contrato. Retorna 404 se ainda nao foi anexado.",
+        )
+        def get(self, id):
+            contrato = get_item_or_404(ContratoHonorario, id)
+            if not contrato.arquivo_path or not os.path.exists(contrato.arquivo_path):
+                return {
+                    "message": "PDF original nao disponivel. Faca novo upload se desejar.",
+                    "code": "pdf_unavailable",
+                }, 404
+
+            as_attachment = request.args.get("download", "0") == "1"
+            file_directory = os.path.dirname(contrato.arquivo_path)
+            file_name_on_disk = os.path.basename(contrato.arquivo_path)
+            download_name = contrato.arquivo_nome or file_name_on_disk
+            return send_from_directory(
+                file_directory,
+                file_name_on_disk,
+                as_attachment=as_attachment,
+                download_name=download_name,
+            )
 
     @contratos_ns.route("/<int:id>/gerar-parcelas")
     class ContratoGerarParcelasAPI(Resource):

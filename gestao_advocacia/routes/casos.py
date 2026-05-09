@@ -15,7 +15,17 @@ from extensions import db
 from gemini_service import get_gemini_client
 from gemini_service import is_enabled as gemini_is_enabled
 from helpers import get_item_or_404, get_tenant_id, query_for_tenant, tenant_scoped
-from models import Caso, Cliente, Documento, MovimentacaoCNJ, PublicacaoDJEN, TarefaPrazo, log_audit
+from models import (
+    Caso,
+    Cliente,
+    ContratoHonorario,
+    Documento,
+    MovimentacaoCNJ,
+    ProcuracaoAnalise,
+    PublicacaoDJEN,
+    TarefaPrazo,
+    log_audit,
+)
 from ocr_service import extract_case_data_from_file
 
 
@@ -1107,6 +1117,60 @@ def register_casos_routes(
                 }
                 for p in publicacoes
             ], 200
+
+    @casos_ns.route("/<int:caso_id>/documentos")
+    @casos_ns.param("caso_id", "ID do caso para listar procuracoes e contratos vinculados")
+    class CasoListarDocumentosAPI(Resource):
+        @casos_ns.doc(
+            "listar_documentos_caso_endpoint",
+            security="jsonWebToken",
+            description=(
+                "Retorna procuracoes e contratos vinculados ao caso. "
+                "Inclui contratos ligados ao cliente do caso mas sem caso especifico, "
+                "para que o usuario veja todo o contexto documental."
+            ),
+        )
+        @jwt_required()
+        @tenant_scoped
+        def get(self, caso_id):
+            tenant_id = get_tenant_id()
+            caso_db = query_for_tenant(Caso).filter_by(id=caso_id).first()
+            if not caso_db:
+                casos_ns.abort(404, message=f"Caso com ID {caso_id} nao foi encontrado.")
+
+            procuracoes = (
+                ProcuracaoAnalise.query.filter_by(tenant_id=tenant_id)
+                .filter(
+                    (ProcuracaoAnalise.caso_id == caso_db.id)
+                    | (
+                        (ProcuracaoAnalise.caso_id.is_(None))
+                        & (ProcuracaoAnalise.cliente_id == caso_db.cliente_id)
+                    )
+                )
+                .order_by(ProcuracaoAnalise.criado_em.desc())
+                .all()
+            )
+
+            contratos = (
+                ContratoHonorario.query.filter_by(tenant_id=tenant_id)
+                .filter(
+                    (ContratoHonorario.caso_id == caso_db.id)
+                    | (
+                        (ContratoHonorario.caso_id.is_(None))
+                        & (ContratoHonorario.cliente_id == caso_db.cliente_id)
+                    )
+                )
+                .order_by(
+                    ContratoHonorario.data_assinatura.desc().nullslast(),
+                    ContratoHonorario.id.desc(),
+                )
+                .all()
+            )
+
+            return {
+                "procuracoes": [p.to_dict() for p in procuracoes],
+                "contratos": [c.to_dict() for c in contratos],
+            }, 200
 
     @casos_ns.route("/<int:caso_id>/gerar-resumo")
     @casos_ns.param("caso_id", "ID do caso para gerar resumo via IA")
