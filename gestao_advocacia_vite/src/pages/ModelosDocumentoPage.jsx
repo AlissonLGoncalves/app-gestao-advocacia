@@ -22,6 +22,7 @@ import {
 import { listModelos, createModelo, updateModelo, deleteModelo } from '../api/modelos.js'
 import { useConfirm } from '../hooks/useConfirm.jsx'
 import PreviewModeloModal from '../components/PreviewModeloModal.jsx'
+import TiptapEditor from '../components/TiptapEditor.jsx'
 
 const TIPOS = [
   { value: 'procuracao_pf', label: 'Procuração — PF' },
@@ -216,21 +217,19 @@ export default function ModelosDocumentoPage() {
               </div>
               <div className="col-12">
                 <label className="form-label small fw-semibold">
-                  Conteúdo HTML (com placeholders Jinja2)
+                  Conteúdo (editor visual com placeholders Jinja2)
                 </label>
-                <textarea
-                  className="form-control font-monospace"
-                  rows={20}
+                <TiptapEditor
                   value={editando.conteudo_html}
-                  onChange={(e) => setEditando({ ...editando, conteudo_html: e.target.value })}
-                  spellCheck={false}
-                  data-testid="textarea-conteudo-modelo"
+                  onChange={(html) => setEditando({ ...editando, conteudo_html: html })}
+                  ariaLabel="Editor do modelo de documento"
                 />
                 <div className="form-text small">
-                  Use <code>{'{{cliente.nome_razao_social}}'}</code>,{' '}
+                  Digite placeholders como <code>{'{{cliente.nome_razao_social}}'}</code>,{' '}
                   <code>{'{{cliente.cpf_cnpj}}'}</code>, <code>{'{{caso.numero_processo}}'}</code>,{' '}
                   <code>{'{{advogado.nome}}'}</code>, <code>{'{{data_atual}}'}</code>,{' '}
-                  <code>{'{{cidade_local}}'}</code>.
+                  <code>{'{{cidade_local}}'}</code> diretamente no texto. Eles serão substituídos
+                  pelos dados do cliente/caso ao gerar o documento.
                 </div>
                 {Array.isArray(editando.variaveis_disponiveis) &&
                   editando.variaveis_disponiveis.length > 0 && (
