@@ -96,6 +96,14 @@ function CasosPage() {
         >
           Importar CNJs em lote
         </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-primary"
+          onClick={() => navigate('/casos/buscar')}
+          title="Buscar processo no tribunal pelo número CNJ"
+        >
+          Buscar no tribunal
+        </button>
       </div>
       <CasoList key={refreshKey} onEditCaso={handleEditarCaso} />
     </>

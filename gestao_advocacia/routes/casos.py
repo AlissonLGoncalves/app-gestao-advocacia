@@ -543,6 +543,102 @@ def register_casos_routes(
                 "resultados": resultados,
             }, 200
 
+    @casos_ns.route("/buscar-cnj")
+    class CasoBuscarCNJOnDemandAPI(Resource):
+        """Epic #12 (#186): busca on-demand de processo a partir do CNJ.
+
+        Inspirado no Astrea ('Busca de processo automatica > Pelo numero CNJ'):
+        usuario cola o CNJ, sistema detecta o tribunal, escolhe o adapter
+        certo e devolve dados estruturados. Frontend pode entao exibir e
+        permitir criar Caso a partir do resultado.
+
+        MVP sincrono: retorna direto. Versao com fila/credito fica para
+        proxima iteracao.
+        """
+
+        @jwt_required()
+        @tenant_scoped
+        @casos_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Recebe {cnj} no body, detecta o tribunal e busca dados via "
+                "adapter (DataJud no MVP). Retorna dados padronizados ou erro "
+                "explicito caso o tribunal nao seja suportado/esteja fora do ar."
+            ),
+        )
+        def post(self):
+            from tribunal_adapters import selecionar_adapter  # noqa: PLC0415
+            from utils.tribunal_detector import detectar_tribunal_do_cnj  # noqa: PLC0415
+
+            data = request.get_json(silent=True) or {}
+            cnj_input = data.get("cnj") or data.get("numero")
+            if not cnj_input or not isinstance(cnj_input, str):
+                return {
+                    "message": "Campo 'cnj' (string) e obrigatorio.",
+                    "code": "missing_cnj",
+                }, 400
+
+            tribunal_info = detectar_tribunal_do_cnj(cnj_input)
+            if tribunal_info.get("erro") == "cnj_formato_invalido":
+                return {
+                    "message": "Numero CNJ invalido. Esperado 20 digitos.",
+                    "code": "cnj_invalido",
+                    "tribunal": tribunal_info,
+                }, 400
+
+            if not tribunal_info.get("suportado"):
+                return {
+                    "message": (
+                        f"Tribunal {tribunal_info.get('tribunal_codigo')} nao suportado "
+                        f"pela busca automatica nesta versao."
+                    ),
+                    "code": "tribunal_nao_suportado",
+                    "tribunal": tribunal_info,
+                }, 422
+
+            # Verifica duplicado no tenant
+            cnj_normalizado = tribunal_info["cnj_normalizado"]
+            tenant_id = get_tenant_id()
+            existente = (
+                Caso.query.filter_by(tenant_id=tenant_id, numero_processo=cnj_normalizado)
+                .order_by(Caso.id.asc())
+                .first()
+            )
+
+            adapter = selecionar_adapter(tribunal_info)
+            if not adapter:
+                return {
+                    "message": "Nenhum adapter disponivel para este tribunal.",
+                    "code": "sem_adapter",
+                    "tribunal": tribunal_info,
+                }, 422
+
+            app.logger.info(
+                "epic_186_busca_cnj_iniciada",
+                extra={
+                    "event": "epic_186_busca_cnj",
+                    "cnj": cnj_normalizado,
+                    "tribunal": tribunal_info.get("tribunal_codigo"),
+                    "adapter": adapter.nome,
+                },
+            )
+
+            resultado = adapter.buscar(cnj_normalizado)
+
+            response = {
+                "tribunal": tribunal_info,
+                "resultado": resultado.to_dict(),
+                "ja_cadastrado": (
+                    {
+                        "caso_id": existente.id if existente else None,
+                        "titulo": existente.titulo if existente else None,
+                    }
+                    if existente
+                    else None
+                ),
+            }
+            return response, 200 if resultado.sucesso else 200  # 200 mesmo em erro de adapter
+
     @casos_ns.route("/consulta-publica-cnj")
     class CasoConsultaPublicaCNJAPI(Resource):
         @jwt_required()
