@@ -24,9 +24,15 @@ from models import (
     ProcuracaoAnalise,
     PublicacaoDJEN,
     TarefaPrazo,
+    User,
     log_audit,
 )
 from ocr_service import extract_case_data_from_file
+from utils.oab_match import (
+    identificar_cliente_no_processo,
+    oab_do_tenant,
+    parsear_polos_datajud,
+)
 
 
 def register_casos_routes(
@@ -653,6 +659,37 @@ def register_casos_routes(
                             nomes_partes.append(nome)
                 parte_contraria = ", ".join(nomes_partes[:5])
 
+            # Epic #11: auto-detecta qual polo e cliente cruzando OAB do escritorio
+            # com OABs dos advogados de cada parte (vindas do DataJud).
+            cliente_detectado = {
+                "polo": None,
+                "parte": None,
+                "motivo": "tenant_sem_oab",
+                "oab_match": None,
+            }
+            try:
+                user_obj = User.query.get(int(user_id)) if user_id else None
+                tenant_obj = user_obj.tenant if user_obj else None
+                oab_escritorio = oab_do_tenant(tenant_obj)
+                if oab_escritorio:
+                    polos_normalizados = parsear_polos_datajud(partes)
+                    cliente_detectado = identificar_cliente_no_processo(
+                        polos_normalizados,
+                        [oab_escritorio],
+                    )
+                    # Reduz a parte ao essencial pra UI (nome + tipo)
+                    parte_match = cliente_detectado.get("parte")
+                    if isinstance(parte_match, dict):
+                        cliente_detectado["parte"] = {
+                            "nome": parte_match.get("nome"),
+                            "tipo": parte_match.get("tipo"),
+                        }
+            except Exception as exc:
+                app.logger.warning(
+                    "epic_185_falha_auto_detectar_cliente",
+                    extra={"event": "epic_185_falha", "erro": str(exc)},
+                )
+
             return {
                 "numero_processo": numero_limpo,
                 "classe_acao": classe_acao,
@@ -664,6 +701,7 @@ def register_casos_routes(
                 "nivel_sigilo": nivel_sigilo,
                 "parte_contraria": parte_contraria,
                 "movimento_mais_recente": movimento_mais_recente,
+                "cliente_detectado": cliente_detectado,
                 "raw": dados_processo,
             }, 200
 
