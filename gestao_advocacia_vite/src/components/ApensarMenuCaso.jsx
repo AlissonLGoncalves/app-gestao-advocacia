@@ -3,7 +3,7 @@
 // 'Alterar instancia atual'). Encapsula 3 acoes em 1 componente isolado para
 // minimizar conflito com Epic #6 (Tabs no detalhe).
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import {
@@ -33,23 +33,29 @@ function ApensarMenuCaso({ caso, onCasoAtualizado }) {
   const [novaInstancia, setNovaInstancia] = useState('')
   const [salvando, setSalvando] = useState(false)
 
-  const carregarApensos = useCallback(async () => {
-    if (!caso?.id) return
-    setLoadingApensos(true)
-    try {
-      const data = await listarApensosCaso(caso.id)
-      setApensos(data.apensos || [])
-    } catch (err) {
-      console.error('Erro ao listar apensos:', err)
-      setApensos([])
-    } finally {
-      setLoadingApensos(false)
-    }
-  }, [caso?.id])
+  const casoId = caso?.id
 
   useEffect(() => {
-    carregarApensos()
-  }, [carregarApensos])
+    if (!casoId) return
+    let cancelado = false
+    setLoadingApensos(true)
+    listarApensosCaso(casoId)
+      .then((data) => {
+        if (!cancelado) setApensos(data.apensos || [])
+      })
+      .catch((err) => {
+        if (!cancelado) {
+          console.error('Erro ao listar apensos:', err)
+          setApensos([])
+        }
+      })
+      .finally(() => {
+        if (!cancelado) setLoadingApensos(false)
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [casoId])
 
   const abrirModalApensar = async () => {
     setSalvando(false)
