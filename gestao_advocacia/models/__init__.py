@@ -247,6 +247,14 @@ class Caso(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_caso_user_id"), nullable=False
     )
+    # Epic #8 (#182): apensar processo. Quando preenchido, este caso e
+    # apenso ao caso indicado. Self-FK nullable.
+    caso_principal_id = db.Column(
+        db.Integer,
+        db.ForeignKey("caso.id", name="fk_caso_caso_principal_id"),
+        nullable=True,
+        index=True,
+    )
     data_ultima_verificacao_cnj = db.Column(db.DateTime, nullable=True)
     data_ultima_verificacao_djen = db.Column(db.DateTime, nullable=True)
 
@@ -316,6 +324,8 @@ class Caso(db.Model):
                 else None
             ),
             "user_id": self.user_id,
+            "caso_principal_id": self.caso_principal_id,
+            "eh_apenso": self.caso_principal_id is not None,
             "data_ultima_verificacao_cnj": (
                 self.data_ultima_verificacao_cnj.isoformat()
                 if self.data_ultima_verificacao_cnj

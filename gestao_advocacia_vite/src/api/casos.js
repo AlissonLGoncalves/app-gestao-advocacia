@@ -35,5 +35,16 @@ export const buscarProcessoLocal = (numero) =>
 
 export const importarCnjsEmLote = (cnjs) => api.post('/casos/importar-cnjs', { cnjs })
 
+// Epic #8 (#182): apensar processos + alterar instancia
+export const apensarCaso = (casoId, casoPrincipalId) =>
+  api.post(`/casos/${casoId}/apensar`, { caso_principal_id: casoPrincipalId })
+
+export const desapensarCaso = (casoId) => api.del(`/casos/${casoId}/apensar`)
+
+export const listarApensosCaso = (casoId) => api.get(`/casos/${casoId}/apensos`)
+
+export const alterarInstanciaCaso = (casoId, instancia) =>
+  api.patch(`/casos/${casoId}/instancia`, { instancia })
+
 export const extrairEventosDeDocumento = (documentoId) =>
   api.post(`/casos/extrair-eventos-de-documento/${documentoId}`, {})

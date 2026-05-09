@@ -12,6 +12,7 @@ import {
 import HonorariosCasoCard from '../components/HonorariosCasoCard'
 import DocumentosCasoTab from '../components/DocumentosCasoTab'
 import DocumentosVinculadosCard from '../components/DocumentosVinculadosCard'
+import ApensarMenuCaso from '../components/ApensarMenuCaso.jsx'
 import CasoTimeline from '../components/CasoTimeline'
 
 // Componente auxiliar para exibir mensagens de status (loading, error, success)
@@ -339,6 +340,11 @@ function CasoDetalhePage() {
       </div>
       {/* SEÇÃO DE HONORÁRIOS ADVOCATÍCIOS FINANCEIROS */}
       <HonorariosCasoCard casoId={casoId} clienteId={caso.cliente_id} />
+      {/* Epic #8 (#182): apensar processo + alterar instancia */}
+      <ApensarMenuCaso
+        caso={caso}
+        onCasoAtualizado={(novoCaso) => setCaso((prev) => ({ ...prev, ...novoCaso }))}
+      />
       {/* PROCURAÇÕES E CONTRATOS VINCULADOS (viewer + download) */}
       <DocumentosVinculadosCard casoId={casoId} />
       {/* SEÇÃO DO DRIVE DO PROCESSO */}
