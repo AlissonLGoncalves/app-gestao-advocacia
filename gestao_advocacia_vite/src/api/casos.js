@@ -35,6 +35,9 @@ export const buscarProcessoLocal = (numero) =>
 
 export const importarCnjsEmLote = (cnjs) => api.post('/casos/importar-cnjs', { cnjs })
 
+// Epic #12 (#186): busca on-demand de processo via CNJ
+export const buscarProcessoOnDemand = (cnj) => api.post('/casos/buscar-cnj', { cnj })
+
 // Epic #8 (#182): apensar processos + alterar instancia
 export const apensarCaso = (casoId, casoPrincipalId) =>
   api.post(`/casos/${casoId}/apensar`, { caso_principal_id: casoPrincipalId })
