@@ -155,11 +155,11 @@ function EnderecoSection({ formData, loadingCep, onChange, onCepBlur }) {
           autoComplete="off"
           containerClassName="col-md-5 mb-3"
         />
-          <datalist id="paises-list">
-            {PAISES.map((p) => (
-              <option key={p} value={p} />
-            ))}
-          </datalist>
+        <datalist id="paises-list">
+          {PAISES.map((p) => (
+            <option key={p} value={p} />
+          ))}
+        </datalist>
       </div>
     </>
   )

@@ -33,16 +33,7 @@ describe('FormInput', () => {
   })
 
   it('exibe asterisco quando required', () => {
-    render(
-      <FormInput
-        label="Nome"
-        name="nome"
-        id="nome"
-        value=""
-        onChange={vi.fn()}
-        required
-      />
-    )
+    render(<FormInput label="Nome" name="nome" id="nome" value="" onChange={vi.fn()} required />)
 
     expect(screen.getByText(/Nome \*/)).toBeInTheDocument()
   })
@@ -66,9 +57,7 @@ describe('FormInput', () => {
   })
 
   it('respeita disabled', () => {
-    render(
-      <FormInput label="X" name="x" id="x" value="" onChange={vi.fn()} disabled />
-    )
+    render(<FormInput label="X" name="x" id="x" value="" onChange={vi.fn()} disabled />)
     expect(screen.getByLabelText('X')).toBeDisabled()
   })
 

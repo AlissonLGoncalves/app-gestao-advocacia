@@ -40,11 +40,11 @@ function DadosPessoaisSection({
         autoComplete="off"
         containerClassName="col-md-6 mb-3"
       />
-        <datalist id="orgaos-emissores-list">
-          {ORGAOS_EMISSORES.map((o) => (
-            <option key={o} value={o} />
-          ))}
-        </datalist>
+      <datalist id="orgaos-emissores-list">
+        {ORGAOS_EMISSORES.map((o) => (
+          <option key={o} value={o} />
+        ))}
+      </datalist>
       <FormInput
         label="Data de Nascimento (DD/MM/YYYY)"
         name="data_nascimento"
@@ -86,11 +86,11 @@ function DadosPessoaisSection({
         autoComplete="off"
         containerClassName="col-md-6 mb-3"
       />
-        <datalist id="profissoes-list">
-          {PROFISSOES.map((p) => (
-            <option key={p} value={p} />
-          ))}
-        </datalist>
+      <datalist id="profissoes-list">
+        {PROFISSOES.map((p) => (
+          <option key={p} value={p} />
+        ))}
+      </datalist>
       <FormInput
         label="Nacionalidade"
         name="nacionalidade"
@@ -102,11 +102,11 @@ function DadosPessoaisSection({
         autoComplete="off"
         containerClassName="col-md-6 mb-3"
       />
-        <datalist id="nacionalidades-list">
-          {NACIONALIDADES.map((n) => (
-            <option key={n} value={n} />
-          ))}
-        </datalist>
+      <datalist id="nacionalidades-list">
+        {NACIONALIDADES.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
     </>
   )
 

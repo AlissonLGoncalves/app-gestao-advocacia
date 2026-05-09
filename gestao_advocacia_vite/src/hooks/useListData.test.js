@@ -6,9 +6,7 @@ describe('useListData', () => {
   it('carrega items via fetcher e expoe loading=false ao final', async () => {
     const fetcher = vi.fn().mockResolvedValue([{ id: 1 }, { id: 2 }])
 
-    const { result } = renderHook(() =>
-      useListData({ fetcher, errorPrefix: 'Erro X' })
-    )
+    const { result } = renderHook(() => useListData({ fetcher, errorPrefix: 'Erro X' }))
 
     expect(result.current.loading).toBe(true)
     await waitFor(() => expect(result.current.loading).toBe(false))
@@ -53,9 +51,7 @@ describe('useListData', () => {
       .mockResolvedValueOnce([{ id: 1 }])
       .mockResolvedValueOnce([{ id: 1 }, { id: 2 }])
 
-    const { result } = renderHook(() =>
-      useListData({ fetcher, errorPrefix: 'Erro' })
-    )
+    const { result } = renderHook(() => useListData({ fetcher, errorPrefix: 'Erro' }))
 
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.items).toHaveLength(1)

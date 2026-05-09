@@ -162,4 +162,3 @@ export async function listProximos(dias = 7) {
     return !Number.isNaN(inicio.getTime()) && inicio <= limite
   })
 }
-

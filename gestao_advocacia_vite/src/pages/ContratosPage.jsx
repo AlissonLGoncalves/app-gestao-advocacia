@@ -8,7 +8,14 @@ import {
   LinkIcon,
 } from '@heroicons/react/24/outline'
 
-const STATUS_OPTIONS = ['Todos', 'Ativo', 'Pendente Assinatura', 'Minuta', 'Finalizado', 'Cancelado']
+const STATUS_OPTIONS = [
+  'Todos',
+  'Ativo',
+  'Pendente Assinatura',
+  'Minuta',
+  'Finalizado',
+  'Cancelado',
+]
 const TIPO_OPTIONS = ['Todos', 'Fixo', 'Êxito', 'Misto', 'Mensal', 'Horas']
 
 const ICON_TITLE = { width: '24px', height: '24px', display: 'inline' }

@@ -79,7 +79,7 @@ def main():
     app = _build_app()
     with app.app_context():
         from extensions import db  # noqa: PLC0415
-        from models import Caso, ContratoHonorario, Cliente, User  # noqa: PLC0415
+        from models import Caso, Cliente, ContratoHonorario, User  # noqa: PLC0415
 
         if args.contrato_id and args.caso_id:
             if not args.apply:

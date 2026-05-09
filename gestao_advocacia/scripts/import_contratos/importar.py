@@ -238,9 +238,9 @@ def main():
 
     app = _build_app()
     with app.app_context():
+        from contrato_service import extrair_dados_contrato, validar_extracao  # noqa: PLC0415
         from extensions import db  # noqa: PLC0415
         from models import Cliente, ContratoHonorario, User  # noqa: PLC0415
-        from contrato_service import extrair_dados_contrato, validar_extracao  # noqa: PLC0415
 
         user = User.query.get(args.user_id)
         if not user:

@@ -128,5 +128,4 @@ describe('api/agenda', () => {
     expect(proximos).toHaveLength(1)
     expect(proximos[0].titulo).toBe('Hoje')
   })
-
 })
