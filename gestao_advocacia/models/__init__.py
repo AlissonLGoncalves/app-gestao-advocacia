@@ -1198,6 +1198,62 @@ class TenantAnotacao(db.Model):
         }
 
 
+class ModeloDocumento(db.Model):
+    """Templates editáveis de documentos (Procuração PF/PJ, Contrato PF/PJ, etc.)
+    com placeholders Jinja2-like ({{cliente.nome}}, {{caso.numero_processo}})
+    que são renderizados em HTML pelo backend a partir dos dados do cliente
+    e caso. Epic #9 (#183).
+
+    `tipo` agrupa modelos por finalidade (procuracao_pf, procuracao_pj,
+    contrato_pf, contrato_pj, peticao, outro). `padrao=True` indica que é um
+    template de "fábrica" criado via seed — pode ser editado pelo tenant
+    mas sobrescreve só pra esse tenant (clone-on-write opcional no futuro).
+    """
+
+    __tablename__ = "modelo_documento"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_modelo_documento_tenant_id"),
+        nullable=True,
+        index=True,
+    )
+    titulo = db.Column(db.String(200), nullable=False)
+    tipo = db.Column(db.String(50), nullable=False, index=True)
+    descricao = db.Column(db.Text, nullable=True)
+    conteudo_html = db.Column(db.Text, nullable=False)
+    # Documenta as variáveis que o template aceita pra ajudar o user a editar
+    # sem ter que decorar (ex.: ["cliente.nome_razao_social", "caso.numero_processo"]).
+    variaveis_disponiveis = db.Column(db.JSON, nullable=True)
+    # Modelos com padrao=True vêm do seed; padrao=False são customizados pelo
+    # tenant. Ambos podem ser editados; só os custom podem ser deletados.
+    padrao = db.Column(db.Boolean, nullable=False, default=False, server_default="false")
+    ativo = db.Column(db.Boolean, nullable=False, default=True, server_default="true")
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_modelo_documento_user_id"),
+        nullable=True,
+    )
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "titulo": self.titulo,
+            "tipo": self.tipo,
+            "descricao": self.descricao,
+            "conteudo_html": self.conteudo_html,
+            "variaveis_disponiveis": self.variaveis_disponiveis or [],
+            "padrao": self.padrao,
+            "ativo": self.ativo,
+            "user_id": self.user_id,
+            "criado_em": self.criado_em.isoformat() if self.criado_em else None,
+            "atualizado_em": (self.atualizado_em.isoformat() if self.atualizado_em else None),
+        }
+
+
 class ConsentimentoUsuario(db.Model):
     __tablename__ = "consentimento_usuario"
     id = db.Column(db.Integer, primary_key=True)
