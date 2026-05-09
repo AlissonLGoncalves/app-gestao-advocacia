@@ -721,6 +721,14 @@ def registrar_rotas_djen(
             if data_fim:
                 q = q.filter(PublicacaoDJEN.data_disponibilizacao <= data_fim)
 
+            # Epic #10 (#184): filtro de vinculacao. Permite as abas
+            # "Pendentes" (sem caso) / "Vinculadas" (com caso) na UI.
+            vinculacao = (request.args.get("vinculacao") or "").strip().lower()
+            if vinculacao == "sem_caso":
+                q = q.filter(PublicacaoDJEN.caso_id.is_(None))
+            elif vinculacao == "com_caso":
+                q = q.filter(PublicacaoDJEN.caso_id.isnot(None))
+
             limit = min(int(request.args.get("limit", 50)), 200)
             offset = int(request.args.get("offset", 0))
             total = q.count()
@@ -739,7 +747,17 @@ def registrar_rotas_djen(
                 .all()
             )
 
-            nao_lidas = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id, lida=False).count()
+            # Epic #10 (#184): contagens por categoria pra alimentar as
+            # abas no DjenPage. 4 queries de count baratas (cada uma usa
+            # indice tenant_id; nao_lidas e pendentes ja tem indice
+            # composto). Nao filtra pelos filtros aplicados — sempre conta
+            # do tenant inteiro pra que o badge da aba reflita o universo
+            # total, nao o subset filtrado.
+            base_q = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id)
+            nao_lidas = base_q.filter_by(lida=False).count()
+            pendentes = base_q.filter(PublicacaoDJEN.caso_id.is_(None)).count()
+            vinculadas = base_q.filter(PublicacaoDJEN.caso_id.isnot(None)).count()
+            total_geral = base_q.count()
 
             return {
                 "total": total,
@@ -747,6 +765,16 @@ def registrar_rotas_djen(
                 "limit": limit,
                 "offset": offset,
                 "items": [p.to_dict() for p in items],
+                "contagens": {
+                    "todas": total_geral,
+                    "nao_lidas": nao_lidas,
+                    "pendentes": pendentes,
+                    "vinculadas": vinculadas,
+                    # Reservado pra Epic #2 (#176 — classificacao IA).
+                    # Quando a coluna PublicacaoDJEN.importante existir,
+                    # incrementa aqui sem mudar o frontend.
+                    "importantes": 0,
+                },
             }
 
     @djen_ns.route("/triagem")
