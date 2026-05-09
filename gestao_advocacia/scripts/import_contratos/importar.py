@@ -159,8 +159,15 @@ def _classificar_assinatura(dados: dict, arquivo_nome: str) -> tuple[str, str]:
     return status, " | ".join(desc_partes)
 
 
-def _construir_contrato(ContratoHonorario, dados: dict, cliente_id: int, user_id: int, tenant_id,
-                       arquivo_hash: str, arquivo_nome: str):
+def _construir_contrato(
+    ContratoHonorario,
+    dados: dict,
+    cliente_id: int,
+    user_id: int,
+    tenant_id,
+    arquivo_hash: str,
+    arquivo_nome: str,
+):
     parcelas = dados.get("parcelas") or []
     parcelas_json = json.dumps(parcelas, ensure_ascii=False) if parcelas else None
 
@@ -223,7 +230,9 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="Forca dry-run mesmo se houver --apply")
     ap.add_argument("--min-prioridade", type=int, default=1, help="Prioridade minima do scan (1-3)")
     ap.add_argument("--limit", type=int, default=0, help="Limita aos primeiros N arquivos")
-    ap.add_argument("--out-jsons", default="out/contratos_extraidos", help="Pasta para salvar JSONs")
+    ap.add_argument(
+        "--out-jsons", default="out/contratos_extraidos", help="Pasta para salvar JSONs"
+    )
     ap.add_argument(
         "--incluir-minutas",
         action="store_true",
@@ -238,9 +247,9 @@ def main():
 
     app = _build_app()
     with app.app_context():
+        from contrato_service import extrair_dados_contrato, validar_extracao  # noqa: PLC0415
         from extensions import db  # noqa: PLC0415
         from models import Cliente, ContratoHonorario, User  # noqa: PLC0415
-        from contrato_service import extrair_dados_contrato, validar_extracao  # noqa: PLC0415
 
         user = User.query.get(args.user_id)
         if not user:

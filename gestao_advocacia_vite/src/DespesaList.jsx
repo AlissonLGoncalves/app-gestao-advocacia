@@ -15,15 +15,13 @@ import { exportarParaPDF } from './utils/pdfGenerator.js'
 import { api } from './api/client.js'
 import { deleteDespesa, listDespesas } from './api/financeiro.js'
 import { useConfirm } from './hooks/useConfirm.jsx'
+import useListData from './hooks/useListData.js'
 import EmptyState from './components/EmptyState.jsx'
 
 function DespesaList({ onEditDespesa, refreshKey }) {
   const { confirm, ConfirmDialog } = useConfirm()
-  const [despesas, setDespesas] = useState([])
   const [clientes, setClientes] = useState([])
   const [casos, setCasos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState(null)
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -65,47 +63,31 @@ function DespesaList({ onEditDespesa, refreshKey }) {
   }, [clienteFilter])
 
   const fetchDespesas = useCallback(async () => {
-    setLoading(true)
-    setError('')
-
     const hasToken =
       localStorage.getItem('token') ||
       localStorage.getItem('access_token') ||
       localStorage.getItem('auth_token')
     if (!hasToken) {
-      setError('Autenticação necessária. Por favor, faça login.')
-      setLoading(false)
       toast.error('Sessão expirada ou inválida.')
-      return
+      throw new Error('Autenticação necessária. Por favor, faça login.')
     }
 
-    try {
-      const params = {
-        sort_by: sortConfig.key,
-        sort_order: sortConfig.direction,
-        search: searchTerm,
-        status: statusFilter,
-        data_vencimento_inicio: dataVencimentoInicio,
-        data_vencimento_fim: dataVencimentoFim,
-        data_despesa_inicio: dataDespesaInicio,
-        data_despesa_fim: dataDespesaFim,
-      }
-
-      if (casoFilter) {
-        params.caso_id = casoFilter === 'DESPESA_GERAL' ? -1 : casoFilter
-      }
-
-      const data = await listDespesas(params)
-      setDespesas(data)
-    } catch (err) {
-      console.error('DespesaList: Erro detalhado ao buscar despesas:', err)
-      setError(`Erro ao carregar despesas: ${err.message}`)
-      if (!err.message.includes('Autenticação')) {
-        toast.error(`Erro ao carregar despesas: ${err.message}`)
-      }
-    } finally {
-      setLoading(false)
+    const params = {
+      sort_by: sortConfig.key,
+      sort_order: sortConfig.direction,
+      search: searchTerm,
+      status: statusFilter,
+      data_vencimento_inicio: dataVencimentoInicio,
+      data_vencimento_fim: dataVencimentoFim,
+      data_despesa_inicio: dataDespesaInicio,
+      data_despesa_fim: dataDespesaFim,
     }
+
+    if (casoFilter) {
+      params.caso_id = casoFilter === 'DESPESA_GERAL' ? -1 : casoFilter
+    }
+
+    return listDespesas(params)
   }, [
     searchTerm,
     clienteFilter,
@@ -118,13 +100,30 @@ function DespesaList({ onEditDespesa, refreshKey }) {
     sortConfig,
   ])
 
+  const handleFetchError = useCallback((err) => {
+    console.error('DespesaList: Erro detalhado ao buscar despesas:', err)
+    if (!err.message.includes('Autenticação')) {
+      toast.error(`Erro ao carregar despesas: ${err.message}`)
+    }
+  }, [])
+
+  const {
+    items: despesas,
+    loading,
+    error,
+    setError,
+    refetch: fetchDespesasLista,
+  } = useListData({
+    fetcher: fetchDespesas,
+    mapData: (data) => data,
+    errorPrefix: 'Erro ao carregar despesas',
+    onError: handleFetchError,
+    refreshKey,
+  })
+
   useEffect(() => {
     fetchClientesECasosParaFiltro()
   }, [fetchClientesECasosParaFiltro])
-
-  useEffect(() => {
-    fetchDespesas()
-  }, [fetchDespesas, refreshKey])
 
   const handleDeleteClick = async (id) => {
     const hasToken =
@@ -146,7 +145,7 @@ function DespesaList({ onEditDespesa, refreshKey }) {
       try {
         await deleteDespesa(id)
         toast.success(`Despesa ID ${id} excluída com sucesso!`)
-        fetchDespesas()
+        fetchDespesasLista()
       } catch (err) {
         console.error(`DespesaList: Erro ao deletar despesa ${id}:`, err)
         setError(`Erro ao deletar despesa: ${err.message}`)

@@ -1,5 +1,6 @@
 import React from 'react'
 import { ORGAOS_EMISSORES, PROFISSOES, NACIONALIDADES } from '../../../constants/clienteOpcoes.js'
+import FormInput from '../../FormInput.jsx'
 
 function DadosPessoaisSection({
   formData,
@@ -19,56 +20,41 @@ function DadosPessoaisSection({
   const cpfCnpjBloqueado = isEditing && !isDjenPlaceholder && !cpfCnpjLiberadoEdicao
   const renderCamposPF = () => (
     <>
-      <div className="col-md-6 mb-3">
-        <label htmlFor="rg" className="form-label form-label-sm">
-          RG
-        </label>
-        <input
-          type="text"
-          name="rg"
-          id="rg"
-          className="form-control form-control-sm"
-          value={formData.rg || ''}
-          onChange={onChange}
-          placeholder="0.000.000-0"
-        />
-      </div>
-      <div className="col-md-6 mb-3">
-        <label htmlFor="orgao_emissor" className="form-label form-label-sm">
-          Órgão Emissor
-        </label>
-        <input
-          type="text"
-          name="orgao_emissor"
-          id="orgao_emissor"
-          className="form-control form-control-sm"
-          value={formData.orgao_emissor || ''}
-          onChange={onChange}
-          placeholder="Ex: SSP/PR"
-          list="orgaos-emissores-list"
-          autoComplete="off"
-        />
-        <datalist id="orgaos-emissores-list">
-          {ORGAOS_EMISSORES.map((o) => (
-            <option key={o} value={o} />
-          ))}
-        </datalist>
-      </div>
-      <div className="col-md-6 mb-3">
-        <label htmlFor="data_nascimento" className="form-label form-label-sm">
-          Data de Nascimento (DD/MM/YYYY)
-        </label>
-        <input
-          type="text"
-          name="data_nascimento"
-          id="data_nascimento"
-          className="form-control form-control-sm"
-          value={formData.data_nascimento ? formatDataParaExibicao(formData.data_nascimento) : ''}
-          onChange={onDataNascimentoChange}
-          placeholder="DD/MM/YYYY"
-          maxLength="10"
-        />
-      </div>
+      <FormInput
+        label="RG"
+        name="rg"
+        id="rg"
+        value={formData.rg || ''}
+        onChange={onChange}
+        placeholder="0.000.000-0"
+        containerClassName="col-md-6 mb-3"
+      />
+      <FormInput
+        label="Órgão Emissor"
+        name="orgao_emissor"
+        id="orgao_emissor"
+        value={formData.orgao_emissor || ''}
+        onChange={onChange}
+        placeholder="Ex: SSP/PR"
+        list="orgaos-emissores-list"
+        autoComplete="off"
+        containerClassName="col-md-6 mb-3"
+      />
+      <datalist id="orgaos-emissores-list">
+        {ORGAOS_EMISSORES.map((o) => (
+          <option key={o} value={o} />
+        ))}
+      </datalist>
+      <FormInput
+        label="Data de Nascimento (DD/MM/YYYY)"
+        name="data_nascimento"
+        id="data_nascimento"
+        value={formData.data_nascimento ? formatDataParaExibicao(formData.data_nascimento) : ''}
+        onChange={onDataNascimentoChange}
+        placeholder="DD/MM/YYYY"
+        maxLength={10}
+        containerClassName="col-md-6 mb-3"
+      />
       <div className="col-md-6 mb-3">
         <label htmlFor="estado_civil" className="form-label form-label-sm">
           Estado Civil
@@ -89,105 +75,75 @@ function DadosPessoaisSection({
           <option value="Outro">Outro</option>
         </select>
       </div>
-      <div className="col-md-6 mb-3">
-        <label htmlFor="profissao" className="form-label form-label-sm">
-          Profissão
-        </label>
-        <input
-          type="text"
-          name="profissao"
-          id="profissao"
-          className="form-control form-control-sm"
-          value={formData.profissao || ''}
-          onChange={onChange}
-          placeholder="Digite ou selecione..."
-          list="profissoes-list"
-          autoComplete="off"
-        />
-        <datalist id="profissoes-list">
-          {PROFISSOES.map((p) => (
-            <option key={p} value={p} />
-          ))}
-        </datalist>
-      </div>
-      <div className="col-md-6 mb-3">
-        <label htmlFor="nacionalidade" className="form-label form-label-sm">
-          Nacionalidade
-        </label>
-        <input
-          type="text"
-          name="nacionalidade"
-          id="nacionalidade"
-          className="form-control form-control-sm"
-          value={formData.nacionalidade || ''}
-          onChange={onChange}
-          placeholder="Digite ou selecione..."
-          list="nacionalidades-list"
-          autoComplete="off"
-        />
-        <datalist id="nacionalidades-list">
-          {NACIONALIDADES.map((n) => (
-            <option key={n} value={n} />
-          ))}
-        </datalist>
-      </div>
+      <FormInput
+        label="Profissão"
+        name="profissao"
+        id="profissao"
+        value={formData.profissao || ''}
+        onChange={onChange}
+        placeholder="Digite ou selecione..."
+        list="profissoes-list"
+        autoComplete="off"
+        containerClassName="col-md-6 mb-3"
+      />
+      <datalist id="profissoes-list">
+        {PROFISSOES.map((p) => (
+          <option key={p} value={p} />
+        ))}
+      </datalist>
+      <FormInput
+        label="Nacionalidade"
+        name="nacionalidade"
+        id="nacionalidade"
+        value={formData.nacionalidade || ''}
+        onChange={onChange}
+        placeholder="Digite ou selecione..."
+        list="nacionalidades-list"
+        autoComplete="off"
+        containerClassName="col-md-6 mb-3"
+      />
+      <datalist id="nacionalidades-list">
+        {NACIONALIDADES.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
     </>
   )
 
   const renderCamposPJ = () => (
     <>
-      <div className="col-md-6 mb-3">
-        <label htmlFor="nome_fantasia" className="form-label form-label-sm">
-          Nome Fantasia
-        </label>
-        <input
-          type="text"
-          name="nome_fantasia"
-          id="nome_fantasia"
-          className="form-control form-control-sm"
-          value={formData.nome_fantasia || ''}
-          onChange={onChange}
-        />
-      </div>
-      <div className="col-md-6 mb-3">
-        <label htmlFor="nire" className="form-label form-label-sm">
-          NIRE
-        </label>
-        <input
-          type="text"
-          name="nire"
-          id="nire"
-          className="form-control form-control-sm"
-          value={formData.nire || ''}
-          onChange={onChange}
-        />
-      </div>
-      <div className="col-md-6 mb-3">
-        <label htmlFor="inscricao_estadual" className="form-label form-label-sm">
-          Inscrição Estadual
-        </label>
-        <input
-          type="text"
-          name="inscricao_estadual"
-          id="inscricao_estadual"
-          className="form-control form-control-sm"
-          value={formData.inscricao_estadual || ''}
-          onChange={onChange}
-        />
-      </div>
-      <div className="col-md-6 mb-3">
-        <label htmlFor="inscricao_municipal" className="form-label form-label-sm">
-          Inscrição Municipal
-        </label>
-        <input
-          type="text"
-          name="inscricao_municipal"
-          id="inscricao_municipal"
-          className="form-control form-control-sm"
-          value={formData.inscricao_municipal || ''}
-          onChange={onChange}
-        />
-      </div>
+      <FormInput
+        label="Nome Fantasia"
+        name="nome_fantasia"
+        id="nome_fantasia"
+        value={formData.nome_fantasia || ''}
+        onChange={onChange}
+        containerClassName="col-md-6 mb-3"
+      />
+      <FormInput
+        label="NIRE"
+        name="nire"
+        id="nire"
+        value={formData.nire || ''}
+        onChange={onChange}
+        containerClassName="col-md-6 mb-3"
+      />
+      <FormInput
+        label="Inscrição Estadual"
+        name="inscricao_estadual"
+        id="inscricao_estadual"
+        value={formData.inscricao_estadual || ''}
+        onChange={onChange}
+        containerClassName="col-md-6 mb-3"
+      />
+      <FormInput
+        label="Inscrição Municipal"
+        name="inscricao_municipal"
+        id="inscricao_municipal"
+        value={formData.inscricao_municipal || ''}
+        onChange={onChange}
+        containerClassName="col-md-6 mb-3"
+      />
     </>
   )
 
@@ -263,22 +219,14 @@ function DadosPessoaisSection({
         </div>
       </div>
 
-      <div className="mb-3">
-        <label htmlFor="nome_razao_social" className="form-label form-label-sm">
-          {formData.tipo_pessoa === 'PF' ? 'Nome Completo *' : 'Razao Social *'}
-        </label>
-        <input
-          type="text"
-          name="nome_razao_social"
-          id="nome_razao_social"
-          className={`form-control form-control-sm ${validationErrors.nome_razao_social ? 'is-invalid' : ''}`}
-          value={formData.nome_razao_social}
-          onChange={onChange}
-        />
-        {validationErrors.nome_razao_social && (
-          <div className="invalid-feedback d-block">{validationErrors.nome_razao_social}</div>
-        )}
-      </div>
+      <FormInput
+        label={formData.tipo_pessoa === 'PF' ? 'Nome Completo *' : 'Razao Social *'}
+        name="nome_razao_social"
+        id="nome_razao_social"
+        value={formData.nome_razao_social}
+        onChange={onChange}
+        error={validationErrors.nome_razao_social}
+      />
 
       <div className="row">
         {formData.tipo_pessoa === 'PF' ? renderCamposPF() : renderCamposPJ()}
@@ -288,119 +236,80 @@ function DadosPessoaisSection({
         <>
           <h6 className="mt-4 mb-3 text-muted small">CNPJs Adicionais (Opcional)</h6>
           <div className="row">
-            <div className="col-md-6 mb-3">
-              <label htmlFor="cnpj_secundario" className="form-label form-label-sm">
-                CNPJ Secundario
-              </label>
-              <input
-                type="text"
-                name="cnpj_secundario"
-                id="cnpj_secundario"
-                className={`form-control form-control-sm ${validationErrors.cnpj_secundario ? 'is-invalid' : ''}`}
-                value={formData.cnpj_secundario || ''}
-                onChange={onCpfCnpjChange}
-                onBlur={onGenericCnpjBlur}
-                maxLength={18}
-              />
-              {validationErrors.cnpj_secundario && (
-                <div className="invalid-feedback d-block">{validationErrors.cnpj_secundario}</div>
-              )}
-            </div>
-            <div className="col-md-6 mb-3">
-              <label htmlFor="descricao_cnpj_secundario" className="form-label form-label-sm">
-                Descricao CNPJ Secundario
-              </label>
-              <input
-                type="text"
-                name="descricao_cnpj_secundario"
-                id="descricao_cnpj_secundario"
-                className="form-control form-control-sm"
-                value={formData.descricao_cnpj_secundario || ''}
-                onChange={onChange}
-              />
-            </div>
+            <FormInput
+              label="CNPJ Secundario"
+              name="cnpj_secundario"
+              id="cnpj_secundario"
+              value={formData.cnpj_secundario || ''}
+              onChange={onCpfCnpjChange}
+              onBlur={onGenericCnpjBlur}
+              error={validationErrors.cnpj_secundario}
+              maxLength={18}
+              containerClassName="col-md-6 mb-3"
+            />
+            <FormInput
+              label="Descricao CNPJ Secundario"
+              name="descricao_cnpj_secundario"
+              id="descricao_cnpj_secundario"
+              value={formData.descricao_cnpj_secundario || ''}
+              onChange={onChange}
+              containerClassName="col-md-6 mb-3"
+            />
           </div>
           <div className="row">
-            <div className="col-md-6 mb-3">
-              <label htmlFor="cnpj_terciario" className="form-label form-label-sm">
-                CNPJ Terciario
-              </label>
-              <input
-                type="text"
-                name="cnpj_terciario"
-                id="cnpj_terciario"
-                className={`form-control form-control-sm ${validationErrors.cnpj_terciario ? 'is-invalid' : ''}`}
-                value={formData.cnpj_terciario || ''}
-                onChange={onCpfCnpjChange}
-                onBlur={onGenericCnpjBlur}
-                maxLength={18}
-              />
-              {validationErrors.cnpj_terciario && (
-                <div className="invalid-feedback d-block">{validationErrors.cnpj_terciario}</div>
-              )}
-            </div>
-            <div className="col-md-6 mb-3">
-              <label htmlFor="descricao_cnpj_terciario" className="form-label form-label-sm">
-                Descricao CNPJ Terciario
-              </label>
-              <input
-                type="text"
-                name="descricao_cnpj_terciario"
-                id="descricao_cnpj_terciario"
-                className="form-control form-control-sm"
-                value={formData.descricao_cnpj_terciario || ''}
-                onChange={onChange}
-              />
-            </div>
+            <FormInput
+              label="CNPJ Terciario"
+              name="cnpj_terciario"
+              id="cnpj_terciario"
+              value={formData.cnpj_terciario || ''}
+              onChange={onCpfCnpjChange}
+              onBlur={onGenericCnpjBlur}
+              error={validationErrors.cnpj_terciario}
+              maxLength={18}
+              containerClassName="col-md-6 mb-3"
+            />
+            <FormInput
+              label="Descricao CNPJ Terciario"
+              name="descricao_cnpj_terciario"
+              id="descricao_cnpj_terciario"
+              value={formData.descricao_cnpj_terciario || ''}
+              onChange={onChange}
+              containerClassName="col-md-6 mb-3"
+            />
           </div>
 
           <h6 className="mt-4 mb-3 text-muted small">
             Representante Legal (pessoa que assina pela empresa)
           </h6>
           <div className="row">
-            <div className="col-md-5 mb-3">
-              <label htmlFor="responsavel_nome" className="form-label form-label-sm">
-                Nome do Responsável
-              </label>
-              <input
-                type="text"
-                name="responsavel_nome"
-                id="responsavel_nome"
-                className="form-control form-control-sm"
-                value={formData.responsavel_nome || ''}
-                onChange={onChange}
-                placeholder="Ex: João da Silva"
-              />
-            </div>
-            <div className="col-md-3 mb-3">
-              <label htmlFor="responsavel_cpf" className="form-label form-label-sm">
-                CPF do Responsável
-              </label>
-              <input
-                type="text"
-                name="responsavel_cpf"
-                id="responsavel_cpf"
-                className="form-control form-control-sm"
-                value={formData.responsavel_cpf || ''}
-                onChange={onChange}
-                placeholder="000.000.000-00"
-                maxLength={14}
-              />
-            </div>
-            <div className="col-md-4 mb-3">
-              <label htmlFor="responsavel_cargo" className="form-label form-label-sm">
-                Cargo
-              </label>
-              <input
-                type="text"
-                name="responsavel_cargo"
-                id="responsavel_cargo"
-                className="form-control form-control-sm"
-                value={formData.responsavel_cargo || ''}
-                onChange={onChange}
-                placeholder="Ex: Sócio Administrador"
-              />
-            </div>
+            <FormInput
+              label="Nome do Responsável"
+              name="responsavel_nome"
+              id="responsavel_nome"
+              value={formData.responsavel_nome || ''}
+              onChange={onChange}
+              placeholder="Ex: João da Silva"
+              containerClassName="col-md-5 mb-3"
+            />
+            <FormInput
+              label="CPF do Responsável"
+              name="responsavel_cpf"
+              id="responsavel_cpf"
+              value={formData.responsavel_cpf || ''}
+              onChange={onChange}
+              placeholder="000.000.000-00"
+              maxLength={14}
+              containerClassName="col-md-3 mb-3"
+            />
+            <FormInput
+              label="Cargo"
+              name="responsavel_cargo"
+              id="responsavel_cargo"
+              value={formData.responsavel_cargo || ''}
+              onChange={onChange}
+              placeholder="Ex: Sócio Administrador"
+              containerClassName="col-md-4 mb-3"
+            />
           </div>
         </>
       )}

@@ -48,8 +48,6 @@ function RelatoriosPage() {
               <option value={TIPOS_RELATORIO.NENHUM}>-- Escolha um Relatório --</option>
               <option value={TIPOS_RELATORIO.CONTAS_A_RECEBER}>Contas a Receber</option>
               <option value={TIPOS_RELATORIO.CONTAS_A_PAGAR}>Contas a Pagar</option>
-              {/* <option value="RECEITA_POR_CLIENTE">Receita por Cliente</option> */}
-              {/* <option value="DESPESAS_POR_CATEGORIA">Despesas por Categoria</option> */}
             </select>
           </div>
 

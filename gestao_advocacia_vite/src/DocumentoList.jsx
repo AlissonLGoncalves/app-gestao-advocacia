@@ -14,15 +14,13 @@ import { toast } from 'react-toastify'
 import { api } from './api/client.js'
 import { deleteDocumento, downloadDocumento, listDocumentos } from './api/documentos.js'
 import { useConfirm } from './hooks/useConfirm.jsx'
+import useListData from './hooks/useListData.js'
 import EmptyState from './components/EmptyState.jsx'
 
 function DocumentoList({ onEditDocumento, refreshKey }) {
   const { confirm, ConfirmDialog } = useConfirm()
-  const [documentos, setDocumentos] = useState([])
   const [clientes, setClientes] = useState([])
   const [casos, setCasos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState(null)
   const [previewDoc, setPreviewDoc] = useState(null)
   const [previewBlobUrl, setPreviewBlobUrl] = useState(null)
@@ -51,56 +49,59 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
   }, [clienteFilter])
 
   const fetchDocumentos = useCallback(async () => {
-    setLoading(true)
-    setError('')
     const token = localStorage.getItem('token')
     if (!token) {
-      setError('Autenticação necessária. Por favor, faça login.')
-      setLoading(false)
       toast.error('Sessão expirada ou inválida.')
-      return
+      throw new Error('Autenticação necessária. Por favor, faça login.')
     }
-    try {
-      const params = {
-        sort_by: sortConfig.key,
-        sort_order: sortConfig.direction,
-      }
 
-      if (searchTerm) {
-        params.search = searchTerm
-      }
+    const params = {
+      sort_by: sortConfig.key,
+      sort_order: sortConfig.direction,
+    }
 
-      if (casoFilter) {
-        if (casoFilter === 'DOCUMENTO_GERAL_CLIENTE' && clienteFilter) {
-          params.cliente_id = clienteFilter
-          params.sem_caso = true
-        } else if (casoFilter !== 'DOCUMENTO_GERAL_CLIENTE') {
-          params.caso_id = casoFilter
-        }
-      } else if (clienteFilter) {
+    if (searchTerm) {
+      params.search = searchTerm
+    }
+
+    if (casoFilter) {
+      if (casoFilter === 'DOCUMENTO_GERAL_CLIENTE' && clienteFilter) {
         params.cliente_id = clienteFilter
+        params.sem_caso = true
+      } else if (casoFilter !== 'DOCUMENTO_GERAL_CLIENTE') {
+        params.caso_id = casoFilter
       }
-
-      const data = await listDocumentos(null, params)
-      setDocumentos(data.documentos || [])
-    } catch (err) {
-      console.error('DocumentoList: Erro detalhado ao buscar documentos:', err)
-      setError(`Erro ao carregar documentos: ${err.message}`)
-      if (!err.message.includes('Autenticação')) {
-        toast.error(`Erro ao carregar documentos: ${err.message}`)
-      }
-    } finally {
-      setLoading(false)
+    } else if (clienteFilter) {
+      params.cliente_id = clienteFilter
     }
+
+    return listDocumentos(null, params)
   }, [searchTerm, clienteFilter, casoFilter, sortConfig])
+
+  const handleFetchError = useCallback((err) => {
+    console.error('DocumentoList: Erro detalhado ao buscar documentos:', err)
+    if (!err.message.includes('Autenticação')) {
+      toast.error(`Erro ao carregar documentos: ${err.message}`)
+    }
+  }, [])
+
+  const {
+    items: documentos,
+    loading,
+    error,
+    setError,
+    refetch: fetchDocumentosLista,
+  } = useListData({
+    fetcher: fetchDocumentos,
+    mapData: (data) => data.documentos || [],
+    errorPrefix: 'Erro ao carregar documentos',
+    onError: handleFetchError,
+    refreshKey,
+  })
 
   useEffect(() => {
     fetchClientesECasosParaFiltro()
   }, [fetchClientesECasosParaFiltro])
-
-  useEffect(() => {
-    fetchDocumentos()
-  }, [fetchDocumentos, refreshKey])
 
   const handleDeleteClick = async (id) => {
     const token = localStorage.getItem('token')
@@ -119,7 +120,7 @@ function DocumentoList({ onEditDocumento, refreshKey }) {
       try {
         await deleteDocumento(id)
         toast.success(`Documento ID ${id} excluído com sucesso!`)
-        fetchDocumentos()
+        fetchDocumentosLista()
       } catch (err) {
         console.error(`DocumentoList: Erro ao deletar documento ${id}:`, err)
         setError(`Erro ao deletar documento: ${err.message}`)

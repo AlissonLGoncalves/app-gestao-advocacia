@@ -16,6 +16,7 @@ from extensions import db, limiter
 from helpers.admin_session import admin_session
 from mail_service import enviar_alerta_email, enviar_email
 from models import ConsentimentoUsuario, LoginAudit, PasswordResetToken, Tenant, User
+from utils.cpf_cnpj import format_cpf, validate_cpf
 from utils.log_sanitizer import mask_email, mask_user_id
 from utils.password_policy import validar_forca_senha
 
@@ -175,31 +176,8 @@ def _registrar_login_audit(*, user_id, email_tentativa, sucesso, motivo_falha=No
         )
 
 
-def _somente_digitos(valor):
-    return re.sub(r"\D", "", str(valor or ""))
-
-
-def _formatar_cpf(cpf):
-    digits = _somente_digitos(cpf)
-    if len(digits) != 11:
-        return None
-    return f"{digits[0:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:11]}"
-
-
-def _validar_cpf(cpf):
-    digits = _somente_digitos(cpf)
-    if len(digits) != 11 or digits == digits[0] * 11:
-        return False
-
-    soma_1 = sum(int(digits[i]) * (10 - i) for i in range(9))
-    dig_1 = (soma_1 * 10) % 11
-    dig_1 = 0 if dig_1 == 10 else dig_1
-
-    soma_2 = sum(int(digits[i]) * (11 - i) for i in range(10))
-    dig_2 = (soma_2 * 10) % 11
-    dig_2 = 0 if dig_2 == 10 else dig_2
-
-    return digits[-2:] == f"{dig_1}{dig_2}"
+# CPF/CNPJ validation functions moved to utils/cpf_cnpj.py
+# Use: validate_cpf(), format_cpf(), extract_digits()
 
 
 def _normalizar_tipo_pessoa(tipo_pessoa):
@@ -360,9 +338,9 @@ def register_auth_routes(
                 cpf_informado = documento
             cpf_formatado = None
             if cpf_informado:
-                if not _validar_cpf(cpf_informado):
+                if not validate_cpf(cpf_informado):
                     return {"message": "CPF inválido."}, 400
-                cpf_formatado = _formatar_cpf(cpf_informado)
+                cpf_formatado = format_cpf(cpf_informado)
 
             if role not in ["admin", "advogado", "assistente"]:
                 return {"message": "Role deve ser admin, advogado ou assistente."}, 400
@@ -1110,9 +1088,9 @@ def register_auth_routes(
             if cpf is not None:
                 if user.cpf:
                     return {"message": "CPF já cadastrado e não pode ser alterado."}, 400
-                if not _validar_cpf(cpf):
+                if not validate_cpf(cpf):
                     return {"message": "CPF inválido."}, 400
-                user.cpf = _formatar_cpf(cpf)
+                user.cpf = format_cpf(cpf)
 
             db.session.commit()
             return user.to_dict(), 200

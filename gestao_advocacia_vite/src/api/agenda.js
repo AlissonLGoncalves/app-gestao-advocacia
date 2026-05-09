@@ -162,12 +162,3 @@ export async function listProximos(dias = 7) {
     return !Number.isNaN(inicio.getTime()) && inicio <= limite
   })
 }
-
-// Mantem endpoints de OAuth no modulo, sem alterar o fluxo de redirect do browser.
-export function connectGoogleAgenda() {
-  return request('/agenda/google/connect')
-}
-
-export function callbackGoogleAgenda(params = {}) {
-  return request(`/agenda/google/callback${toQueryString(params)}`)
-}

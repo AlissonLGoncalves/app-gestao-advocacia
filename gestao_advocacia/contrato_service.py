@@ -8,7 +8,6 @@ prontos para popular ContratoHonorario.
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -17,6 +16,7 @@ from typing import Any
 from flask import current_app
 
 from gemini_service import get_gemini_client
+from utils.cpf_cnpj import validate_cpf
 
 _DEFAULT_GEMINI_MODELS = (
     "gemini-2.5-flash",
@@ -64,23 +64,8 @@ def _is_model_not_found_error(exc: Exception) -> bool:
     return "not_found" in msg or ("not found" in msg and "models/" in msg)
 
 
-def _only_digits(value: str | None) -> str:
-    return re.sub(r"\D", "", value or "")
-
-
-def _is_valid_cpf(value: str | None) -> bool:
-    digits = _only_digits(value)
-    if len(digits) != 11 or digits == digits[0] * 11:
-        return False
-    total = sum(int(digits[i]) * (10 - i) for i in range(9))
-    mod = (total * 10) % 11
-    first = 0 if mod == 10 else mod
-    if first != int(digits[9]):
-        return False
-    total = sum(int(digits[i]) * (11 - i) for i in range(10))
-    mod = (total * 10) % 11
-    second = 0 if mod == 10 else mod
-    return second == int(digits[10])
+# CPF/CNPJ validation functions moved to utils/cpf_cnpj.py
+# Use: validate_cpf(), extract_digits()
 
 
 PROMPT = """Voce e um extrator juridico brasileiro de CONTRATOS DE HONORARIOS ADVOCATICIOS.
@@ -231,7 +216,7 @@ def validar_extracao(dados: dict) -> tuple[bool, list[str]]:
         avisos.append("Nome do contratante ausente.")
 
     cpf = contratante.get("cpf")
-    if cpf and not _is_valid_cpf(cpf):
+    if cpf and not validate_cpf(cpf):
         avisos.append("CPF do contratante invalido.")
 
     tipo = (dados.get("tipo_honorario") or "").lower()

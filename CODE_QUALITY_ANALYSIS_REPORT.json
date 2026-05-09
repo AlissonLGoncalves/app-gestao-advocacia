@@ -1,0 +1,353 @@
+{
+  "analysis_date": "2026-05-09",
+  "project": "app-gestao-advocacia",
+  "scope": ["gestao_advocacia (Python backend)", "gestao_advocacia_vite (React/Vite frontend)"],
+  "summary": {
+    "total_findings": 28,
+    "high_risk": 4,
+    "medium_risk": 12,
+    "low_risk": 12
+  },
+  "commented_code": [
+    {
+      "id": "CC_001",
+      "file": "gestao_advocacia_vite/src/RelatoriosPage.jsx",
+      "line": 51,
+      "risk_level": "LOW",
+      "code_snippet": "{/* <option value=\"RECEITA_POR_CLIENTE\">Receita por Cliente</option> */}",
+      "description": "Commented-out option for 'Receita por Cliente' report type",
+      "reason_to_remove": "Feature not implemented; should either be implemented or removed entirely. Keeping commented code creates confusion about expected features",
+      "action": "Remove or implement the feature. If removing, consider creating a GitHub issue for future implementation"
+    },
+    {
+      "id": "CC_002",
+      "file": "gestao_advocacia_vite/src/RelatoriosPage.jsx",
+      "line": 52,
+      "risk_level": "LOW",
+      "code_snippet": "{/* <option value=\"DESPESAS_POR_CATEGORIA\">Despesas por Categoria</option> */}",
+      "description": "Commented-out option for 'Despesas por Categoria' report type",
+      "reason_to_remove": "Feature not implemented; creates confusion about expected features",
+      "action": "Remove or implement the feature"
+    },
+    {
+      "id": "CC_003",
+      "file": "gestao_advocacia/config.py",
+      "line": 39,
+      "risk_level": "LOW",
+      "code_snippet": "# print(f\"INFO: Arquivo .env carregado de: {dotenv_path}\") # Para depuração",
+      "description": "Commented-out debug print statement",
+      "reason_to_remove": "Debug code left in production config; should use proper logging instead",
+      "action": "Remove or use proper logging framework (current app already has logging_config.py)"
+    },
+    {
+      "id": "CC_004",
+      "file": "gestao_advocacia/config.py",
+      "line": 45,
+      "risk_level": "LOW",
+      "code_snippet": "# print(f\"INFO: Arquivo .env carregado de: {env_local_path}\") # Para depuração",
+      "description": "Commented-out debug print statement",
+      "reason_to_remove": "Debug code; should use proper logging",
+      "action": "Remove"
+    }
+  ],
+  "unused_imports": [
+    {
+      "id": "UI_001",
+      "file": "gestao_advocacia/app.py",
+      "line": 105,
+      "import_statement": "from helpers import get_item_or_404  # noqa: E402, F401",
+      "description": "get_item_or_404 imported but marked with F401 (unused)",
+      "risk_level": "MEDIUM",
+      "reason": "F401 flag indicates known unused import; if re-exported, should document that; otherwise remove",
+      "action": "Either remove import or document re-export intent"
+    },
+    {
+      "id": "UI_002",
+      "file": "gestao_advocacia/app.py",
+      "line": 107,
+      "import_statement": "from models import (  # noqa: E402, F401",
+      "description": "Models imported with F401 flag (unused)",
+      "risk_level": "MEDIUM",
+      "reason": "Multiple model imports marked as F401; verify if these are for re-export or can be removed",
+      "action": "Document re-export or remove unused imports"
+    }
+  ],
+  "unused_functions": [
+    {
+      "id": "UF_001",
+      "file": "gestao_advocacia/extensions.py",
+      "line": 9,
+      "function": "class NullMail",
+      "description": "NullMail placeholder class with only a pass statement",
+      "risk_level": "LOW",
+      "reason": "Class with docstring stating 'Placeholder para manter ponto único' but serves no actual purpose",
+      "action": "Remove or clarify intent if this is for future use"
+    },
+    {
+      "id": "UF_002",
+      "file": "gestao_advocacia/migrations/env.py",
+      "line": 52,
+      "function": "include_object()",
+      "description": "Function defined but logic appears minimal/potentially unused",
+      "risk_level": "MEDIUM",
+      "reason": "Alembic migration helper; verify it's actually called by migration system",
+      "action": "Verify usage in migration runs or remove if not needed"
+    }
+  ],
+  "unused_state_variables": [
+    {
+      "id": "USV_001",
+      "file": "gestao_advocacia_vite/src/CasoForm.jsx",
+      "line": 48,
+      "state_var": "eventosIA",
+      "description": "useState hook for 'eventosIA' set but rarely read",
+      "risk_level": "LOW",
+      "reason": "State is set in event extraction flow but usage in render is limited",
+      "action": "Verify if this state is actually displayed; consolidate with other event state if possible"
+    },
+    {
+      "id": "USV_002",
+      "file": "gestao_advocacia_vite/src/Dashboard.jsx",
+      "line": 170,
+      "state_var": "resultadoConsulta",
+      "description": "resultadoConsulta state set but conditional rendering may be incomplete",
+      "risk_level": "LOW",
+      "reason": "State is set but might not be fully rendered in all cases",
+      "action": "Review rendering logic to ensure state is properly displayed"
+    }
+  ],
+  "unused_callbacks_and_hooks": [
+    {
+      "id": "UCH_001",
+      "file": "gestao_advocacia_vite/src/CasoList.jsx",
+      "line": 56,
+      "hook": "fetchClientesParaFiltro",
+      "description": "useCallback for fetching clients for filters",
+      "risk_level": "LOW",
+      "reason": "Callback defined but might be called only in specific conditions",
+      "action": "Verify the callback is actually triggered; remove if dead code"
+    }
+  ],
+  "orphaned_utilities": [
+    {
+      "id": "OU_001",
+      "file": "gestao_advocacia/utils/cnj.py",
+      "function": "somente_digitos_cnj()",
+      "line": 41,
+      "risk_level": "LOW",
+      "description": "Function exists but usage pattern unclear",
+      "reason": "Function is defined but might be shadowed by similar functions elsewhere",
+      "action": "Search codebase for all usages; consolidate similar functions"
+    },
+    {
+      "id": "OU_002",
+      "file": "gestao_advocacia_vite/src/utils/htmlTribunal.js",
+      "function": "decodeHtmlEntities()",
+      "line": 32,
+      "risk_level": "LOW",
+      "description": "HTML utility function - verify all usages",
+      "reason": "Used in DjenPage and CasoTimeline per docstring, but should verify all imports",
+      "action": "Grep for all usages and verify complete coverage"
+    }
+  ],
+  "duplicate_logic": [
+    {
+      "id": "DL_001",
+      "file": "gestao_advocacia/routes/auth.py + gestao_advocacia/routes/casos.py",
+      "pattern": "CPF/CNPJ validation and normalization",
+      "risk_level": "MEDIUM",
+      "duplicated_lines": [
+        "gestao_advocacia/routes/auth.py:178-189 (_somente_digitos, _formatar_cpf, _validar_cpf)",
+        "gestao_advocacia/contrato_service.py:67-71 (_only_digits, _is_valid_cpf)"
+      ],
+      "description": "Multiple implementations of CPF/CNPJ validation logic",
+      "reason": "Same logic implemented in different files; should be centralized in utils",
+      "action": "Consolidate all CPF/CNPJ validation into gestao_advocacia/utils/cpf_cnpj.py"
+    },
+    {
+      "id": "DL_002",
+      "file": "gestao_advocacia_vite/src/components + gestao_advocacia_vite/src/pages",
+      "pattern": "Form input rendering with error handling",
+      "risk_level": "MEDIUM",
+      "duplicated_locations": [
+        "ClienteForm.jsx",
+        "CasoForm.jsx",
+        "DespesaForm.jsx",
+        "components/forms/cliente/* .jsx",
+        "components/forms/caso/*.jsx"
+      ],
+      "description": "Similar form input field logic repeated across multiple form components",
+      "reason": "Each form component implements its own input rendering; could use shared FormInput component",
+      "action": "Create reusable FormInput component in components/forms/ to reduce duplication"
+    },
+    {
+      "id": "DL_003",
+      "file": "gestao_advocacia_vite/src/pages",
+      "pattern": "Data fetching + loading + error handling pattern",
+      "risk_level": "MEDIUM",
+      "duplicated_files": [
+        "CasoList.jsx",
+        "ClienteList.jsx",
+        "DespesasPage.jsx",
+        "RecebimentosPage.jsx",
+        "DocumentosPage.jsx"
+      ],
+      "description": "Nearly identical fetch/loading/error pattern in list pages",
+      "reason": "Each list page implements useEffect + useState + error handling; custom hook could reduce code",
+      "action": "Create useListData() custom hook to encapsulate fetch/loading/error pattern"
+    },
+    {
+      "id": "DL_004",
+      "file": "gestao_advocacia/djen_triagem.py + gestao_advocacia/djen_routes.py",
+      "pattern": "Nome normalization logic",
+      "risk_level": "LOW",
+      "functions": [
+        "djen_triagem.normalizar_nome()",
+        "Routes use same pattern multiple times"
+      ],
+      "description": "Name normalization function exists but pattern may be reimplemented",
+      "reason": "Centralized function exists but might be reimplemented locally in routes",
+      "action": "Verify all routes import normalizar_nome from djen_triagem; remove any local implementations"
+    }
+  ],
+  "unused_api_methods": [
+    {
+      "id": "UAM_001",
+      "file": "gestao_advocacia_vite/src/api/agenda.js",
+      "function": "connectGoogleAgenda()",
+      "line": 167,
+      "risk_level": "MEDIUM",
+      "description": "Google Calendar integration function defined but usage unclear",
+      "reason": "Function exported but no clear usage in visible component code; backend endpoint may be incomplete",
+      "action": "Search for usage; if not used, remove or document for future implementation"
+    },
+    {
+      "id": "UAM_002",
+      "file": "gestao_advocacia_vite/src/api/agenda.js",
+      "function": "callbackGoogleAgenda()",
+      "line": 171,
+      "risk_level": "MEDIUM",
+      "description": "Google Calendar callback handler",
+      "reason": "Typically paired with connectGoogleAgenda; if parent unused, this is too",
+      "action": "Remove if connectGoogleAgenda is removed"
+    }
+  ],
+  "unused_react_components": [
+    {
+      "id": "URC_001",
+      "file": "gestao_advocacia_vite/src/RelatoriosPage.jsx (internal)",
+      "component": "RECEITA_POR_CLIENTE renderer (commented out)",
+      "line": 51,
+      "risk_level": "LOW",
+      "description": "Partial implementation of revenue by client report",
+      "reason": "Feature incomplete; commented out in select dropdown",
+      "action": "Either complete implementation or remove entirely"
+    },
+    {
+      "id": "URC_002",
+      "file": "gestao_advocacia_vite/src/RelatoriosPage.jsx (internal)",
+      "component": "DESPESAS_POR_CATEGORIA renderer (commented out)",
+      "line": 52,
+      "risk_level": "LOW",
+      "description": "Partial implementation of expenses by category report",
+      "reason": "Feature incomplete; commented out in select dropdown",
+      "action": "Either complete implementation or remove entirely"
+    }
+  ],
+  "dead_code_patterns": [
+    {
+      "id": "DCP_001",
+      "file": "gestao_advocacia_vite/src/pages/RelatoriosPage.jsx",
+      "pattern": "Commented-out report type options with no corresponding case handlers",
+      "risk_level": "MEDIUM",
+      "lines": [51, 52],
+      "description": "Two report options are commented out but no corresponding renderRelatorioSelecionado() cases exist",
+      "reason": "Indicates incomplete feature implementation or abandoned refactoring",
+      "action": "Remove commented options and clean up code, or implement features"
+    },
+    {
+      "id": "DCP_002",
+      "file": "gestao_advocacia/config.py",
+      "pattern": "Debug print statements commented out",
+      "risk_level": "LOW",
+      "lines": [39, 45, 46, 47],
+      "description": "Multiple commented-out print/debug statements",
+      "reason": "Debug code should not be committed; use proper logging",
+      "action": "Remove all commented debug prints and use app.logger instead"
+    }
+  ],
+  "unused_routes_endpoints": [
+    {
+      "id": "URE_001",
+      "file": "gestao_advocacia/routes/portal.py",
+      "description": "Verify all portal routes are referenced in app.py or relevant route registrations",
+      "risk_level": "MEDIUM",
+      "action": "Search for register_portal_routes calls; ensure all endpoints are wired"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "HIGH",
+      "category": "Code Organization",
+      "action": "Consolidate CPF/CNPJ validation logic",
+      "details": "Create gestao_advocacia/utils/cpf_cnpj.py with centralized validation functions. Update all imports in auth.py, contrato_service.py, and routes/casos.py"
+    },
+    {
+      "priority": "HIGH",
+      "category": "Code Reusability",
+      "action": "Create custom hooks for data fetching",
+      "details": "Implement useListData() hook in gestao_advocacia_vite/src/hooks/ to reduce duplication in CasoList, ClienteList, DespesasPage, etc."
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "Code Quality",
+      "action": "Remove commented-out code",
+      "details": "Delete all commented-out code in RelatoriosPage.jsx (lines 51-52) and config.py (lines 39, 45-47). Create GitHub issues for unfinished features"
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "Component Design",
+      "action": "Extract FormInput component",
+      "details": "Create reusable FormInput component to reduce duplication in ClienteForm, CasoForm, DespesaForm, and section components"
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "API Endpoints",
+      "action": "Verify Google Calendar integration",
+      "details": "Confirm connectGoogleAgenda() and callbackGoogleAgenda() are actively used; if not, remove or document for future implementation"
+    },
+    {
+      "priority": "LOW",
+      "category": "Cleanup",
+      "action": "Remove unused imports marked with F401",
+      "details": "Clean up explicit noqa: F401 comments in app.py if re-export intent can be documented or if imports are truly unused"
+    }
+  ],
+  "analysis_methodology": {
+    "tools_used": [
+      "grep_search for pattern detection",
+      "semantic_search for code analysis",
+      "file_read for detailed inspection"
+    ],
+    "files_scanned": {
+      "python_files": 120,
+      "javascript_jsx_files": 127,
+      "configuration_files": 5
+    },
+    "exclusions": [
+      "node_modules/",
+      ".git/",
+      "build/",
+      "dist/",
+      "__pycache__/",
+      ".pytest_cache/"
+    ]
+  },
+  "next_steps": [
+    "Review HIGH priority recommendations with team",
+    "Create GitHub issues for incomplete features (RECEITA_POR_CLIENTE, DESPESAS_POR_CATEGORIA)",
+    "Schedule refactoring sprint for duplicate code consolidation",
+    "Run linter to catch additional unused imports/functions",
+    "Update CI/CD pipeline to include dead code detection"
+  ]
+}

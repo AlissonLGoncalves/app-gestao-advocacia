@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import argparse
 import csv
-import os
 import re
 from pathlib import Path
 
-EXTS = {".pdf"}  # DOCX nao suportado pelo upload do Gemini; rode novamente com .docx exportado para PDF
+EXTS = {
+    ".pdf"
+}  # DOCX nao suportado pelo upload do Gemini; rode novamente com .docx exportado para PDF
 
 # Termos fortes (provavel contrato de honorarios)
 RE_FORTE = re.compile(
