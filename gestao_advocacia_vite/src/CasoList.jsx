@@ -631,18 +631,39 @@ function CasoList({ onEditCaso, refreshKey }) {
                 </td>
               </tr>
             )}
-            {casos.map((caso) => (
+            {casos.map((caso) => {
+              // Estilo Astrea: "Autor × Réu" na coluna Título.
+              // Sem campo de polo do cliente, assumimos cliente = autor e
+              // parte_contraria = réu (pode estar invertido em casos onde o
+              // cliente é réu, mas é a heuristica mais útil até termos polo
+              // explícito no modelo Caso).
+              const clienteNome = caso.cliente_nome || caso.cliente?.nome_razao_social || ''
+              const parteContraria = (caso.parte_contraria || '').trim()
+              const partesLabel =
+                clienteNome && parteContraria
+                  ? `${clienteNome} × ${parteContraria}`
+                  : clienteNome || parteContraria || caso.titulo
+              return (
               <tr key={caso.id}>
                 <td className="px-3 py-2">
                   <span
                     role="button"
-                    className="text-primary text-decoration-underline"
-                    style={{ cursor: 'pointer' }}
-                    title="Abrir detalhes do caso (linha do tempo, publicações vinculadas, etc.)"
+                    className="text-primary text-decoration-underline d-block"
+                    style={{ cursor: 'pointer', fontWeight: 500 }}
+                    title={`Abrir detalhes do caso · Título interno: ${caso.titulo || '(sem título)'}`}
                     onClick={() => navigate(`/casos/detalhe/${caso.id}`)}
                   >
-                    {caso.titulo}
+                    {partesLabel}
                   </span>
+                  {caso.titulo && partesLabel !== caso.titulo && (
+                    <small
+                      className="text-muted d-block text-truncate"
+                      style={{ maxWidth: '320px', fontSize: '0.72rem' }}
+                      title={caso.titulo}
+                    >
+                      {caso.titulo}
+                    </small>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   {caso.cliente_nome || caso.cliente?.nome_razao_social || 'N/A'}
@@ -733,7 +754,8 @@ function CasoList({ onEditCaso, refreshKey }) {
                   </button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
