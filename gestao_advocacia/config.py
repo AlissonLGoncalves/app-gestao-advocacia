@@ -115,7 +115,7 @@ class Config:
     # valor causa, parte contraria). 'gemini-2.5-pro' eh ~5x melhor para isso. Custo
     # cresce mas o volume eh baixo (so quando usuario clica num grupo).
     GEMINI_TRIAGEM_MODEL = os.environ.get("GEMINI_TRIAGEM_MODEL", "gemini-2.5-pro")
-    APP_VERSION = os.environ.get("APP_VERSION") or "1.7.0"
+    APP_VERSION = os.environ.get("APP_VERSION") or "1.7.1"
 
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
