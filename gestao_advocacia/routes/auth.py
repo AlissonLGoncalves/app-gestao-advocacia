@@ -16,7 +16,7 @@ from extensions import db, limiter
 from helpers.admin_session import admin_session
 from mail_service import enviar_alerta_email, enviar_email
 from models import ConsentimentoUsuario, LoginAudit, PasswordResetToken, Tenant, User
-from utils.cpf_cnpj import extract_digits, format_cpf, validate_cpf
+from utils.cpf_cnpj import format_cpf, validate_cpf
 from utils.log_sanitizer import mask_email, mask_user_id
 from utils.password_policy import validar_forca_senha
 

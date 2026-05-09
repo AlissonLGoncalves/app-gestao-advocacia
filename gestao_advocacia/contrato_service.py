@@ -8,7 +8,6 @@ prontos para popular ContratoHonorario.
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -17,7 +16,7 @@ from typing import Any
 from flask import current_app
 
 from gemini_service import get_gemini_client
-from utils.cpf_cnpj import extract_digits, validate_cpf
+from utils.cpf_cnpj import validate_cpf
 
 _DEFAULT_GEMINI_MODELS = (
     "gemini-2.5-flash",
