@@ -28,11 +28,34 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sys
 import traceback
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+
+
+def _contratos_upload_root(app):
+    return app.config.get("CONTRATOS_UPLOAD_ROOT") or os.path.join(
+        os.sep, "data", "uploads", "contratos"
+    )
+
+
+def _persistir_arquivo_contrato(app, src_path: Path, arquivo_hash: str) -> str:
+    """Copia o arquivo do contrato para o storage permanente e retorna o path final.
+
+    O nome final no storage usa o hash + extensao original para evitar colisoes
+    e facilitar deduplicacao. Idempotente: se ja existir nao sobrescreve.
+    """
+    upload_root = _contratos_upload_root(app)
+    os.makedirs(upload_root, exist_ok=True)
+    suffix = src_path.suffix or ".pdf"
+    dest_path = os.path.join(upload_root, f"{arquivo_hash}{suffix.lower()}")
+    if not os.path.exists(dest_path):
+        shutil.copyfile(str(src_path), dest_path)
+    return dest_path
+
 
 _BASE_DIR = os.path.join(os.path.dirname(__file__), "..", "..")
 sys.path.insert(0, os.path.abspath(_BASE_DIR))
@@ -167,6 +190,7 @@ def _construir_contrato(
     tenant_id,
     arquivo_hash: str,
     arquivo_nome: str,
+    arquivo_path: str | None = None,
 ):
     parcelas = dados.get("parcelas") or []
     parcelas_json = json.dumps(parcelas, ensure_ascii=False) if parcelas else None
@@ -215,6 +239,7 @@ def _construir_contrato(
         vigencia_condicao=dados.get("vigencia_condicao") or None,
         arquivo_hash=arquivo_hash,
         arquivo_nome=arquivo_nome,
+        arquivo_path=arquivo_path,
         parcelas_json=parcelas_json,
         caso_id=None,
         cliente_id=cliente_id,
@@ -337,6 +362,9 @@ def main():
                 )
                 print(f"  -> cliente {motivo}: id={cliente.id} {cliente.nome_razao_social}")
 
+                arquivo_path_persistido = _persistir_arquivo_contrato(app, arquivo, arquivo_hash)
+                print(f"  -> PDF persistido em: {arquivo_path_persistido}")
+
                 contrato = _construir_contrato(
                     ContratoHonorario,
                     dados,
@@ -345,6 +373,7 @@ def main():
                     tenant_id,
                     arquivo_hash,
                     arquivo.name,
+                    arquivo_path=arquivo_path_persistido,
                 )
                 db.session.add(contrato)
                 db.session.commit()

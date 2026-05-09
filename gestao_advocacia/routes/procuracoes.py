@@ -4,7 +4,7 @@ import re
 import uuid
 from datetime import datetime
 
-from flask import g, request
+from flask import g, request, send_from_directory
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource
 
@@ -142,6 +142,39 @@ def register_procuracoes_routes(app, procuracoes_ns, procuracao_model_dto):
             response_payload = analise.to_dict()
             response_payload["avisos_validacao"] = avisos_validacao
             return response_payload
+
+    @procuracoes_ns.route("/<int:analise_id>/arquivo")
+    class ProcuracaoArquivoAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @procuracoes_ns.doc(
+            security="jsonWebToken",
+            description="Baixa o arquivo PDF/DOCX original da procuração analisada.",
+        )
+        def get(self, analise_id):
+            analise = db.session.get(ProcuracaoAnalise, analise_id)
+            if not analise:
+                procuracoes_ns.abort(404, "Análise de procuração não encontrada.")
+            if analise.tenant_id != g.tenant_id:
+                procuracoes_ns.abort(403, "Acesso negado a análise de outro tenant.")
+            if not analise.arquivo_path or not os.path.exists(analise.arquivo_path):
+                procuracoes_ns.abort(
+                    404,
+                    "Arquivo original não disponível. Faça novo upload se desejar.",
+                )
+
+            as_attachment = request.args.get("download", "0") == "1"
+            file_directory = os.path.dirname(analise.arquivo_path)
+            file_name_on_disk = os.path.basename(analise.arquivo_path)
+            download_name = (analise.dados_extraidos or {}).get(
+                "arquivo_original_nome"
+            ) or file_name_on_disk
+            return send_from_directory(
+                file_directory,
+                file_name_on_disk,
+                as_attachment=as_attachment,
+                download_name=download_name,
+            )
 
     @procuracoes_ns.route("/<int:analise_id>/criar-caso")
     class ProcuracaoCriarCasoAPI(Resource):

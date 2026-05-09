@@ -8,6 +8,7 @@ import {
   extrairTextoPlano,
 } from '../utils/htmlTribunal.js'
 import ModalCriarClienteCaso from '../components/djen/ModalCriarClienteCaso.jsx'
+import CategoriasPublicacoes from '../components/djen/CategoriasPublicacoes.jsx'
 import {
   baixarCertidao as baixarCertidaoApi,
   createOab,
@@ -136,6 +137,22 @@ export default function DjenPage() {
   const [publicacoes, setPublicacoes] = useState([])
   const [total, setTotal] = useState(0)
   const [naoLidas, setNaoLidas] = useState(0)
+  // Epic #10: aba de categoria DENTRO da aba "publicacoes". Inspirado no
+  // Astrea (Importantes / Andamentos / Tarefas / etc). Por enquanto:
+  // todas | nao_lidas | pendentes | vinculadas. "Importantes" fica visivel
+  // como placeholder (em breve) ate a Epic #2 (#176) classificar via IA.
+  const [categoria, setCategoria] = useState('todas')
+  const [contagens, setContagens] = useState({
+    todas: 0,
+    nao_lidas: 0,
+    pendentes: 0,
+    vinculadas: 0,
+    importantes: 0,
+  })
+  const categoriaRef = useRef('todas')
+  useEffect(() => {
+    categoriaRef.current = categoria
+  }, [categoria])
   const [loadingPubs, setLoadingPubs] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [autoSyncExecutada, setAutoSyncExecutada] = useState(false)
@@ -192,12 +209,21 @@ export default function DjenPage() {
   const carregarPublicacoes = useCallback(
     async (offsetParam = 0, limitParam = itensPorPagina) => {
       const f = filtrosRef.current
+      const cat = categoriaRef.current
       setLoadingPubs(true)
       try {
+        // Epic #10: a categoria selecionada vira filtro server-side. Quando
+        // o user filtrou explicitamente em "Leitura", manda o valor dele;
+        // senao, deriva de "categoria" (ex: aba "Nao lidas" => lida=false).
+        const lidaFromCat = cat === 'nao_lidas' ? 'false' : ''
+        const lidaFiltro = f.lida !== '' ? f.lida : lidaFromCat
+        const vinculacao =
+          cat === 'pendentes' ? 'sem_caso' : cat === 'vinculadas' ? 'com_caso' : undefined
+
         const data = await listPublicacoes({
           limit: limitParam,
           offset: offsetParam,
-          lida: f.lida !== '' ? f.lida : undefined,
+          lida: lidaFiltro !== '' ? lidaFiltro : undefined,
           sigla_tribunal: f.sigla_tribunal || undefined,
           numero_processo: f.numero_processo || undefined,
           nome_parte: f.nome_parte || undefined,
@@ -206,11 +232,13 @@ export default function DjenPage() {
           data_fim: f.data_fim || undefined,
           origem: f.origem || undefined,
           ordenar: f.ordenar || 'data_desc',
+          vinculacao,
         })
 
         setPublicacoes(data.items || [])
         setTotal(data.total || 0)
         setNaoLidas(data.nao_lidas || 0)
+        if (data.contagens) setContagens(data.contagens)
       } catch {
         toast.error('Erro ao carregar publicações DJEN.')
       } finally {
@@ -288,6 +316,13 @@ export default function DjenPage() {
     carregarTriagem,
     carregarUltimasPublicacoesDjen,
   ])
+
+  // Epic #10: ao trocar de categoria, recarrega lista (server-side filter).
+  // categoriaRef pega o valor atual dentro da callback estavel.
+  useEffect(() => {
+    carregarPublicacoes(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoria])
 
   // ── Sincronizar (B1 2026-05-01: async via djen-worker) ────────────────────
   // POST /djen/sync retorna 202 + job_id; depois polling em GET /djen/sync/<id>
@@ -804,6 +839,18 @@ export default function DjenPage() {
         {/* ── Aba Publicações ────────────────────────────────────────────────── */}
         {aba === 'publicacoes' && (
           <div className="row g-4">
+            {/* Epic #10: Categorias rápidas (pills) — alterna o filtro
+                server-side via parametro `vinculacao`/`lida` na chamada. */}
+            <div className="col-12">
+              <CategoriasPublicacoes
+                ativa={categoria}
+                contagens={contagens}
+                onChange={(novaCat) => {
+                  setCategoria(novaCat)
+                  setOffset(0)
+                }}
+              />
+            </div>
             {/* Filtros */}
             <div className="col-12">
               <div className="card shadow-sm border-0">
