@@ -228,6 +228,25 @@ export default function PrazosPage() {
     }
   }
 
+  // Atalho "ja cumpri / nao era prazo": move pra Concluido com 1 clique.
+  const handleConcluirTarefa = async (tarefa) => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${API_URL}/tarefas/${tarefa.id}/concluir`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      })
+      if (res.ok) {
+        toast.success('Tarefa marcada como cumprida.')
+        carregarTarefas()
+      } else {
+        toast.error('Falha ao concluir tarefa.')
+      }
+    } catch {
+      toast.error('Erro na comunicação com servidor.')
+    }
+  }
+
   // Toggle "Concluir" da vista lista — usa PUT simples; posicao é preservada.
   const handleMoverTarefa = async (id, novoStatus) => {
     try {
@@ -462,6 +481,7 @@ export default function PrazosPage() {
                 casos={casos}
                 onEditar={handleEditarTarefa}
                 onConfirmarPrazo={handleConfirmarPrazo}
+                onConcluir={handleConcluirTarefa}
               />
             ))}
           </div>
@@ -610,7 +630,7 @@ export default function PrazosPage() {
 
 // ── Sub-componentes do Kanban (dnd-kit) ──────────────────────────────────────
 
-function KanbanColuna({ coluna, ids, tarefas, casos, onEditar, onConfirmarPrazo }) {
+function KanbanColuna({ coluna, ids, tarefas, casos, onEditar, onConfirmarPrazo, onConcluir }) {
   const { setNodeRef, isOver } = useDroppable({ id: coluna.id })
   const cards = ids.map((id) => tarefas.find((t) => t.id === id)).filter(Boolean)
 
@@ -654,6 +674,7 @@ function KanbanColuna({ coluna, ids, tarefas, casos, onEditar, onConfirmarPrazo 
                 casos={casos}
                 onEditar={onEditar}
                 onConfirmarPrazo={onConfirmarPrazo}
+                onConcluir={onConcluir}
               />
             ))}
           </SortableContext>
@@ -668,7 +689,7 @@ function KanbanColuna({ coluna, ids, tarefas, casos, onEditar, onConfirmarPrazo 
   )
 }
 
-function KanbanCard({ tarefa, casos, onEditar, onConfirmarPrazo }) {
+function KanbanCard({ tarefa, casos, onEditar, onConfirmarPrazo, onConcluir }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tarefa.id,
   })
@@ -686,12 +707,13 @@ function KanbanCard({ tarefa, casos, onEditar, onConfirmarPrazo }) {
         casos={casos}
         onEditar={onEditar}
         onConfirmarPrazo={onConfirmarPrazo}
+        onConcluir={onConcluir}
       />
     </div>
   )
 }
 
-function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, arrastando }) {
+function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, onConcluir, arrastando }) {
   const overdue = isOverdue(tarefa)
   const diasV = overdue ? diasVencido(tarefa) : 0
   const diasRestantes = !overdue ? diasAteVencimento(tarefa) : null
@@ -783,7 +805,7 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, arrastand
 
         {(casoLocal || numeroProcesso) && (
           <Link
-            to={casoLocal ? `/casos/${casoLocal.id}` : `/casos/${tarefa.caso_id}`}
+            to={`/casos/detalhe/${casoLocal ? casoLocal.id : tarefa.caso_id}`}
             className="d-flex align-items-center text-decoration-none mb-1 text-truncate"
             style={{ fontSize: '0.72rem', color: 'var(--bs-primary)' }}
             title={
@@ -827,21 +849,41 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, arrastand
           )
         )}
 
-        {precisaConfirmarPrazo && onConfirmarPrazo && (
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-warning w-100 mt-2 d-flex align-items-center justify-content-center gap-1"
-            style={{ fontSize: '0.72rem' }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation()
-              onConfirmarPrazo(tarefa)
-            }}
-            title="Confirma que o prazo gerado pela IA esta correto"
-          >
-            <CheckCircleIcon style={{ width: 13, height: 13 }} />
-            Confirmar prazo
-          </button>
+        {(precisaConfirmarPrazo || onConcluir) && tarefa.status !== 'Concluído' && (
+          <div className="d-flex gap-1 mt-2">
+            {precisaConfirmarPrazo && onConfirmarPrazo && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-warning flex-grow-1 d-flex align-items-center justify-content-center gap-1"
+                style={{ fontSize: '0.72rem' }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onConfirmarPrazo(tarefa)
+                }}
+                title="Confirma que o prazo gerado pela IA esta correto"
+              >
+                <CheckCircleIcon style={{ width: 13, height: 13 }} />
+                Confirmar
+              </button>
+            )}
+            {onConcluir && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-success flex-grow-1 d-flex align-items-center justify-content-center gap-1"
+                style={{ fontSize: '0.72rem' }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onConcluir(tarefa)
+                }}
+                title="Marcar como cumprido (move para Concluído)"
+              >
+                <CheckCircleIcon style={{ width: 13, height: 13 }} />
+                Cumprido
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
