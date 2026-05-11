@@ -276,6 +276,9 @@ def register_api_routes(app, api, finance_access_required):
             "valor_causa": fields.Float(description="Valor da causa em R$"),
             "data_distribuicao": fields.String(description="Data de distribuicao (YYYY-MM-DD)"),
             "notas_caso": fields.String(description="Notas sobre o caso"),
+            "prioridade": fields.String(
+                description="Prioridade: Urgente, Alta, Normal, Baixa (default Normal)"
+            ),
             "cliente_id": fields.Integer(required=True, description="ID do cliente associado"),
         },
     )
@@ -298,6 +301,7 @@ def register_api_routes(app, api, finance_access_required):
             "data_distribuicao": fields.String,
             "notas_caso": fields.String,
             "descricao": fields.String,
+            "prioridade": fields.String,
             "data_criacao": fields.DateTime(dt_format="iso8601"),
             "data_atualizacao": fields.DateTime(dt_format="iso8601"),
             "cliente_id": fields.Integer,

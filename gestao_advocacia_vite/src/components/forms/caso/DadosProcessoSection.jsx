@@ -85,7 +85,7 @@ function DadosProcessoSection({
             <div className="invalid-feedback d-block">{validationErrors.cliente_id}</div>
           )}
         </div>
-        <div className="col-md-6 mb-3">
+        <div className="col-md-3 mb-3">
           <label htmlFor="status_caso" className="form-label form-label-sm">
             Status *
           </label>
@@ -100,6 +100,23 @@ function DadosProcessoSection({
             <option value="Suspenso">Suspenso</option>
             <option value="Encerrado">Encerrado</option>
             <option value="Arquivado">Arquivado</option>
+          </select>
+        </div>
+        <div className="col-md-3 mb-3">
+          <label htmlFor="prioridade_caso" className="form-label form-label-sm">
+            Prioridade
+          </label>
+          <select
+            name="prioridade"
+            id="prioridade_caso"
+            className="form-select form-select-sm"
+            value={formData.prioridade || 'Normal'}
+            onChange={onChange}
+          >
+            <option value="Urgente">Urgente</option>
+            <option value="Alta">Alta</option>
+            <option value="Normal">Normal</option>
+            <option value="Baixa">Baixa</option>
           </select>
         </div>
       </div>

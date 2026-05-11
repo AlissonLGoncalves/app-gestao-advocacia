@@ -254,6 +254,9 @@ class Caso(db.Model):
     data_distribuicao = db.Column(db.Date, nullable=True)
     notas_caso = db.Column(db.Text, nullable=True)
     descricao = db.Column(db.Text, nullable=True)
+    # Epico 4: triagem visual via CardMeta. Mesmo set de valores
+    # ('Urgente'/'Alta'/'Normal'/'Baixa') usado em TarefaPrazo.
+    prioridade = db.Column(db.String(20), nullable=False, default="Normal", server_default="Normal")
     # Timestamps e relações
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     data_atualizacao = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -333,6 +336,7 @@ class Caso(db.Model):
             ),
             "notas_caso": self.notas_caso,
             "descricao": self.descricao,
+            "prioridade": self.prioridade,
             "data_criacao": self.data_criacao.isoformat() if self.data_criacao else None,
             "data_atualizacao": (
                 self.data_atualizacao.isoformat() if self.data_atualizacao else None
