@@ -1332,6 +1332,15 @@ def register_casos_routes(
             except DjenAPIError as e:
                 return {"message": f"Erro ao consultar o DJEN: {str(e)}"}, 502
 
+            # Epic #2: cliente Gemini reutilizado pra classificar inline cada pub.
+            try:
+                from gemini_service import get_gemini_client, is_enabled  # noqa: PLC0415
+
+                gemini_client_inline = get_gemini_client() if is_enabled() else None
+            except Exception:
+                gemini_client_inline = None
+            modelo_inline = app.config.get("GEMINI_TRIAGEM_MODEL", "gemini-2.5-flash")
+
             novas = 0
             for item in items:
                 try:
@@ -1343,6 +1352,8 @@ def register_casos_routes(
                         caso_id=caso_id,
                         item=item,
                         origem="processo",
+                        gemini_client=gemini_client_inline,
+                        modelo_classificador=modelo_inline,
                     )
                     if salvo:
                         novas += 1

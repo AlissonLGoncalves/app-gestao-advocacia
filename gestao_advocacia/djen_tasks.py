@@ -357,8 +357,18 @@ def _item_get(item, *keys):
     return None
 
 
-def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, origem):
-    """Persiste uma publicação se ainda não existir no banco."""
+def _salvar_publicacao(
+    db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, origem,
+    gemini_client=None, modelo_classificador=None,
+):
+    """Persiste uma publicação se ainda não existir no banco.
+
+    Epic #2: classifica via IA antes do INSERT — toda pub nasce com
+    `importante` decidido (ou NULL se classifier falhar; nesse caso o loop
+    pos-sync em job_monitorar_djen faz retry). `gemini_client` opcional
+    permite caching em bulk paths; None faz fallback no proprio classifier
+    (so short-circuit roda, sem IA).
+    """
     # enriquecimento-cnj: hot-path
     from utils.cnj import extrair_primeiro_cnj_valido  # noqa: PLC0415
 
@@ -557,6 +567,23 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
         status_origem=status_origem_default,
         triagem_ignorada=False,
     )
+
+    # Epic #2: classifica inline antes do INSERT. Short-circuit (tipo/keyword)
+    # eh free e instantaneo; chamada IA so se gemini_client foi passado.
+    # Defensivo: nunca derrubar o save se classifier crashar.
+    try:
+        from djen_classifier import classificar_publicacao  # noqa: PLC0415
+
+        modelo = modelo_classificador or "gemini-2.5-flash"
+        resultado = classificar_publicacao(pub, gemini_client, modelo)
+        if resultado["importante"] is not None:
+            pub.importante = resultado["importante"]
+            pub.classificado_em = resultado["classificado_em"]
+            pub.classificacao_motivo = resultado["motivo"]
+    except Exception:
+        # Loop pos-sync em job_monitorar_djen pega como retry safety net.
+        pass
+
     db.session.add(pub)
     return True
 
@@ -756,6 +783,18 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         total_oabs_processadas = 0
         total_casos_processados = 0
         erros = 0
+
+        # Epic #2: client Gemini reutilizado entre todas as pubs do job pra
+        # evitar reconstruir a cada save. None se IA desabilitada — nesse caso
+        # so short-circuit (tipo/keyword) roda inline.
+        try:
+            from gemini_service import get_gemini_client, is_enabled  # noqa: PLC0415
+
+            _gemini_client_job = get_gemini_client() if is_enabled() else None
+        except Exception:
+            _gemini_client_job = None
+        _modelo_classificador = app.config.get("GEMINI_TRIAGEM_MODEL", "gemini-2.5-flash")
+
         buscar_todos_tribunais = bool(app.config.get("DJEN_BUSCAR_TODOS_TRIBUNAIS", True))
         siglas_tribunais = []
 
@@ -810,7 +849,9 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
                 total_itens_encontrados += len(items)
                 for item in items:
                     saved = _salvar_publicacao(
-                        db, PublicacaoDJEN, oab_mon.user_id, oab_mon.tenant_id, None, item, "oab"
+                        db, PublicacaoDJEN, oab_mon.user_id, oab_mon.tenant_id, None, item, "oab",
+                        gemini_client=_gemini_client_job,
+                        modelo_classificador=_modelo_classificador,
                     )
                     if saved:
                         total_novas += 1
@@ -892,7 +933,9 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
 
                 for item in items:
                     saved = _salvar_publicacao(
-                        db, PublicacaoDJEN, caso.user_id, tenant_id_caso, caso.id, item, "processo"
+                        db, PublicacaoDJEN, caso.user_id, tenant_id_caso, caso.id, item, "processo",
+                        gemini_client=_gemini_client_job,
+                        modelo_classificador=_modelo_classificador,
                     )
                     if saved:
                         total_novas += 1
@@ -930,19 +973,16 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
 
         logger.info(f"JOB DJEN: concluído. {total_novas} nova(s) publicação(ões) salva(s).")
 
-        # Epic #2 (#176): classifica publicacoes pendentes (importante IS NULL)
-        # via Gemini + short-circuit por tipo/keyword. Roda DEPOIS do save pra
-        # nao atrasar o sync; se falhar parcial, pubs ficam com importante=NULL
-        # pra retry no proximo sync (idempotente).
+        # Epic #2 (#176): retry safety net. Classificacao principal agora roda
+        # inline em _salvar_publicacao — esse loop so pega pubs que ficaram
+        # NULL por falha do classifier no momento do save (ex.: Gemini fora do
+        # ar) ou pubs pre-existentes a esta mudanca. Idempotente.
         total_classificadas = 0
         try:
             from djen_classifier import classificar_publicacao  # noqa: PLC0415
-            from gemini_service import get_gemini_client, is_enabled  # noqa: PLC0415
 
             # Limite por execucao pra evitar runaway de custo. Configuravel.
             classificar_max = int(app.config.get("DJEN_CLASSIFICAR_MAX_POR_RUN", 100))
-            modelo = app.config.get("GEMINI_TRIAGEM_MODEL", "gemini-2.5-flash")
-            gemini_client = get_gemini_client() if is_enabled() else None
 
             q_pendentes = PublicacaoDJEN.query.filter(PublicacaoDJEN.importante.is_(None))
             if tenant_id is not None:
@@ -950,7 +990,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             pendentes = q_pendentes.limit(classificar_max).all()
 
             for pub in pendentes:
-                resultado = classificar_publicacao(pub, gemini_client, modelo)
+                resultado = classificar_publicacao(pub, _gemini_client_job, _modelo_classificador)
                 if resultado["importante"] is None:
                     continue  # falhou — deixa NULL pra retry
                 pub.importante = resultado["importante"]
