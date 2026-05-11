@@ -703,12 +703,10 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, arrastand
     (casoLocal && casoLocal.cliente && casoLocal.cliente.nome_razao_social) ||
     (casoLocal && casoLocal.cliente_nome) ||
     null
-  const numeroProcesso =
-    tarefa.numero_processo || (casoLocal && casoLocal.numero_processo) || null
+  const numeroProcesso = tarefa.numero_processo || (casoLocal && casoLocal.numero_processo) || null
   const tituloCaso = casoLocal && casoLocal.titulo
   const dataFmt = formatarDataBR(tarefa.data_vencimento)
-  const precisaConfirmarPrazo =
-    !!tarefa.prazo_calculado_por_ia && tarefa.prazo_validado === false
+  const precisaConfirmarPrazo = !!tarefa.prazo_calculado_por_ia && tarefa.prazo_validado === false
 
   return (
     <div
@@ -796,9 +794,7 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, arrastand
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <BriefcaseIcon
-              style={{ width: 12, height: 12, flexShrink: 0, marginRight: 4 }}
-            />
+            <BriefcaseIcon style={{ width: 12, height: 12, flexShrink: 0, marginRight: 4 }} />
             <span className="text-truncate">{numeroProcesso || tituloCaso}</span>
           </Link>
         )}
@@ -819,7 +815,11 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, arrastand
                 {dataFmt}
                 {diasRestantes !== null && diasRestantes >= 0 && (
                   <span className="ms-1">
-                    ({diasRestantes === 0 ? 'hoje' : `em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`})
+                    (
+                    {diasRestantes === 0
+                      ? 'hoje'
+                      : `em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`}
+                    )
                   </span>
                 )}
               </span>
