@@ -3,7 +3,14 @@
     "allow": [
       "Bash(python -c ' *)",
       "Bash(python -m flask db migrate -m \"add portal_cliente_id to user\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "PowerShell(Set-Location gestao_advocacia; $env:FLASK_APP=\"app.py\"; python -m flask db upgrade 2>&1 | Select-Object -Last 10)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(c.get\\('name','?'\\), '->', c.get\\('conclusion'\\) or c.get\\('status'\\) or c.get\\('state'\\)\\) for c in d.get\\('statusCheckRollup',[]\\)]\")",
+      "Bash(xargs -I {} gh run view {} --log-failed)",
+      "PowerShell(npx prettier --check src/pages/PrazosPage.jsx src/App.jsx 2>&1)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(c['name'],'->',c['bucket']\\) for c in d]\")",
+      "Bash(python -m json.tool)",
+      "Bash(base64 -w0 diag_caso31.py)"
     ]
   }
 }

@@ -964,6 +964,52 @@ def registrar_rotas_djen(
 
             return {"tarefas_criadas": criadas}, 200
 
+    @djen_ns.route("/auto-tarefas/limpar-vencidos")
+    class DjenAutoTarefasLimparVencidosAPI(Resource):
+        """Feature Kanban<>DJEN: move para Concluído as tarefas auto-geradas
+        pela IA que ja estao vencidas ha mais de N dias (default 60) e nunca
+        foram validadas pelo advogado. Idempotente."""
+
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Limpa do Kanban prazos auto-gerados pela IA que ja venceram "
+                "ha muito tempo (default 60 dias) e nao foram tocados pelo "
+                "advogado — premissa: foram cumpridos offline ou nao eram "
+                "prazo real. Move status para Concluído. Aceita ?dias=N para "
+                "ajustar a janela."
+            ),
+        )
+        @jwt_required()
+        def post(self):
+            from app import User  # noqa: PLC0415
+            from djen_tasks import limpar_prazos_vencidos_antigos  # noqa: PLC0415
+
+            user_id = get_jwt_identity()
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, "Modulo DJEN desabilitado para este tenant.")
+
+            try:
+                dias = int(request.args.get("dias", 60))
+            except (TypeError, ValueError):
+                dias = 60
+            if dias < 1:
+                djen_ns.abort(400, "dias deve ser >= 1.")
+
+            try:
+                limpadas = limpar_prazos_vencidos_antigos(
+                    current_app, tenant_id=user.tenant_id, dias_minimos=dias
+                )
+            except Exception as exc:
+                current_app.logger.error("djen_limpar_vencidos_falha: %s", exc, exc_info=True)
+                db.session.rollback()
+                djen_ns.abort(500, "Falha ao limpar prazos vencidos.")
+
+            return {"tarefas_concluidas": limpadas, "dias_minimos": dias}, 200
+
     @djen_ns.route("/triagem/casos-compativeis")
     class PublicacaoTriagemCasosCompativeisAPI(Resource):
         @djen_ns.doc(

@@ -182,6 +182,25 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
             db.session.commit()
             return tarefa
 
+    @tarefas_ns.route("/<int:id>/concluir")
+    class TarefaConcluirAPI(Resource):
+        """Feature Kanban<>DJEN: atalho de 1 clique para 'já cumpri / não era prazo'.
+
+        Marca status=Concluido + prazo_validado=True. Idempotente para tarefas
+        ja concluidas.
+        """
+
+        @jwt_required()
+        @tenant_scoped
+        @tarefas_ns.marshal_with(tarefa_model_dto)
+        @tarefas_ns.doc(security="jsonWebToken")
+        def patch(self, id):
+            tarefa = get_item_or_404(TarefaPrazo, id)
+            tarefa.status = "Concluído"
+            tarefa.prazo_validado = True
+            db.session.commit()
+            return tarefa
+
     @tarefas_ns.route("/<int:id>")
     class TarefaDetailAPI(Resource):
         @jwt_required()

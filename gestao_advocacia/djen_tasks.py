@@ -561,7 +561,10 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
     return True
 
 
-def _criar_tarefa_de_publicacao(db, TarefaPrazo, pub):
+DJEN_AUTO_TAREFA_MAX_IDADE_DIAS_PADRAO = 60
+
+
+def _criar_tarefa_de_publicacao(db, TarefaPrazo, pub, max_idade_dias=None):
     """Cria TarefaPrazo automaticamente a partir de PublicacaoDJEN importante.
 
     Feature Kanban<>DJEN — fecha o ciclo Cliente -> Caso -> Intimacao -> Prazo.
@@ -569,6 +572,9 @@ def _criar_tarefa_de_publicacao(db, TarefaPrazo, pub):
       - pub.importante is True (classificada como relevante)
       - pub.caso_id nao e' None (sem caso vinculado, vai pra Triagem manual)
       - nao existe TarefaPrazo com publicacao_djen_id=pub.id (idempotente)
+      - data_disponibilizacao nao e' mais antiga que ``max_idade_dias``
+        (default 60d). Publicacoes mais antigas tipicamente ja foram cumpridas
+        offline e cardar elas como "vencido ha N dias" so polui o Kanban.
 
     Prazo calculado pela tabela de regras em djen_prazo_calculator.calcular_prazo.
     Nasce com prazo_validado=False e prazo_calculado_por_ia=True — o card no
@@ -577,10 +583,27 @@ def _criar_tarefa_de_publicacao(db, TarefaPrazo, pub):
     Retorna a TarefaPrazo criada (adicionada na sessao, sem commit) ou None
     se condicoes nao foram atendidas.
     """
+    from datetime import date, timedelta  # noqa: PLC0415
+
     from djen_prazo_calculator import calcular_prazo  # noqa: PLC0415
 
     if not pub or pub.importante is not True or pub.caso_id is None:
         return None
+
+    # Filtro de idade: ignora publicacoes muito antigas pra nao gerar prazo
+    # ja vencido ha meses. Configuravel via DJEN_AUTO_TAREFA_MAX_IDADE_DIAS.
+    if max_idade_dias is None:
+        try:
+            max_idade_dias = int(
+                current_app.config.get(
+                    "DJEN_AUTO_TAREFA_MAX_IDADE_DIAS", DJEN_AUTO_TAREFA_MAX_IDADE_DIAS_PADRAO
+                )
+            )
+        except (RuntimeError, TypeError, ValueError):
+            max_idade_dias = DJEN_AUTO_TAREFA_MAX_IDADE_DIAS_PADRAO
+    if max_idade_dias and max_idade_dias > 0 and pub.data_disponibilizacao:
+        if pub.data_disponibilizacao < date.today() - timedelta(days=max_idade_dias):
+            return None
 
     # Idempotencia: pub ja deu origem a uma tarefa?
     existe = TarefaPrazo.query.filter_by(publicacao_djen_id=pub.id).first()
@@ -626,6 +649,51 @@ def _criar_tarefa_de_publicacao(db, TarefaPrazo, pub):
     )
     db.session.add(tarefa)
     return tarefa
+
+
+def limpar_prazos_vencidos_antigos(app, tenant_id=None, dias_minimos=60):
+    """Feature Kanban<>DJEN: move para 'Concluído' tarefas auto-geradas pela IA
+    que ja estao vencidas ha mais de ``dias_minimos`` dias e ainda nao foram
+    validadas pelo advogado.
+
+    Premissa: se passou tanto tempo sem o advogado tocar no card, ou foi
+    cumprido offline ou nao era prazo real. Em ambos os casos polui o Kanban.
+
+    So' afeta tarefas com prazo_calculado_por_ia=True e prazo_validado=False
+    — manuais e ja-confirmadas ficam intocadas.
+
+    Retorna o numero de tarefas movidas.
+    """
+    from datetime import date, timedelta  # noqa: PLC0415
+
+    from extensions import db  # noqa: PLC0415
+    from models import TarefaPrazo  # noqa: PLC0415
+
+    logger = logging.getLogger(__name__)
+    corte = date.today() - timedelta(days=dias_minimos)
+
+    q = (
+        TarefaPrazo.query.filter(TarefaPrazo.prazo_calculado_por_ia.is_(True))
+        .filter(TarefaPrazo.prazo_validado.is_(False))
+        .filter(TarefaPrazo.status != "Concluído")
+        .filter(TarefaPrazo.data_vencimento.isnot(None))
+        .filter(db.func.date(TarefaPrazo.data_vencimento) < corte)
+    )
+    if tenant_id is not None:
+        q = q.filter_by(tenant_id=tenant_id)
+
+    afetadas = q.all()
+    for t in afetadas:
+        t.status = "Concluído"
+        t.prazo_validado = True
+
+    if afetadas:
+        db.session.commit()
+        logger.info(
+            f"Kanban<>DJEN: limpou {len(afetadas)} prazo(s) vencido(s) ha mais de "
+            f"{dias_minimos} dia(s) (status -> Concluído)."
+        )
+    return len(afetadas)
 
 
 def executar_auto_criacao_tarefas(app, tenant_id=None):

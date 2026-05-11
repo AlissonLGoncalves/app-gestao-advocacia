@@ -16,7 +16,11 @@ import pytest
 from flask_jwt_extended import create_access_token
 
 from djen_prazo_calculator import calcular_prazo
-from djen_tasks import _criar_tarefa_de_publicacao, executar_auto_criacao_tarefas
+from djen_tasks import (
+    _criar_tarefa_de_publicacao,
+    executar_auto_criacao_tarefas,
+    limpar_prazos_vencidos_antigos,
+)
 from models import Caso, Cliente, PublicacaoDJEN, TarefaPrazo, Tenant, User
 
 
@@ -230,6 +234,111 @@ class TestDtoEnriquecido:
         assert t["prazo_calculado_por_ia"] is True
         assert t["prazo_validado"] is False
         assert t["prazo_dias_origem"] == 15
+
+
+class TestFiltroIdade:
+    def test_nao_cria_se_publicacao_muito_antiga(self, db, app, setup_kanban_djen):
+        """Pub com data_disponibilizacao > 60 dias atras nao gera tarefa."""
+        pub = setup_kanban_djen["pub"]
+        pub.data_disponibilizacao = date.today() - timedelta(days=90)
+        db.session.commit()
+        with app.app_context():
+            r = _criar_tarefa_de_publicacao(db, TarefaPrazo, pub)
+        assert r is None
+
+    def test_cria_se_pub_dentro_da_janela(self, db, app, setup_kanban_djen):
+        pub = setup_kanban_djen["pub"]
+        pub.data_disponibilizacao = date.today() - timedelta(days=30)
+        db.session.commit()
+        with app.app_context():
+            r = _criar_tarefa_de_publicacao(db, TarefaPrazo, pub)
+        assert r is not None
+
+    def test_respeita_param_max_idade_dias(self, db, setup_kanban_djen):
+        """Permite override explicito por argumento (uso retroativo)."""
+        pub = setup_kanban_djen["pub"]
+        pub.data_disponibilizacao = date.today() - timedelta(days=90)
+        db.session.commit()
+        r = _criar_tarefa_de_publicacao(db, TarefaPrazo, pub, max_idade_dias=120)
+        assert r is not None
+
+
+class TestLimpezaRetroativa:
+    def test_move_para_concluido_apenas_ia_vencidos_antigos(self, app, db, setup_kanban_djen):
+        tenant = setup_kanban_djen["tenant"]
+        user = setup_kanban_djen["user"]
+        caso = setup_kanban_djen["caso"]
+
+        antiga_ia = TarefaPrazo(
+            tenant_id=tenant.id,
+            user_id=user.id,
+            caso_id=caso.id,
+            titulo="Antiga IA",
+            status="A Fazer",
+            prazo_calculado_por_ia=True,
+            prazo_validado=False,
+            data_vencimento=datetime.utcnow() - timedelta(days=90),
+        )
+        manual_antiga = TarefaPrazo(
+            tenant_id=tenant.id,
+            user_id=user.id,
+            caso_id=caso.id,
+            titulo="Manual antiga",
+            status="A Fazer",
+            prazo_calculado_por_ia=False,
+            prazo_validado=True,
+            data_vencimento=datetime.utcnow() - timedelta(days=90),
+        )
+        ia_confirmada_antiga = TarefaPrazo(
+            tenant_id=tenant.id,
+            user_id=user.id,
+            caso_id=caso.id,
+            titulo="IA confirmada antiga",
+            status="A Fazer",
+            prazo_calculado_por_ia=True,
+            prazo_validado=True,  # ja validada — nao tocar
+            data_vencimento=datetime.utcnow() - timedelta(days=90),
+        )
+        ia_recente = TarefaPrazo(
+            tenant_id=tenant.id,
+            user_id=user.id,
+            caso_id=caso.id,
+            titulo="IA recente",
+            status="A Fazer",
+            prazo_calculado_por_ia=True,
+            prazo_validado=False,
+            data_vencimento=datetime.utcnow() + timedelta(days=5),
+        )
+        db.session.add_all([antiga_ia, manual_antiga, ia_confirmada_antiga, ia_recente])
+        db.session.commit()
+
+        with app.app_context():
+            n = limpar_prazos_vencidos_antigos(app, tenant_id=tenant.id, dias_minimos=60)
+        assert n == 1
+        db.session.refresh(antiga_ia)
+        db.session.refresh(manual_antiga)
+        db.session.refresh(ia_confirmada_antiga)
+        db.session.refresh(ia_recente)
+        assert antiga_ia.status == "Concluído"
+        assert antiga_ia.prazo_validado is True
+        assert manual_antiga.status == "A Fazer"  # manual intocada
+        assert ia_confirmada_antiga.status == "A Fazer"  # ja validada — preservada
+        assert ia_recente.status == "A Fazer"  # dentro do prazo
+
+
+class TestConcluirRota:
+    def test_patch_concluir_marca_concluido(self, client, db, setup_kanban_djen):
+        pub = setup_kanban_djen["pub"]
+        tarefa = _criar_tarefa_de_publicacao(db, TarefaPrazo, pub)
+        db.session.commit()
+        resp = client.patch(
+            f"/api/v1/tarefas/{tarefa.id}/concluir",
+            headers=setup_kanban_djen["headers"],
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "Concluído"
+        assert data["prazo_validado"] is True
 
 
 class TestValidarPrazoRota:
