@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline'
 import AvatarSigla from './ui/AvatarSigla.jsx'
 import PrioridadeBadge from './ui/PrioridadeBadge.jsx'
+import SlaBar from './ui/SlaBar.jsx'
 
 // Mini-Kanban estilo Astrea: 3 colunas com prazos urgentes em destaque.
 // Reusa AvatarSigla/PrioridadeBadge do Epico 1.
@@ -82,7 +83,7 @@ function TarefaCard({ tarefa, hoje }) {
       style={{ display: 'block', color: 'inherit' }}
     >
       <div
-        className="card border-0 shadow-sm mb-2"
+        className="card border-0 shadow-sm mb-2 overflow-hidden"
         style={{
           borderRadius: 'var(--radius-sm)',
           transition: 'transform 0.15s ease',
@@ -90,6 +91,10 @@ function TarefaCard({ tarefa, hoje }) {
         onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateX(2px)')}
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateX(0)')}
       >
+        <SlaBar
+          dataVencimento={tarefa.data_vencimento}
+          concluido={tarefa.status === 'Concluído' || tarefa.status === 'Concluido'}
+        />
         <div className="card-body p-2">
           <div className="d-flex justify-content-between align-items-start gap-2 mb-1">
             <div

@@ -25,6 +25,7 @@ import {
   aplicarReorderEmTarefas,
 } from '../utils/kanbanReorder.js'
 import PrioridadeBadge from '../components/ui/PrioridadeBadge.jsx'
+import SlaBar from '../components/ui/SlaBar.jsx'
 import {
   PlusIcon,
   ClockIcon,
@@ -730,7 +731,7 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, onConclui
 
   return (
     <div
-      className={`card mb-3 border-0 shadow-sm ${arrastando ? 'shadow' : ''}`}
+      className={`card mb-3 border-0 shadow-sm overflow-hidden ${arrastando ? 'shadow' : ''}`}
       style={{
         cursor: arrastando ? 'grabbing' : 'grab',
         borderRadius: 'var(--radius-md)',
@@ -742,6 +743,10 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, onConclui
         transform: arrastando ? 'rotate(2deg)' : 'none',
       }}
     >
+      <SlaBar
+        dataVencimento={tarefa.data_vencimento}
+        concluido={tarefa.status === 'Concluído' || tarefa.status === 'Concluido'}
+      />
       <div className="card-body p-3">
         <div className="d-flex justify-content-between align-items-start mb-2">
           <div className="d-flex flex-wrap gap-1">
