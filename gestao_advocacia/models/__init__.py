@@ -5,6 +5,22 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db
 
 
+def _iniciais_de_nome(nome):
+    """Retorna ate 2 iniciais maiusculas do nome completo.
+
+    Used to render avatar pills in UI (e.g. "Alisson Luiz" -> "AL").
+    Returns None for empty/None input so callers can fall back.
+    """
+    if not nome:
+        return None
+    partes = [p for p in str(nome).strip().split() if p]
+    if not partes:
+        return None
+    if len(partes) == 1:
+        return partes[0][:2].upper()
+    return (partes[0][0] + partes[-1][0]).upper()
+
+
 class Tenant(db.Model):
     __tablename__ = "tenant"
     id = db.Column(db.Integer, primary_key=True)
@@ -294,6 +310,10 @@ class Caso(db.Model):
 
     def to_dict(self):
         cliente_obj = self.cliente_associado if hasattr(self, "cliente_associado") else None
+        responsavel = self.responsavel_user if hasattr(self, "responsavel_user") else None
+        responsavel_nome = (
+            responsavel.nome_completo or responsavel.username if responsavel else None
+        )
         return {
             "id": self.id,
             "titulo": self.titulo,
@@ -324,6 +344,8 @@ class Caso(db.Model):
                 else None
             ),
             "user_id": self.user_id,
+            "responsavel_nome": responsavel_nome,
+            "responsavel_iniciais": _iniciais_de_nome(responsavel_nome),
             "caso_principal_id": self.caso_principal_id,
             "eh_apenso": self.caso_principal_id is not None,
             "data_ultima_verificacao_cnj": (
@@ -923,10 +945,18 @@ class PublicacaoDJEN(db.Model):
         db.Index("ix_publicacao_djen_tenant_created", "tenant_id", "data_captura"),
     )
 
+    responsavel_user = db.relationship("User", foreign_keys=[user_id])
+
     def to_dict(self):
+        responsavel = self.responsavel_user if hasattr(self, "responsavel_user") else None
+        responsavel_nome = (
+            responsavel.nome_completo or responsavel.username if responsavel else None
+        )
         return {
             "id": self.id,
             "user_id": self.user_id,
+            "responsavel_nome": responsavel_nome,
+            "responsavel_iniciais": _iniciais_de_nome(responsavel_nome),
             "tenant_id": self.tenant_id,
             "caso_id": self.caso_id,
             "djen_id": self.djen_id,

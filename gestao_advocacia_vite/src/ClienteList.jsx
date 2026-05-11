@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_URL } from './config.js'
 import { deleteCliente, listClientes } from './api/clientes.js'
+import StatusBadge from './components/ui/StatusBadge.jsx'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -557,11 +558,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
                                     )}
                                   </div>
                                   <div>
-                                    <span
-                                      className={`badge ${caso.status === 'Encerrado' || caso.status === 'Arquivado' ? 'bg-secondary' : 'bg-success'}`}
-                                    >
-                                      {caso.status}
-                                    </span>
+                                    <StatusBadge tipo="caso" valor={caso.status} />
                                   </div>
                                 </li>
                               ))}

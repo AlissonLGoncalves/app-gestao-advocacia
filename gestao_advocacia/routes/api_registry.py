@@ -309,6 +309,12 @@ def register_api_routes(app, api, finance_access_required):
                 attribute=lambda c: getattr(getattr(c, "cliente", None), "nome_razao_social", None)
             ),
             "user_id": fields.Integer,
+            "responsavel_nome": fields.String(
+                description="Nome do advogado responsavel pelo caso (do User.nome_completo)"
+            ),
+            "responsavel_iniciais": fields.String(
+                description="Iniciais (ate 2 letras) para avatar visual"
+            ),
             "data_ultima_verificacao_cnj": fields.DateTime(dt_format="iso8601", nullable=True),
             "movimentacoes_cnj_count": fields.Integer,
         },

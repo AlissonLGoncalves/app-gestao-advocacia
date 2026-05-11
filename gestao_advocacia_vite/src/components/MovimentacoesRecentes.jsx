@@ -15,6 +15,7 @@ import { toast } from 'react-toastify'
 import { API_URL } from '../config.js'
 import { CalendarIcon, ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline'
 import { baixarCertidao as baixarCertidaoApi } from '../api/djen.js'
+import AvatarSigla from './ui/AvatarSigla.jsx'
 
 const fmtData = (iso) => {
   if (!iso) return ''
@@ -222,6 +223,12 @@ const MovimentacoesRecentes = ({ className = '' }) => {
                                 <span className="badge bg-light text-dark border">
                                   {pub.cliente_nome}
                                 </span>
+                              )}
+                              {pub.responsavel_nome && (
+                                <AvatarSigla
+                                  nome={pub.responsavel_nome}
+                                  iniciais={pub.responsavel_iniciais}
+                                />
                               )}
                             </div>
                             <div className="fw-semibold text-truncate small">
