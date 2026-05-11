@@ -991,7 +991,9 @@ function GrupoLista({ grupo, casos, onEditar, onConcluir }) {
                             {overdue && (
                               <ExclamationTriangleIcon style={{ width: 13, height: 13 }} />
                             )}
-                            {new Date(t.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
+                            {new Date(
+                              String(t.data_vencimento).slice(0, 10) + 'T12:00:00'
+                            ).toLocaleDateString('pt-BR')}
                           </span>
                         ) : (
                           <span className="text-muted" style={{ fontSize: '0.8rem' }}>
