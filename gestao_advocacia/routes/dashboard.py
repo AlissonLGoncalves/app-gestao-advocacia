@@ -8,7 +8,17 @@ from sqlalchemy import func
 
 from extensions import db
 from helpers import get_tenant_id
-from models import Caso, Cliente, Despesa, EventoAgenda, PublicacaoDJEN, Recebimento, TarefaPrazo
+from models import (
+    AccessRequest,
+    Caso,
+    Cliente,
+    Despesa,
+    EventoAgenda,
+    PublicacaoDJEN,
+    Recebimento,
+    TarefaPrazo,
+    User,
+)
 
 
 def register_dashboard_routes(app, dashboard_ns):
@@ -81,8 +91,40 @@ def register_dashboard_routes(app, dashboard_ns):
                 djen_nao_lidas = 0
                 djen_sem_vinculo = 0
 
+            hoje = datetime.utcnow().date()
+
+            # Badges do menu lateral: contadores de itens "atrasados" por
+            # area financeira. Recebimento vencido = data_recebimento <= hoje
+            # e recebido=False. Mesma logica pra Despesa com data_despesa.
             try:
-                hoje = datetime.utcnow().date()
+                recebimentos_vencidos = Recebimento.query.filter(
+                    Recebimento.user_id == user_id,
+                    Recebimento.recebido.is_(False),
+                    Recebimento.data_recebimento <= hoje,
+                ).count()
+                despesas_vencidas = Despesa.query.filter(
+                    Despesa.user_id == user_id,
+                    Despesa.pago.is_(False),
+                    Despesa.data_despesa <= hoje,
+                ).count()
+            except Exception:
+                db.session.rollback()
+                recebimentos_vencidos = 0
+                despesas_vencidas = 0
+
+            # Solicitacoes de acesso pendentes — so visivel pra superadmin.
+            # Frontend filtra exibicao via userRole; backend devolve sempre
+            # pra evitar branchear a resposta.
+            solicitacoes_pendentes = 0
+            try:
+                user = User.query.get(user_id)
+                if user and user.role == "superadmin":
+                    solicitacoes_pendentes = AccessRequest.query.filter_by(status="pending").count()
+            except Exception:
+                db.session.rollback()
+                solicitacoes_pendentes = 0
+
+            try:
                 tarefas_vencidas = TarefaPrazo.query.filter(
                     TarefaPrazo.user_id == user_id,
                     TarefaPrazo.status != "Concluído",
@@ -129,6 +171,13 @@ def register_dashboard_routes(app, dashboard_ns):
                     "vencidas": tarefas_vencidas,
                     "vencendo_hoje": tarefas_vencendo_hoje,
                     "aguardando_confirmacao": tarefas_aguardando_confirmacao,
+                },
+                "alertas_financeiro": {
+                    "recebimentos_vencidos": recebimentos_vencidos,
+                    "despesas_vencidas": despesas_vencidas,
+                },
+                "alertas_admin": {
+                    "solicitacoes_pendentes": solicitacoes_pendentes,
                 },
             }, 200
 

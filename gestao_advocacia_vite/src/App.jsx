@@ -47,6 +47,7 @@ import { adminApi } from './api/admin.js'
 import { APP_VERSION } from './version.js'
 import GlobalSearch from './components/GlobalSearch.jsx'
 import HeaderQuickAdd from './components/HeaderQuickAdd.jsx'
+import MenuItemBadge from './components/ui/MenuItemBadge.jsx'
 
 // Importação dos ícones
 import {
@@ -206,7 +207,13 @@ const MainLayout = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCounts, setSidebarCounts] = useState({ djenPendentes: 0, tarefasAlerta: 0 })
+  const [sidebarCounts, setSidebarCounts] = useState({
+    djenPendentes: 0,
+    tarefasAlerta: 0,
+    recebimentosVencidos: 0,
+    despesasVencidas: 0,
+    solicitacoesPendentes: 0,
+  })
 
   const fetchSidebarCounts = useCallback(async () => {
     try {
@@ -220,6 +227,9 @@ const MainLayout = () => {
           (data.alertas_tarefas?.vencidas ?? 0) +
           (data.alertas_tarefas?.vencendo_hoje ?? 0) +
           (data.alertas_tarefas?.aguardando_confirmacao ?? 0),
+        recebimentosVencidos: data.alertas_financeiro?.recebimentos_vencidos ?? 0,
+        despesasVencidas: data.alertas_financeiro?.despesas_vencidas ?? 0,
+        solicitacoesPendentes: data.alertas_admin?.solicitacoes_pendentes ?? 0,
       })
     } catch {
       // sidebar badges são não-críticos, ignorar falhas silenciosamente
@@ -353,7 +363,7 @@ const MainLayout = () => {
     return finalTitle.charAt(0).toUpperCase() + finalTitle.slice(1)
   }
 
-  const SidebarLink = ({ to, icon: IconComponent, children, badge }) => (
+  const SidebarLink = ({ to, icon: IconComponent, children, badge, badgeCor = 'danger' }) => (
     <NavLink
       to={to}
       onClick={() => setSidebarOpen(false)}
@@ -362,23 +372,7 @@ const MainLayout = () => {
     >
       <IconComponent className="sidebar-link-icon" />
       <span style={{ flex: 1 }}>{children}</span>
-      {badge > 0 && (
-        <span
-          style={{
-            backgroundColor: '#ef4444',
-            color: '#fff',
-            borderRadius: '10px',
-            fontSize: '0.65rem',
-            fontWeight: 700,
-            minWidth: '18px',
-            padding: '1px 5px',
-            textAlign: 'center',
-            lineHeight: '16px',
-          }}
-        >
-          {badge > 99 ? '99+' : badge}
-        </span>
-      )}
+      <MenuItemBadge count={badge} cor={badgeCor} />
     </NavLink>
   )
 
@@ -421,13 +415,21 @@ const MainLayout = () => {
           </SidebarLink>
           {userRole !== 'assistente' && (
             <>
-              <SidebarLink to="/recebimentos" icon={CurrencyDollarIcon}>
+              <SidebarLink
+                to="/recebimentos"
+                icon={CurrencyDollarIcon}
+                badge={sidebarCounts.recebimentosVencidos}
+              >
                 Recebimentos
               </SidebarLink>
               <SidebarLink to="/contratos" icon={CurrencyDollarIcon}>
                 Contratos
               </SidebarLink>
-              <SidebarLink to="/despesas" icon={CreditCardIcon}>
+              <SidebarLink
+                to="/despesas"
+                icon={CreditCardIcon}
+                badge={sidebarCounts.despesasVencidas}
+              >
                 Despesas
               </SidebarLink>
             </>
@@ -441,7 +443,12 @@ const MainLayout = () => {
           <SidebarLink to="/modelos" icon={DocumentTextIcon}>
             Modelos
           </SidebarLink>
-          <SidebarLink to="/djen" icon={NewspaperIcon} badge={sidebarCounts.djenPendentes}>
+          <SidebarLink
+            to="/djen"
+            icon={NewspaperIcon}
+            badge={sidebarCounts.djenPendentes}
+            badgeCor="warning"
+          >
             DJEN — Publicações
           </SidebarLink>
           <SidebarLink to="/relatorios" icon={ChartBarIcon}>
@@ -462,7 +469,11 @@ const MainLayout = () => {
               <SidebarLink to="/admin/tenants" icon={BuildingOffice2Icon}>
                 Backoffice
               </SidebarLink>
-              <SidebarLink to="/admin/access-requests" icon={UserCircleIcon}>
+              <SidebarLink
+                to="/admin/access-requests"
+                icon={UserCircleIcon}
+                badge={sidebarCounts.solicitacoesPendentes}
+              >
                 Solicitações
               </SidebarLink>
             </>
