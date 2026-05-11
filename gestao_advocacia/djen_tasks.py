@@ -656,9 +656,7 @@ def executar_auto_criacao_tarefas(app, tenant_id=None):
     q = (
         PublicacaoDJEN.query.filter(PublicacaoDJEN.importante.is_(True))
         .filter(PublicacaoDJEN.caso_id.isnot(None))
-        .filter(
-            ~PublicacaoDJEN.id.in_(db.session.query(sub_pubs_com_tarefa.c.publicacao_djen_id))
-        )
+        .filter(~PublicacaoDJEN.id.in_(db.session.query(sub_pubs_com_tarefa.c.publicacao_djen_id)))
     )
     if tenant_id is not None:
         q = q.filter_by(tenant_id=tenant_id)

@@ -25,7 +25,6 @@ tarefas manuais — nao precisam de revisao).
 from alembic import op
 import sqlalchemy as sa
 
-
 revision = "d4f7b1a3c2e8"
 down_revision = "cbddb535d048"
 branch_labels = None
@@ -50,9 +49,7 @@ def upgrade():
                 server_default=sa.false(),
             )
         )
-        batch_op.add_column(
-            sa.Column("prazo_dias_origem", sa.Integer(), nullable=True)
-        )
+        batch_op.add_column(sa.Column("prazo_dias_origem", sa.Integer(), nullable=True))
         batch_op.create_index(
             "ix_tarefa_prazo_prazo_validado",
             ["tenant_id", "prazo_validado"],

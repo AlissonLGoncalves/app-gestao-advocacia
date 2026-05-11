@@ -27,7 +27,6 @@ import re
 from datetime import date, datetime, time, timedelta
 from typing import Optional
 
-
 # Tabela de regras: ordem importa — a primeira que casar e' usada.
 # Cada regra: (palavras_no_texto, tipos_que_combinam, dias, prioridade, nome).
 # Dias sao corridos (mais conservador). Para prazos processuais reais o
@@ -35,53 +34,83 @@ from typing import Optional
 _REGRAS = [
     # Recursos — 15 dias uteis CPC; usamos 15 corridos por seguranca
     (
-        re.compile(r"\b(apelac|recurs(o|ar)\b|embargos? de declarac|embargos? infringentes|agravo de instrument)", re.I),
-        {"intimacao", "intimação", "sentenca", "sentença", "decisao", "decisão", "acordao", "acórdão"},
-        15, "Alta", "recurso_15d",
+        re.compile(
+            r"\b(apelac|recurs(o|ar)\b|embargos? de declarac|embargos? infringentes|agravo de instrument)",
+            re.I,
+        ),
+        {
+            "intimacao",
+            "intimação",
+            "sentenca",
+            "sentença",
+            "decisao",
+            "decisão",
+            "acordao",
+            "acórdão",
+        },
+        15,
+        "Alta",
+        "recurso_15d",
     ),
     # Contestacao — sem \b final pra casar "contestacao/contestaçao"
     (
         re.compile(r"\b(contestac|contestaç|conteste\b|defes(a|ar)\b)", re.I),
         {"intimacao", "intimação", "citacao", "citação"},
-        15, "Alta", "contestacao_15d",
+        15,
+        "Alta",
+        "contestacao_15d",
     ),
     # Citacao com prazo de pagamento (cumprimento de sentenca)
     (
-        re.compile(r"\b(cumprimento de sentenc|pague|pagamento.{0,30}volunt|multa.{0,30}10%)", re.I),
+        re.compile(
+            r"\b(cumprimento de sentenc|pague|pagamento.{0,30}volunt|multa.{0,30}10%)", re.I
+        ),
         {"intimacao", "intimação", "citacao", "citação", "decisao", "decisão"},
-        15, "Urgente", "cumprimento_sentenca_15d",
+        15,
+        "Urgente",
+        "cumprimento_sentenca_15d",
     ),
     # Manifestacao geral (parecer, especificacao de provas, replica)
     (
         re.compile(r"\b(manifest|impugn|repli(c|qu)a|especifica(r|cao|ção).{0,20}prov)", re.I),
         {"intimacao", "intimação"},
-        15, "Normal", "manifestacao_15d",
+        15,
+        "Normal",
+        "manifestacao_15d",
     ),
     # Audiencia designada — alerta com 7 dias de antecedencia padrao;
     # data real da audiencia exige parser dedicado, fica como TODO
     (
         re.compile(r"\b(audienc|designad.{0,30}(audi|sess))", re.I),
         {"intimacao", "intimação", "despacho", "decisao", "decisão"},
-        7, "Urgente", "audiencia_7d",
+        7,
+        "Urgente",
+        "audiencia_7d",
     ),
     # Embargos de declaracao (5 dias)
     (
         re.compile(r"\bembargos? de declarac", re.I),
         set(),  # qualquer tipo
-        5, "Alta", "embargos_declaracao_5d",
+        5,
+        "Alta",
+        "embargos_declaracao_5d",
     ),
     # Sentenca/Decisao generica sem palavra-chave de recurso — prazo
     # conservador de 15d para o advogado decidir se recorre
     (
         re.compile(r".*"),  # catch-all
         {"sentenca", "sentença", "acordao", "acórdão"},
-        15, "Alta", "sentenca_revisao_15d",
+        15,
+        "Alta",
+        "sentenca_revisao_15d",
     ),
     # Decisao/Despacho generico — 5 dias para cumprir/manifestar
     (
         re.compile(r".*"),
         {"decisao", "decisão", "despacho"},
-        5, "Normal", "decisao_despacho_5d",
+        5,
+        "Normal",
+        "decisao_despacho_5d",
     ),
 ]
 
@@ -106,7 +135,9 @@ def _para_datetime(data_disp) -> datetime:
     # String iso fallback
     if isinstance(data_disp, str):
         try:
-            return datetime.fromisoformat(data_disp).replace(hour=12, minute=0, second=0, microsecond=0)
+            return datetime.fromisoformat(data_disp).replace(
+                hour=12, minute=0, second=0, microsecond=0
+            )
         except ValueError:
             pass
     # Sem data de partida — usa hoje meio-dia

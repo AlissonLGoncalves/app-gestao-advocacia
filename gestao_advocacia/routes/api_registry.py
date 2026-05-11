@@ -440,19 +440,21 @@ def register_api_routes(app, api, finance_access_required):
             # Feature Kanban<>DJEN: campos para o card do Kanban exibir
             # cliente + caso sem precisar de chamada adicional ao backend.
             "cliente_id": fields.Integer(
-                attribute=lambda t: getattr(getattr(t, "caso_tarefa_associado", None), "cliente_id", None)
+                attribute=lambda t: getattr(
+                    getattr(t, "caso_tarefa_associado", None), "cliente_id", None
+                )
             ),
             "cliente_nome": fields.String(
                 attribute=lambda t: getattr(
-                    getattr(
-                        getattr(t, "caso_tarefa_associado", None), "cliente_associado", None
-                    ),
+                    getattr(getattr(t, "caso_tarefa_associado", None), "cliente_associado", None),
                     "nome_razao_social",
                     None,
                 )
             ),
             "numero_processo": fields.String(
-                attribute=lambda t: getattr(getattr(t, "caso_tarefa_associado", None), "numero_processo", None)
+                attribute=lambda t: getattr(
+                    getattr(t, "caso_tarefa_associado", None), "numero_processo", None
+                )
             ),
             "caso_area": fields.String(
                 attribute=lambda t: getattr(
