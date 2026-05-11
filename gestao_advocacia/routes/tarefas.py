@@ -151,6 +151,37 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
             db.session.commit()
             return {"updated": atualizadas}, 200
 
+    @tarefas_ns.route("/<int:id>/validar-prazo")
+    class TarefaValidarPrazoAPI(Resource):
+        """Feature Kanban<>DJEN: marca prazo como validado pelo advogado.
+
+        Aceita opcionalmente nova data_vencimento no body. Sem corpo apenas
+        confirma o prazo calculado pela IA. Esta acao remove o badge "IA -
+        confirmar prazo" do card no Kanban.
+        """
+
+        @jwt_required()
+        @tenant_scoped
+        @tarefas_ns.marshal_with(tarefa_model_dto)
+        @tarefas_ns.doc(security="jsonWebToken")
+        def patch(self, id):
+            tarefa = get_item_or_404(TarefaPrazo, id)
+            data = request.get_json(silent=True) or {}
+
+            dv = data.get("data_vencimento")
+            if dv:
+                try:
+                    tarefa.data_vencimento = datetime.fromisoformat(dv.replace("Z", "+00:00"))
+                except ValueError:
+                    abort(400, "data_vencimento invalida (esperado ISO 8601).")
+
+            if "prioridade" in data and data["prioridade"]:
+                tarefa.prioridade = data["prioridade"]
+
+            tarefa.prazo_validado = True
+            db.session.commit()
+            return tarefa
+
     @tarefas_ns.route("/<int:id>")
     class TarefaDetailAPI(Resource):
         @jwt_required()

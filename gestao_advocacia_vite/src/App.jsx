@@ -213,8 +213,13 @@ const MainLayout = () => {
       const data = await api.get('/dashboard/stats')
       setSidebarCounts({
         djenPendentes: data.alertas_djen?.pendentes_triagem ?? 0,
+        // Feature Kanban<>DJEN: badge inclui prazos pendentes de confirmacao
+        // (gerados pela IA) — assim o advogado ve no menu que ha cards
+        // aguardando revisao mesmo quando nao ha tarefas vencidas.
         tarefasAlerta:
-          (data.alertas_tarefas?.vencidas ?? 0) + (data.alertas_tarefas?.vencendo_hoje ?? 0),
+          (data.alertas_tarefas?.vencidas ?? 0) +
+          (data.alertas_tarefas?.vencendo_hoje ?? 0) +
+          (data.alertas_tarefas?.aguardando_confirmacao ?? 0),
       })
     } catch {
       // sidebar badges são não-críticos, ignorar falhas silenciosamente

@@ -792,9 +792,18 @@ class TarefaPrazo(db.Model):
         nullable=True,
         index=True,
     )
+    # Feature Kanban<>DJEN: marca tarefas geradas pelo auto-fluxo DJEN cujo
+    # prazo foi calculado pela tabela de regras + classificacao IA. Card no
+    # Kanban exibe badge "IA — confirmar prazo" enquanto prazo_validado=False.
+    # Tarefas criadas manualmente nascem com prazo_validado=True.
+    prazo_validado = db.Column(db.Boolean, nullable=False, default=True)
+    prazo_calculado_por_ia = db.Column(db.Boolean, nullable=False, default=False)
+    # Numero de dias da regra aplicada (5/10/15/30). Util para auditoria.
+    prazo_dias_origem = db.Column(db.Integer, nullable=True)
     __table_args__ = (
         db.Index("ix_tarefa_prazo_tenant_created", "tenant_id", "data_criacao"),
         db.Index("ix_tarefa_prazo_tenant_status_posicao", "tenant_id", "status", "posicao"),
+        db.Index("ix_tarefa_prazo_prazo_validado", "tenant_id", "prazo_validado"),
     )
 
     def to_dict(self):
@@ -816,6 +825,9 @@ class TarefaPrazo(db.Model):
             "user_id": self.user_id,
             "caso_id": self.caso_id,
             "publicacao_djen_id": self.publicacao_djen_id,
+            "prazo_validado": bool(self.prazo_validado),
+            "prazo_calculado_por_ia": bool(self.prazo_calculado_por_ia),
+            "prazo_dias_origem": self.prazo_dias_origem,
             "data_criacao": self.data_criacao.isoformat() if self.data_criacao else None,
         }
 
