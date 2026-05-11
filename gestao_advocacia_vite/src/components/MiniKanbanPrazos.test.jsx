@@ -45,18 +45,18 @@ describe('classificarTarefa', () => {
 })
 
 describe('MiniKanbanPrazos render', () => {
-  const originalFetch = global.fetch
+  const originalFetch = globalThis.fetch
 
   beforeEach(() => {
     localStorage.setItem('token', 'fake')
   })
   afterEach(() => {
-    global.fetch = originalFetch
+    globalThis.fetch = originalFetch
     localStorage.clear()
   })
 
   function renderWithFetch(tarefas) {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => tarefas,
     })
@@ -71,7 +71,7 @@ describe('MiniKanbanPrazos render', () => {
     const { container } = renderWithFetch([
       { id: 1, titulo: 'Longe', data_vencimento: '2099-01-01', status: 'A Fazer' },
     ])
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled())
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled())
     // pode ficar com null root quando totalUrgente === 0
     await waitFor(() => {
       expect(container.querySelector('.card')).toBeNull()
