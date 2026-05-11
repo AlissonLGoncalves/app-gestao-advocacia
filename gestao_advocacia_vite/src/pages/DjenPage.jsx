@@ -10,6 +10,7 @@ import {
 import ModalCriarClienteCaso from '../components/djen/ModalCriarClienteCaso.jsx'
 import CategoriasPublicacoes from '../components/djen/CategoriasPublicacoes.jsx'
 import ModalNovaTarefaInline from '../components/djen/ModalNovaTarefaInline.jsx'
+import RiscoBadge from '../components/ui/RiscoBadge.jsx'
 import {
   baixarCertidao as baixarCertidaoApi,
   createOab,
@@ -1088,29 +1089,10 @@ export default function DjenPage() {
                           <div className="flex-grow-1 me-2" style={{ minWidth: 0 }}>
                             <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                               {!pub.lida && <span className="badge bg-primary">Nova</span>}
-                              {/* Epic #2 (#176): selo IA "Importante" — tooltip
-                                  mostra o motivo da classificacao. */}
-                              {pub.importante === true && (
-                                <span
-                                  className="badge bg-danger d-flex align-items-center gap-1"
-                                  title={
-                                    pub.classificacao_motivo ||
-                                    'Classificada como importante pela IA.'
-                                  }
-                                  data-testid={`pub-${pub.id}-selo-importante`}
-                                >
-                                  <span aria-hidden="true">⭐</span> Importante
-                                  <span
-                                    className="ms-1 px-1 rounded"
-                                    style={{
-                                      fontSize: '0.6rem',
-                                      background: 'rgba(255,255,255,0.25)',
-                                    }}
-                                  >
-                                    IA
-                                  </span>
-                                </span>
-                              )}
+                              {/* Risk tag: deriva de importante + tipo_comunicacao
+                                  para 3 niveis (Alto/Atencao/Rotina). Tooltip
+                                  mostra o motivo da classificacao da IA. */}
+                              <RiscoBadge pub={pub} />
                               <span className="badge bg-secondary">
                                 {pub.sigla_tribunal || '—'}
                               </span>
