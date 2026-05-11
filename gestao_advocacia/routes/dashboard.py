@@ -119,9 +119,7 @@ def register_dashboard_routes(app, dashboard_ns):
             try:
                 user = User.query.get(user_id)
                 if user and user.role == "superadmin":
-                    solicitacoes_pendentes = AccessRequest.query.filter_by(
-                        status="pending"
-                    ).count()
+                    solicitacoes_pendentes = AccessRequest.query.filter_by(status="pending").count()
             except Exception:
                 db.session.rollback()
                 solicitacoes_pendentes = 0
