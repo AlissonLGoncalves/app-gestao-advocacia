@@ -15,6 +15,16 @@ import DocumentosVinculadosCard from '../components/DocumentosVinculadosCard'
 import ApensarMenuCaso from '../components/ApensarMenuCaso.jsx'
 import CasoTimeline from '../components/CasoTimeline'
 import ProximasAtividadesCard from '../components/ProximasAtividadesCard.jsx'
+import PrioridadeBadge from '../components/ui/PrioridadeBadge.jsx'
+import StatusBadge from '../components/ui/StatusBadge.jsx'
+import { useConfirm } from '../hooks/useConfirm.jsx'
+import {
+  CheckCircleIcon,
+  EyeIcon,
+  TrashIcon,
+  NewspaperIcon,
+  SparklesIcon,
+} from '@heroicons/react/24/outline'
 
 // Componente auxiliar para exibir mensagens de status (loading, error, success)
 const StatusDisplay = ({ isLoading, error, successMessage, className = '' }) => {
@@ -35,6 +45,7 @@ const TAB_DEFAULT = 'resumo'
 function CasoDetalhePage() {
   const { casoId } = useParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   const tabAtiva = TABS_VALIDAS.includes(tabParam) ? tabParam : TAB_DEFAULT
@@ -121,6 +132,65 @@ function CasoDetalhePage() {
   useEffect(() => {
     carregarDadosDoCaso()
   }, [carregarDadosDoCaso])
+
+  // Acoes inline na aba Atividades — evita ter que abrir o Kanban so pra
+  // mexer numa tarefa vinculada ao caso. Reusa endpoints existentes do
+  // ciclo Kanban<>DJEN.
+  const recarregarPrazos = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${API_URL}/tarefas`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPrazos(data.filter((t) => t.caso_id === parseInt(casoId)))
+      }
+    } catch (e) {
+      console.error('Erro ao recarregar prazos:', e)
+    }
+  }
+
+  const handleConcluirTarefa = async (tarefa) => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${API_URL}/tarefas/${tarefa.id}/concluir`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      })
+      if (res.ok) {
+        toast.success('Tarefa marcada como cumprida.')
+        recarregarPrazos()
+      } else {
+        toast.error('Falha ao concluir tarefa.')
+      }
+    } catch {
+      toast.error('Erro na comunicação com servidor.')
+    }
+  }
+
+  const handleExcluirTarefa = async (tarefa) => {
+    const ok = await confirm(
+      `Tem certeza que deseja excluir "${tarefa.titulo}"? Essa ação não pode ser desfeita.`,
+      'Excluir prazo'
+    )
+    if (!ok) return
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${API_URL}/tarefas/${tarefa.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        toast.success('Prazo excluído.')
+        recarregarPrazos()
+      } else {
+        toast.error('Falha ao excluir.')
+      }
+    } catch {
+      toast.error('Erro na comunicação com servidor.')
+    }
+  }
 
   const handleAtualizarViaDJEN = async () => {
     if (!caso || !caso.numero_processo) {
@@ -465,35 +535,108 @@ function CasoDetalhePage() {
                         <th>Prioridade</th>
                         <th>Status</th>
                         <th>Vencimento</th>
+                        <th>Origem</th>
+                        <th className="text-center" style={{ width: 120 }}>
+                          Ações
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {prazos.map((t) => (
-                        <tr key={t.id}>
-                          <td className="fw-medium text-dark">{t.titulo}</td>
-                          <td>
-                            <span
-                              className={`badge bg-${t.prioridade === 'Urgente' ? 'danger' : t.prioridade === 'Alta' ? 'warning' : 'info'}-subtle text-dark`}
-                            >
-                              {t.prioridade}
-                            </span>
-                          </td>
-                          <td>
-                            <span
-                              className={`badge ${t.status === 'Concluído' ? 'bg-success' : t.status === 'Fazendo' ? 'bg-warning' : 'bg-danger'}`}
-                            >
-                              {t.status}
-                            </span>
-                          </td>
-                          <td>
-                            {t.data_vencimento
-                              ? new Date(
-                                  String(t.data_vencimento).slice(0, 10) + 'T12:00:00'
-                                ).toLocaleDateString('pt-BR')
-                              : '-'}
-                          </td>
-                        </tr>
-                      ))}
+                      {prazos.map((t) => {
+                        const concluida = t.status === 'Concluído' || t.status === 'Concluido'
+                        const precisaConfirmarIA =
+                          t.prazo_calculado_por_ia && t.prazo_validado === false
+                        return (
+                          <tr
+                            key={t.id}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => navigate(`/prazos?tarefa=${t.id}`)}
+                            title="Abrir no Kanban de Prazos"
+                          >
+                            <td className="fw-medium text-dark">{t.titulo}</td>
+                            <td>
+                              <PrioridadeBadge prioridade={t.prioridade} mostrarNormal />
+                            </td>
+                            <td>
+                              <StatusBadge tipo="tarefa" valor={t.status} />
+                            </td>
+                            <td>
+                              {t.data_vencimento
+                                ? new Date(
+                                    String(t.data_vencimento).slice(0, 10) + 'T12:00:00'
+                                  ).toLocaleDateString('pt-BR')
+                                : '-'}
+                            </td>
+                            <td>
+                              <div className="d-flex flex-wrap gap-1">
+                                {t.publicacao_djen_id && (
+                                  <span
+                                    role="button"
+                                    className="badge bg-info-subtle text-info-emphasis d-inline-flex align-items-center gap-1"
+                                    title="Ver publicação DJEN que originou este prazo"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      navigate(`/djen?publicacao=${t.publicacao_djen_id}`)
+                                    }}
+                                  >
+                                    <NewspaperIcon style={{ width: 11, height: 11 }} />
+                                    via DJEN
+                                  </span>
+                                )}
+                                {precisaConfirmarIA && (
+                                  <span
+                                    className="badge bg-warning-subtle text-warning-emphasis d-inline-flex align-items-center gap-1"
+                                    title={
+                                      t.prazo_dias_origem
+                                        ? `Prazo de ${t.prazo_dias_origem} dias calculado pela IA — revise e confirme no Kanban`
+                                        : 'Prazo calculado pela IA — revise e confirme no Kanban'
+                                    }
+                                  >
+                                    <SparklesIcon style={{ width: 11, height: 11 }} />
+                                    IA — confirmar
+                                  </span>
+                                )}
+                                {!t.publicacao_djen_id && !precisaConfirmarIA && (
+                                  <span className="text-muted" style={{ fontSize: '0.72rem' }}>
+                                    Manual
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="text-center" onClick={(e) => e.stopPropagation()}>
+                              {!concluida && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-success p-1 lh-1 me-1"
+                                  title="Marcar como cumprida"
+                                  onClick={() => handleConcluirTarefa(t)}
+                                  style={{ width: 28, height: 28 }}
+                                >
+                                  <CheckCircleIcon style={{ width: 14, height: 14 }} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary p-1 lh-1 me-1"
+                                title="Abrir no Kanban"
+                                onClick={() => navigate(`/prazos?tarefa=${t.id}`)}
+                                style={{ width: 28, height: 28 }}
+                              >
+                                <EyeIcon style={{ width: 14, height: 14 }} />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger p-1 lh-1"
+                                title="Excluir prazo"
+                                onClick={() => handleExcluirTarefa(t)}
+                                style={{ width: 28, height: 28 }}
+                              >
+                                <TrashIcon style={{ width: 14, height: 14 }} />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -584,6 +727,7 @@ function CasoDetalhePage() {
           Voltar para Lista de Casos
         </button>
       </div>
+      {ConfirmDialog}
     </div>
   )
 }
