@@ -95,10 +95,19 @@ def register_dashboard_routes(app, dashboard_ns):
                     TarefaPrazo.data_vencimento.isnot(None),
                     db.func.date(TarefaPrazo.data_vencimento) == hoje,
                 ).count()
+                # Feature Kanban<>DJEN: prazos gerados pela IA que ainda
+                # nao foram confirmados pelo advogado. Entra no badge do
+                # menu Prazos como sinal de "tem coisa pra revisar".
+                tarefas_aguardando_confirmacao = TarefaPrazo.query.filter(
+                    TarefaPrazo.user_id == user_id,
+                    TarefaPrazo.status != "Concluído",
+                    TarefaPrazo.prazo_validado.is_(False),
+                ).count()
             except Exception:
                 db.session.rollback()
                 tarefas_vencidas = 0
                 tarefas_vencendo_hoje = 0
+                tarefas_aguardando_confirmacao = 0
 
             return {
                 "total_clientes": total_clientes,
@@ -119,6 +128,7 @@ def register_dashboard_routes(app, dashboard_ns):
                 "alertas_tarefas": {
                     "vencidas": tarefas_vencidas,
                     "vencendo_hoje": tarefas_vencendo_hoje,
+                    "aguardando_confirmacao": tarefas_aguardando_confirmacao,
                 },
             }, 200
 

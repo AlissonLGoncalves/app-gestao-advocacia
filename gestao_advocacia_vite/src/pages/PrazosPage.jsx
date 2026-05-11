@@ -34,6 +34,8 @@ import {
   ExclamationTriangleIcon,
   ListBulletIcon,
   ViewColumnsIcon,
+  UserIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline'
 
 // ── Constantes do Kanban ─────────────────────────────────────────────────────
@@ -55,14 +57,42 @@ const dateStr = (offsetDays = 0) => {
 
 const hojeLocal = () => dateStr(0)
 
-const isOverdue = (t) =>
-  !!(t.data_vencimento && t.status !== 'Concluído' && t.data_vencimento < hojeLocal())
+// Backend pode retornar data_vencimento como "YYYY-MM-DD" (modelo to_dict)
+// ou ISO completo "YYYY-MM-DDTHH:MM:SS" (DTO flask-restx). Normaliza para
+// "YYYY-MM-DD" para todas as comparacoes/parsing seguros.
+const dataYmd = (raw) => {
+  if (!raw) return null
+  const s = String(raw).slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null
+}
+
+const isOverdue = (t) => {
+  const d = dataYmd(t.data_vencimento)
+  return !!(d && t.status !== 'Concluído' && d < hojeLocal())
+}
 
 const diasVencido = (t) => {
-  if (!t.data_vencimento) return 0
+  const d = dataYmd(t.data_vencimento)
+  if (!d) return 0
   const [ay, am, ad] = hojeLocal().split('-').map(Number)
-  const [by, bm, bd] = t.data_vencimento.split('-').map(Number)
+  const [by, bm, bd] = d.split('-').map(Number)
   return Math.floor((new Date(ay, am - 1, ad) - new Date(by, bm - 1, bd)) / 86400000)
+}
+
+const diasAteVencimento = (t) => {
+  const d = dataYmd(t.data_vencimento)
+  if (!d) return null
+  const [ay, am, ad] = hojeLocal().split('-').map(Number)
+  const [by, bm, bd] = d.split('-').map(Number)
+  return Math.floor((new Date(by, bm - 1, bd) - new Date(ay, am - 1, ad)) / 86400000)
+}
+
+const formatarDataBR = (raw) => {
+  const d = dataYmd(raw)
+  if (!d) return null
+  const [y, m, day] = d.split('-').map(Number)
+  const dt = new Date(y, m - 1, day)
+  return Number.isNaN(dt.getTime()) ? null : dt.toLocaleDateString('pt-BR')
 }
 
 const getCorPrioridade = (p) =>
@@ -171,6 +201,27 @@ export default function PrazosPage() {
       } else {
         const err = await res.json()
         toast.error(err.message || 'Erro ao salvar.')
+      }
+    } catch {
+      toast.error('Erro na comunicação com servidor.')
+    }
+  }
+
+  // Feature Kanban<>DJEN: confirma prazo gerado pela IA. Remove o badge
+  // "IA - confirmar" do card e marca prazo_validado=true no backend.
+  const handleConfirmarPrazo = async (tarefa) => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${API_URL}/tarefas/${tarefa.id}/validar-prazo`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) {
+        toast.success('Prazo confirmado.')
+        carregarTarefas()
+      } else {
+        toast.error('Falha ao confirmar prazo.')
       }
     } catch {
       toast.error('Erro na comunicação com servidor.')
@@ -410,6 +461,7 @@ export default function PrazosPage() {
                 tarefas={tarefas}
                 casos={casos}
                 onEditar={handleEditarTarefa}
+                onConfirmarPrazo={handleConfirmarPrazo}
               />
             ))}
           </div>
@@ -558,7 +610,7 @@ export default function PrazosPage() {
 
 // ── Sub-componentes do Kanban (dnd-kit) ──────────────────────────────────────
 
-function KanbanColuna({ coluna, ids, tarefas, casos, onEditar }) {
+function KanbanColuna({ coluna, ids, tarefas, casos, onEditar, onConfirmarPrazo }) {
   const { setNodeRef, isOver } = useDroppable({ id: coluna.id })
   const cards = ids.map((id) => tarefas.find((t) => t.id === id)).filter(Boolean)
 
@@ -596,7 +648,13 @@ function KanbanColuna({ coluna, ids, tarefas, casos, onEditar }) {
         >
           <SortableContext items={ids} strategy={verticalListSortingStrategy}>
             {cards.map((t) => (
-              <KanbanCard key={t.id} tarefa={t} casos={casos} onEditar={onEditar} />
+              <KanbanCard
+                key={t.id}
+                tarefa={t}
+                casos={casos}
+                onEditar={onEditar}
+                onConfirmarPrazo={onConfirmarPrazo}
+              />
             ))}
           </SortableContext>
           {cards.length === 0 && (
@@ -610,7 +668,7 @@ function KanbanColuna({ coluna, ids, tarefas, casos, onEditar }) {
   )
 }
 
-function KanbanCard({ tarefa, casos, onEditar }) {
+function KanbanCard({ tarefa, casos, onEditar, onConfirmarPrazo }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tarefa.id,
   })
@@ -623,15 +681,32 @@ function KanbanCard({ tarefa, casos, onEditar }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <KanbanCardVisual tarefa={tarefa} casos={casos} onEditar={onEditar} />
+      <KanbanCardVisual
+        tarefa={tarefa}
+        casos={casos}
+        onEditar={onEditar}
+        onConfirmarPrazo={onConfirmarPrazo}
+      />
     </div>
   )
 }
 
-function KanbanCardVisual({ tarefa, casos, onEditar, arrastando }) {
+function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, arrastando }) {
   const overdue = isOverdue(tarefa)
-  const dias = overdue ? diasVencido(tarefa) : 0
-  const casoVinculado = casos.find((c) => c.id === tarefa.caso_id)
+  const diasV = overdue ? diasVencido(tarefa) : 0
+  const diasRestantes = !overdue ? diasAteVencimento(tarefa) : null
+  // Backend ja' serializa cliente_nome e numero_processo no DTO. Fallback
+  // pra busca no array local mantem compat com tarefas legadas.
+  const casoLocal = casos.find((c) => c.id === tarefa.caso_id)
+  const clienteNome =
+    tarefa.cliente_nome ||
+    (casoLocal && casoLocal.cliente && casoLocal.cliente.nome_razao_social) ||
+    (casoLocal && casoLocal.cliente_nome) ||
+    null
+  const numeroProcesso = tarefa.numero_processo || (casoLocal && casoLocal.numero_processo) || null
+  const tituloCaso = casoLocal && casoLocal.titulo
+  const dataFmt = formatarDataBR(tarefa.data_vencimento)
+  const precisaConfirmarPrazo = !!tarefa.prazo_calculado_por_ia && tarefa.prazo_validado === false
 
   return (
     <div
@@ -639,17 +714,36 @@ function KanbanCardVisual({ tarefa, casos, onEditar, arrastando }) {
       style={{
         cursor: arrastando ? 'grabbing' : 'grab',
         borderRadius: 'var(--radius-md)',
-        borderLeft: overdue ? '4px solid #dc3545' : '4px solid transparent',
+        borderLeft: overdue
+          ? '4px solid #dc3545'
+          : precisaConfirmarPrazo
+            ? '4px solid #f59e0b'
+            : '4px solid transparent',
         transform: arrastando ? 'rotate(2deg)' : 'none',
       }}
     >
       <div className="card-body p-3">
         <div className="d-flex justify-content-between align-items-start mb-2">
-          <span
-            className={`badge bg-${getCorPrioridade(tarefa.prioridade)}-subtle text-${getCorPrioridade(tarefa.prioridade)}`}
-          >
-            {tarefa.prioridade}
-          </span>
+          <div className="d-flex flex-wrap gap-1">
+            <span
+              className={`badge bg-${getCorPrioridade(tarefa.prioridade)}-subtle text-${getCorPrioridade(tarefa.prioridade)}`}
+            >
+              {tarefa.prioridade}
+            </span>
+            {precisaConfirmarPrazo && (
+              <span
+                className="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1"
+                title={
+                  tarefa.prazo_dias_origem
+                    ? `Prazo de ${tarefa.prazo_dias_origem} dias calculado pela IA — revise e confirme`
+                    : 'Prazo calculado pela IA — revise e confirme'
+                }
+              >
+                <SparklesIcon style={{ width: 11, height: 11 }} />
+                IA — confirmar
+              </span>
+            )}
+          </div>
           {onEditar && (
             <button
               className="btn btn-link btn-sm p-0 text-muted"
@@ -667,63 +761,87 @@ function KanbanCardVisual({ tarefa, casos, onEditar, arrastando }) {
         </div>
 
         <h6
-          className="card-title fw-bold text-dark mb-1"
-          style={{ fontFamily: 'var(--font-heading)' }}
+          className="card-title fw-bold text-dark mb-2"
+          style={{ fontFamily: 'var(--font-heading)', fontSize: '0.9rem' }}
         >
           {tarefa.titulo}
         </h6>
 
-        {overdue && (
-          <p
-            className="mb-1 d-flex align-items-center gap-1 text-danger"
-            style={{ fontSize: '0.72rem', fontWeight: 600 }}
+        {clienteNome && (
+          <div
+            className="d-flex align-items-center mb-1 text-truncate"
+            style={{ fontSize: '0.75rem' }}
+            title={`Cliente: ${clienteNome}`}
           >
-            <ExclamationTriangleIcon style={{ width: 12, height: 12, flexShrink: 0 }} />
-            Vencido há {dias} dia{dias !== 1 ? 's' : ''}
-          </p>
+            <UserIcon
+              style={{ width: 12, height: 12, flexShrink: 0, marginRight: 4 }}
+              className="text-muted"
+            />
+            <span className="text-dark fw-semibold text-truncate">{clienteNome}</span>
+          </div>
         )}
 
-        <div className="d-flex align-items-center mt-1">
-          <span className="small text-muted" style={{ fontSize: '0.72rem' }}>
-            {tarefa.tipo_tarefa === 'Prazo' && (
-              <ExclamationCircleIcon
-                className="text-danger"
-                style={{ width: 12, display: 'inline', marginRight: 2 }}
-              />
-            )}
-            {tarefa.tipo_tarefa}
-          </span>
-        </div>
-
-        {casoVinculado && (
+        {(casoLocal || numeroProcesso) && (
           <Link
-            to={`/casos/${casoVinculado.id}`}
-            className="small text-decoration-none mb-0 text-truncate mt-1 d-block"
+            to={casoLocal ? `/casos/${casoLocal.id}` : `/casos/${tarefa.caso_id}`}
+            className="d-flex align-items-center text-decoration-none mb-1 text-truncate"
             style={{ fontSize: '0.72rem', color: 'var(--bs-primary)' }}
-            title={`Abrir caso: ${casoVinculado.titulo} (${casoVinculado.numero_processo})`}
+            title={
+              tituloCaso
+                ? `${tituloCaso}${numeroProcesso ? ` (${numeroProcesso})` : ''}`
+                : numeroProcesso || ''
+            }
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <BriefcaseIcon
-              style={{ width: 11, marginRight: 3, display: 'inline', marginTop: '-2px' }}
-            />
-            {casoVinculado.titulo}
+            <BriefcaseIcon style={{ width: 12, height: 12, flexShrink: 0, marginRight: 4 }} />
+            <span className="text-truncate">{numeroProcesso || tituloCaso}</span>
           </Link>
         )}
 
-        {tarefa.data_vencimento && (
-          <div className="d-flex align-items-center mt-2 pt-2 border-top">
-            <ClockIcon
-              className={overdue ? 'text-danger me-1' : 'text-muted me-1'}
-              style={{ width: 13 }}
-            />
-            <span
-              className={`small ${overdue ? 'text-danger fw-semibold' : 'text-muted'}`}
-              style={{ fontSize: '0.75rem' }}
-            >
-              {new Date(tarefa.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
-            </span>
-          </div>
+        {overdue ? (
+          <p
+            className="mb-0 d-flex align-items-center gap-1 text-danger"
+            style={{ fontSize: '0.72rem', fontWeight: 600 }}
+          >
+            <ExclamationTriangleIcon style={{ width: 12, height: 12, flexShrink: 0 }} />
+            Vencido há {diasV} dia{diasV !== 1 ? 's' : ''}
+          </p>
+        ) : (
+          dataFmt && (
+            <div className="d-flex align-items-center pt-2 mt-2 border-top">
+              <ClockIcon className="text-muted me-1" style={{ width: 13 }} />
+              <span className="small text-muted" style={{ fontSize: '0.75rem' }}>
+                {dataFmt}
+                {diasRestantes !== null && diasRestantes >= 0 && (
+                  <span className="ms-1">
+                    (
+                    {diasRestantes === 0
+                      ? 'hoje'
+                      : `em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`}
+                    )
+                  </span>
+                )}
+              </span>
+            </div>
+          )
+        )}
+
+        {precisaConfirmarPrazo && onConfirmarPrazo && (
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-warning w-100 mt-2 d-flex align-items-center justify-content-center gap-1"
+            style={{ fontSize: '0.72rem' }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              onConfirmarPrazo(tarefa)
+            }}
+            title="Confirma que o prazo gerado pela IA esta correto"
+          >
+            <CheckCircleIcon style={{ width: 13, height: 13 }} />
+            Confirmar prazo
+          </button>
         )}
       </div>
     </div>

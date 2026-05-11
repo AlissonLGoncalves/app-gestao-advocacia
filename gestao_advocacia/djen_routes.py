@@ -927,6 +927,43 @@ def registrar_rotas_djen(
                 "ainda_pendentes": ainda_pendentes,
             }, 200
 
+    @djen_ns.route("/auto-tarefas/run")
+    class DjenAutoTarefasRunAPI(Resource):
+        """Feature Kanban<>DJEN: dispara a geracao retroativa de TarefaPrazo
+        a partir de publicacoes ja classificadas como importantes e vinculadas
+        a caso. Idempotente — chamar varias vezes nao duplica."""
+
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Cria TarefaPrazo automaticamente para toda publicacao DJEN do "
+                "tenant que seja importante=true, com caso_id NOT NULL e que "
+                "ainda nao tenha tarefa associada. Util apos um deploy desta "
+                "feature para gerar o backlog de prazos das publicacoes ja "
+                "existentes."
+            ),
+        )
+        @jwt_required()
+        def post(self):
+            from app import User  # noqa: PLC0415
+            from djen_tasks import executar_auto_criacao_tarefas  # noqa: PLC0415
+
+            user_id = get_jwt_identity()
+            user = User.query.get(int(user_id))
+            if not user:
+                djen_ns.abort(401)
+            if not _tenant_djen_habilitado(user.tenant_id):
+                djen_ns.abort(403, "Modulo DJEN desabilitado para este tenant.")
+
+            try:
+                criadas = executar_auto_criacao_tarefas(current_app, tenant_id=user.tenant_id)
+            except Exception as exc:
+                current_app.logger.error("djen_auto_tarefas_run_falha: %s", exc, exc_info=True)
+                db.session.rollback()
+                djen_ns.abort(500, "Falha ao gerar tarefas automaticas.")
+
+            return {"tarefas_criadas": criadas}, 200
+
     @djen_ns.route("/triagem/casos-compativeis")
     class PublicacaoTriagemCasosCompativeisAPI(Resource):
         @djen_ns.doc(

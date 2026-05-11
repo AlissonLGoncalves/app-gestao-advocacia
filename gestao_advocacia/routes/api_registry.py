@@ -437,6 +437,35 @@ def register_api_routes(app, api, finance_access_required):
             "user_id": fields.Integer,
             "caso_id": fields.Integer,
             "publicacao_djen_id": fields.Integer,
+            # Feature Kanban<>DJEN: campos para o card do Kanban exibir
+            # cliente + caso sem precisar de chamada adicional ao backend.
+            "cliente_id": fields.Integer(
+                attribute=lambda t: getattr(
+                    getattr(t, "caso_tarefa_associado", None), "cliente_id", None
+                )
+            ),
+            "cliente_nome": fields.String(
+                attribute=lambda t: getattr(
+                    getattr(getattr(t, "caso_tarefa_associado", None), "cliente_associado", None),
+                    "nome_razao_social",
+                    None,
+                )
+            ),
+            "numero_processo": fields.String(
+                attribute=lambda t: getattr(
+                    getattr(t, "caso_tarefa_associado", None), "numero_processo", None
+                )
+            ),
+            "caso_area": fields.String(
+                attribute=lambda t: getattr(
+                    getattr(t, "caso_tarefa_associado", None), "area_direito", None
+                )
+            ),
+            # Defesa contra "prazo errado pela IA": campos para o card mostrar
+            # badge de revisao e permitir confirmacao.
+            "prazo_validado": fields.Boolean,
+            "prazo_calculado_por_ia": fields.Boolean,
+            "prazo_dias_origem": fields.Integer,
         },
     )
 

@@ -561,6 +561,120 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
     return True
 
 
+def _criar_tarefa_de_publicacao(db, TarefaPrazo, pub):
+    """Cria TarefaPrazo automaticamente a partir de PublicacaoDJEN importante.
+
+    Feature Kanban<>DJEN — fecha o ciclo Cliente -> Caso -> Intimacao -> Prazo.
+    So' cria se:
+      - pub.importante is True (classificada como relevante)
+      - pub.caso_id nao e' None (sem caso vinculado, vai pra Triagem manual)
+      - nao existe TarefaPrazo com publicacao_djen_id=pub.id (idempotente)
+
+    Prazo calculado pela tabela de regras em djen_prazo_calculator.calcular_prazo.
+    Nasce com prazo_validado=False e prazo_calculado_por_ia=True — o card no
+    Kanban exibe badge "IA — confirmar prazo" ate o advogado confirmar.
+
+    Retorna a TarefaPrazo criada (adicionada na sessao, sem commit) ou None
+    se condicoes nao foram atendidas.
+    """
+    from djen_prazo_calculator import calcular_prazo  # noqa: PLC0415
+
+    if not pub or pub.importante is not True or pub.caso_id is None:
+        return None
+
+    # Idempotencia: pub ja deu origem a uma tarefa?
+    existe = TarefaPrazo.query.filter_by(publicacao_djen_id=pub.id).first()
+    if existe is not None:
+        return None
+
+    calc = calcular_prazo(pub.tipo_comunicacao, pub.texto, pub.data_disponibilizacao)
+
+    # Titulo curto pro card. Prefere tipo_comunicacao + numero do processo;
+    # texto bruto da DJEN tem ruido (cabecalho de tribunal etc).
+    tipo_label = (pub.tipo_comunicacao or "Intimacao").strip().capitalize()
+    proc_label = pub.numero_processo_mascara or pub.numero_processo or ""
+    titulo = f"{tipo_label}: {proc_label}".strip(": ").strip()
+    if len(titulo) > 240:
+        titulo = titulo[:237] + "..."
+
+    descricao_parts = []
+    if pub.classificacao_motivo:
+        descricao_parts.append(f"Classificacao IA: {pub.classificacao_motivo}")
+    if pub.texto:
+        trecho = pub.texto.strip().replace("\n", " ")
+        if len(trecho) > 500:
+            trecho = trecho[:497] + "..."
+        descricao_parts.append(f"Trecho: {trecho}")
+    descricao = "\n\n".join(descricao_parts) or None
+
+    tarefa = TarefaPrazo(
+        tenant_id=pub.tenant_id,
+        user_id=pub.user_id,
+        caso_id=pub.caso_id,
+        publicacao_djen_id=pub.id,
+        titulo=titulo,
+        descricao=descricao,
+        status="A Fazer",
+        prioridade=calc["prioridade"],
+        data_vencimento=calc["data_vencimento"],
+        tipo_tarefa="Prazo",
+        origem_id=f"djen:{pub.id}",
+        posicao=0,
+        prazo_validado=False,
+        prazo_calculado_por_ia=True,
+        prazo_dias_origem=calc["dias"],
+    )
+    db.session.add(tarefa)
+    return tarefa
+
+
+def executar_auto_criacao_tarefas(app, tenant_id=None):
+    """Feature Kanban<>DJEN: varre PublicacaoDJEN importantes ja vinculadas
+    a caso e que ainda nao viraram TarefaPrazo, criando-as automaticamente.
+
+    Idempotente (filtra NOT EXISTS em publicacao_djen_id). Usado tanto pelo
+    job periodico quanto pela rota admin de regeneracao retroativa.
+
+    Args:
+        app: Flask app (precisa de app_context ja ativo; o caller cuida).
+        tenant_id: opcional, restringe a um tenant especifico (multi-tenant).
+
+    Retorna o numero de tarefas criadas no commit.
+    """
+    from extensions import db  # noqa: PLC0415
+    from models import PublicacaoDJEN, TarefaPrazo  # noqa: PLC0415
+
+    logger = logging.getLogger(__name__)
+    tarefas_max = int(app.config.get("DJEN_AUTO_TAREFA_MAX_POR_RUN", 200))
+
+    # NOT IN subquery: pubs sem tarefa associada via publicacao_djen_id.
+    sub_pubs_com_tarefa = (
+        db.session.query(TarefaPrazo.publicacao_djen_id)
+        .filter(TarefaPrazo.publicacao_djen_id.isnot(None))
+        .subquery()
+    )
+    q = (
+        PublicacaoDJEN.query.filter(PublicacaoDJEN.importante.is_(True))
+        .filter(PublicacaoDJEN.caso_id.isnot(None))
+        .filter(~PublicacaoDJEN.id.in_(db.session.query(sub_pubs_com_tarefa.c.publicacao_djen_id)))
+    )
+    if tenant_id is not None:
+        q = q.filter_by(tenant_id=tenant_id)
+    pubs = q.limit(tarefas_max).all()
+
+    total = 0
+    for pub in pubs:
+        if _criar_tarefa_de_publicacao(db, TarefaPrazo, pub) is not None:
+            total += 1
+    if total:
+        db.session.commit()
+        logger.info(
+            f"Kanban<>DJEN: criou {total} tarefa(s) automatica(s) "
+            f"a partir de publicacoes importantes."
+        )
+    return total
+
+
 def _parse_data_disponibilizacao(valor):
     if not valor:
         return None
@@ -966,6 +1080,19 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         except Exception as e:
             logger.warning(f"JOB DJEN: classificacao IA falhou ({e}). Continuando.")
 
+        # Feature Kanban<>DJEN: para toda publicacao classificada como
+        # importante (importante=True) com caso vinculado (caso_id NOT NULL)
+        # e que ainda nao virou tarefa, cria TarefaPrazo automaticamente.
+        # Idempotente: rodar varias vezes nao duplica.
+        total_tarefas_criadas = 0
+        try:
+            total_tarefas_criadas = executar_auto_criacao_tarefas(app, tenant_id=tenant_id)
+        except Exception as e:
+            logger.warning(
+                f"JOB DJEN: auto-criacao de tarefas falhou ({e}). Continuando.",
+                exc_info=True,
+            )
+
         return {
             "ok": True,
             "lookback_days": janela_dias,
@@ -974,6 +1101,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             "itens_encontrados": total_itens_encontrados,
             "publicacoes_salvas": total_novas,
             "publicacoes_classificadas": total_classificadas,
+            "tarefas_auto_criadas": total_tarefas_criadas,
             "erros": erros,
         }
 
