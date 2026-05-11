@@ -36,6 +36,7 @@ function CasoList({ onEditCaso, refreshKey }) {
   const [dataAtualizacaoInicioFilter, setDataAtualizacaoInicioFilter] = useState('')
   const [dataAtualizacaoFimFilter, setDataAtualizacaoFimFilter] = useState('')
   const [areaDireitoFilter, setAreaDireitoFilter] = useState('')
+  const [prioridadeFilter, setPrioridadeFilter] = useState('')
   const [faseProcessualFilter, setFaseProcessualFilter] = useState('')
   const [varaJuizoFilter, setVaraJuizoFilter] = useState('')
   const [instanciaFilter, setInstanciaFilter] = useState('')
@@ -88,6 +89,7 @@ function CasoList({ onEditCaso, refreshKey }) {
       data_atualizacao_inicio: dataAtualizacaoInicioFilter,
       data_atualizacao_fim: dataAtualizacaoFimFilter,
       area_direito: areaDireitoFilter,
+      prioridade: prioridadeFilter,
       fase_processual: faseProcessualFilter,
       vara_juizo: varaJuizoFilter,
       instancia: instanciaFilter,
@@ -105,6 +107,7 @@ function CasoList({ onEditCaso, refreshKey }) {
     dataAtualizacaoInicioFilter,
     dataAtualizacaoFimFilter,
     areaDireitoFilter,
+    prioridadeFilter,
     faseProcessualFilter,
     varaJuizoFilter,
     instanciaFilter,
@@ -195,6 +198,7 @@ function CasoList({ onEditCaso, refreshKey }) {
     setDataAtualizacaoInicioFilter('')
     setDataAtualizacaoFimFilter('')
     setAreaDireitoFilter('')
+    setPrioridadeFilter('')
     setFaseProcessualFilter('')
     setVaraJuizoFilter('')
     setInstanciaFilter('')
@@ -215,6 +219,10 @@ function CasoList({ onEditCaso, refreshKey }) {
     areaDireitoFilter && {
       label: `Área: ${areaDireitoFilter}`,
       clear: () => setAreaDireitoFilter(''),
+    },
+    prioridadeFilter && {
+      label: `Prioridade: ${prioridadeFilter}`,
+      clear: () => setPrioridadeFilter(''),
     },
     faseProcessualFilter && {
       label: `Fase: ${faseProcessualFilter}`,
@@ -391,6 +399,20 @@ function CasoList({ onEditCaso, refreshKey }) {
                   value={areaDireitoFilter}
                   onChange={(e) => setAreaDireitoFilter(e.target.value)}
                 />
+              </div>
+              <div className="col-md-3 col-sm-6">
+                <label className="form-label form-label-sm mb-1">Prioridade</label>
+                <select
+                  className="form-select form-select-sm"
+                  value={prioridadeFilter}
+                  onChange={(e) => setPrioridadeFilter(e.target.value)}
+                >
+                  <option value="">Todas</option>
+                  <option value="Urgente">Urgente</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Normal">Normal</option>
+                  <option value="Baixa">Baixa</option>
+                </select>
               </div>
               <div className="col-md-3 col-sm-6">
                 <label className="form-label form-label-sm mb-1">Fase Processual</label>
@@ -674,6 +696,7 @@ function CasoList({ onEditCaso, refreshKey }) {
                   <td className="px-3 py-2">
                     <CardMeta
                       status={caso.status}
+                      prioridade={caso.prioridade}
                       responsavelNome={caso.responsavel_nome}
                       responsavelIniciais={caso.responsavel_iniciais}
                     />

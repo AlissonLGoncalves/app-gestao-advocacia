@@ -76,6 +76,11 @@ def register_casos_routes(
         elif dd == "" or dd is None:
             caso.data_distribuicao = None
         caso.notas_caso = data.get("notas_caso", caso.notas_caso)
+        # Prioridade: aceita Urgente/Alta/Normal/Baixa. Valor desconhecido = mantem.
+        if "prioridade" in data:
+            pr = data.get("prioridade")
+            if pr in ("Urgente", "Alta", "Normal", "Baixa"):
+                caso.prioridade = pr
         return caso
 
     @casos_ns.route("/extrair-eventos-ia")
@@ -821,6 +826,7 @@ def register_casos_routes(
             fase_processual = request.args.get("fase_processual", "").strip()
             vara_juizo = request.args.get("vara_juizo", "").strip()
             instancia = request.args.get("instancia", "").strip()
+            prioridade = request.args.get("prioridade", "").strip()
             valor_causa_min = request.args.get("valor_causa_min", "").strip()
             valor_causa_max = request.args.get("valor_causa_max", "").strip()
             data_distribuicao_inicio = request.args.get("data_distribuicao_inicio", "").strip()
@@ -878,6 +884,8 @@ def register_casos_routes(
                 query = query.filter(Caso.vara_juizo.ilike(f"%{vara_juizo}%"))
             if instancia:
                 query = query.filter(Caso.instancia == instancia)
+            if prioridade:
+                query = query.filter(Caso.prioridade == prioridade)
 
             def _parse_float(value, field_name):
                 if not value:
@@ -906,6 +914,7 @@ def register_casos_routes(
                 "cliente_nome": Cliente.nome_razao_social,
                 "numero_processo": Caso.numero_processo,
                 "status": Caso.status,
+                "prioridade": Caso.prioridade,
                 "data_criacao": Caso.data_criacao,
                 "data_atualizacao": Caso.data_atualizacao,
             }

@@ -13,6 +13,7 @@ const initialState = {
   titulo: '',
   numero_processo: '',
   status: 'Ativo',
+  prioridade: 'Normal',
   parte_contraria: '',
   adv_parte_contraria: '',
   tipo_acao: '',
