@@ -96,7 +96,6 @@ const formatarDataBR = (raw) => {
   return Number.isNaN(dt.getTime()) ? null : dt.toLocaleDateString('pt-BR')
 }
 
-
 const TAREFA_VAZIA = {
   titulo: '',
   descricao: '',

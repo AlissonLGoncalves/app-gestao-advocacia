@@ -91,13 +91,7 @@ describe('StatusBadge', () => {
 
 describe('CardMeta', () => {
   it('compoe status + prioridade + avatar', () => {
-    render(
-      <CardMeta
-        status="Ativo"
-        prioridade="Urgente"
-        responsavelNome="Alisson Luiz"
-      />
-    )
+    render(<CardMeta status="Ativo" prioridade="Urgente" responsavelNome="Alisson Luiz" />)
     expect(screen.getByText('Ativo')).toBeInTheDocument()
     expect(screen.getByText('Urgente')).toBeInTheDocument()
     expect(screen.getByText('AL')).toBeInTheDocument()

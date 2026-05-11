@@ -28,11 +28,7 @@ export default function CardMeta({
     >
       <StatusBadge tipo={statusTipo} valor={status} />
       <PrioridadeBadge prioridade={prioridade} />
-      <AvatarSigla
-        nome={responsavelNome}
-        iniciais={responsavelIniciais}
-        size={avatarSize}
-      />
+      <AvatarSigla nome={responsavelNome} iniciais={responsavelIniciais} size={avatarSize} />
     </span>
   )
 }
