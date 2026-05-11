@@ -24,6 +24,7 @@ import {
   calcularReorder,
   aplicarReorderEmTarefas,
 } from '../utils/kanbanReorder.js'
+import PrioridadeBadge from '../components/ui/PrioridadeBadge.jsx'
 import {
   PlusIcon,
   ClockIcon,
@@ -95,8 +96,6 @@ const formatarDataBR = (raw) => {
   return Number.isNaN(dt.getTime()) ? null : dt.toLocaleDateString('pt-BR')
 }
 
-const getCorPrioridade = (p) =>
-  ({ Urgente: 'danger', Alta: 'warning', Baixa: 'info' })[p] || 'primary'
 
 const TAREFA_VAZIA = {
   titulo: '',
@@ -747,11 +746,8 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, onConclui
       <div className="card-body p-3">
         <div className="d-flex justify-content-between align-items-start mb-2">
           <div className="d-flex flex-wrap gap-1">
-            <span
-              className={`badge bg-${getCorPrioridade(tarefa.prioridade)}-subtle text-${getCorPrioridade(tarefa.prioridade)}`}
-            >
-              {tarefa.prioridade}
-            </span>
+            <PrioridadeBadge prioridade={tarefa.prioridade} mostrarNormal />
+
             {precisaConfirmarPrazo && (
               <span
                 className="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1"
@@ -970,12 +966,7 @@ function GrupoLista({ grupo, casos, onEditar, onConcluir }) {
                         )}
                       </td>
                       <td className="d-none d-md-table-cell">
-                        <span
-                          className={`badge bg-${getCorPrioridade(t.prioridade)}-subtle text-${getCorPrioridade(t.prioridade)}`}
-                          style={{ fontSize: '0.72rem' }}
-                        >
-                          {t.prioridade}
-                        </span>
+                        <PrioridadeBadge prioridade={t.prioridade} mostrarNormal />
                       </td>
                       <td
                         className="d-none d-md-table-cell text-muted"

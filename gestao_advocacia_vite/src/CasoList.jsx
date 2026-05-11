@@ -20,6 +20,7 @@ import { exportarParaPDF } from './utils/pdfGenerator.js'
 import { useConfirm } from './hooks/useConfirm.jsx'
 import useListData from './hooks/useListData.js'
 import EmptyState from './components/EmptyState.jsx'
+import CardMeta from './components/ui/CardMeta.jsx'
 
 function CasoList({ onEditCaso, refreshKey }) {
   const location = useLocation()
@@ -253,21 +254,6 @@ function CasoList({ onEditCaso, refreshKey }) {
       },
     },
   ].filter(Boolean)
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'Ativo':
-        return 'bg-success-subtle text-success-emphasis'
-      case 'Encerrado':
-        return 'bg-secondary-subtle text-secondary-emphasis'
-      case 'Suspenso':
-        return 'bg-warning-subtle text-warning-emphasis'
-      case 'Arquivado':
-        return 'bg-info-subtle text-info-emphasis'
-      default:
-        return 'bg-light text-dark'
-    }
-  }
 
   const handleExportPDF = () => {
     if (casos.length === 0) {
@@ -686,9 +672,11 @@ function CasoList({ onEditCaso, refreshKey }) {
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <span className={`badge fs-xs ${getStatusBadge(caso.status)}`}>
-                      {caso.status}
-                    </span>
+                    <CardMeta
+                      status={caso.status}
+                      responsavelNome={caso.responsavel_nome}
+                      responsavelIniciais={caso.responsavel_iniciais}
+                    />
                   </td>
                   <td className="px-3 py-2">
                     {caso.data_criacao ? new Date(caso.data_criacao).toLocaleDateString() : '-'}
