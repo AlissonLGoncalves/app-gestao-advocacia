@@ -5,6 +5,7 @@ import { listProximos } from './api/agenda.js'
 import { syncDjen, listOabs } from './api/djen.js'
 import MovimentacoesRecentes from './components/MovimentacoesRecentes.jsx'
 import OnboardingChecklist from './components/OnboardingChecklist.jsx'
+import MiniKanbanPrazos from './components/MiniKanbanPrazos.jsx'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -375,6 +376,14 @@ function Dashboard({ mudarSecao }) {
 
   return (
     <div className="container-fluid p-0">
+      {/* ── Zona 1: Pra voce agora ─────────────────────────────────────────── */}
+      <h5
+        className="fw-bold mb-3 mx-1"
+        style={{ fontFamily: 'var(--font-heading)', color: 'var(--text-1)' }}
+      >
+        Pra você agora
+      </h5>
+
       {/* ── Briefing do Dia ─────────────────────────────────────────────────── */}
       {temBriefing && (
         <div className="row mb-4 g-0">
@@ -463,6 +472,9 @@ function Dashboard({ mudarSecao }) {
         </div>
       )}
 
+      {/* ── Mini-Kanban de Prazos ──────────────────────────────────────────── */}
+      <MiniKanbanPrazos />
+
       {/* ── Banner onboarding DJEN ──────────────────────────────────────────── */}
       {oabsMonitoradas !== null && oabsMonitoradas.length === 0 && (
         <div className="row mb-4 g-0">
@@ -490,6 +502,14 @@ function Dashboard({ mudarSecao }) {
           </div>
         </div>
       )}
+
+      {/* ── Zona 2: Panorama ───────────────────────────────────────────────── */}
+      <h5
+        className="fw-bold mb-3 mt-4 mx-1"
+        style={{ fontFamily: 'var(--font-heading)', color: 'var(--text-1)' }}
+      >
+        Panorama
+      </h5>
 
       {/* ── Stat Cards ──────────────────────────────────────────────────────── */}
       <OnboardingChecklist
