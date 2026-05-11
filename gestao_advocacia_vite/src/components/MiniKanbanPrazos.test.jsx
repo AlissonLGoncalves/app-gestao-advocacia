@@ -88,11 +88,13 @@ describe('MiniKanbanPrazos render', () => {
         status: 'A Fazer',
       },
     ])
-    expect(await screen.findByText('Vencidos')).toBeInTheDocument()
-    // "Hoje" aparece como titulo de coluna E como prazo formatado — checa que aparece >= 1x
+    // Aguarda os cards renderizarem (apos fetch resolver). Findby* e necessario
+    // porque o widget renderiza colunas imediatamente em "Carregando..." e so
+    // depois os cards aparecem — CI mais lento pegou essa race.
+    expect(await screen.findByText('Atrasado')).toBeInTheDocument()
+    expect(screen.getByText('Vencidos')).toBeInTheDocument()
     expect(screen.getAllByText('Hoje').length).toBeGreaterThan(0)
     expect(screen.getByText('Próximos 7 dias')).toBeInTheDocument()
-    expect(screen.getByText('Atrasado')).toBeInTheDocument()
     expect(screen.getByText('Hoje task')).toBeInTheDocument()
   })
 })
