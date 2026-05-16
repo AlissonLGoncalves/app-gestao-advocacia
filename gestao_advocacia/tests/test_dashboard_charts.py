@@ -82,6 +82,10 @@ def test_charts_financeiro_mensal_agrega_recebimento_e_despesa(auth_client, db):
         user_id=user_id,
         descricao="Honorarios",
         valor=1500,
+        data_vencimento=hoje,
+        data_pagamento=hoje,
+        status="Pago",
+        # Campos legados sincronizados (Fase 1 do Recebimento Robusto).
         data_recebimento=hoje,
         recebido=True,
     )

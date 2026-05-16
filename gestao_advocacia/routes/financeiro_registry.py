@@ -57,47 +57,40 @@ def register_financeiro_api(app, api, finance_access_required):
             "valor": fields.Float(
                 required=True, description="Valor do recebimento (ex: 1200.50)", min=0.01
             ),
-            # data_vencimento e data_recebimento sao aceitos como aliases pelo
-            # backend pra compat com o frontend (que tem dois campos). O modelo
-            # ainda persiste numa unica coluna (data_recebimento). Pelo menos
-            # um dos dois e obrigatorio (validacao no route).
             "data_vencimento": fields.Date(
-                description="Data de vencimento (YYYY-MM-DD). Alias preferido."
+                description=(
+                    "Data de vencimento (YYYY-MM-DD). Opcional desde Fase 4 "
+                    "(permite 'sem vencimento')."
+                )
             ),
-            "data_recebimento": fields.Date(
-                description="Data em que o valor foi ou sera recebido (YYYY-MM-DD)",
+            "data_pagamento": fields.Date(
+                description=(
+                    "Data em que o valor foi efetivamente recebido (preenche "
+                    "automaticamente quando status passa a 'Pago' sem data)."
+                )
             ),
-            "recebido": fields.Boolean(
-                description="Indica se o valor ja foi efetivamente recebido", default=False
-            ),
-            # status string ("Pago", "Pendente", ...) e mapeado pra recebido
-            # boolean no backend. "Pago" => recebido=True; qualquer outro
-            # => recebido=False. Aceito como conveniencia pro frontend.
             "status": fields.String(
-                description='Status legivel ("Pago"/"Pendente"/...). Mapeado para "recebido".'
+                description=(
+                    'Status: "Pendente" | "Pago" | "Vencido" | "Cancelado" | '
+                    '"Em Negociacao". Default: "Pendente".'
+                ),
+                enum=["Pendente", "Pago", "Vencido", "Cancelado", "Em Negociacao"],
             ),
-            "caso_id": fields.Integer(
-                description="ID do caso ao qual este recebimento esta associado (opcional)"
+            "categoria": fields.String(description="Categoria do recebimento."),
+            "forma_pagamento": fields.String(description="PIX, Boleto, etc."),
+            "notas": fields.String(description="Observacoes livres."),
+            "cliente_id": fields.Integer(description="ID do cliente vinculado (opcional)."),
+            "caso_id": fields.Integer(description="ID do caso vinculado (opcional)."),
+            # Aliases retidos por compat com clients antigos (POST/PUT da Fase 0).
+            "data_recebimento": fields.Date(
+                description=(
+                    "[DEPRECATED] Alias de data_pagamento ou data_vencimento. "
+                    "Preferir os campos novos."
+                )
             ),
-            # cliente_id, categoria, forma_pagamento e notas sao aceitos no
-            # input mas NAO sao persistidos (o modelo nao tem essas colunas).
-            # Ignorados silenciosamente — manter pra evitar rejeicao do payload
-            # do frontend ate adicionarmos migration.
-            "cliente_id": fields.Integer(description="Ignorado (deduzido do caso)."),
-            "categoria": fields.String(description="Ignorado (nao persistido)."),
-            "forma_pagamento": fields.String(description="Ignorado (nao persistido)."),
-            "notas": fields.String(description="Ignorado (nao persistido)."),
+            "recebido": fields.Boolean(description='[DEPRECATED] Alias de status=="Pago".'),
         },
     )
-
-    def _recebimento_cliente_id(rec):
-        """cliente_id derivado: vem do caso.cliente_id quando ha caso vinculado."""
-        caso = getattr(rec, "caso_recebimento_associado", None)
-        return caso.cliente_id if caso else None
-
-    def _recebimento_status(rec):
-        """status legivel derivado do boolean `recebido`."""
-        return "Pago" if rec.recebido else "Pendente"
 
     recebimento_model_dto = recebimentos_ns.model(
         "RecebimentoOutput",
@@ -108,25 +101,62 @@ def register_financeiro_api(app, api, finance_access_required):
                 attribute=lambda x: str(x.valor),
                 description="Valor do recebimento formatado como string",
             ),
-            "data_recebimento": fields.Date(dt_format="iso8601"),
-            # alias do mesmo dado pra compat com o frontend, que tem dois
-            # campos (vencimento/recebimento) mas o DB so guarda um.
-            "data_vencimento": fields.Date(
-                dt_format="iso8601",
-                attribute=lambda x: x.data_recebimento,
-                description="Alias de data_recebimento (mesma coluna).",
-            ),
-            "recebido": fields.Boolean,
-            "status": fields.String(
-                attribute=_recebimento_status,
-                description='Derivado: "Pago" se recebido, senao "Pendente".',
-            ),
+            "status": fields.String,
+            "data_vencimento": fields.Date(dt_format="iso8601"),
+            "data_pagamento": fields.Date(dt_format="iso8601"),
+            "categoria": fields.String,
+            "forma_pagamento": fields.String,
+            "notas": fields.String,
+            "cliente_id": fields.Integer(nullable=True),
             "caso_id": fields.Integer(nullable=True),
-            "cliente_id": fields.Integer(
-                attribute=_recebimento_cliente_id,
-                description="Derivado do caso vinculado.",
-            ),
             "user_id": fields.Integer,
+            "recorrencia_id": fields.Integer(nullable=True),
+            "numero_parcela": fields.Integer(nullable=True),
+            # Compat retroativa — clientes antigos ainda leem esses campos.
+            "data_recebimento": fields.Date(dt_format="iso8601"),
+            "recebido": fields.Boolean,
+        },
+    )
+
+    recebimento_serie_input_dto = recebimentos_ns.model(
+        "RecebimentoSerieInput",
+        {
+            "tipo": fields.String(
+                required=True,
+                description='"RECORRENTE" (indefinido) ou "PARCELADO" (N fechado).',
+                enum=["RECORRENTE", "PARCELADO"],
+            ),
+            "frequencia": fields.String(
+                description='Para RECORRENTE/PARCELADO: "MENSAL"|"SEMANAL"|"QUINZENAL"|"ANUAL".',
+                enum=["MENSAL", "SEMANAL", "QUINZENAL", "ANUAL"],
+            ),
+            "valor_parcela": fields.Float(
+                required=True, description="Valor de cada parcela.", min=0.01
+            ),
+            "total_parcelas": fields.Integer(
+                description=(
+                    "Numero de parcelas a gerar. Obrigatorio se PARCELADO. "
+                    "Para RECORRENTE: opcional (default=12)."
+                )
+            ),
+            "data_inicio": fields.Date(
+                required=True, description="Data de vencimento da 1a parcela."
+            ),
+            "descricao": fields.String(required=True),
+            "categoria": fields.String(),
+            "cliente_id": fields.Integer(),
+            "caso_id": fields.Integer(),
+            "notas": fields.String(),
+        },
+    )
+
+    recebimento_serie_output_dto = recebimentos_ns.model(
+        "RecebimentoSerieOutput",
+        {
+            "recorrencia_id": fields.Integer,
+            "tipo": fields.String,
+            "total_geradas": fields.Integer,
+            "parcelas": fields.List(fields.Nested(recebimento_model_dto)),
         },
     )
 
@@ -190,6 +220,8 @@ def register_financeiro_api(app, api, finance_access_required):
         recebimentos_ns,
         recebimento_input_model_dto,
         recebimento_model_dto,
+        recebimento_serie_input_dto,
+        recebimento_serie_output_dto,
         finance_access_required,
     )
 
