@@ -48,6 +48,24 @@ export function marcarRecebimentoPago(id, body = {}) {
   return api.put(`/recebimentos/${id}`, body)
 }
 
+/**
+ * Cria uma serie de recebimentos (PARCELADO ou RECORRENTE).
+ *
+ * Body esperado pelo backend (POST /recebimentos/serie):
+ *   tipo            "PARCELADO" | "RECORRENTE"
+ *   frequencia      "MENSAL" | "SEMANAL" | "QUINZENAL" | "ANUAL"
+ *   valor_parcela   number > 0
+ *   total_parcelas  int (obrigatorio se PARCELADO; default 12 se RECORRENTE)
+ *   data_inicio     "YYYY-MM-DD"
+ *   descricao       string
+ *   categoria?, cliente_id?, caso_id?, notas?
+ *
+ * Resposta: { recorrencia_id, tipo, total_geradas, parcelas: [...] }
+ */
+export function createRecebimentoSerie(body) {
+  return api.post('/recebimentos/serie', body)
+}
+
 export async function listDespesas(params = {}) {
   const data = await api.get(`/despesas/${toQueryString(params)}`)
   return normalizeListPayload(data, 'despesas')
