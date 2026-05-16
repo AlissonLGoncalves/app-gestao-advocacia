@@ -9,11 +9,15 @@ import {
   FunnelIcon,
   DocumentArrowDownIcon,
   CurrencyDollarIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
 import { api } from './api/client.js'
-import { deleteRecebimento, listRecebimentos } from './api/financeiro.js'
+import { deleteRecebimento, listRecebimentos, marcarRecebimentoPago } from './api/financeiro.js'
 import { useConfirm } from './hooks/useConfirm.jsx'
 import useListData from './hooks/useListData.js'
 import EmptyState from './components/EmptyState.jsx'
@@ -28,6 +32,10 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
   const [clienteFilter, setClienteFilter] = useState('')
   const [casoFilter, setCasoFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  // "Programados" = pendentes com vencimento futuro. Filtro rapido botaozinho.
+  const [quickFilter, setQuickFilter] = useState('todos') // todos|programados|atrasados|pagos
+  // Marcar como Pago inline (loading por linha)
+  const [markingPaidId, setMarkingPaidId] = useState(null)
   const [dataVencimentoInicio, setDataVencimentoInicio] = useState('')
   const [dataVencimentoFim, setDataVencimentoFim] = useState('')
   const [dataRecebimentoInicio, setDataRecebimentoInicio] = useState('')
@@ -120,6 +128,53 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
     fetchClientesECasosParaFiltro()
   }, [fetchClientesECasosParaFiltro])
 
+  /**
+   * Marcar como Pago inline (botao direto na linha). Faz PUT mandando
+   * status="Pago" — backend (Fase 1) preenche data_pagamento=hoje
+   * automaticamente quando nao vier.
+   */
+  const handleMarcarPago = async (recebimento) => {
+    if (markingPaidId) return
+    setMarkingPaidId(recebimento.id)
+    try {
+      await marcarRecebimentoPago(recebimento.id, {
+        descricao: recebimento.descricao,
+        valor: recebimento.valor,
+        status: 'Pago',
+      })
+      toast.success(`"${recebimento.descricao}" marcado como Pago.`)
+      fetchRecebimentosLista()
+    } catch (err) {
+      toast.error(`Erro ao marcar como pago: ${err.message}`)
+    } finally {
+      setMarkingPaidId(null)
+    }
+  }
+
+  /**
+   * Filtragem local pelo quickFilter (mais responsivo que round-trip).
+   * O fetch ja traz a lista completa filtrada pelo backend (status etc);
+   * aqui aplicamos refinamentos rapidos por estado de vencimento.
+   */
+  const hojeISO = new Date().toISOString().split('T')[0]
+  const recebimentosFiltrados = React.useMemo(() => {
+    if (quickFilter === 'todos') return recebimentos
+    return recebimentos.filter((r) => {
+      const status = r.status || (r.recebido ? 'Pago' : 'Pendente')
+      const venc = r.data_vencimento
+      if (quickFilter === 'programados') {
+        return status !== 'Pago' && status !== 'Cancelado' && venc && venc >= hojeISO
+      }
+      if (quickFilter === 'atrasados') {
+        return status !== 'Pago' && status !== 'Cancelado' && venc && venc < hojeISO
+      }
+      if (quickFilter === 'pagos') {
+        return status === 'Pago'
+      }
+      return true
+    })
+  }, [recebimentos, quickFilter, hojeISO])
+
   const handleDeleteClick = async (id) => {
     const hasToken =
       localStorage.getItem('token') ||
@@ -197,6 +252,7 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
     setDataVencimentoFim('')
     setDataRecebimentoInicio('')
     setDataRecebimentoFim('')
+    setQuickFilter('todos')
     setShowFilters(false)
   }
 
@@ -428,6 +484,35 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
         </div>
       )}
 
+      {/* Quick filters: filtros rapidos por estado de vencimento/pagamento.
+          Aplicados localmente sobre o resultado do backend pra resposta instantanea. */}
+      <div className="px-3 py-2 border-bottom bg-white d-flex flex-wrap gap-2 align-items-center">
+        <span className="small text-muted me-1">Mostrar:</span>
+        {[
+          { value: 'todos', label: 'Todos', icon: null },
+          { value: 'programados', label: 'Programados', icon: ClockIcon },
+          { value: 'atrasados', label: 'Atrasados', icon: ExclamationTriangleIcon },
+          { value: 'pagos', label: 'Pagos', icon: CheckCircleIcon },
+        ].map((opt) => {
+          const ativo = quickFilter === opt.value
+          const Icon = opt.icon
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              className={`btn btn-sm ${ativo ? 'btn-primary' : 'btn-outline-secondary'}`}
+              onClick={() => setQuickFilter(opt.value)}
+            >
+              {Icon && <Icon style={{ width: 14, height: 14 }} className="me-1" />}
+              {opt.label}
+            </button>
+          )
+        })}
+        <small className="ms-auto text-muted">
+          {recebimentosFiltrados.length} de {recebimentos.length}
+        </small>
+      </div>
+
       <div className="table-responsive">
         <table className="table table-hover table-striped table-sm mb-0 align-middle">
           <thead className="table-light">
@@ -451,13 +536,13 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
               <th onClick={() => requestSort('data_vencimento')} style={{ cursor: 'pointer' }}>
                 Vencimento {getSortIcon('data_vencimento')}
               </th>
-              <th onClick={() => requestSort('data_recebimento')} style={{ cursor: 'pointer' }}>
-                Recebimento {getSortIcon('data_recebimento')}
+              <th onClick={() => requestSort('data_pagamento')} style={{ cursor: 'pointer' }}>
+                Pagamento {getSortIcon('data_pagamento')}
               </th>
               <th onClick={() => requestSort('status')} style={{ cursor: 'pointer' }}>
                 Status {getSortIcon('status')}
               </th>
-              <th className="text-center" style={{ width: '100px' }}>
+              <th className="text-center" style={{ width: '140px' }}>
                 Ações
               </th>
             </tr>
@@ -472,16 +557,31 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                 </td>
               </tr>
             )}
-            {!loading && recebimentos.length === 0 && !error && (
+            {!loading && recebimentosFiltrados.length === 0 && !error && (
               <tr>
                 <td colSpan="8">
                   <EmptyState
                     icon={CurrencyDollarIcon}
-                    title="Nenhum recebimento registrado"
-                    description="Registre honorários, parcelas e outros recebimentos do escritório."
+                    title={
+                      quickFilter !== 'todos'
+                        ? `Nenhum recebimento ${
+                            quickFilter === 'programados'
+                              ? 'programado'
+                              : quickFilter === 'atrasados'
+                                ? 'atrasado'
+                                : 'pago'
+                          }`
+                        : 'Nenhum recebimento registrado'
+                    }
+                    description={
+                      quickFilter !== 'todos'
+                        ? 'Ajuste os filtros ou troque o atalho acima.'
+                        : 'Registre honorários, parcelas e outros recebimentos do escritório.'
+                    }
                     actionLabel="Novo Recebimento"
                     onAction={() => onEditRecebimento(null)}
                     filtered={
+                      quickFilter !== 'todos' ||
                       !!(
                         searchTerm ||
                         clienteFilter ||
@@ -497,72 +597,146 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                 </td>
               </tr>
             )}
-            {recebimentos.map((r) => (
-              <tr key={r.id}>
-                <td className="px-3 py-2">{r.descricao}</td>
-                <td className="px-3 py-2">{r.cliente_nome || '-'}</td>
-                <td className="px-3 py-2">{r.caso_titulo || '-'}</td>
-                <td className="px-3 py-2 text-end">
-                  {parseFloat(r.valor).toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                  })}
-                </td>
-                <td className="px-3 py-2">{new Date(r.data_vencimento).toLocaleDateString()}</td>
-                <td className="px-3 py-2">
-                  {r.data_recebimento ? new Date(r.data_recebimento).toLocaleDateString() : '-'}
-                </td>
-                <td className="px-3 py-2">
-                  <span className={`badge fs-xs ${getStatusBadge(r.status)}`}>{r.status}</span>
-                </td>
-                <td className="px-3 py-2 text-center">
-                  <button
-                    onClick={() => onEditRecebimento(r)}
-                    className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
-                    title="Editar"
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    disabled={deletingId === r.id}
-                  >
-                    <PencilSquareIcon style={{ width: '16px', height: '16px' }} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteClick(r.id)}
-                    className="btn btn-sm btn-outline-danger p-1 lh-1"
-                    title="Deletar"
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    disabled={deletingId === r.id}
-                  >
-                    {deletingId === r.id ? (
-                      <div
-                        className="spinner-border spinner-border-sm"
-                        role="status"
-                        style={{ width: '1rem', height: '1rem' }}
-                      ></div>
+            {recebimentosFiltrados.map((r) => {
+              const statusEfetivo = r.status || (r.recebido ? 'Pago' : 'Pendente')
+              const podeMarcarPago = statusEfetivo !== 'Pago' && statusEfetivo !== 'Cancelado'
+              return (
+                <tr key={r.id}>
+                  <td className="px-3 py-2">
+                    <div>{r.descricao}</div>
+                    <div className="d-flex flex-wrap gap-1 mt-1">
+                      {/* Badge de serie: recorrente OU parcela X/Y */}
+                      {r.recorrencia_id && r.numero_parcela ? (
+                        <span
+                          className="badge bg-info-subtle text-info-emphasis"
+                          style={{ fontSize: '0.65rem' }}
+                          title="Parte de uma serie de recebimentos"
+                        >
+                          <ArrowPathIcon style={{ width: 10, height: 10 }} className="me-1" />
+                          Parcela {r.numero_parcela}
+                        </span>
+                      ) : null}
+                      {r.categoria && (
+                        <span
+                          className="badge bg-light text-muted border"
+                          style={{ fontSize: '0.65rem' }}
+                        >
+                          {r.categoria}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">{r.cliente_nome || '-'}</td>
+                  <td className="px-3 py-2">{r.caso_titulo || '-'}</td>
+                  <td className="px-3 py-2 text-end">
+                    {parseFloat(r.valor).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </td>
+                  <td className="px-3 py-2">
+                    {r.data_vencimento ? (
+                      <span
+                        className={
+                          podeMarcarPago && r.data_vencimento < hojeISO
+                            ? 'text-danger fw-semibold'
+                            : ''
+                        }
+                      >
+                        {new Date(r.data_vencimento).toLocaleDateString()}
+                      </span>
                     ) : (
-                      <TrashIcon style={{ width: '16px', height: '16px' }} />
+                      <small className="text-muted">sem vencimento</small>
                     )}
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-3 py-2">
+                    {r.data_pagamento
+                      ? new Date(r.data_pagamento).toLocaleDateString()
+                      : r.data_recebimento && statusEfetivo === 'Pago'
+                        ? new Date(r.data_recebimento).toLocaleDateString()
+                        : '-'}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`badge fs-xs ${getStatusBadge(statusEfetivo)}`}>
+                      {statusEfetivo}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    {podeMarcarPago && (
+                      <button
+                        onClick={() => handleMarcarPago(r)}
+                        className="btn btn-sm btn-outline-success me-1 p-1 lh-1"
+                        title="Marcar como Pago (preenche data_pagamento=hoje)"
+                        disabled={markingPaidId === r.id || deletingId === r.id}
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {markingPaidId === r.id ? (
+                          <div
+                            className="spinner-border spinner-border-sm"
+                            role="status"
+                            style={{ width: '1rem', height: '1rem' }}
+                          />
+                        ) : (
+                          <CheckCircleIcon style={{ width: '16px', height: '16px' }} />
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onEditRecebimento(r)}
+                      className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
+                      title="Editar"
+                      style={{
+                        width: '30px',
+                        height: '30px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      disabled={deletingId === r.id}
+                    >
+                      <PencilSquareIcon style={{ width: '16px', height: '16px' }} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(r.id)}
+                      className="btn btn-sm btn-outline-danger p-1 lh-1"
+                      title="Deletar"
+                      style={{
+                        width: '30px',
+                        height: '30px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      disabled={deletingId === r.id}
+                    >
+                      {deletingId === r.id ? (
+                        <div
+                          className="spinner-border spinner-border-sm"
+                          role="status"
+                          style={{ width: '1rem', height: '1rem' }}
+                        />
+                      ) : (
+                        <TrashIcon style={{ width: '16px', height: '16px' }} />
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
-      {!loading && recebimentos.length > 0 && (
+      {!loading && recebimentosFiltrados.length > 0 && (
         <div className="card-footer bg-light text-muted p-2 text-end small">
-          {recebimentos.length} recebimento(s) encontrado(s)
+          {recebimentosFiltrados.length} recebimento(s) listado(s)
+          {quickFilter !== 'todos' &&
+            ` (${recebimentos.length - recebimentosFiltrados.length} ocultos pelo filtro)`}
         </div>
       )}
     </div>
