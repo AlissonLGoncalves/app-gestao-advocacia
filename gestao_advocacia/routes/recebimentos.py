@@ -9,6 +9,38 @@ from helpers import get_item_or_404, get_list_query, get_tenant_id, query_for_te
 from models import Caso, Recebimento
 
 
+def _parse_data_recebimento(data):
+    """Aceita data_vencimento OU data_recebimento (alias). Retorna (date, erro).
+
+    Frontend tem dois campos separados mas o DB so tem um (`data_recebimento`).
+    Preferimos data_vencimento se vier preenchida (eh o campo de uso mais
+    comum no formulario), caindo de volta pra data_recebimento. Pelo menos um
+    e obrigatorio.
+    """
+    raw = (data.get("data_vencimento") or data.get("data_recebimento") or "").strip()
+    if not raw:
+        return None, "Data (vencimento ou recebimento) e obrigatoria."
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date(), None
+    except ValueError:
+        return None, "Formato de data invalido. Use YYYY-MM-DD."
+
+
+def _resolve_recebido(data, default):
+    """Resolve o booleano `recebido` a partir do payload.
+
+    Prioridade: campo explicito `recebido` > derivado do `status` ("Pago"
+    => True, qualquer outro => False) > valor default (usado no UPDATE pra
+    preservar o estado atual quando nada eh enviado).
+    """
+    if "recebido" in data and data["recebido"] is not None:
+        return bool(data["recebido"])
+    status = data.get("status")
+    if isinstance(status, str) and status.strip():
+        return status.strip().lower() == "pago"
+    return default
+
+
 def register_recebimentos_routes(
     app,
     recebimentos_ns,
@@ -36,18 +68,18 @@ def register_recebimentos_routes(
         @recebimentos_ns.doc(security="jsonWebToken")
         def post(self):
             user_id = get_jwt_identity()
-            data = request.get_json()
-            if not all(k in data for k in ("descricao", "valor", "data_recebimento")):
-                return {"message": "Descrição, valor e data são obrigatórios."}, 400
+            data = request.get_json() or {}
+            if "descricao" not in data or "valor" not in data:
+                return {"message": "Descrição e valor são obrigatórios."}, 400
             try:
                 valor_decimal = float(data["valor"])
                 if valor_decimal <= 0:
                     return {"message": "Valor do recebimento deve ser positivo."}, 400
-                data_recebimento_obj = datetime.strptime(
-                    data["data_recebimento"], "%Y-%m-%d"
-                ).date()
-            except ValueError:
-                return {"message": "Formato de valor ou data inválido."}, 400
+            except (TypeError, ValueError):
+                return {"message": "Formato de valor inválido."}, 400
+            data_recebimento_obj, erro = _parse_data_recebimento(data)
+            if erro:
+                return {"message": erro}, 400
             caso_id_val = data.get("caso_id")
             if caso_id_val:
                 if not query_for_tenant(Caso).filter_by(id=caso_id_val).first():
@@ -56,7 +88,7 @@ def register_recebimentos_routes(
                 descricao=data["descricao"],
                 valor=valor_decimal,
                 data_recebimento=data_recebimento_obj,
-                recebido=data.get("recebido", False),
+                recebido=_resolve_recebido(data, default=False),
                 caso_id=caso_id_val,
                 user_id=user_id,
                 tenant_id=get_tenant_id(),
@@ -89,18 +121,18 @@ def register_recebimentos_routes(
         def put(self, recebimento_id_param):
             user_id = get_jwt_identity()
             recebimento = get_item_or_404(Recebimento, recebimento_id_param)
-            data = request.get_json()
-            if not all(k in data for k in ("descricao", "valor", "data_recebimento")):
-                return {"message": "Descrição, valor e data são obrigatórios."}, 400
+            data = request.get_json() or {}
+            if "descricao" not in data or "valor" not in data:
+                return {"message": "Descrição e valor são obrigatórios."}, 400
             try:
                 valor_decimal = float(data["valor"])
                 if valor_decimal <= 0:
                     return {"message": "Valor do recebimento deve ser positivo."}, 400
-                data_recebimento_obj = datetime.strptime(
-                    data["data_recebimento"], "%Y-%m-%d"
-                ).date()
-            except ValueError:
-                return {"message": "Formato de valor ou data inválido."}, 400
+            except (TypeError, ValueError):
+                return {"message": "Formato de valor inválido."}, 400
+            data_recebimento_obj, erro = _parse_data_recebimento(data)
+            if erro:
+                return {"message": erro}, 400
             caso_id_val = data.get("caso_id")
             if "caso_id" in data:
                 if caso_id_val is not None:
@@ -112,7 +144,7 @@ def register_recebimentos_routes(
             recebimento.descricao = data["descricao"]
             recebimento.valor = valor_decimal
             recebimento.data_recebimento = data_recebimento_obj
-            recebimento.recebido = data.get("recebido", recebimento.recebido)
+            recebimento.recebido = _resolve_recebido(data, default=recebimento.recebido)
             db.session.commit()
             app.logger.info(
                 f"Recebimento ID {recebimento.id} atualizado pelo usuário ID {user_id}."

@@ -174,9 +174,8 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
                 name="cliente_id"
                 id="cliente_id_rec"
                 className={`form-select form-select-sm ${validationErrors.cliente_id ? 'is-invalid' : ''}`}
-                value={formData.cliente_id}
+                value={formData.cliente_id || ''}
                 onChange={handleChange}
-                disabled={isEditing}
               >
                 <option value="">Selecione...</option>
                 {clientes.map((c) => (
@@ -197,9 +196,9 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
                 name="caso_id"
                 id="caso_id_rec"
                 className={`form-select form-select-sm ${validationErrors.caso_id ? 'is-invalid' : ''}`}
-                value={formData.caso_id}
+                value={formData.caso_id || ''}
                 onChange={handleChange}
-                disabled={isEditing || !formData.cliente_id}
+                disabled={!formData.cliente_id}
               >
                 <option value="">Selecione...</option>
                 {casos
