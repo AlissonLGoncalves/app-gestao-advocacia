@@ -307,6 +307,92 @@ def test_dashboard_separa_pendentes_a_receber_e_atrasados(auth_client, db):
     assert stats["recebimentos_atrasados"]["valor_total"] == 200.0
 
 
+def test_dashboard_inclui_recebidos_mes_e_ano(auth_client, db):
+    """Dashboard expoe `recebimentos_pagos_mes` e `recebimentos_pagos_ano`
+    (caixa do periodo). Conta so status=Pago com data_pagamento dentro do
+    intervalo."""
+    hoje = date.today()
+    cliente_id = _criar_cliente(auth_client, "11")
+
+    # Pago hoje (entra em mes e ano)
+    auth_client.post(
+        "/api/v1/recebimentos",
+        json={
+            "descricao": "Pago hoje",
+            "valor": 500,
+            "data_vencimento": hoje.isoformat(),
+            "data_pagamento": hoje.isoformat(),
+            "status": "Pago",
+            "cliente_id": cliente_id,
+        },
+    )
+    # Pago em janeiro do ano corrente (entra so no ano, fora do mes — a
+    # menos que hoje seja janeiro, caso em que entra nos dois).
+    pago_jan = date(hoje.year, 1, 5)
+    auth_client.post(
+        "/api/v1/recebimentos",
+        json={
+            "descricao": "Pago em janeiro",
+            "valor": 300,
+            "data_vencimento": pago_jan.isoformat(),
+            "data_pagamento": pago_jan.isoformat(),
+            "status": "Pago",
+            "cliente_id": cliente_id,
+        },
+    )
+    # Pago no ano passado (nao entra nem em mes nem em ano)
+    ano_passado = date(hoje.year - 1, 6, 15)
+    auth_client.post(
+        "/api/v1/recebimentos",
+        json={
+            "descricao": "Pago ano passado",
+            "valor": 999,
+            "data_vencimento": ano_passado.isoformat(),
+            "data_pagamento": ano_passado.isoformat(),
+            "status": "Pago",
+            "cliente_id": cliente_id,
+        },
+    )
+    # Pendente (nao entra)
+    auth_client.post(
+        "/api/v1/recebimentos",
+        json={
+            "descricao": "Pendente",
+            "valor": 777,
+            "data_vencimento": hoje.isoformat(),
+            "status": "Pendente",
+            "cliente_id": cliente_id,
+        },
+    )
+
+    res = auth_client.get("/api/v1/dashboard/stats")
+    assert res.status_code == 200
+    stats = json.loads(res.data)
+
+    # Ano corrente: hoje (500) + janeiro (300) = 800
+    assert stats["recebimentos_pagos_ano"]["quantidade"] == 2
+    assert stats["recebimentos_pagos_ano"]["valor_total"] == 800.0
+
+    # Mes corrente: depende se eh janeiro ou nao
+    if hoje.month == 1:
+        assert stats["recebimentos_pagos_mes"]["quantidade"] == 2
+        assert stats["recebimentos_pagos_mes"]["valor_total"] == 800.0
+    else:
+        assert stats["recebimentos_pagos_mes"]["quantidade"] == 1
+        assert stats["recebimentos_pagos_mes"]["valor_total"] == 500.0
+
+
+def test_dashboard_recebidos_mes_zero_quando_nada_pago(auth_client, db):
+    """Sem pagamentos no mes, os campos devem retornar 0 (nao null)."""
+    res = auth_client.get("/api/v1/dashboard/stats")
+    assert res.status_code == 200
+    stats = json.loads(res.data)
+    assert stats["recebimentos_pagos_mes"]["quantidade"] == 0
+    assert stats["recebimentos_pagos_mes"]["valor_total"] == 0.0
+    assert stats["recebimentos_pagos_ano"]["quantidade"] == 0
+    assert stats["recebimentos_pagos_ano"]["valor_total"] == 0.0
+
+
 def test_dashboard_cancelados_nao_contam_em_pendentes(auth_client, db):
     cliente_id = _criar_cliente(auth_client, "09")
     auth_client.post(
