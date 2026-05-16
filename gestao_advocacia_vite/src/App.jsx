@@ -47,6 +47,7 @@ import { adminApi } from './api/admin.js'
 import { APP_VERSION } from './version.js'
 import GlobalSearch from './components/GlobalSearch.jsx'
 import HeaderQuickAdd from './components/HeaderQuickAdd.jsx'
+import NotificacoesBell from './components/NotificacoesBell.jsx'
 import MenuItemBadge from './components/ui/MenuItemBadge.jsx'
 
 // Importação dos ícones
@@ -536,6 +537,7 @@ const MainLayout = () => {
             </div>
             <div className="d-flex align-items-center gap-2 ms-auto">
               <HeaderQuickAdd />
+              <NotificacoesBell />
               <GlobalSearch />
               <div className="app-header-date text-capitalize d-none d-lg-block">{dataAtual}</div>
             </div>
