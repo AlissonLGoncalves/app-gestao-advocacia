@@ -885,12 +885,8 @@ class Recebimento(db.Model):
             "descricao": self.descricao,
             "valor": str(self.valor),
             "status": self.status,
-            "data_vencimento": (
-                self.data_vencimento.isoformat() if self.data_vencimento else None
-            ),
-            "data_pagamento": (
-                self.data_pagamento.isoformat() if self.data_pagamento else None
-            ),
+            "data_vencimento": (self.data_vencimento.isoformat() if self.data_vencimento else None),
+            "data_pagamento": (self.data_pagamento.isoformat() if self.data_pagamento else None),
             "categoria": self.categoria,
             "forma_pagamento": self.forma_pagamento,
             "notas": self.notas,

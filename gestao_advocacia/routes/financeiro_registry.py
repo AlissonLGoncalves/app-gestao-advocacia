@@ -79,12 +79,8 @@ def register_financeiro_api(app, api, finance_access_required):
             "categoria": fields.String(description="Categoria do recebimento."),
             "forma_pagamento": fields.String(description="PIX, Boleto, etc."),
             "notas": fields.String(description="Observacoes livres."),
-            "cliente_id": fields.Integer(
-                description="ID do cliente vinculado (opcional)."
-            ),
-            "caso_id": fields.Integer(
-                description="ID do caso vinculado (opcional)."
-            ),
+            "cliente_id": fields.Integer(description="ID do cliente vinculado (opcional)."),
+            "caso_id": fields.Integer(description="ID do caso vinculado (opcional)."),
             # Aliases retidos por compat com clients antigos (POST/PUT da Fase 0).
             "data_recebimento": fields.Date(
                 description=(
@@ -92,9 +88,7 @@ def register_financeiro_api(app, api, finance_access_required):
                     "Preferir os campos novos."
                 )
             ),
-            "recebido": fields.Boolean(
-                description='[DEPRECATED] Alias de status=="Pago".'
-            ),
+            "recebido": fields.Boolean(description='[DEPRECATED] Alias de status=="Pago".'),
         },
     )
 

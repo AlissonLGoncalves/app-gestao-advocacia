@@ -216,9 +216,7 @@ def register_recebimentos_routes(
             novo.sync_legacy_fields()
             db.session.add(novo)
             db.session.commit()
-            app.logger.info(
-                f"Novo recebimento ID {novo.id} criado para usuario {user_id}."
-            )
+            app.logger.info(f"Novo recebimento ID {novo.id} criado para usuario {user_id}.")
             return novo, 201
 
     @recebimentos_ns.route("/<int:recebimento_id_param>")
@@ -290,9 +288,7 @@ def register_recebimentos_routes(
 
             recebimento.sync_legacy_fields()
             db.session.commit()
-            app.logger.info(
-                f"Recebimento ID {recebimento.id} atualizado por usuario {user_id}."
-            )
+            app.logger.info(f"Recebimento ID {recebimento.id} atualizado por usuario {user_id}.")
             return recebimento
 
         @jwt_required()
@@ -304,9 +300,7 @@ def register_recebimentos_routes(
             recebimento = get_item_or_404(Recebimento, recebimento_id_param)
             db.session.delete(recebimento)
             db.session.commit()
-            app.logger.info(
-                f"Recebimento ID {recebimento.id} deletado por usuario {user_id}."
-            )
+            app.logger.info(f"Recebimento ID {recebimento.id} deletado por usuario {user_id}.")
             return "", 204
 
     # ===== Novo endpoint: criar serie (recorrente ou parcelada) =====
