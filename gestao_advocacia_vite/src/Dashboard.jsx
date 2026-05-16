@@ -160,6 +160,10 @@ function Dashboard({ mudarSecao }) {
     recebimentosAtrasadosQtd: 0,
     despesasAPagarValor: 0,
     despesasAPagarQtd: 0,
+    despesasProgramadasValor: 0,
+    despesasProgramadasQtd: 0,
+    despesasAtrasadasValor: 0,
+    despesasAtrasadasQtd: 0,
     djenPendentesTriagem: 0,
     djenNaoLidas: 0,
   })
@@ -200,6 +204,10 @@ function Dashboard({ mudarSecao }) {
         recebimentosAtrasadosQtd: data.recebimentos_atrasados?.quantidade ?? 0,
         despesasAPagarValor: data.despesas_a_pagar?.valor_total ?? 0,
         despesasAPagarQtd: data.despesas_a_pagar?.quantidade ?? 0,
+        despesasProgramadasValor: data.despesas_programadas?.valor_total ?? 0,
+        despesasProgramadasQtd: data.despesas_programadas?.quantidade ?? 0,
+        despesasAtrasadasValor: data.despesas_atrasadas?.valor_total ?? 0,
+        despesasAtrasadasQtd: data.despesas_atrasadas?.quantidade ?? 0,
         djenPendentesTriagem: data.alertas_djen?.pendentes_triagem ?? 0,
         djenNaoLidas: data.alertas_djen?.nao_lidas ?? 0,
       })
@@ -592,6 +600,29 @@ function Dashboard({ mudarSecao }) {
             colorClass="text-danger"
             bgColorClass="bg-danger-subtle"
             onClick={() => handleCardClick('RECEBIMENTOS')}
+          />
+        </div>
+      </div>
+      {/* ── Linha Despesas detalhadas (Programadas + Atrasadas) ──────────────── */}
+      <div className="row mt-3 g-3">
+        <div className="col-sm-6 col-lg-6">
+          <StatCard
+            title="Despesas Programadas"
+            value={`${stats.despesasProgramadasQtd} (R$ ${stats.despesasProgramadasValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+            icon={TrendingDownIconSolid}
+            colorClass="text-info"
+            bgColorClass="bg-info-subtle"
+            onClick={() => handleCardClick('DESPESAS')}
+          />
+        </div>
+        <div className="col-sm-6 col-lg-6">
+          <StatCard
+            title="Despesas Atrasadas"
+            value={`${stats.despesasAtrasadasQtd} (R$ ${stats.despesasAtrasadasValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+            icon={TrendingDownIconSolid}
+            colorClass="text-danger"
+            bgColorClass="bg-danger-subtle"
+            onClick={() => handleCardClick('DESPESAS')}
           />
         </div>
       </div>
