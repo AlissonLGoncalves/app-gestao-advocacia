@@ -70,9 +70,27 @@ def register_dashboard_routes(app, dashboard_ns):
             recebimentos_atrasados_qtd = len(recebimentos_atrasados)
             recebimentos_atrasados_valor = sum(float(r.valor) for r in recebimentos_atrasados)
 
-            despesas_a_pagar = Despesa.query.filter_by(user_id=user_id, pago=False).all()
+            # Apos Despesa Robusto Fase 1: conta por status (nao mais
+            # boolean `pago`). Pendente = qualquer status != Pago/Cancelado.
+            despesas_a_pagar = Despesa.query.filter(
+                Despesa.user_id == user_id,
+                ~Despesa.status.in_(["Pago", "Cancelado"]),
+            ).all()
             despesas_a_pagar_qtd = len(despesas_a_pagar)
             despesas_a_pagar_valor = sum(float(d.valor) for d in despesas_a_pagar)
+
+            # Despesas "a pagar" (programadas futuras) vs "atrasadas".
+            despesas_programadas = [
+                d for d in despesas_a_pagar if d.data_vencimento and d.data_vencimento >= hoje_date
+            ]
+            despesas_programadas_qtd = len(despesas_programadas)
+            despesas_programadas_valor = sum(float(d.valor) for d in despesas_programadas)
+
+            despesas_atrasadas = [
+                d for d in despesas_a_pagar if d.data_vencimento and d.data_vencimento < hoje_date
+            ]
+            despesas_atrasadas_qtd = len(despesas_atrasadas)
+            despesas_atrasadas_valor = sum(float(d.valor) for d in despesas_atrasadas)
 
             agora = datetime.utcnow()
             proximos_eventos = (
@@ -129,8 +147,9 @@ def register_dashboard_routes(app, dashboard_ns):
                 ).count()
                 despesas_vencidas = Despesa.query.filter(
                     Despesa.user_id == user_id,
-                    Despesa.pago.is_(False),
-                    Despesa.data_despesa <= hoje,
+                    ~Despesa.status.in_(["Pago", "Cancelado"]),
+                    Despesa.data_vencimento.isnot(None),
+                    Despesa.data_vencimento <= hoje,
                 ).count()
             except Exception:
                 db.session.rollback()
@@ -194,6 +213,14 @@ def register_dashboard_routes(app, dashboard_ns):
                 "despesas_a_pagar": {
                     "quantidade": despesas_a_pagar_qtd,
                     "valor_total": round(despesas_a_pagar_valor, 2),
+                },
+                "despesas_programadas": {
+                    "quantidade": despesas_programadas_qtd,
+                    "valor_total": round(despesas_programadas_valor, 2),
+                },
+                "despesas_atrasadas": {
+                    "quantidade": despesas_atrasadas_qtd,
+                    "valor_total": round(despesas_atrasadas_valor, 2),
                 },
                 "proximos_eventos": eventos_lista,
                 "alertas_djen": {
@@ -398,10 +425,18 @@ def register_dashboard_routes(app, dashboard_ns):
                     ),
                 ),
             ).all()
+            # Despesas pagas: preferir data_pagamento; fallback pra
+            # data_despesa legado (registros pre-migration).
             despesas = Despesa.query.filter(
                 Despesa.tenant_id == tenant_id,
-                Despesa.pago.is_(True),
-                Despesa.data_despesa >= data_inicio,
+                Despesa.status == "Pago",
+                db.or_(
+                    Despesa.data_pagamento >= data_inicio,
+                    db.and_(
+                        Despesa.data_pagamento.is_(None),
+                        Despesa.data_despesa >= data_inicio,
+                    ),
+                ),
             ).all()
 
             buckets = {}
@@ -422,7 +457,10 @@ def register_dashboard_routes(app, dashboard_ns):
                 if chave in buckets:
                     buckets[chave]["receita"] += float(r.valor or 0)
             for d in despesas:
-                chave = d.data_despesa.strftime("%Y-%m")
+                ref = d.data_pagamento or d.data_despesa
+                if not ref:
+                    continue
+                chave = ref.strftime("%Y-%m")
                 if chave in buckets:
                     buckets[chave]["despesa"] += float(d.valor or 0)
 

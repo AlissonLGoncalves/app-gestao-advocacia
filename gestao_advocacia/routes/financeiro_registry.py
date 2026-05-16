@@ -20,31 +20,79 @@ def register_financeiro_api(app, api, finance_access_required):
         "DespesaInput",
         {
             "descricao": fields.String(required=True, description="Descricao da despesa"),
-            "valor": fields.Float(
-                required=True, description="Valor da despesa (ex: 150.75)", min=0.01
+            "valor": fields.Float(required=True, description="Valor (ex: 150.75)", min=0.01),
+            "data_vencimento": fields.Date(description="Data de vencimento (opcional)"),
+            "data_pagamento": fields.Date(description="Data efetiva do pagamento"),
+            "status": fields.String(
+                description='"Pendente"|"Pago"|"Vencido"|"Cancelado"|"Em Negociacao"',
+                enum=["Pendente", "Pago", "Vencido", "Cancelado", "Em Negociacao"],
             ),
-            "data_despesa": fields.Date(
-                required=True, description="Data em que a despesa ocorreu (formato YYYY-MM-DD)"
-            ),
-            "pago": fields.Boolean(description="Indica se a despesa ja foi paga", default=False),
-            "caso_id": fields.Integer(
-                description="ID do caso ao qual esta despesa esta associada (opcional)"
-            ),
+            "categoria": fields.String(),
+            "forma_pagamento": fields.String(),
+            "notas": fields.String(),
+            "fornecedor": fields.String(description="Loja/prestador (texto livre, opcional)"),
+            "cliente_id": fields.Integer(description="Cliente vinculado (para reembolso)"),
+            "caso_id": fields.Integer(),
+            # Aliases legados retidos por compat com clients antigos
+            "data_despesa": fields.Date(description="[DEPRECATED] use data_vencimento"),
+            "pago": fields.Boolean(description='[DEPRECATED] use status=="Pago"'),
         },
     )
+
     despesa_model_dto = despesas_ns.model(
         "DespesaOutput",
         {
             "id": fields.Integer(readonly=True),
             "descricao": fields.String,
-            "valor": fields.String(
-                attribute=lambda x: str(x.valor),
-                description="Valor da despesa formatado como string",
-            ),
-            "data_despesa": fields.Date(dt_format="iso8601"),
-            "pago": fields.Boolean,
+            "valor": fields.String(attribute=lambda x: str(x.valor)),
+            "status": fields.String,
+            "data_vencimento": fields.Date(dt_format="iso8601"),
+            "data_pagamento": fields.Date(dt_format="iso8601"),
+            "categoria": fields.String,
+            "forma_pagamento": fields.String,
+            "notas": fields.String,
+            "fornecedor": fields.String,
+            "cliente_id": fields.Integer(nullable=True),
             "caso_id": fields.Integer(nullable=True),
             "user_id": fields.Integer,
+            "recorrencia_id": fields.Integer(nullable=True),
+            "numero_parcela": fields.Integer(nullable=True),
+            # Compat retroativa
+            "data_despesa": fields.Date(dt_format="iso8601"),
+            "pago": fields.Boolean,
+        },
+    )
+
+    despesa_serie_input_dto = despesas_ns.model(
+        "DespesaSerieInput",
+        {
+            "tipo": fields.String(
+                required=True,
+                enum=["RECORRENTE", "PARCELADO"],
+                description="RECORRENTE (aluguel mensal) ou PARCELADO (compra em N x).",
+            ),
+            "frequencia": fields.String(enum=["MENSAL", "SEMANAL", "QUINZENAL", "ANUAL"]),
+            "valor_parcela": fields.Float(required=True, min=0.01),
+            "total_parcelas": fields.Integer(
+                description="Obrigatorio se PARCELADO; default 12 se RECORRENTE."
+            ),
+            "data_inicio": fields.Date(required=True),
+            "descricao": fields.String(required=True),
+            "categoria": fields.String(),
+            "fornecedor": fields.String(),
+            "cliente_id": fields.Integer(),
+            "caso_id": fields.Integer(),
+            "notas": fields.String(),
+        },
+    )
+
+    despesa_serie_output_dto = despesas_ns.model(
+        "DespesaSerieOutput",
+        {
+            "recorrencia_id": fields.Integer,
+            "tipo": fields.String,
+            "total_geradas": fields.Integer,
+            "parcelas": fields.List(fields.Nested(despesa_model_dto)),
         },
     )
 
@@ -212,6 +260,8 @@ def register_financeiro_api(app, api, finance_access_required):
         despesas_ns,
         despesa_input_model_dto,
         despesa_model_dto,
+        despesa_serie_input_dto,
+        despesa_serie_output_dto,
         finance_access_required,
     )
 
