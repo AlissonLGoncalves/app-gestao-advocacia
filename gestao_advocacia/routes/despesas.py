@@ -10,7 +10,9 @@ Novo: POST /despesas/serie cria N parcelas vinculadas a uma
 RecorrenciaDespesa (aluguel mensal, compra parcelada com fornecedor, etc).
 """
 
+from collections import defaultdict
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from flask import request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -285,6 +287,103 @@ def register_despesas_routes(
             db.session.commit()
             app.logger.info(f"Despesa ID {despesa.id} deletada por usuario {user_id}.")
             return "", 204
+
+    # ===== Historico de despesas pagas (status=Pago) =====
+    @despesas_ns.route("/historico")
+    class DespesaHistoricoAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @finance_access_required
+        @despesas_ns.doc(
+            security="jsonWebToken",
+            params={
+                "ano": "Ano (YYYY). Default: ano corrente.",
+                "mes": "Mes (1-12). Opcional: se omitido, retorna o ano inteiro.",
+            },
+            description=(
+                "Historico de despesas pagas (status=Pago) agrupado por "
+                "data_pagamento. Espelha /recebimentos/historico — usado pra "
+                "compor visao de Entrada x Saida (Etapa 4)."
+            ),
+        )
+        def get(self):
+            hoje = date.today()
+            try:
+                ano = int(request.args.get("ano") or hoje.year)
+            except (TypeError, ValueError):
+                despesas_ns.abort(400, message="ano invalido. Use YYYY.")
+            if ano < 1900 or ano > 2200:
+                despesas_ns.abort(400, message="ano fora do intervalo permitido.")
+
+            mes_raw = request.args.get("mes")
+            mes = None
+            if mes_raw not in (None, ""):
+                try:
+                    mes = int(mes_raw)
+                except (TypeError, ValueError):
+                    despesas_ns.abort(400, message="mes invalido. Use 1-12.")
+                if mes < 1 or mes > 12:
+                    despesas_ns.abort(400, message="mes deve estar entre 1 e 12.")
+
+            ini_ano = date(ano, 1, 1)
+            fim_ano = date(ano, 12, 31)
+
+            query = query_for_tenant(Despesa).filter(
+                Despesa.status == STATUS_PAGO,
+                Despesa.data_pagamento.isnot(None),
+                Despesa.data_pagamento >= ini_ano,
+                Despesa.data_pagamento <= fim_ano,
+            )
+            despesas_ano = query.order_by(Despesa.data_pagamento.desc()).all()
+
+            por_mes_total = [Decimal("0") for _ in range(12)]
+            por_mes_qtd = [0 for _ in range(12)]
+            total_ano = Decimal("0")
+            por_categoria_acc = defaultdict(lambda: {"total": Decimal("0"), "qtd": 0})
+
+            itens_filtrados = []
+            total_mes = Decimal("0") if mes else None
+            qtd_mes = 0 if mes else None
+
+            for d in despesas_ano:
+                valor = Decimal(str(d.valor))
+                total_ano += valor
+                m_idx = d.data_pagamento.month
+                por_mes_total[m_idx - 1] += valor
+                por_mes_qtd[m_idx - 1] += 1
+
+                cat = d.categoria or "Sem categoria"
+                por_categoria_acc[cat]["total"] += valor
+                por_categoria_acc[cat]["qtd"] += 1
+
+                if mes is None or m_idx == mes:
+                    itens_filtrados.append(d.to_dict())
+                    if mes is not None:
+                        total_mes += valor
+                        qtd_mes += 1
+
+            por_categoria = [
+                {"categoria": cat, "total": str(v["total"]), "qtd": v["qtd"]}
+                for cat, v in sorted(
+                    por_categoria_acc.items(), key=lambda kv: kv[1]["total"], reverse=True
+                )
+            ]
+            por_mes = [
+                {"mes": m + 1, "total": str(por_mes_total[m]), "qtd": por_mes_qtd[m]}
+                for m in range(12)
+            ]
+
+            return {
+                "ano": ano,
+                "mes": mes,
+                "itens": itens_filtrados,
+                "total_mes": str(total_mes) if total_mes is not None else None,
+                "total_ano": str(total_ano),
+                "qtd_mes": qtd_mes,
+                "qtd_ano": len(despesas_ano),
+                "por_categoria": por_categoria,
+                "por_mes": por_mes,
+            }
 
     # ===== Endpoint: criar serie (RECORRENTE ou PARCELADO) =====
     @despesas_ns.route("/serie")

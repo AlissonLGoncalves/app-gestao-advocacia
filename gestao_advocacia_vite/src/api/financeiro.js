@@ -116,6 +116,16 @@ export function createDespesaSerie(body) {
   return api.post('/despesas/serie', body)
 }
 
+/**
+ * Historico de despesas pagas (status=Pago) no periodo. Espelha
+ * getHistoricoRecebimentos — usado pra compor Entrada x Saida (Etapa 4).
+ *
+ * GET /despesas/historico?ano=YYYY&mes=MM
+ */
+export function getHistoricoDespesas(params = {}) {
+  return api.get(`/despesas/historico${toQueryString(params)}`)
+}
+
 export function getResumoFinanceiro(params = {}) {
   return api.get(`/dashboard/stats${toQueryString(params)}`)
 }
