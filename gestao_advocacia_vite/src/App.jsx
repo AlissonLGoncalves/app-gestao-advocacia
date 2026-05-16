@@ -343,7 +343,8 @@ const MainLayout = () => {
     if (actionSegment === 'novo') titlePrefix = 'Novo '
     else if (actionSegment === 'editar' && idSegment) titlePrefix = 'Editar '
 
-    let baseTitle = ''
+    // Sempre atribuido no switch (incluindo default). Nao precisa de seed.
+    let baseTitle
     switch (baseSegment) {
       case 'clientes':
         baseTitle = 'Cliente'

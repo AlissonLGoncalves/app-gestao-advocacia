@@ -1,5 +1,5 @@
 // src/components/OnboardingChecklist.jsx
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircleIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
 import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid'
@@ -55,7 +55,9 @@ export default function OnboardingChecklist({ stats }) {
   const navigate = useNavigate()
   const [recolhido, setRecolhido] = useState(false)
 
-  const dismissed = sessionStorage.getItem(STORAGE_KEY) === 'true'
+  // Nota: o estado real de "ocultar" e feito por ocultoPermanente abaixo
+  // (linha ~75). A leitura direta de STORAGE_KEY era duplicada e nao era
+  // reativa — removida.
 
   const statsCompletos = {
     totalClientes: stats?.totalClientes ?? 0,

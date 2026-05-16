@@ -29,7 +29,7 @@ describe('CasoForm', () => {
     localStorage.setItem('token', 'token-teste')
     createCaso.mockResolvedValue({ id: 99 })
     consultaPublicaCnj.mockResolvedValue({})
-    globalThis.fetch = vi.fn((url, options) => {
+    globalThis.fetch = vi.fn((url, _options) => {
       if (String(url).includes('/clientes/?sort_by=')) {
         return Promise.resolve({
           ok: true,

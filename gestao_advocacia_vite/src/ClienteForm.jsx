@@ -7,7 +7,7 @@ import DadosPessoaisSection from './components/forms/cliente/DadosPessoaisSectio
 import EnderecoSection from './components/forms/cliente/EnderecoSection.jsx'
 import ContatoSection from './components/forms/cliente/ContatoSection.jsx'
 import useClienteForm from './hooks/useClienteForm.js'
-import { anonimizarCliente, extrairDadosDocumentoCliente } from './api/clientes.js'
+import { anonimizarCliente } from './api/clientes.js'
 import { api } from './api/client.js'
 
 const initialStatePF = {

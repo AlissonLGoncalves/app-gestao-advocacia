@@ -1,5 +1,5 @@
 // src/ClienteList.jsx
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_URL } from './config.js'
 import { deleteCliente, listClientes } from './api/clientes.js'
