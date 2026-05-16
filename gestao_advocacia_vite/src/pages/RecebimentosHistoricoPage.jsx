@@ -10,6 +10,7 @@ import {
 import { getHistoricoRecebimentos, getHistoricoDespesas } from '../api/financeiro.js'
 import { listClientes } from '../api/clientes.js'
 import { listCasos } from '../api/casos.js'
+import EmitirNFSeButton from '../components/EmitirNFSeButton.jsx'
 
 const MESES_PT = [
   'Janeiro',
@@ -485,6 +486,7 @@ function RecebimentosHistoricoPage() {
                             <th>Caso</th>
                             <th>Categoria</th>
                             <th className="text-end">Valor</th>
+                            <th>NFS-e</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -504,6 +506,9 @@ function RecebimentosHistoricoPage() {
                                 )}
                               </td>
                               <td className="text-end fw-bold">{formatBRL(it.valor)}</td>
+                              <td>
+                                <EmitirNFSeButton recebimento={it} />
+                              </td>
                             </tr>
                           ))}
                         </tbody>

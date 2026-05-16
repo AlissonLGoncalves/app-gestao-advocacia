@@ -13,6 +13,7 @@ from .dashboard import register_dashboard_routes
 from .documentos import register_documentos_routes
 from .eventos import register_eventos_routes
 from .financeiro_registry import register_financeiro_api
+from .nfse import register_nfse_routes
 from .notificacoes import register_notificacoes_routes
 from .portal import register_portal_routes
 from .procuracoes import register_procuracoes_routes
@@ -47,6 +48,7 @@ def register_api_routes(app, api, finance_access_required):
     projudi_ns = Namespace("projudi", description="Integracao com projudi-agent (scraper local)")
     modelos_ns = Namespace("modelos", description="Modelos editaveis de documentos juridicos")
     notificacoes_ns = Namespace("notificacoes", description="Notificacoes in-app do usuario")
+    nfse_ns = Namespace("nfse", description="Emissao de Notas Fiscais de Servico eletronicas")
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -64,6 +66,7 @@ def register_api_routes(app, api, finance_access_required):
     api.add_namespace(projudi_ns)
     api.add_namespace(modelos_ns)
     api.add_namespace(notificacoes_ns)
+    api.add_namespace(nfse_ns)
 
     user_model_dto = auth_ns.model(
         "UserRegistration",
@@ -484,6 +487,7 @@ def register_api_routes(app, api, finance_access_required):
 
     register_dashboard_routes(app, dashboard_ns)
     register_notificacoes_routes(app, notificacoes_ns)
+    register_nfse_routes(app, nfse_ns, finance_access_required)
     register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_model_dto)
     register_documentos_routes(app, documentos_ns, documento_model_dto)
     register_procuracoes_routes(app, procuracoes_ns, procuracao_model_dto)
