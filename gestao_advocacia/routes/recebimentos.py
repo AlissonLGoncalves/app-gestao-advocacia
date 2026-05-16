@@ -10,7 +10,9 @@ Novo: POST /recebimentos/serie cria N recebimentos vinculados a uma
 RecorrenciaRecebimento (parcelamento fechado ou honorario recorrente).
 """
 
+from collections import defaultdict
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from flask import request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -302,6 +304,110 @@ def register_recebimentos_routes(
             db.session.commit()
             app.logger.info(f"Recebimento ID {recebimento.id} deletado por usuario {user_id}.")
             return "", 204
+
+    # ===== Historico de pagamentos recebidos (status=Pago) =====
+    @recebimentos_ns.route("/historico")
+    class RecebimentoHistoricoAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @finance_access_required
+        @recebimentos_ns.doc(
+            security="jsonWebToken",
+            params={
+                "ano": "Ano (YYYY). Default: ano corrente.",
+                "mes": "Mes (1-12). Opcional: se omitido, retorna o ano inteiro.",
+            },
+            description=(
+                "Historico de recebimentos pagos (status=Pago) agrupado por "
+                "data_pagamento. Retorna itens do periodo + totais consolidados "
+                "(mes, ano), breakdown por categoria e por mes (12 buckets)."
+            ),
+        )
+        def get(self):
+            hoje = date.today()
+            try:
+                ano = int(request.args.get("ano") or hoje.year)
+            except (TypeError, ValueError):
+                recebimentos_ns.abort(400, message="ano invalido. Use YYYY.")
+            if ano < 1900 or ano > 2200:
+                recebimentos_ns.abort(400, message="ano fora do intervalo permitido.")
+
+            mes_raw = request.args.get("mes")
+            mes = None
+            if mes_raw not in (None, ""):
+                try:
+                    mes = int(mes_raw)
+                except (TypeError, ValueError):
+                    recebimentos_ns.abort(400, message="mes invalido. Use 1-12.")
+                if mes < 1 or mes > 12:
+                    recebimentos_ns.abort(400, message="mes deve estar entre 1 e 12.")
+
+            # Janela do ano inteiro (sempre buscamos o ano todo pra montar
+            # `por_mes` e `total_ano`; o filtro de mes so afeta `itens` e
+            # `total_mes`).
+            ini_ano = date(ano, 1, 1)
+            fim_ano = date(ano, 12, 31)
+
+            query = query_for_tenant(Recebimento).filter(
+                Recebimento.status == STATUS_PAGO,
+                Recebimento.data_pagamento.isnot(None),
+                Recebimento.data_pagamento >= ini_ano,
+                Recebimento.data_pagamento <= fim_ano,
+            )
+            recebimentos_ano = query.order_by(Recebimento.data_pagamento.desc()).all()
+
+            # Buckets por mes (1..12). Inicializa zerado pra UI nao ter que
+            # preencher meses faltantes.
+            por_mes_total = [Decimal("0") for _ in range(12)]
+            por_mes_qtd = [0 for _ in range(12)]
+            total_ano = Decimal("0")
+            por_categoria_acc = defaultdict(lambda: {"total": Decimal("0"), "qtd": 0})
+
+            # Itens filtrados pelo mes (se houver). `total_mes`/`qtd_mes` so
+            # existem quando o usuario filtrou mes especifico.
+            itens_filtrados = []
+            total_mes = Decimal("0") if mes else None
+            qtd_mes = 0 if mes else None
+
+            for r in recebimentos_ano:
+                valor = Decimal(str(r.valor))
+                total_ano += valor
+                m_idx = r.data_pagamento.month
+                por_mes_total[m_idx - 1] += valor
+                por_mes_qtd[m_idx - 1] += 1
+
+                cat = r.categoria or "Sem categoria"
+                por_categoria_acc[cat]["total"] += valor
+                por_categoria_acc[cat]["qtd"] += 1
+
+                if mes is None or m_idx == mes:
+                    itens_filtrados.append(r.to_dict())
+                    if mes is not None:
+                        total_mes += valor
+                        qtd_mes += 1
+
+            por_categoria = [
+                {"categoria": cat, "total": str(v["total"]), "qtd": v["qtd"]}
+                for cat, v in sorted(
+                    por_categoria_acc.items(), key=lambda kv: kv[1]["total"], reverse=True
+                )
+            ]
+            por_mes = [
+                {"mes": m + 1, "total": str(por_mes_total[m]), "qtd": por_mes_qtd[m]}
+                for m in range(12)
+            ]
+
+            return {
+                "ano": ano,
+                "mes": mes,
+                "itens": itens_filtrados,
+                "total_mes": str(total_mes) if total_mes is not None else None,
+                "total_ano": str(total_ano),
+                "qtd_mes": qtd_mes,
+                "qtd_ano": len(recebimentos_ano),
+                "por_categoria": por_categoria,
+                "por_mes": por_mes,
+            }
 
     # ===== Novo endpoint: criar serie (recorrente ou parcelada) =====
     @recebimentos_ns.route("/serie")

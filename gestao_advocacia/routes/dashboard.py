@@ -70,6 +70,31 @@ def register_dashboard_routes(app, dashboard_ns):
             recebimentos_atrasados_qtd = len(recebimentos_atrasados)
             recebimentos_atrasados_valor = sum(float(r.valor) for r in recebimentos_atrasados)
 
+            # Pagamentos efetivamente recebidos no mes/ano corrente.
+            # Usa data_pagamento (nocao de caixa) e status="Pago".
+            # Espelha o endpoint /recebimentos/historico (Etapa 1).
+            ini_ano = date(hoje_date.year, 1, 1)
+            ini_mes = date(hoje_date.year, hoje_date.month, 1)
+            try:
+                recebidos_ano_q = Recebimento.query.filter(
+                    Recebimento.user_id == user_id,
+                    Recebimento.status == "Pago",
+                    Recebimento.data_pagamento.isnot(None),
+                    Recebimento.data_pagamento >= ini_ano,
+                    Recebimento.data_pagamento <= hoje_date,
+                ).all()
+                recebidos_ano_qtd = len(recebidos_ano_q)
+                recebidos_ano_valor = sum(float(r.valor) for r in recebidos_ano_q)
+                recebidos_mes_q = [
+                    r for r in recebidos_ano_q if r.data_pagamento >= ini_mes
+                ]
+                recebidos_mes_qtd = len(recebidos_mes_q)
+                recebidos_mes_valor = sum(float(r.valor) for r in recebidos_mes_q)
+            except Exception:
+                db.session.rollback()
+                recebidos_ano_qtd = recebidos_mes_qtd = 0
+                recebidos_ano_valor = recebidos_mes_valor = 0.0
+
             # Apos Despesa Robusto Fase 1: conta por status (nao mais
             # boolean `pago`). Pendente = qualquer status != Pago/Cancelado.
             despesas_a_pagar = Despesa.query.filter(
@@ -209,6 +234,14 @@ def register_dashboard_routes(app, dashboard_ns):
                 "recebimentos_atrasados": {
                     "quantidade": recebimentos_atrasados_qtd,
                     "valor_total": round(recebimentos_atrasados_valor, 2),
+                },
+                "recebimentos_pagos_mes": {
+                    "quantidade": recebidos_mes_qtd,
+                    "valor_total": round(recebidos_mes_valor, 2),
+                },
+                "recebimentos_pagos_ano": {
+                    "quantidade": recebidos_ano_qtd,
+                    "valor_total": round(recebidos_ano_valor, 2),
                 },
                 "despesas_a_pagar": {
                     "quantidade": despesas_a_pagar_qtd,
