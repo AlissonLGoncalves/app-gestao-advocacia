@@ -70,6 +70,9 @@ const initialState = () => ({
   // Campos da serie (so quando tipo != UNICO)
   frequencia: 'MENSAL',
   total_parcelas: 12,
+  // Fase 4: flag "Sem vencimento". Quando true, data_vencimento e
+  // enviado como null pro backend.
+  semVencimento: false,
 })
 
 function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel }) {
@@ -132,6 +135,8 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
         dados.status = recebimentoParaEditar.recebido ? 'Pago' : 'Pendente'
       }
       dados.tipo = TIPO_UNICO // edicao nao suporta mudar pra serie
+      // Detectar registros sem vencimento (data_vencimento=null no backend).
+      dados.semVencimento = !dados.data_vencimento
       setFormData(dados)
       setIsEditing(true)
     } else {
@@ -150,8 +155,11 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
     ) {
       erros.valor = 'Valor deve ser positivo.'
     }
-    if (!formData.data_vencimento) {
-      erros.data_vencimento = 'Data de vencimento e obrigatoria.'
+    // Data de vencimento eh OPCIONAL para tipo UNICO (Fase 4: "Sem vencimento").
+    // Para serie (RECORRENTE/PARCELADO) eh obrigatoria — precisa do ponto
+    // de partida pra calcular vencimentos das parcelas.
+    if (formData.tipo !== TIPO_UNICO && !formData.data_vencimento) {
+      erros.data_vencimento = 'Data inicial e obrigatoria para series.'
     }
     if (!formData.status) erros.status = 'Status e obrigatorio.'
     if (!formData.categoria) erros.categoria = 'Categoria e obrigatoria.'
@@ -526,7 +534,10 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
           <div className="row">
             <div className="col-md-6 mb-3">
               <label htmlFor="data_vencimento_rec" className="form-label form-label-sm">
-                {formData.tipo === TIPO_UNICO ? 'Data de Vencimento *' : 'Data da 1a parcela *'}
+                {formData.tipo === TIPO_UNICO ? 'Data de Vencimento' : 'Data da 1a parcela *'}
+                {formData.tipo === TIPO_UNICO && (
+                  <span className="text-muted ms-1">(opcional)</span>
+                )}
               </label>
               <input
                 type="date"
@@ -535,7 +546,29 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
                 className={`form-control form-control-sm ${validationErrors.data_vencimento ? 'is-invalid' : ''}`}
                 value={formData.data_vencimento}
                 onChange={handleChange}
+                disabled={formData.tipo === TIPO_UNICO && formData.semVencimento}
               />
+              {formData.tipo === TIPO_UNICO && (
+                <div className="form-check form-check-sm mt-1">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    id="semVencimentoCheck"
+                    checked={!!formData.semVencimento}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setFormData((prev) => ({
+                        ...prev,
+                        semVencimento: checked,
+                        data_vencimento: checked ? '' : hoje(),
+                      }))
+                    }}
+                  />
+                  <label className="form-check-label small text-muted" htmlFor="semVencimentoCheck">
+                    Sem data de vencimento (lancamento sem prazo)
+                  </label>
+                </div>
+              )}
               {validationErrors.data_vencimento && (
                 <div className="invalid-feedback d-block">{validationErrors.data_vencimento}</div>
               )}

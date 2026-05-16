@@ -154,6 +154,10 @@ function Dashboard({ mudarSecao }) {
     casosAtivos: undefined,
     recebimentosPendentesValor: 0,
     recebimentosPendentesQtd: 0,
+    recebimentosAReceberValor: 0,
+    recebimentosAReceberQtd: 0,
+    recebimentosAtrasadosValor: 0,
+    recebimentosAtrasadosQtd: 0,
     despesasAPagarValor: 0,
     despesasAPagarQtd: 0,
     djenPendentesTriagem: 0,
@@ -189,6 +193,11 @@ function Dashboard({ mudarSecao }) {
         casosAtivos: data.casos_ativos ?? 0,
         recebimentosPendentesValor: data.recebimentos_pendentes?.valor_total ?? 0,
         recebimentosPendentesQtd: data.recebimentos_pendentes?.quantidade ?? 0,
+        // Novos counters do dashboard.py (Fase 1 do Recebimento Robusto)
+        recebimentosAReceberValor: data.recebimentos_a_receber?.valor_total ?? 0,
+        recebimentosAReceberQtd: data.recebimentos_a_receber?.quantidade ?? 0,
+        recebimentosAtrasadosValor: data.recebimentos_atrasados?.valor_total ?? 0,
+        recebimentosAtrasadosQtd: data.recebimentos_atrasados?.quantidade ?? 0,
         despesasAPagarValor: data.despesas_a_pagar?.valor_total ?? 0,
         despesasAPagarQtd: data.despesas_a_pagar?.quantidade ?? 0,
         djenPendentesTriagem: data.alertas_djen?.pendentes_triagem ?? 0,
@@ -560,6 +569,29 @@ function Dashboard({ mudarSecao }) {
             colorClass="text-danger"
             bgColorClass="bg-danger-subtle"
             onClick={() => handleCardClick('DESPESAS')}
+          />
+        </div>
+      </div>
+      {/* ── Linha Recebimentos detalhados (A Receber + Atrasados) ─────────────── */}
+      <div className="row mt-3 g-3">
+        <div className="col-sm-6 col-lg-6">
+          <StatCard
+            title="A Receber (Programados)"
+            value={`${stats.recebimentosAReceberQtd} (R$ ${stats.recebimentosAReceberValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+            icon={CreditCardIconSolid}
+            colorClass="text-info"
+            bgColorClass="bg-info-subtle"
+            onClick={() => handleCardClick('RECEBIMENTOS')}
+          />
+        </div>
+        <div className="col-sm-6 col-lg-6">
+          <StatCard
+            title="Atrasados"
+            value={`${stats.recebimentosAtrasadosQtd} (R$ ${stats.recebimentosAtrasadosValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+            icon={CreditCardIconSolid}
+            colorClass="text-danger"
+            bgColorClass="bg-danger-subtle"
+            onClick={() => handleCardClick('RECEBIMENTOS')}
           />
         </div>
       </div>
