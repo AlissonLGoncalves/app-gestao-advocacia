@@ -1,8 +1,13 @@
 // src/pages/RecebimentosHistoricoPage.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowTrendingUpIcon, ArrowLeftIcon } from '@heroicons/react/24/solid'
-import { getHistoricoRecebimentos } from '../api/financeiro.js'
+import {
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  ArrowLeftIcon,
+  ScaleIcon,
+} from '@heroicons/react/24/solid'
+import { getHistoricoRecebimentos, getHistoricoDespesas } from '../api/financeiro.js'
 import { listClientes } from '../api/clientes.js'
 import { listCasos } from '../api/casos.js'
 
@@ -49,6 +54,7 @@ function RecebimentosHistoricoPage() {
   // mes vazio = ano inteiro
   const [mes, setMes] = useState('')
   const [historico, setHistorico] = useState(null)
+  const [despesas, setDespesas] = useState(null)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
 
@@ -95,12 +101,18 @@ function RecebimentosHistoricoPage() {
     try {
       const params = { ano }
       if (mes) params.mes = mes
-      const data = await getHistoricoRecebimentos(params)
-      setHistorico(data)
+      // Carrega recebimentos e despesas em paralelo pra compor Entrada x Saida.
+      const [rec, desp] = await Promise.all([
+        getHistoricoRecebimentos(params),
+        getHistoricoDespesas(params),
+      ])
+      setHistorico(rec)
+      setDespesas(desp)
     } catch (e) {
       console.error('RecebimentosHistoricoPage: erro ao carregar', e)
       setErro(e?.message || 'Falha ao carregar o histórico.')
       setHistorico(null)
+      setDespesas(null)
     } finally {
       setLoading(false)
     }
@@ -114,10 +126,24 @@ function RecebimentosHistoricoPage() {
   const resolverCaso = (id) => (id ? casoMap[id] || `Caso #${id}` : 'Sem caso')
 
   // Maior valor mensal serve de referencia pras barras (escala relativa).
+  // Considera entrada E saida juntas pro grafico comparativo ficar coerente.
   const maxMes = useMemo(() => {
-    if (!historico?.por_mes) return 0
-    return historico.por_mes.reduce((acc, b) => Math.max(acc, parseFloat(b.total) || 0), 0)
-  }, [historico])
+    const arr = []
+    if (historico?.por_mes) arr.push(...historico.por_mes.map((b) => parseFloat(b.total) || 0))
+    if (despesas?.por_mes) arr.push(...despesas.por_mes.map((b) => parseFloat(b.total) || 0))
+    return arr.length ? Math.max(...arr) : 0
+  }, [historico, despesas])
+
+  // Calculos de saldo (Entrada x Saida — Etapa 4).
+  const saldoMes = useMemo(() => {
+    if (!mes || !historico || !despesas) return null
+    if (historico.total_mes == null || despesas.total_mes == null) return null
+    return parseFloat(historico.total_mes) - parseFloat(despesas.total_mes)
+  }, [mes, historico, despesas])
+  const saldoAno = useMemo(() => {
+    if (!historico || !despesas) return null
+    return parseFloat(historico.total_ano) - parseFloat(despesas.total_ano)
+  }, [historico, despesas])
 
   return (
     <div className="container-fluid px-md-3 px-lg-4 py-3">
@@ -273,16 +299,99 @@ function RecebimentosHistoricoPage() {
             </div>
           </div>
 
-          {/* Barras por mes */}
+          {/* Entrada x Saida — Etapa 4 */}
+          {despesas && (
+            <div className="card border-0 shadow-sm mb-3">
+              <div className="card-header bg-white border-0 pb-0">
+                <h3 className="h6 mb-0 fw-bold text-dark">
+                  Entrada × Saída {mes ? `— ${MESES_PT[parseInt(mes, 10) - 1]}/${ano}` : `— ${ano}`}
+                </h3>
+              </div>
+              <div className="card-body">
+                <div className="row g-3 mb-3">
+                  <div className="col-md-4">
+                    <div className="d-flex align-items-center p-3 rounded bg-success-subtle">
+                      <ArrowTrendingUpIcon
+                        style={{ width: 24, height: 24, color: '#198754' }}
+                        className="me-2"
+                      />
+                      <div>
+                        <div className="small text-muted">Entradas (recebidas)</div>
+                        <div className="h5 mb-0 fw-bold text-success">
+                          {formatBRL(mes ? historico.total_mes : historico.total_ano)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-4">
+                    <div className="d-flex align-items-center p-3 rounded bg-danger-subtle">
+                      <ArrowTrendingDownIcon
+                        style={{ width: 24, height: 24, color: '#dc3545' }}
+                        className="me-2"
+                      />
+                      <div>
+                        <div className="small text-muted">Saídas (pagas)</div>
+                        <div className="h5 mb-0 fw-bold text-danger">
+                          {formatBRL(mes ? despesas.total_mes : despesas.total_ano)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-4">
+                    {(() => {
+                      const saldo = mes ? saldoMes : saldoAno
+                      const positivo = saldo == null ? null : saldo >= 0
+                      const bgClass =
+                        positivo == null
+                          ? 'bg-light'
+                          : positivo
+                            ? 'bg-success-subtle'
+                            : 'bg-danger-subtle'
+                      const txtClass =
+                        positivo == null ? 'text-muted' : positivo ? 'text-success' : 'text-danger'
+                      return (
+                        <div className={`d-flex align-items-center p-3 rounded ${bgClass}`}>
+                          <ScaleIcon
+                            style={{
+                              width: 24,
+                              height: 24,
+                              color: positivo ? '#198754' : '#dc3545',
+                            }}
+                            className="me-2"
+                          />
+                          <div>
+                            <div className="small text-muted">Saldo</div>
+                            <div className={`h5 mb-0 fw-bold ${txtClass}`}>
+                              {saldo == null ? '—' : formatBRL(saldo)}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Distribuicao mensal — barras pareadas (entrada vs saida) */}
           <div className="card border-0 shadow-sm mb-3">
-            <div className="card-header bg-white border-0 pb-0">
+            <div className="card-header bg-white border-0 pb-0 d-flex justify-content-between align-items-center">
               <h3 className="h6 mb-0 fw-bold text-dark">Distribuição mensal — {ano}</h3>
+              <div className="small text-muted">
+                <span style={{ color: '#198754' }}>● Entrada</span>{' '}
+                <span style={{ color: '#dc3545' }} className="ms-2">
+                  ● Saída
+                </span>
+              </div>
             </div>
             <div className="card-body">
-              <div className="d-flex flex-column gap-2">
-                {historico.por_mes.map((b) => {
-                  const total = parseFloat(b.total) || 0
-                  const pct = maxMes > 0 ? (total / maxMes) * 100 : 0
+              <div className="d-flex flex-column gap-1">
+                {historico.por_mes.map((b, i) => {
+                  const totalRec = parseFloat(b.total) || 0
+                  const totalDesp = despesas ? parseFloat(despesas.por_mes[i].total) || 0 : 0
+                  const pctRec = maxMes > 0 ? (totalRec / maxMes) * 100 : 0
+                  const pctDesp = maxMes > 0 ? (totalDesp / maxMes) * 100 : 0
                   const isMesSelecionado = mes && parseInt(mes, 10) === b.mes
                   return (
                     <div
@@ -291,6 +400,7 @@ function RecebimentosHistoricoPage() {
                       style={{
                         cursor: 'pointer',
                         fontWeight: isMesSelecionado ? 700 : 400,
+                        padding: '4px 0',
                       }}
                       onClick={() => setMes(String(b.mes))}
                       role="button"
@@ -302,31 +412,44 @@ function RecebimentosHistoricoPage() {
                       <span style={{ width: 40, fontSize: '0.85rem' }} className="text-muted">
                         {MESES_ABREV[b.mes - 1]}
                       </span>
-                      <div
-                        className="flex-grow-1 me-2"
-                        style={{ background: '#f0f0f4', height: 22, borderRadius: 4 }}
-                      >
+                      <div className="flex-grow-1 me-2">
                         <div
                           style={{
-                            width: `${pct}%`,
-                            height: '100%',
-                            background: isMesSelecionado
-                              ? 'var(--primary)'
-                              : 'linear-gradient(90deg, #198754 0%, #20c997 100%)',
-                            borderRadius: 4,
-                            transition: 'width 0.3s ease',
+                            background: '#f0f0f4',
+                            height: 11,
+                            borderRadius: 3,
+                            marginBottom: 2,
                           }}
-                        />
+                        >
+                          <div
+                            style={{
+                              width: `${pctRec}%`,
+                              height: '100%',
+                              background: '#198754',
+                              borderRadius: 3,
+                              transition: 'width 0.3s ease',
+                            }}
+                          />
+                        </div>
+                        <div style={{ background: '#f0f0f4', height: 11, borderRadius: 3 }}>
+                          <div
+                            style={{
+                              width: `${pctDesp}%`,
+                              height: '100%',
+                              background: '#dc3545',
+                              borderRadius: 3,
+                              transition: 'width 0.3s ease',
+                            }}
+                          />
+                        </div>
                       </div>
-                      <span style={{ width: 130, fontSize: '0.85rem' }} className="text-end">
-                        {formatBRL(total)}
-                      </span>
-                      <span
-                        style={{ width: 40, fontSize: '0.75rem' }}
-                        className="text-end text-muted"
+                      <div
+                        style={{ width: 160, fontSize: '0.78rem' }}
+                        className="text-end font-monospace"
                       >
-                        ({b.qtd})
-                      </span>
+                        <div className="text-success">{formatBRL(totalRec)}</div>
+                        <div className="text-danger">{formatBRL(totalDesp)}</div>
+                      </div>
                     </div>
                   )
                 })}
