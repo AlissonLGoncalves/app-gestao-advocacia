@@ -40,11 +40,35 @@ def register_dashboard_routes(app, dashboard_ns):
                 Caso.user_id == user_id, ~Caso.status.in_(status_inativos)
             ).count()
 
-            recebimentos_pendentes = Recebimento.query.filter_by(
-                user_id=user_id, recebido=False
+            # Apos Fase 1 do Recebimento Robusto: contamos por `status` ao
+            # inves do boolean legado `recebido`. Pendente = qualquer status
+            # diferente de "Pago" ou "Cancelado".
+            recebimentos_pendentes = Recebimento.query.filter(
+                Recebimento.user_id == user_id,
+                ~Recebimento.status.in_(["Pago", "Cancelado"]),
             ).all()
             recebimentos_pendentes_qtd = len(recebimentos_pendentes)
             recebimentos_pendentes_valor = sum(float(r.valor) for r in recebimentos_pendentes)
+
+            # "A Receber" = pendentes com vencimento futuro (programados).
+            # Util pra projecao de caixa no dashboard.
+            hoje_date = datetime.utcnow().date()
+            recebimentos_a_receber = [
+                r
+                for r in recebimentos_pendentes
+                if r.data_vencimento and r.data_vencimento >= hoje_date
+            ]
+            recebimentos_a_receber_qtd = len(recebimentos_a_receber)
+            recebimentos_a_receber_valor = sum(float(r.valor) for r in recebimentos_a_receber)
+
+            # "Atrasados" = pendentes com vencimento ja passado.
+            recebimentos_atrasados = [
+                r
+                for r in recebimentos_pendentes
+                if r.data_vencimento and r.data_vencimento < hoje_date
+            ]
+            recebimentos_atrasados_qtd = len(recebimentos_atrasados)
+            recebimentos_atrasados_valor = sum(float(r.valor) for r in recebimentos_atrasados)
 
             despesas_a_pagar = Despesa.query.filter_by(user_id=user_id, pago=False).all()
             despesas_a_pagar_qtd = len(despesas_a_pagar)
@@ -94,13 +118,14 @@ def register_dashboard_routes(app, dashboard_ns):
             hoje = datetime.utcnow().date()
 
             # Badges do menu lateral: contadores de itens "atrasados" por
-            # area financeira. Recebimento vencido = data_recebimento <= hoje
-            # e recebido=False. Mesma logica pra Despesa com data_despesa.
+            # area financeira. Recebimento vencido = data_vencimento <= hoje
+            # e status != Pago/Cancelado. Mesma logica pra Despesa.
             try:
                 recebimentos_vencidos = Recebimento.query.filter(
                     Recebimento.user_id == user_id,
-                    Recebimento.recebido.is_(False),
-                    Recebimento.data_recebimento <= hoje,
+                    ~Recebimento.status.in_(["Pago", "Cancelado"]),
+                    Recebimento.data_vencimento.isnot(None),
+                    Recebimento.data_vencimento <= hoje,
                 ).count()
                 despesas_vencidas = Despesa.query.filter(
                     Despesa.user_id == user_id,
@@ -157,6 +182,14 @@ def register_dashboard_routes(app, dashboard_ns):
                 "recebimentos_pendentes": {
                     "quantidade": recebimentos_pendentes_qtd,
                     "valor_total": round(recebimentos_pendentes_valor, 2),
+                },
+                "recebimentos_a_receber": {
+                    "quantidade": recebimentos_a_receber_qtd,
+                    "valor_total": round(recebimentos_a_receber_valor, 2),
+                },
+                "recebimentos_atrasados": {
+                    "quantidade": recebimentos_atrasados_qtd,
+                    "valor_total": round(recebimentos_atrasados_valor, 2),
                 },
                 "despesas_a_pagar": {
                     "quantidade": despesas_a_pagar_qtd,
@@ -352,10 +385,18 @@ def register_dashboard_routes(app, dashboard_ns):
                 ano_inicio -= 1
             data_inicio = date(ano_inicio, mes_inicio, 1)
 
+            # Receita = recebimentos pagos (preferir data_pagamento; cair pra
+            # data_recebimento legado quando ainda nao migrado).
             recebimentos = Recebimento.query.filter(
                 Recebimento.tenant_id == tenant_id,
-                Recebimento.recebido.is_(True),
-                Recebimento.data_recebimento >= data_inicio,
+                Recebimento.status == "Pago",
+                db.or_(
+                    Recebimento.data_pagamento >= data_inicio,
+                    db.and_(
+                        Recebimento.data_pagamento.is_(None),
+                        Recebimento.data_recebimento >= data_inicio,
+                    ),
+                ),
             ).all()
             despesas = Despesa.query.filter(
                 Despesa.tenant_id == tenant_id,
@@ -374,7 +415,10 @@ def register_dashboard_routes(app, dashboard_ns):
                 buckets[chave] = {"mes": chave, "receita": 0.0, "despesa": 0.0}
 
             for r in recebimentos:
-                chave = r.data_recebimento.strftime("%Y-%m")
+                ref = r.data_pagamento or r.data_recebimento
+                if not ref:
+                    continue
+                chave = ref.strftime("%Y-%m")
                 if chave in buckets:
                     buckets[chave]["receita"] += float(r.valor or 0)
             for d in despesas:

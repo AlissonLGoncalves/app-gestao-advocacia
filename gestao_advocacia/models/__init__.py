@@ -744,6 +744,77 @@ class Despesa(db.Model):
         }
 
 
+class RecorrenciaRecebimento(db.Model):
+    """Configuracao de recorrencia/parcelamento.
+
+    Tipo "RECORRENTE" representa honorario mensal/semanal indefinido (ex:
+    R$ 1.500/mes ate cancelar). Tipo "PARCELADO" representa uma divida
+    fechada dividida em N parcelas (ex: acordo R$ 12.000 em 12x).
+
+    A geracao das parcelas individuais (objetos Recebimento) eh feita pelo
+    endpoint POST /recebimentos/serie. Esta tabela so guarda a config.
+    """
+
+    __tablename__ = "recorrencia_recebimento"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_recorrencia_recebimento_tenant_id"),
+        nullable=True,
+        index=True,
+    )
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_recorrencia_recebimento_user_id"),
+        nullable=False,
+    )
+    # "RECORRENTE" | "PARCELADO"
+    tipo = db.Column(db.String(20), nullable=False)
+    # "MENSAL" | "SEMANAL" | "QUINZENAL" | "ANUAL" (apenas RECORRENTE usa)
+    frequencia = db.Column(db.String(20), nullable=True)
+    valor_parcela = db.Column(db.Numeric(10, 2), nullable=False)
+    # PARCELADO: numero total de parcelas. RECORRENTE: opcional (limite).
+    total_parcelas = db.Column(db.Integer, nullable=True)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date, nullable=True)
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
+    descricao = db.Column(db.String(200), nullable=True)
+    cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cliente.id", name="fk_recorrencia_recebimento_cliente_id"),
+        nullable=True,
+    )
+    caso_id = db.Column(
+        db.Integer,
+        db.ForeignKey("caso.id", name="fk_recorrencia_recebimento_caso_id"),
+        nullable=True,
+    )
+    categoria = db.Column(db.String(80), nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    parcelas = db.relationship(
+        "Recebimento",
+        backref="recorrencia",
+        lazy="dynamic",
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tipo": self.tipo,
+            "frequencia": self.frequencia,
+            "valor_parcela": str(self.valor_parcela) if self.valor_parcela else None,
+            "total_parcelas": self.total_parcelas,
+            "data_inicio": self.data_inicio.isoformat() if self.data_inicio else None,
+            "data_fim": self.data_fim.isoformat() if self.data_fim else None,
+            "ativo": self.ativo,
+            "descricao": self.descricao,
+            "cliente_id": self.cliente_id,
+            "caso_id": self.caso_id,
+            "categoria": self.categoria,
+        }
+
+
 class Recebimento(db.Model):
     __tablename__ = "recebimento"
     id = db.Column(db.Integer, primary_key=True)
@@ -752,8 +823,38 @@ class Recebimento(db.Model):
     )
     descricao = db.Column(db.String(200), nullable=False)
     valor = db.Column(db.Numeric(10, 2), nullable=False)
-    data_recebimento = db.Column(db.Date, nullable=False)
+    # DEPRECATED: mantido por compat retroativa (codigo antigo + dashboard
+    # antigo). Em ambiente novo, usar data_vencimento e data_pagamento. O
+    # endpoint mantem ambos sincronizados durante a transicao.
+    data_recebimento = db.Column(db.Date, nullable=True)
+    # DEPRECATED: usar `status`. Mantido sincronizado (status="Pago" <=> True).
     recebido = db.Column(db.Boolean, default=False)
+    # === Campos adicionados na Fase 1 do Recebimento Robusto ===
+    cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cliente.id", name="fk_recebimento_cliente_id"),
+        nullable=True,
+        index=True,
+    )
+    # "Pendente" | "Pago" | "Vencido" | "Cancelado" | "Em Negociacao"
+    status = db.Column(db.String(30), nullable=True, default="Pendente", index=True)
+    # Data prevista pra receber. Nullable: permite "sem vencimento" (Fase 4).
+    data_vencimento = db.Column(db.Date, nullable=True, index=True)
+    # Data efetiva do recebimento (preenchida quando status=Pago).
+    data_pagamento = db.Column(db.Date, nullable=True)
+    categoria = db.Column(db.String(80), nullable=True)
+    forma_pagamento = db.Column(db.String(50), nullable=True)
+    notas = db.Column(db.Text, nullable=True)
+    # Vinculo opcional a uma serie recorrente/parcelada.
+    recorrencia_id = db.Column(
+        db.Integer,
+        db.ForeignKey("recorrencia_recebimento.id", name="fk_recebimento_recorrencia_id"),
+        nullable=True,
+        index=True,
+    )
+    # Para PARCELADO: 3 de 12. Para RECORRENTE: numero sequencial.
+    numero_parcela = db.Column(db.Integer, nullable=True)
+    # === Fim dos campos adicionados ===
     caso_id = db.Column(
         db.Integer, db.ForeignKey("caso.id", name="fk_recebimento_caso_id"), nullable=True
     )
@@ -767,16 +868,43 @@ class Recebimento(db.Model):
     )
     __table_args__ = (db.Index("ix_recebimento_tenant_created", "tenant_id", "data_recebimento"),)
 
+    def sync_legacy_fields(self):
+        """Mantem campos deprecated (data_recebimento, recebido) sincronizados.
+
+        Chamado pelos endpoints antes do commit. Evita drift entre os campos
+        novos (status, data_vencimento, data_pagamento) e os antigos enquanto
+        existir codigo legado lendo recebido/data_recebimento.
+        """
+        self.recebido = self.status == "Pago"
+        # data_recebimento legado = data_pagamento se pago, senao vencimento.
+        self.data_recebimento = self.data_pagamento or self.data_vencimento
+
     def to_dict(self):
         return {
             "id": self.id,
             "descricao": self.descricao,
             "valor": str(self.valor),
-            "data_recebimento": self.data_recebimento.isoformat(),
-            "recebido": self.recebido,
+            "status": self.status,
+            "data_vencimento": (
+                self.data_vencimento.isoformat() if self.data_vencimento else None
+            ),
+            "data_pagamento": (
+                self.data_pagamento.isoformat() if self.data_pagamento else None
+            ),
+            "categoria": self.categoria,
+            "forma_pagamento": self.forma_pagamento,
+            "notas": self.notas,
+            "cliente_id": self.cliente_id,
             "caso_id": self.caso_id,
             "user_id": self.user_id,
             "contrato_id": self.contrato_id,
+            "recorrencia_id": self.recorrencia_id,
+            "numero_parcela": self.numero_parcela,
+            # Deprecated mas devolvidos por compat retroativa.
+            "data_recebimento": (
+                self.data_recebimento.isoformat() if self.data_recebimento else None
+            ),
+            "recebido": self.recebido,
         }
 
 
