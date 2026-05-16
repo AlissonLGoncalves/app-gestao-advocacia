@@ -94,6 +94,10 @@ def test_charts_financeiro_mensal_agrega_recebimento_e_despesa(auth_client, db):
         user_id=user_id,
         descricao="Custas",
         valor=200,
+        data_vencimento=hoje,
+        data_pagamento=hoje,
+        status="Pago",
+        # Legados (Fase 1 do Despesa Robusto)
         data_despesa=hoje,
         pago=True,
     )

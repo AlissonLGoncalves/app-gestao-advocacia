@@ -714,6 +714,73 @@ class ContratoHonorario(db.Model):
         }
 
 
+class RecorrenciaDespesa(db.Model):
+    """Configuracao de recorrencia/parcelamento de DESPESAS.
+
+    Espelha RecorrenciaRecebimento. Tipo RECORRENTE = pagamento mensal/
+    semanal indefinido (aluguel, conta de luz, mensalidade SaaS). Tipo
+    PARCELADO = divida fechada em N parcelas (compra de software anual em
+    12x, divida acordada com fornecedor).
+
+    A geracao das parcelas individuais (Despesas) eh feita pelo endpoint
+    POST /despesas/serie.
+    """
+
+    __tablename__ = "recorrencia_despesa"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_recorrencia_despesa_tenant_id"),
+        nullable=True,
+        index=True,
+    )
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_recorrencia_despesa_user_id"),
+        nullable=False,
+    )
+    tipo = db.Column(db.String(20), nullable=False)  # RECORRENTE | PARCELADO
+    frequencia = db.Column(db.String(20), nullable=True)  # MENSAL|SEMANAL|QUINZENAL|ANUAL
+    valor_parcela = db.Column(db.Numeric(10, 2), nullable=False)
+    total_parcelas = db.Column(db.Integer, nullable=True)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date, nullable=True)
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
+    descricao = db.Column(db.String(200), nullable=True)
+    fornecedor = db.Column(db.String(200), nullable=True)
+    caso_id = db.Column(
+        db.Integer,
+        db.ForeignKey("caso.id", name="fk_recorrencia_despesa_caso_id"),
+        nullable=True,
+    )
+    cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cliente.id", name="fk_recorrencia_despesa_cliente_id"),
+        nullable=True,
+    )
+    categoria = db.Column(db.String(80), nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    parcelas = db.relationship("Despesa", backref="recorrencia", lazy="dynamic")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tipo": self.tipo,
+            "frequencia": self.frequencia,
+            "valor_parcela": str(self.valor_parcela) if self.valor_parcela else None,
+            "total_parcelas": self.total_parcelas,
+            "data_inicio": self.data_inicio.isoformat() if self.data_inicio else None,
+            "data_fim": self.data_fim.isoformat() if self.data_fim else None,
+            "ativo": self.ativo,
+            "descricao": self.descricao,
+            "fornecedor": self.fornecedor,
+            "caso_id": self.caso_id,
+            "cliente_id": self.cliente_id,
+            "categoria": self.categoria,
+        }
+
+
 class Despesa(db.Model):
     __tablename__ = "despesa"
     id = db.Column(db.Integer, primary_key=True)
@@ -722,8 +789,36 @@ class Despesa(db.Model):
     )
     descricao = db.Column(db.String(200), nullable=False)
     valor = db.Column(db.Numeric(10, 2), nullable=False)
-    data_despesa = db.Column(db.Date, nullable=False)
+    # DEPRECATED: mantido por compat. Use data_vencimento/data_pagamento.
+    data_despesa = db.Column(db.Date, nullable=True)
+    # DEPRECATED: use status. Sincronizado (status=="Pago" <=> True).
     pago = db.Column(db.Boolean, default=False)
+    # === Fase 1 "Despesa Robusto" — novos campos ===
+    # Cliente vinculado: pra despesas reembolsaveis (custas que o cliente
+    # devolve, despesas de viagem de audiencia, etc).
+    cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cliente.id", name="fk_despesa_cliente_id"),
+        nullable=True,
+        index=True,
+    )
+    status = db.Column(db.String(30), nullable=True, default="Pendente", index=True)
+    data_vencimento = db.Column(db.Date, nullable=True, index=True)
+    data_pagamento = db.Column(db.Date, nullable=True)
+    categoria = db.Column(db.String(80), nullable=True)
+    forma_pagamento = db.Column(db.String(50), nullable=True)
+    notas = db.Column(db.Text, nullable=True)
+    # Texto livre — quem recebeu o pagamento (loja, prestador, etc).
+    # Nao eh entidade propria pra evitar overhead de cadastro de fornecedor.
+    fornecedor = db.Column(db.String(200), nullable=True)
+    recorrencia_id = db.Column(
+        db.Integer,
+        db.ForeignKey("recorrencia_despesa.id", name="fk_despesa_recorrencia_id"),
+        nullable=True,
+        index=True,
+    )
+    numero_parcela = db.Column(db.Integer, nullable=True)
+    # === Fim dos campos novos ===
     caso_id = db.Column(
         db.Integer, db.ForeignKey("caso.id", name="fk_despesa_caso_id"), nullable=True
     )
@@ -732,15 +827,31 @@ class Despesa(db.Model):
     )
     __table_args__ = (db.Index("ix_despesa_tenant_created", "tenant_id", "data_despesa"),)
 
+    def sync_legacy_fields(self):
+        """Sincroniza campos deprecated (pago, data_despesa) com novos."""
+        self.pago = self.status == "Pago"
+        self.data_despesa = self.data_pagamento or self.data_vencimento
+
     def to_dict(self):
         return {
             "id": self.id,
             "descricao": self.descricao,
             "valor": str(self.valor),
-            "data_despesa": self.data_despesa.isoformat(),
-            "pago": self.pago,
+            "status": self.status,
+            "data_vencimento": (self.data_vencimento.isoformat() if self.data_vencimento else None),
+            "data_pagamento": (self.data_pagamento.isoformat() if self.data_pagamento else None),
+            "categoria": self.categoria,
+            "forma_pagamento": self.forma_pagamento,
+            "notas": self.notas,
+            "fornecedor": self.fornecedor,
+            "cliente_id": self.cliente_id,
             "caso_id": self.caso_id,
             "user_id": self.user_id,
+            "recorrencia_id": self.recorrencia_id,
+            "numero_parcela": self.numero_parcela,
+            # Deprecated mas devolvidos por compat retroativa.
+            "data_despesa": self.data_despesa.isoformat() if self.data_despesa else None,
+            "pago": self.pago,
         }
 
 
