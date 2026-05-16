@@ -307,6 +307,17 @@ class Caso(db.Model):
     tarefas_caso = db.relationship(
         "TarefaPrazo", backref="caso_tarefa_associado", lazy="dynamic", cascade="all, delete-orphan"
     )
+    # Alias read-only para Caso.cliente. O backref de Cliente.casos ja cria
+    # Caso.cliente_associado, mas varios pontos do codigo (caso_model_dto,
+    # GET /casos/buscar-processo-local, triagem DJEN) usam c.cliente — que
+    # silenciosamente retornava None desde o PR #148. Mantem padrao das
+    # relationships de Recebimento/Despesa.
+    cliente = db.relationship(
+        "Cliente",
+        foreign_keys=[cliente_id],
+        viewonly=True,
+        overlaps="casos,cliente_associado",
+    )
 
     def __repr__(self):
         return f"<Caso {self.id} - {self.titulo}>"

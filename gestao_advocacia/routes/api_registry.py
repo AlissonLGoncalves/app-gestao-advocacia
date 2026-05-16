@@ -308,10 +308,23 @@ def register_api_routes(app, api, finance_access_required):
             "data_criacao": fields.DateTime(dt_format="iso8601"),
             "data_atualizacao": fields.DateTime(dt_format="iso8601"),
             "cliente_id": fields.Integer,
-            "cliente": fields.Raw(description="Objeto cliente {id, nome_razao_social}"),
-            # Nome do cliente serializado direto pelo relationship — frontend
-            # usa esse campo na lista/coluna 'Cliente' (mais simples que
-            # depender do objeto cliente serializado).
+            # Objeto cliente minimo {id, nome_razao_social} — usado por varios
+            # componentes (EventoAgendaForm, DocumentoForm, ContratosPage,
+            # PrazosPage) que leem caso.cliente.nome_razao_social. Antes do
+            # relationship Caso.cliente existir, o campo era sempre None e
+            # passava pelo JSON encoder sem erro; agora precisa ser serializado
+            # explicitamente pra evitar TypeError com o objeto SQLAlchemy.
+            "cliente": fields.Raw(
+                attribute=lambda c: (
+                    {
+                        "id": getattr(c, "cliente").id,
+                        "nome_razao_social": getattr(c, "cliente").nome_razao_social,
+                    }
+                    if getattr(c, "cliente", None)
+                    else None
+                ),
+                description="Objeto cliente {id, nome_razao_social}",
+            ),
             "cliente_nome": fields.String(
                 attribute=lambda c: getattr(getattr(c, "cliente", None), "nome_razao_social", None)
             ),
