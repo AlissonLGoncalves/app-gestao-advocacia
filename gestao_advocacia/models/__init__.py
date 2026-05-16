@@ -714,6 +714,63 @@ class ContratoHonorario(db.Model):
         }
 
 
+class Notificacao(db.Model):
+    """Notificacao in-app pro usuario.
+
+    Criada pelo cron de vencimentos (notificacoes_tasks.py) ou outras
+    fontes futuras (DJEN, prazos, convites). `dedupe_key` previne
+    duplicacao quando o cron roda multiplas vezes pra mesma situacao.
+    """
+
+    __tablename__ = "notificacao"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tenant.id", name="fk_notificacao_tenant_id"),
+        nullable=True,
+        index=True,
+    )
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", name="fk_notificacao_user_id"),
+        nullable=False,
+        index=True,
+    )
+    # recebimento_vencendo|recebimento_atrasado|despesa_vencendo|
+    # despesa_atrasada|prazo_vencendo|djen_nova|etc.
+    tipo = db.Column(db.String(50), nullable=False, index=True)
+    # info|success|warning|danger (cor do badge no frontend)
+    severidade = db.Column(db.String(20), nullable=False, default="info")
+    titulo = db.Column(db.String(200), nullable=False)
+    mensagem = db.Column(db.Text, nullable=True)
+    # Link pra navegar quando user clicar (ex: /recebimentos/editar/42)
+    link = db.Column(db.String(500), nullable=True)
+    lida = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    data_criacao = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    data_leitura = db.Column(db.DateTime, nullable=True)
+    # Chave de dedup por (user_id, dedupe_key) — evita criar a mesma
+    # notificacao 2x. Ex: "recebimento_vencendo:42:2026-06-01".
+    dedupe_key = db.Column(db.String(200), nullable=True, index=True)
+
+    __table_args__ = (
+        db.Index("ix_notificacao_user_lida", "user_id", "lida"),
+        db.UniqueConstraint("user_id", "dedupe_key", name="uq_notificacao_user_dedupe"),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tipo": self.tipo,
+            "severidade": self.severidade,
+            "titulo": self.titulo,
+            "mensagem": self.mensagem,
+            "link": self.link,
+            "lida": self.lida,
+            "data_criacao": self.data_criacao.isoformat() if self.data_criacao else None,
+            "data_leitura": self.data_leitura.isoformat() if self.data_leitura else None,
+        }
+
+
 class RecorrenciaDespesa(db.Model):
     """Configuracao de recorrencia/parcelamento de DESPESAS.
 

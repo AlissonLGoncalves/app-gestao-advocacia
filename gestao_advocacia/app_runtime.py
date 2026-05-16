@@ -176,6 +176,23 @@ def configure_scheduler(app):
                                 f"Job '{job_alertas_id}' agendado para rodar diariamente as 06:00."
                             )
 
+                        # Cron de notificacoes de vencimento (recebimentos +
+                        # despesas) — roda diariamente as 07:00.
+                        notif_job_id = "VerificarVencimentosJob"
+                        if not scheduler.get_job(notif_job_id):
+                            from notificacoes_tasks import job_verificar_vencimentos
+
+                            scheduler.add_job(
+                                id=notif_job_id,
+                                func=job_verificar_vencimentos,
+                                args=[app],
+                                trigger="cron",
+                                hour=7,
+                                minute=0,
+                                replace_existing=True,
+                            )
+                            app.logger.info(f"Job '{notif_job_id}' agendado diariamente as 07:00.")
+
                         if app.config.get("DJEN_JOB_ENABLED", False):
                             djen_job_id = "SincronizarDJENJob"
                             if not scheduler.get_job(djen_job_id):
