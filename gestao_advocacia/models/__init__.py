@@ -882,6 +882,16 @@ class Despesa(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_despesa_user_id"), nullable=False
     )
+    # Relationships read-only para o DTO expor cliente_nome/caso_titulo na
+    # listagem. overlaps silencia o warning do SQLAlchemy sobre os backrefs
+    # ja existentes (Caso.despesas_caso/User.despesas_registradas).
+    cliente = db.relationship("Cliente", foreign_keys=[cliente_id], viewonly=True)
+    caso = db.relationship(
+        "Caso",
+        foreign_keys=[caso_id],
+        viewonly=True,
+        overlaps="caso_despesa_associado,despesas_caso",
+    )
     __table_args__ = (db.Index("ix_despesa_tenant_created", "tenant_id", "data_despesa"),)
 
     def sync_legacy_fields(self):
@@ -1033,6 +1043,16 @@ class Recebimento(db.Model):
         db.Integer,
         db.ForeignKey("contrato_honorario.id", name="fk_recebimento_contrato_id"),
         nullable=True,
+    )
+    # Relationships read-only para o DTO expor cliente_nome/caso_titulo na
+    # listagem. overlaps silencia o warning do SQLAlchemy sobre os backrefs
+    # ja existentes (Caso.recebimentos_caso/User.recebimentos_registrados).
+    cliente = db.relationship("Cliente", foreign_keys=[cliente_id], viewonly=True)
+    caso = db.relationship(
+        "Caso",
+        foreign_keys=[caso_id],
+        viewonly=True,
+        overlaps="caso_recebimento_associado,recebimentos_caso",
     )
     __table_args__ = (db.Index("ix_recebimento_tenant_created", "tenant_id", "data_recebimento"),)
 
