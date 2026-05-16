@@ -66,6 +66,21 @@ export function createRecebimentoSerie(body) {
   return api.post('/recebimentos/serie', body)
 }
 
+/**
+ * Historico de pagamentos recebidos (status=Pago) no periodo.
+ *
+ * GET /recebimentos/historico?ano=YYYY&mes=MM
+ *   ano  number  default = ano corrente
+ *   mes  number  1-12, opcional (sem mes = ano inteiro)
+ *
+ * Resposta: { ano, mes, itens, total_mes, qtd_mes, total_ano, qtd_ano,
+ *             por_categoria: [{categoria, total, qtd}],
+ *             por_mes: [{mes, total, qtd}] x12 }
+ */
+export function getHistoricoRecebimentos(params = {}) {
+  return api.get(`/recebimentos/historico${toQueryString(params)}`)
+}
+
 export async function listDespesas(params = {}) {
   const data = await api.get(`/despesas/${toQueryString(params)}`)
   return normalizeListPayload(data, 'despesas')
