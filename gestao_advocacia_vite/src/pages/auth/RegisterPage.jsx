@@ -35,9 +35,9 @@ function RegisterPage() {
   const [aceiteTermos, setAceiteTermos] = useState(false)
   const [aceiteLgpd, setAceiteLgpd] = useState(false)
 
-  // Gatekeeper de Scroll Obrigatório (Termos)
+  // Modal de Termos (a gating-by-scroll esta planejada mas nao implementada
+  // ainda — state scrolledToBottom foi removido por estar morto)
   const [showTermsModal, setShowTermsModal] = useState(false)
-  const [scrolledToBottom, setScrolledToBottom] = useState(false)
   const [termosConteudo, setTermosConteudo] = useState(termosV10Md)
   const [lgpdConteudo, setLgpdConteudo] = useState(lgpdV10Md)
   const [termosVersao, setTermosVersao] = useState(TERMS_VERSION)
