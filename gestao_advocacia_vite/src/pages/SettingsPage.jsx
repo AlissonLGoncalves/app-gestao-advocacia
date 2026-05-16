@@ -6,9 +6,11 @@ import {
   CheckBadgeIcon,
   ShieldCheckIcon,
   ClipboardDocumentListIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { getTenant, updateTenant } from '../api/tenant'
+import ConfigNFSeForm from '../components/ConfigNFSeForm.jsx'
 
 function SettingsPage() {
   const [activeTab, setActiveTab] = useState('escritorio')
@@ -166,6 +168,12 @@ function SettingsPage() {
               >
                 <CreditCardIcon style={{ width: '20px' }} className="me-2 d-inline" /> Assinatura
                 SaaS
+              </button>
+              <button
+                className={`list-group-item list-group-item-action py-3 px-4 fw-semibold border-bottom-0 ${activeTab === 'nfse' ? 'bg-primary text-white' : 'text-secondary'}`}
+                onClick={() => setActiveTab('nfse')}
+              >
+                <DocumentTextIcon style={{ width: '20px' }} className="me-2 d-inline" /> NFS-e
               </button>
               {userRole === 'admin' && (
                 <button
@@ -568,6 +576,22 @@ function SettingsPage() {
                     Cancelar Assinatura
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ABA: NFS-e */}
+          {activeTab === 'nfse' && (
+            <div className="card shadow-sm border-0 rounded-4">
+              <div className="card-header bg-white border-bottom p-4">
+                <h5 className="mb-0 fw-bold text-dark">Configuração de NFS-e</h5>
+                <p className="text-muted small mb-0 mt-1">
+                  Dados para emissão de Nota Fiscal de Serviço eletrônica diretamente pelo
+                  app.
+                </p>
+              </div>
+              <div className="card-body p-4">
+                <ConfigNFSeForm />
               </div>
             </div>
           )}
