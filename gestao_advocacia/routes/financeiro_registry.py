@@ -57,18 +57,48 @@ def register_financeiro_api(app, api, finance_access_required):
             "valor": fields.Float(
                 required=True, description="Valor do recebimento (ex: 1200.50)", min=0.01
             ),
+            # data_vencimento e data_recebimento sao aceitos como aliases pelo
+            # backend pra compat com o frontend (que tem dois campos). O modelo
+            # ainda persiste numa unica coluna (data_recebimento). Pelo menos
+            # um dos dois e obrigatorio (validacao no route).
+            "data_vencimento": fields.Date(
+                description="Data de vencimento (YYYY-MM-DD). Alias preferido."
+            ),
             "data_recebimento": fields.Date(
-                required=True,
                 description="Data em que o valor foi ou sera recebido (YYYY-MM-DD)",
             ),
             "recebido": fields.Boolean(
                 description="Indica se o valor ja foi efetivamente recebido", default=False
             ),
+            # status string ("Pago", "Pendente", ...) e mapeado pra recebido
+            # boolean no backend. "Pago" => recebido=True; qualquer outro
+            # => recebido=False. Aceito como conveniencia pro frontend.
+            "status": fields.String(
+                description='Status legivel ("Pago"/"Pendente"/...). Mapeado para "recebido".'
+            ),
             "caso_id": fields.Integer(
                 description="ID do caso ao qual este recebimento esta associado (opcional)"
             ),
+            # cliente_id, categoria, forma_pagamento e notas sao aceitos no
+            # input mas NAO sao persistidos (o modelo nao tem essas colunas).
+            # Ignorados silenciosamente — manter pra evitar rejeicao do payload
+            # do frontend ate adicionarmos migration.
+            "cliente_id": fields.Integer(description="Ignorado (deduzido do caso)."),
+            "categoria": fields.String(description="Ignorado (nao persistido)."),
+            "forma_pagamento": fields.String(description="Ignorado (nao persistido)."),
+            "notas": fields.String(description="Ignorado (nao persistido)."),
         },
     )
+
+    def _recebimento_cliente_id(rec):
+        """cliente_id derivado: vem do caso.cliente_id quando ha caso vinculado."""
+        caso = getattr(rec, "caso_recebimento_associado", None)
+        return caso.cliente_id if caso else None
+
+    def _recebimento_status(rec):
+        """status legivel derivado do boolean `recebido`."""
+        return "Pago" if rec.recebido else "Pendente"
+
     recebimento_model_dto = recebimentos_ns.model(
         "RecebimentoOutput",
         {
@@ -79,8 +109,23 @@ def register_financeiro_api(app, api, finance_access_required):
                 description="Valor do recebimento formatado como string",
             ),
             "data_recebimento": fields.Date(dt_format="iso8601"),
+            # alias do mesmo dado pra compat com o frontend, que tem dois
+            # campos (vencimento/recebimento) mas o DB so guarda um.
+            "data_vencimento": fields.Date(
+                dt_format="iso8601",
+                attribute=lambda x: x.data_recebimento,
+                description="Alias de data_recebimento (mesma coluna).",
+            ),
             "recebido": fields.Boolean,
+            "status": fields.String(
+                attribute=_recebimento_status,
+                description='Derivado: "Pago" se recebido, senao "Pendente".',
+            ),
             "caso_id": fields.Integer(nullable=True),
+            "cliente_id": fields.Integer(
+                attribute=_recebimento_cliente_id,
+                description="Derivado do caso vinculado.",
+            ),
             "user_id": fields.Integer,
         },
     )
