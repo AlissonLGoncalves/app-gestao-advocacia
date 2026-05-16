@@ -20,7 +20,6 @@ from extensions import db
 from helpers import get_item_or_404, get_list_query, get_tenant_id, query_for_tenant, tenant_scoped
 from models import Caso, Cliente, Recebimento, RecorrenciaRecebimento
 
-
 # Status validos. Centralizado pra reuso (validacao + dashboard).
 STATUS_VALIDOS = {"Pendente", "Pago", "Vencido", "Cancelado", "Em Negociacao"}
 STATUS_PAGO = "Pago"

@@ -8,10 +8,6 @@ sync com campos legados, e dashboard counters por status.
 import json
 from datetime import date, timedelta
 
-import pytest
-
-from app import Recebimento
-
 
 def _criar_cliente(auth_client, sufixo="rb"):
     resp = auth_client.post(
