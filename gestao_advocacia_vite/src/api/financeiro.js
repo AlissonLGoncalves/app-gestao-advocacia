@@ -91,6 +91,16 @@ export function marcarDespesaPaga(id, body = {}) {
   return api.put(`/despesas/${id}`, body)
 }
 
+/**
+ * Cria uma serie de despesas (PARCELADO ou RECORRENTE).
+ * Espelha createRecebimentoSerie. Body: tipo, frequencia, valor_parcela,
+ * total_parcelas, data_inicio, descricao, fornecedor?, categoria?,
+ * cliente_id?, caso_id?, notas?.
+ */
+export function createDespesaSerie(body) {
+  return api.post('/despesas/serie', body)
+}
+
 export function getResumoFinanceiro(params = {}) {
   return api.get(`/dashboard/stats${toQueryString(params)}`)
 }
