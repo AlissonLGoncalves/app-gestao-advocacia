@@ -19,8 +19,7 @@ const GATEWAY_OPCOES = [
   },
   {
     valor: 'portal_nacional',
-    label: 'Portal Nacional NFS-e (gov.br) — em breve',
-    disabled: true,
+    label: 'Portal Nacional NFS-e (gov.br) — em construção',
   },
   { valor: 'focus_nfe', label: 'Focus NFe — em breve', disabled: true },
   { valor: 'plugnotas', label: 'PlugNotas — em breve', disabled: true },
@@ -38,6 +37,13 @@ function ConfigNFSeForm() {
     aliquota_iss: '',
     ambiente: 'sandbox',
     gateway_tipo: 'mock',
+    // Etapa 5.6.1: campos do Portal Nacional. So aparecem na UI quando
+    // gateway_tipo === 'portal_nacional'.
+    nfse_base_url_homologacao: '',
+    nfse_base_url_producao: '',
+    codigo_municipio_ibge: '',
+    nfse_serie_atual: '1',
+    nfse_numero_atual: '0',
   })
   const [configurado, setConfigurado] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -63,6 +69,13 @@ function ConfigNFSeForm() {
               : '',
           ambiente: data.ambiente || 'sandbox',
           gateway_tipo: data.gateway_tipo || 'mock',
+          nfse_base_url_homologacao: data.nfse_base_url_homologacao || '',
+          nfse_base_url_producao: data.nfse_base_url_producao || '',
+          codigo_municipio_ibge: data.codigo_municipio_ibge || '',
+          nfse_serie_atual:
+            data.nfse_serie_atual != null ? String(data.nfse_serie_atual) : '1',
+          nfse_numero_atual:
+            data.nfse_numero_atual != null ? String(data.nfse_numero_atual) : '0',
         })
         setConfigurado(!!data.configurado)
       })
@@ -89,6 +102,10 @@ function ConfigNFSeForm() {
       const payload = {
         ...form,
         aliquota_iss: form.aliquota_iss === '' ? null : parseFloat(form.aliquota_iss),
+        nfse_serie_atual:
+          form.nfse_serie_atual === '' ? null : parseInt(form.nfse_serie_atual, 10),
+        nfse_numero_atual:
+          form.nfse_numero_atual === '' ? null : parseInt(form.nfse_numero_atual, 10),
       }
       const data = await updateConfigNFSe(payload)
       setConfigurado(!!data.configurado)
@@ -249,6 +266,85 @@ function ConfigNFSeForm() {
           </select>
         </div>
       </div>
+
+      {/* Etapa 5.6.1: bloco do Portal Nacional, so quando selecionado. */}
+      {form.gateway_tipo === 'portal_nacional' && (
+        <>
+          <h6 className="fw-bold text-dark mt-4 mb-3">Portal Nacional NFS-e (gov.br)</h6>
+          <div className="alert alert-warning py-2 small mb-3">
+            ⚠️ Adapter Portal Nacional está em construção:
+            <ul className="mb-0 mt-1">
+              <li>✅ Montagem da DPS XML (sub-etapa 5.6.1) — pronta</li>
+              <li>⏳ Assinatura XMLDSIG + certificado A1 (5.6.2) — pendente</li>
+              <li>⏳ Chamada HTTP mTLS real (5.6.3) — pendente</li>
+            </ul>
+            Por enquanto, escolha &quot;Mock&quot; para testar o fluxo.
+          </div>
+          <div className="row g-3 mb-3">
+            <div className="col-md-6">
+              <label className="form-label text-secondary small fw-bold">
+                Código IBGE do Município
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                maxLength={7}
+                value={form.codigo_municipio_ibge}
+                onChange={handleChange('codigo_municipio_ibge')}
+                placeholder="Ex: 3550308 (São Paulo)"
+              />
+              <small className="text-muted">7 dígitos. Consulte no site do IBGE.</small>
+            </div>
+            <div className="col-md-3">
+              <label className="form-label text-secondary small fw-bold">Série da DPS</label>
+              <input
+                type="number"
+                min="1"
+                className="form-control"
+                value={form.nfse_serie_atual}
+                onChange={handleChange('nfse_serie_atual')}
+              />
+            </div>
+            <div className="col-md-3">
+              <label className="form-label text-secondary small fw-bold">Último número emitido</label>
+              <input
+                type="number"
+                min="0"
+                className="form-control"
+                value={form.nfse_numero_atual}
+                onChange={handleChange('nfse_numero_atual')}
+              />
+              <small className="text-muted">Próxima DPS = este +1.</small>
+            </div>
+          </div>
+          <div className="row g-3 mb-3">
+            <div className="col-md-6">
+              <label className="form-label text-secondary small fw-bold">
+                URL base — Homologação
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                value={form.nfse_base_url_homologacao}
+                onChange={handleChange('nfse_base_url_homologacao')}
+                placeholder="https://..."
+              />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label text-secondary small fw-bold">
+                URL base — Produção
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                value={form.nfse_base_url_producao}
+                onChange={handleChange('nfse_base_url_producao')}
+                placeholder="https://..."
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="d-flex justify-content-between align-items-center mt-4">
         <span className={`badge ${configurado ? 'bg-success' : 'bg-warning text-dark'}`}>

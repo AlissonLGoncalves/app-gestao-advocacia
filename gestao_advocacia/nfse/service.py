@@ -105,7 +105,7 @@ def emitir(recebimento: Recebimento, config: ConfigNFSe | None, user_id: int) ->
     db.session.add(emissao)
     db.session.flush()  # garante id
 
-    gateway = get_gateway(gateway_tipo)
+    gateway = get_gateway(gateway_tipo, config=config)
     try:
         resultado = gateway.emitir(payload)
     except Exception as exc:  # pragma: no cover — defensivo contra adapter mal escrito
