@@ -73,9 +73,7 @@ def gerar_id_ped_reg_evt(*, chave_nfse: str, tipo_evento: int, n_ped_reg: int) -
     """
     chave_dig = _so_digitos(chave_nfse) or ""
     if len(chave_dig) != 50:
-        raise ValueError(
-            f"chave_nfse deve ter 50 digitos, recebido {len(chave_dig)}"
-        )
+        raise ValueError(f"chave_nfse deve ter 50 digitos, recebido {len(chave_dig)}")
     if not isinstance(tipo_evento, int) or tipo_evento <= 0:
         raise ValueError("tipo_evento deve ser inteiro positivo")
     if not isinstance(n_ped_reg, int) or n_ped_reg < 1 or n_ped_reg > 999:
@@ -91,8 +89,7 @@ def _validar_documento_autor(doc: str | None) -> tuple[str, str]:
     if len(digitos) == 14:
         return "CNPJ", digitos
     raise ValueError(
-        f"documento do autor deve ter 11 (CPF) ou 14 (CNPJ) digitos, "
-        f"recebido {len(digitos)}"
+        f"documento do autor deve ter 11 (CPF) ou 14 (CNPJ) digitos, " f"recebido {len(digitos)}"
     )
 
 
@@ -102,9 +99,7 @@ def _validar_motivo_texto(x_motivo: str) -> str:
         raise ValueError("xMotivo obrigatorio")
     texto = x_motivo.strip()
     if len(texto) < 15:
-        raise ValueError(
-            f"xMotivo deve ter pelo menos 15 caracteres (recebido: {len(texto)})"
-        )
+        raise ValueError(f"xMotivo deve ter pelo menos 15 caracteres (recebido: {len(texto)})")
     return texto[:1000]  # limite folgado pra evitar abuse
 
 

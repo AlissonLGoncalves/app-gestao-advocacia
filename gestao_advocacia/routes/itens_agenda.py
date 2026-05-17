@@ -90,9 +90,7 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
             if err:
                 return {"message": err}, 400
             if tipo == "evento" and data_inicio is None:
-                return {
-                    "message": "data_inicio eh obrigatoria para tipo=evento."
-                }, 400
+                return {"message": "data_inicio eh obrigatoria para tipo=evento."}, 400
 
             data_fim, err = _parse_dt(data.get("data_fim"))
             if err:

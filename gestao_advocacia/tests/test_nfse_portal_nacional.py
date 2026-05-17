@@ -133,9 +133,7 @@ def test_montar_dps_xml_valor_e_aliquota_formatados():
     xml = montar_dps_xml(payload, _config(), serie=1, numero=1)
     root = ET.fromstring(xml)
     base = root.find(f"{{{DPS_NS}}}infDPS/{{{DPS_NS}}}valores")
-    v_serv = base.find(
-        f"{{{DPS_NS}}}vServPrest/{{{DPS_NS}}}vServ"
-    )
+    v_serv = base.find(f"{{{DPS_NS}}}vServPrest/{{{DPS_NS}}}vServ")
     assert v_serv.text == "1234.57"  # 2 casas, arredondamento half-up
     p_aliq = base.find(f"{{{DPS_NS}}}trib/{{{DPS_NS}}}tribMun/{{{DPS_NS}}}pAliq")
     assert p_aliq.text == "5.00"
@@ -194,18 +192,14 @@ def test_gateway_sem_certificado_rejeita_com_mensagem_clara():
 
 def test_gateway_com_flag_mas_sem_pfx_no_banco_rejeita():
     """Flag tem_certificado=True mas certificado_pfx_encrypted None — incoerente."""
-    g = PortalNacionalGateway(
-        config=_config(tem_certificado=True, certificado_pfx_encrypted=None)
-    )
+    g = PortalNacionalGateway(config=_config(tem_certificado=True, certificado_pfx_encrypted=None))
     res = g.emitir(_payload())
     assert res.status == "Rejeitada"
     assert "banco" in res.mensagem_erro.lower() or "reenvie" in res.mensagem_erro.lower()
 
 
 def test_gateway_valor_zero_rejeita():
-    g = PortalNacionalGateway(
-        config=_config(tem_certificado=True, certificado_pfx_encrypted=b"x")
-    )
+    g = PortalNacionalGateway(config=_config(tem_certificado=True, certificado_pfx_encrypted=b"x"))
     res = g.emitir(_payload(valor=0))
     assert res.status == "Rejeitada"
     assert "positivo" in res.mensagem_erro.lower()
@@ -242,9 +236,7 @@ def _pfx_de_teste():
     from nfse.portal_nacional.signer import criptografar
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = x509.Name(
-        [x509.NameAttribute(NameOID.COMMON_NAME, "TESTE:12345678000190")]
-    )
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "TESTE:12345678000190")])
     agora = datetime.now(timezone.utc)
     cert = (
         x509.CertificateBuilder()

@@ -85,9 +85,7 @@ def register_dashboard_routes(app, dashboard_ns):
                 ).all()
                 recebidos_ano_qtd = len(recebidos_ano_q)
                 recebidos_ano_valor = sum(float(r.valor) for r in recebidos_ano_q)
-                recebidos_mes_q = [
-                    r for r in recebidos_ano_q if r.data_pagamento >= ini_mes
-                ]
+                recebidos_mes_q = [r for r in recebidos_ano_q if r.data_pagamento >= ini_mes]
                 recebidos_mes_qtd = len(recebidos_mes_q)
                 recebidos_mes_valor = sum(float(r.valor) for r in recebidos_mes_q)
             except Exception:

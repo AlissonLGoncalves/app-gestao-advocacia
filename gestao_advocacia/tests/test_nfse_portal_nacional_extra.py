@@ -39,10 +39,7 @@ def test_resolver_adn_url_producao():
 
 def test_resolver_adn_url_override_env(monkeypatch):
     monkeypatch.setenv("NFSE_ADN_URL_PRODUCAO", "https://custom-adn.example.com/")
-    assert (
-        resolver_adn_url(_FakeConfig("producao"))
-        == "https://custom-adn.example.com"
-    )
+    assert resolver_adn_url(_FakeConfig("producao")) == "https://custom-adn.example.com"
 
 
 # ===================== _danfse_url usa ADN agora =====================
@@ -72,9 +69,7 @@ def _config_com_cert(**overrides):
     from nfse.portal_nacional.signer import criptografar
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = x509.Name(
-        [x509.NameAttribute(NameOID.COMMON_NAME, "TESTE:12345678000190")]
-    )
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "TESTE:12345678000190")])
     agora = datetime.now(timezone.utc)
     cert = (
         x509.CertificateBuilder()
@@ -167,9 +162,7 @@ def test_decisao_judicial_e2e_sucesso(db):
             status=201,
         )
         g = PortalNacionalGateway(config=config)
-        res = g.emitir_decisao_judicial(
-            '<?xml version="1.0"?><NFSe><dummy/></NFSe>'
-        )
+        res = g.emitir_decisao_judicial('<?xml version="1.0"?><NFSe><dummy/></NFSe>')
 
     assert res.status == "Autorizada"
     assert res.gateway_id == chave

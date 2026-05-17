@@ -125,6 +125,7 @@ def _http_error_para_resultado(
         mensagem_erro=f"{prefixo}Portal {exc.status_code}: {exc.body[:300]}",
     )
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -140,10 +141,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
         if not payload.cnpj_emissor:
             return "CNPJ do emissor obrigatorio. Configure em Settings."
         if not payload.codigo_servico:
-            return (
-                "Codigo de servico municipal obrigatorio (ex: 17.06). "
-                "Configure em Settings."
-            )
+            return "Codigo de servico municipal obrigatorio (ex: 17.06). " "Configure em Settings."
         if not self.config or not self.config.codigo_municipio_ibge:
             return (
                 "Codigo IBGE do municipio obrigatorio para Portal Nacional. "
@@ -324,9 +322,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
         except PortalNacionalHTTPError as exc:
             return _http_error_para_resultado(exc, contexto="Consulta NFS-e:")
         except Exception as exc:
-            return EmissaoResultado(
-                status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}"
-            )
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}")
 
         # Sucesso (200): NFSeGetResponseSucesso = {tipoAmbiente,
         # versaoAplicativo, dataHoraProcessamento, chaveAcesso,
@@ -402,9 +398,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
                 )
             return _http_error_para_resultado(exc, contexto="Consulta DPS:")
         except Exception as exc:
-            return EmissaoResultado(
-                status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}"
-            )
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}")
 
         try:
             body = resp.json()
@@ -432,9 +426,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
         atual = self.config.nfse_num_evento_atual or 0
         return atual + 1
 
-    def _enviar_evento(
-        self, chave_acesso: str, xml_pedido: str, contexto: str
-    ) -> EmissaoResultado:
+    def _enviar_evento(self, chave_acesso: str, xml_pedido: str, contexto: str) -> EmissaoResultado:
         """Logica compartilhada de envio de evento: assina, comprime,
         POST com body correto. Retorna EmissaoResultado."""
         try:
@@ -462,9 +454,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
         except PortalNacionalHTTPError as exc:
             return _http_error_para_resultado(exc, contexto=contexto)
         except Exception as exc:
-            return EmissaoResultado(
-                status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}"
-            )
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}")
 
         # Sucesso (201): EventosPostResponseSucesso = {tipoAmbiente,
         # versaoAplicativo, dataHoraProcessamento, eventoXmlGZipB64}.
@@ -478,9 +468,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
             mensagem_erro=f"{contexto} status inesperado {resp.status_code}",
         )
 
-    def cancelar(
-        self, gateway_id: str, motivo: str, *, cod_motivo: int = 9
-    ) -> EmissaoResultado:
+    def cancelar(self, gateway_id: str, motivo: str, *, cod_motivo: int = 9) -> EmissaoResultado:
         """Evento e101101 — Cancelamento simples da NFS-e.
 
         Args:
@@ -504,9 +492,8 @@ class PortalNacionalGateway(NFSeGatewayBase):
             )
 
         # Documento do autor = documento do emissor (advogado/escritorio).
-        documento_autor = (
-            getattr(self.config, "documento_emissor", None)
-            or getattr(self.config, "cnpj_emissor", None)
+        documento_autor = getattr(self.config, "documento_emissor", None) or getattr(
+            self.config, "cnpj_emissor", None
         )
         if not documento_autor:
             return EmissaoResultado(
@@ -549,9 +536,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
             motivo_texto: opcional. Se enviado, min 15 chars.
         """
         if not self.config or not getattr(self.config, "tem_certificado", False):
-            return EmissaoResultado(
-                status="Rejeitada", mensagem_erro="Sem certificado."
-            )
+            return EmissaoResultado(status="Rejeitada", mensagem_erro="Sem certificado.")
         erro_chave = self._validar_chave_acesso(gateway_id)
         if erro_chave:
             return EmissaoResultado(status="Rejeitada", mensagem_erro=erro_chave)
@@ -562,9 +547,8 @@ class PortalNacionalGateway(NFSeGatewayBase):
                 mensagem_erro=f"Chave substituta: {erro_subst}",
             )
 
-        documento_autor = (
-            getattr(self.config, "documento_emissor", None)
-            or getattr(self.config, "cnpj_emissor", None)
+        documento_autor = getattr(self.config, "documento_emissor", None) or getattr(
+            self.config, "cnpj_emissor", None
         )
         if not documento_autor:
             return EmissaoResultado(
@@ -619,9 +603,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
                 mensagem_erro="Certificado A1 nao encontrado no banco. Reenvie em Settings.",
             )
         if not nfse_xml_assinado or not nfse_xml_assinado.strip():
-            return EmissaoResultado(
-                status="Rejeitada", mensagem_erro="XML da NFS-e vazio."
-            )
+            return EmissaoResultado(status="Rejeitada", mensagem_erro="XML da NFS-e vazio.")
 
         try:
             key_pem, cert_pem = self._carregar_cert_pem()
@@ -646,9 +628,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
         except PortalNacionalHTTPError as exc:
             return _http_error_para_resultado(exc, contexto="Decisao judicial:")
         except Exception as exc:
-            return EmissaoResultado(
-                status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}"
-            )
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}")
 
         try:
             body = resp.json()
@@ -772,9 +752,7 @@ class PortalNacionalGateway(NFSeGatewayBase):
         except PortalNacionalHTTPError as exc:
             return _http_error_para_resultado(exc, contexto="Consulta evento:")
         except Exception as exc:
-            return EmissaoResultado(
-                status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}"
-            )
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}")
 
         # Schema oficial: EventosPostResponseSucesso = {tipoAmbiente,
         # versaoAplicativo, dataHoraProcessamento, eventoXmlGZipB64}.
@@ -787,6 +765,4 @@ class PortalNacionalGateway(NFSeGatewayBase):
             )
         if body.get("eventoXmlGZipB64"):
             return EmissaoResultado(status="Autorizada", gateway_id=chave_acesso)
-        return EmissaoResultado(
-            status="Rejeitada", mensagem_erro="Resposta sem eventoXmlGZipB64."
-        )
+        return EmissaoResultado(status="Rejeitada", mensagem_erro="Resposta sem eventoXmlGZipB64.")

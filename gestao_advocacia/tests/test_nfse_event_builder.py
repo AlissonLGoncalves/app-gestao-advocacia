@@ -235,9 +235,7 @@ def _config_com_cert(**overrides):
     from nfse.portal_nacional.signer import criptografar
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = x509.Name(
-        [x509.NameAttribute(NameOID.COMMON_NAME, "TESTE:12345678000190")]
-    )
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "TESTE:12345678000190")])
     agora = datetime.now(timezone.utc)
     cert = (
         x509.CertificateBuilder()
@@ -374,9 +372,7 @@ def test_cancelar_sem_documento_emissor_rejeita(db):
         cnpj_emissor=None,
     )
     g = PortalNacionalGateway(config=config)
-    res = g.cancelar(
-        "1" * 50, motivo="Motivo qualquer com mais de 15 caracteres."
-    )
+    res = g.cancelar("1" * 50, motivo="Motivo qualquer com mais de 15 caracteres.")
     assert res.status == "Rejeitada"
     assert "emissor" in res.mensagem_erro.lower()
 

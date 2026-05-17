@@ -542,9 +542,7 @@ def register_api_routes(app, api, finance_access_required):
                 description="Data/hora inicio (obrigatorio se tipo=evento)"
             ),
             "data_fim": fields.DateTime(description="Data/hora fim do evento (opcional)"),
-            "data_vencimento": fields.DateTime(
-                description="Data fatal (tarefas; opcional)"
-            ),
+            "data_vencimento": fields.DateTime(description="Data fatal (tarefas; opcional)"),
             "posicao": fields.Integer(description="Ordem no kanban (so tarefa)"),
             "caso_id": fields.Integer(description="Caso vinculado (opcional)"),
             "publicacao_djen_id": fields.Integer(

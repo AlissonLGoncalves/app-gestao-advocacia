@@ -111,15 +111,9 @@ def test_historico_ignora_status_diferente_de_pago(auth_client, db):
 
 
 def test_historico_por_categoria_ordena_por_total_desc(auth_client, db):
-    _criar_pago(
-        auth_client, valor=100.00, data_pagamento=date(2025, 1, 1), categoria="Consultoria"
-    )
-    _criar_pago(
-        auth_client, valor=900.00, data_pagamento=date(2025, 1, 2), categoria="Honorarios"
-    )
-    _criar_pago(
-        auth_client, valor=200.00, data_pagamento=date(2025, 1, 3), categoria="Honorarios"
-    )
+    _criar_pago(auth_client, valor=100.00, data_pagamento=date(2025, 1, 1), categoria="Consultoria")
+    _criar_pago(auth_client, valor=900.00, data_pagamento=date(2025, 1, 2), categoria="Honorarios")
+    _criar_pago(auth_client, valor=200.00, data_pagamento=date(2025, 1, 3), categoria="Honorarios")
     _criar_pago(auth_client, valor=50.00, data_pagamento=date(2025, 1, 4))  # sem categoria
 
     resp = auth_client.get("/api/v1/recebimentos/historico?ano=2025")
