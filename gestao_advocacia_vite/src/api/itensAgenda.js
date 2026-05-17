@@ -57,3 +57,34 @@ export function updateItemAgenda(id, body) {
 export function deleteItemAgenda(id) {
   return api.del(`/itens-agenda/${id}`)
 }
+
+// ---------- Endpoints do Kanban (PR D4.1) ----------
+
+/**
+ * Reordena tarefas no kanban (drag-drop).
+ *
+ * Body esperado:
+ *   { columns: { "Pendente": [12, 5], "Em Andamento": [8] } }
+ *
+ * Atualiza status + posicao em batch. So afeta tipo='tarefa' — eventos
+ * sao ignorados silenciosamente. IDs cross-tenant tambem sao ignorados.
+ */
+export function reorderItensAgenda(columns) {
+  return api.put('/itens-agenda/reorder', { columns })
+}
+
+/**
+ * Confirma prazo calculado pela IA. Remove o badge "IA — confirmar".
+ * Opcionalmente atualiza data_vencimento e/ou prioridade.
+ */
+export function validarPrazoItemAgenda(id, opts = {}) {
+  return api.patch(`/itens-agenda/${id}/validar-prazo`, opts)
+}
+
+/**
+ * Atalho 1-clique: marca item como Concluido + prazo_validado=True.
+ * Idempotente.
+ */
+export function concluirItemAgenda(id) {
+  return api.patch(`/itens-agenda/${id}/concluir`, {})
+}
