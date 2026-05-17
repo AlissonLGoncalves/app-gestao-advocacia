@@ -21,6 +21,7 @@ import ClienteDetalhePage from './pages/ClienteDetalhePage.jsx'
 import ContratosPage from './pages/ContratosPage.jsx'
 import DespesasPage from './pages/DespesasPage.jsx'
 import AgendaPage from './pages/AgendaPage.jsx'
+import AgendaUnificadaPage from './pages/AgendaUnificadaPage.jsx'
 import PrazosPage from './pages/PrazosPage.jsx'
 import DocumentosPage from './pages/DocumentosPage.jsx'
 import RelatoriosPage from './pages/RelatoriosPage.jsx'
@@ -687,7 +688,11 @@ function App() {
 
           <Route path="nfse" element={<NotasFiscaisPage />} />
 
-          <Route path="agenda" element={<AgendaPage />} />
+          {/* PR D3: /agenda passa a usar a pagina unificada (itens-agenda).
+              /agenda/legado mantem o form de evento antigo (criacao
+              direta em /eventos) como fallback durante a transicao. */}
+          <Route path="agenda" element={<AgendaUnificadaPage />} />
+          <Route path="agenda/legado" element={<AgendaPage />} />
           <Route path="agenda/novo" element={<AgendaPage />} />
           <Route path="agenda/editar/:eventoId" element={<AgendaPage />} />
 

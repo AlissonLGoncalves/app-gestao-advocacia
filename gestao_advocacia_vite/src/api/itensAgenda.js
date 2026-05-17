@@ -1,0 +1,59 @@
+// src/api/itensAgenda.js
+// Wrapper para /v1/itens-agenda — modelo unificado Prazos+Eventos (PR D3).
+//
+// Esta API substitui /tarefas e /eventos no frontend. Backend ainda tem
+// os endpoints legados ativos (dual-write em D2 mantem item_agenda
+// sempre sincronizada) — eles serao removidos em D4.
+//
+// Vocabulario:
+//   - tipo: 'tarefa' | 'evento'
+//   - categoria: 'Prazo' | 'Audiencia' | 'Reuniao' | 'Peticionamento'
+//                | 'Ligacao' | 'Lembrete' | 'Outros'
+//   - status: 'Pendente' | 'Em Andamento' | 'Concluido' | 'Cancelado'
+
+import { api } from './client.js'
+
+function toQueryString(params) {
+  const search = new URLSearchParams()
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === '') return
+    search.set(key, String(value))
+  })
+  const query = search.toString()
+  return query ? `?${query}` : ''
+}
+
+/**
+ * Lista itens da agenda. Aceita filtros opcionais.
+ *
+ * Params (todos opcionais):
+ *   - tipo: 'tarefa' | 'evento' — filtra por discriminador
+ *   - status: enum — filtra por status
+ *   - caso_id: number — filtra por caso vinculado
+ */
+export function listItensAgenda(params = {}) {
+  return api.get(`/itens-agenda/${toQueryString(params)}`)
+}
+
+export function getItemAgenda(id) {
+  return api.get(`/itens-agenda/${id}`)
+}
+
+/**
+ * Cria novo item. Validacoes minimas no backend:
+ *   - titulo obrigatorio
+ *   - tipo obrigatorio ('tarefa' ou 'evento')
+ *   - se tipo='evento', data_inicio obrigatorio
+ *   - status precisa ser enum valido
+ */
+export function createItemAgenda(body) {
+  return api.post('/itens-agenda/', body)
+}
+
+export function updateItemAgenda(id, body) {
+  return api.put(`/itens-agenda/${id}`, body)
+}
+
+export function deleteItemAgenda(id) {
+  return api.del(`/itens-agenda/${id}`)
+}
