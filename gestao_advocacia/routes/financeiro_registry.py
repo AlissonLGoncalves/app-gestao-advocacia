@@ -54,6 +54,17 @@ def register_financeiro_api(app, api, finance_access_required):
             "fornecedor": fields.String,
             "cliente_id": fields.Integer(nullable=True),
             "caso_id": fields.Integer(nullable=True),
+            # Nome do cliente e titulo do caso resolvidos via relationship
+            # (viewonly). Evita N+1 com lazy="select" padrao? Nao: cada acesso
+            # gera 1 query por linha. Como a lista financeira eh tipicamente
+            # pequena (<200 itens), aceitavel. Se virar gargalo, trocar por
+            # joinedload no get_list_query.
+            "cliente_nome": fields.String(
+                attribute=lambda d: getattr(getattr(d, "cliente", None), "nome_razao_social", None)
+            ),
+            "caso_titulo": fields.String(
+                attribute=lambda d: getattr(getattr(d, "caso", None), "titulo", None)
+            ),
             "user_id": fields.Integer,
             "recorrencia_id": fields.Integer(nullable=True),
             "numero_parcela": fields.Integer(nullable=True),
@@ -174,6 +185,15 @@ def register_financeiro_api(app, api, finance_access_required):
             "notas": fields.String,
             "cliente_id": fields.Integer(nullable=True),
             "caso_id": fields.Integer(nullable=True),
+            # Nome do cliente e titulo do caso resolvidos via relationship
+            # (viewonly). Frontend usa esses campos na coluna Cliente/Caso da
+            # lista e no PDF (RecebimentoList.jsx). Sem isso a lista mostra "-".
+            "cliente_nome": fields.String(
+                attribute=lambda r: getattr(getattr(r, "cliente", None), "nome_razao_social", None)
+            ),
+            "caso_titulo": fields.String(
+                attribute=lambda r: getattr(getattr(r, "caso", None), "titulo", None)
+            ),
             "user_id": fields.Integer,
             "recorrencia_id": fields.Integer(nullable=True),
             "numero_parcela": fields.Integer(nullable=True),

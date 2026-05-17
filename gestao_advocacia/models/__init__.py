@@ -307,6 +307,17 @@ class Caso(db.Model):
     tarefas_caso = db.relationship(
         "TarefaPrazo", backref="caso_tarefa_associado", lazy="dynamic", cascade="all, delete-orphan"
     )
+    # Alias read-only para Caso.cliente. O backref de Cliente.casos ja cria
+    # Caso.cliente_associado, mas varios pontos do codigo (caso_model_dto,
+    # GET /casos/buscar-processo-local, triagem DJEN) usam c.cliente — que
+    # silenciosamente retornava None desde o PR #148. Mantem padrao das
+    # relationships de Recebimento/Despesa.
+    cliente = db.relationship(
+        "Cliente",
+        foreign_keys=[cliente_id],
+        viewonly=True,
+        overlaps="casos,cliente_associado",
+    )
 
     def __repr__(self):
         return f"<Caso {self.id} - {self.titulo}>"
@@ -882,6 +893,16 @@ class Despesa(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id", name="fk_despesa_user_id"), nullable=False
     )
+    # Relationships read-only para o DTO expor cliente_nome/caso_titulo na
+    # listagem. overlaps silencia o warning do SQLAlchemy sobre os backrefs
+    # ja existentes (Caso.despesas_caso/User.despesas_registradas).
+    cliente = db.relationship("Cliente", foreign_keys=[cliente_id], viewonly=True)
+    caso = db.relationship(
+        "Caso",
+        foreign_keys=[caso_id],
+        viewonly=True,
+        overlaps="caso_despesa_associado,despesas_caso",
+    )
     __table_args__ = (db.Index("ix_despesa_tenant_created", "tenant_id", "data_despesa"),)
 
     def sync_legacy_fields(self):
@@ -1043,6 +1064,16 @@ class Recebimento(db.Model):
         db.Integer,
         db.ForeignKey("contrato_honorario.id", name="fk_recebimento_contrato_id"),
         nullable=True,
+    )
+    # Relationships read-only para o DTO expor cliente_nome/caso_titulo na
+    # listagem. overlaps silencia o warning do SQLAlchemy sobre os backrefs
+    # ja existentes (Caso.recebimentos_caso/User.recebimentos_registrados).
+    cliente = db.relationship("Cliente", foreign_keys=[cliente_id], viewonly=True)
+    caso = db.relationship(
+        "Caso",
+        foreign_keys=[caso_id],
+        viewonly=True,
+        overlaps="caso_recebimento_associado,recebimentos_caso",
     )
     __table_args__ = (db.Index("ix_recebimento_tenant_created", "tenant_id", "data_recebimento"),)
 
