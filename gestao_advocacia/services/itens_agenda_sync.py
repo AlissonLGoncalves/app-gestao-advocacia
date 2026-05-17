@@ -20,8 +20,10 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from flask import g
+
 from extensions import db
-from models import EventoAgenda, ItemAgenda, TarefaPrazo
+from models import EventoAgenda, ItemAgenda, TarefaPrazo, Tenant
 
 logger = logging.getLogger(__name__)
 
@@ -197,57 +199,103 @@ def backfill_all(
         "dry_run": not apply,
         "started_at": started_at.isoformat(),
         "tenant_id": tenant_id,
+        "tenants_processados": [],
     }
 
-    # --- Tarefas ---
-    tarefa_q = TarefaPrazo.query
+    # RLS context: tabelas com tenant_id tem politica que faz
+    # current_setting('app.current_tenant_id'). Em scripts (fora de
+    # HTTP request) precisamos setar `g._rls_tenant_id` antes de cada
+    # transacao — o event listener em app.py aplica via set_config.
+    # Tenant table nao tem RLS (eh a propria fonte), entao consultamos
+    # antes de setar qualquer contexto.
     if tenant_id is not None:
-        tarefa_q = tarefa_q.filter(TarefaPrazo.tenant_id == tenant_id)
-
-    processados = 0
-    for tarefa in tarefa_q.yield_per(batch_size):
-        existia = (
-            db.session.query(ItemAgenda.id).filter(ItemAgenda.legacy_tarefa_id == tarefa.id).first()
-            is not None
-        )
-        sync_tarefa(tarefa)
-        if existia:
-            stats["tarefas_atualizadas"] += 1
-        else:
-            stats["tarefas_novas"] += 1
-        processados += 1
-        if apply and processados % batch_size == 0:
-            db.session.commit()
-
-    if apply:
-        db.session.commit()
+        tenants_ids = [tenant_id]
     else:
-        db.session.rollback()
+        tenants_ids = [t.id for t in Tenant.query.order_by(Tenant.id.asc()).all()]
 
-    # --- Eventos ---
-    evento_q = EventoAgenda.query
-    if tenant_id is not None:
-        evento_q = evento_q.filter(EventoAgenda.tenant_id == tenant_id)
+    logger.info(
+        "backfill_itens_agenda: %d tenant(s) para processar%s",
+        len(tenants_ids),
+        " (DRY-RUN)" if not apply else "",
+    )
 
-    processados = 0
-    for evento in evento_q.yield_per(batch_size):
-        existia = (
-            db.session.query(ItemAgenda.id).filter(ItemAgenda.legacy_evento_id == evento.id).first()
-            is not None
-        )
-        sync_evento(evento)
-        if existia:
-            stats["eventos_atualizados"] += 1
-        else:
-            stats["eventos_novos"] += 1
-        processados += 1
-        if apply and processados % batch_size == 0:
+    for tid in tenants_ids:
+        # Garante transacao limpa antes de mudar contexto RLS
+        db.session.commit() if apply else db.session.rollback()
+        # Setar `g._rls_tenant_id` faz o event listener aplicar
+        # `SELECT set_config('app.current_tenant_id', <tid>, true)` na
+        # proxima begin() de transacao SQLAlchemy.
+        g._rls_tenant_id = tid
+
+        novas_t = 0
+        atualizadas_t = 0
+        novas_e = 0
+        atualizadas_e = 0
+
+        # --- Tarefas deste tenant ---
+        tarefas = TarefaPrazo.query.filter(TarefaPrazo.tenant_id == tid).yield_per(batch_size)
+        processados = 0
+        for tarefa in tarefas:
+            existia = (
+                db.session.query(ItemAgenda.id)
+                .filter(ItemAgenda.legacy_tarefa_id == tarefa.id)
+                .first()
+                is not None
+            )
+            sync_tarefa(tarefa)
+            if existia:
+                atualizadas_t += 1
+            else:
+                novas_t += 1
+            processados += 1
+            if apply and processados % batch_size == 0:
+                db.session.commit()
+                # Re-aplica contexto na nova transacao
+                g._rls_tenant_id = tid
+
+        # --- Eventos deste tenant ---
+        eventos = EventoAgenda.query.filter(EventoAgenda.tenant_id == tid).yield_per(batch_size)
+        processados = 0
+        for evento in eventos:
+            existia = (
+                db.session.query(ItemAgenda.id)
+                .filter(ItemAgenda.legacy_evento_id == evento.id)
+                .first()
+                is not None
+            )
+            sync_evento(evento)
+            if existia:
+                atualizadas_e += 1
+            else:
+                novas_e += 1
+            processados += 1
+            if apply and processados % batch_size == 0:
+                db.session.commit()
+                g._rls_tenant_id = tid
+
+        # Commit/rollback final desse tenant
+        if apply:
             db.session.commit()
+        else:
+            db.session.rollback()
 
-    if apply:
-        db.session.commit()
-    else:
-        db.session.rollback()
+        stats["tarefas_novas"] += novas_t
+        stats["tarefas_atualizadas"] += atualizadas_t
+        stats["eventos_novos"] += novas_e
+        stats["eventos_atualizados"] += atualizadas_e
+        stats["tenants_processados"].append(
+            {
+                "tenant_id": tid,
+                "tarefas_novas": novas_t,
+                "tarefas_atualizadas": atualizadas_t,
+                "eventos_novos": novas_e,
+                "eventos_atualizados": atualizadas_e,
+            }
+        )
+
+    # Limpa o contexto pra nao vazar pra proximos usos do app_context
+    if hasattr(g, "_rls_tenant_id"):
+        delattr(g, "_rls_tenant_id")
 
     stats["finished_at"] = datetime.utcnow().isoformat()
     logger.info("backfill_itens_agenda concluido: %s", stats)
