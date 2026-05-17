@@ -79,7 +79,9 @@ function NotasFiscaisPage() {
       {/* Conteudo das abas */}
       <div className="card border-0 shadow-sm">
         <div className="card-body p-3 p-md-4">
-          {abaAtiva === ABAS.EMISSOES && <EmissoesNFSeList />}
+          {abaAtiva === ABAS.EMISSOES && (
+            <EmissoesNFSeList onChangeTab={setAbaAtiva} />
+          )}
           {abaAtiva === ABAS.CONFIG && <ConfigNFSeForm />}
         </div>
       </div>
