@@ -206,14 +206,22 @@ def assinar_dps(xml: str, cert_pem: bytes, key_pem: bytes) -> str:
         digest_algorithm="sha256",
         c14n_algorithm="http://www.w3.org/2001/10/xml-exc-c14n#",
     )
-    # Portal espera assinatura referenciando o atributo Id de infDPS.
-    inf_dps = root.find("{*}infDPS")
-    if inf_dps is not None and inf_dps.get("Id"):
+    # Portal espera assinatura referenciando o atributo Id do elemento
+    # interno. Tenta infDPS (DPS), infPedReg (Pedido de Evento) e
+    # infEvento (Evento) — qual existir.
+    elemento_assinavel = None
+    for tag in ("infDPS", "infPedReg", "infEvento"):
+        elem = root.find(f"{{*}}{tag}")
+        if elem is not None and elem.get("Id"):
+            elemento_assinavel = elem
+            break
+
+    if elemento_assinavel is not None:
         signed = signer.sign(
             root,
             key=key_pem,
             cert=cert_pem,
-            reference_uri=f"#{inf_dps.get('Id')}",
+            reference_uri=f"#{elemento_assinavel.get('Id')}",
         )
     else:
         signed = signer.sign(root, key=key_pem, cert=cert_pem)

@@ -31,6 +31,10 @@ from .dps_builder import (
     gerar_id_dps,
     montar_dps_xml,
 )
+from .event_builder import (
+    montar_pedido_cancelamento,
+    montar_pedido_cancelamento_por_substituicao,
+)
 from .http_client import (
     PortalNacionalHTTPError,
     request_com_mtls,
@@ -422,9 +426,72 @@ class PortalNacionalGateway(NFSeGatewayBase):
             mensagem_erro="Resposta sem chaveAcesso.",
         )
 
-    # ===================== Cancelamento =====================
+    # ===================== Eventos (Etapa 5.6.6.3) =====================
 
-    def cancelar(self, gateway_id: str, motivo: str) -> EmissaoResultado:
+    def _proximo_n_ped_reg(self) -> int:
+        """Numero sequencial do pedido de registro de evento (1-999).
+        Caller eh responsavel por commit da config apos sucesso."""
+        atual = self.config.nfse_num_evento_atual or 0
+        return atual + 1
+
+    def _enviar_evento(
+        self, chave_acesso: str, xml_pedido: str, contexto: str
+    ) -> EmissaoResultado:
+        """Logica compartilhada de envio de evento: assina, comprime,
+        POST com body correto. Retorna EmissaoResultado."""
+        try:
+            key_pem, cert_pem = self._carregar_cert_pem()
+            xml_assinado = assinar_dps(xml_pedido, cert_pem=cert_pem, key_pem=key_pem)
+        except Exception as exc:
+            logger.exception("Falha ao assinar evento")
+            return EmissaoResultado(
+                status="Rejeitada",
+                mensagem_erro=f"Falha ao assinar evento: {exc!s}",
+            )
+
+        pedido_b64 = comprimir_e_codificar(xml_assinado)
+        url = f"{resolver_base_url(self.config)}/nfse/{chave_acesso}/eventos"
+
+        try:
+            resp = request_com_mtls(
+                "POST",
+                url,
+                cert_pem=cert_pem,
+                key_pem=key_pem,
+                # Schema Swagger oficial: body == {pedidoRegistroEventoXmlGZipB64}.
+                json_body={"pedidoRegistroEventoXmlGZipB64": pedido_b64},
+            )
+        except PortalNacionalHTTPError as exc:
+            return _http_error_para_resultado(exc, contexto=contexto)
+        except Exception as exc:
+            return EmissaoResultado(
+                status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}"
+            )
+
+        # Sucesso (201): EventosPostResponseSucesso = {tipoAmbiente,
+        # versaoAplicativo, dataHoraProcessamento, eventoXmlGZipB64}.
+        if 200 <= resp.status_code < 300:
+            # Incrementa contador apos sucesso (caller commit a config).
+            self.config.nfse_num_evento_atual = self._proximo_n_ped_reg()
+            return EmissaoResultado(status="Cancelada", gateway_id=chave_acesso)
+
+        return EmissaoResultado(
+            status="Rejeitada",
+            mensagem_erro=f"{contexto} status inesperado {resp.status_code}",
+        )
+
+    def cancelar(
+        self, gateway_id: str, motivo: str, *, cod_motivo: int = 9
+    ) -> EmissaoResultado:
+        """Evento e101101 — Cancelamento simples da NFS-e.
+
+        Args:
+            gateway_id: chave de acesso da NFS-e (50 digitos).
+            motivo: descricao do motivo (>=15 chars).
+            cod_motivo: 1=Erro emissao, 2=Servico nao prestado, 9=Outros.
+                Default 9 pra compat com chamadas antigas que so passavam
+                texto livre.
+        """
         if not self.config or not getattr(self.config, "tem_certificado", False):
             return EmissaoResultado(
                 status="Rejeitada", mensagem_erro="Sem certificado para cancelar."
@@ -437,41 +504,91 @@ class PortalNacionalGateway(NFSeGatewayBase):
                 status="Rejeitada",
                 mensagem_erro="Motivo do cancelamento precisa ter ao menos 15 caracteres.",
             )
-        # NOTA 5.6.6.2 (pendente): o Swagger oficial exige body
-        # `pedidoRegistroEventoXmlGZipB64` (XML de evento assinado),
-        # nao o JSON {tipoEvento, motivo} que usamos abaixo. Quando o
-        # event_builder for implementado, trocar o body aqui.
-        try:
-            key_pem, cert_pem = self._carregar_cert_pem()
-        except Exception as exc:
+
+        # Documento do autor = documento do emissor (advogado/escritorio).
+        documento_autor = (
+            getattr(self.config, "documento_emissor", None)
+            or getattr(self.config, "cnpj_emissor", None)
+        )
+        if not documento_autor:
             return EmissaoResultado(
-                status="Rejeitada", mensagem_erro=f"Falha ao carregar cert: {exc!s}"
+                status="Rejeitada",
+                mensagem_erro="Documento do emissor nao configurado.",
             )
 
-        url = f"{resolver_base_url(self.config)}/nfse/{gateway_id}/eventos"
         try:
-            resp = request_com_mtls(
-                "POST",
-                url,
-                cert_pem=cert_pem,
-                key_pem=key_pem,
-                json_body={
-                    "tipoEvento": "cancelamento",
-                    "motivo": motivo.strip()[:300],
-                },
+            xml_pedido = montar_pedido_cancelamento(
+                chave_nfse=gateway_id,
+                cod_motivo=cod_motivo,
+                motivo_texto=motivo,
+                documento_autor=documento_autor,
+                ambiente=self.config.ambiente or "sandbox",
+                n_ped_reg=self._proximo_n_ped_reg(),
             )
-        except PortalNacionalHTTPError as exc:
-            return _http_error_para_resultado(exc, contexto="Cancelamento:")
-        except Exception as exc:
+        except ValueError as exc:
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=str(exc))
+
+        return self._enviar_evento(gateway_id, xml_pedido, contexto="Cancelamento:")
+
+    def cancelar_por_substituicao(
+        self,
+        gateway_id: str,
+        *,
+        chave_substituta: str,
+        cod_motivo: int,
+        motivo_texto: str | None = None,
+    ) -> EmissaoResultado:
+        """Evento e105102 — Cancelamento por Substituicao.
+
+        Usado quando a NFS-e antiga e substituida por uma nova ja emitida.
+        Ambas continuam existindo: a antiga vira "cancelada por
+        substituicao" e referencia a nova.
+
+        Args:
+            gateway_id: chave da NFS-e a cancelar (50 digitos).
+            chave_substituta: chave da NFS-e nova que substitui (50 digitos).
+            cod_motivo: TSCodJustSubst — 1-5 ou 99 (Outros).
+            motivo_texto: opcional. Se enviado, min 15 chars.
+        """
+        if not self.config or not getattr(self.config, "tem_certificado", False):
             return EmissaoResultado(
-                status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}"
+                status="Rejeitada", mensagem_erro="Sem certificado."
+            )
+        erro_chave = self._validar_chave_acesso(gateway_id)
+        if erro_chave:
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=erro_chave)
+        erro_subst = self._validar_chave_acesso(chave_substituta)
+        if erro_subst:
+            return EmissaoResultado(
+                status="Rejeitada",
+                mensagem_erro=f"Chave substituta: {erro_subst}",
             )
 
-        if 200 <= resp.status_code < 300:
-            return EmissaoResultado(status="Cancelada", gateway_id=gateway_id)
-        return EmissaoResultado(
-            status="Rejeitada",
-            mensagem_erro=f"Cancelamento rejeitado: status {resp.status_code}",
+        documento_autor = (
+            getattr(self.config, "documento_emissor", None)
+            or getattr(self.config, "cnpj_emissor", None)
+        )
+        if not documento_autor:
+            return EmissaoResultado(
+                status="Rejeitada",
+                mensagem_erro="Documento do emissor nao configurado.",
+            )
+
+        try:
+            xml_pedido = montar_pedido_cancelamento_por_substituicao(
+                chave_nfse=gateway_id,
+                chave_substituta=chave_substituta,
+                cod_motivo=cod_motivo,
+                motivo_texto=motivo_texto,
+                documento_autor=documento_autor,
+                ambiente=self.config.ambiente or "sandbox",
+                n_ped_reg=self._proximo_n_ped_reg(),
+            )
+        except ValueError as exc:
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=str(exc))
+
+        return self._enviar_evento(
+            gateway_id, xml_pedido, contexto="Cancelamento por substituicao:"
         )
 
     # ===================== Decisao Judicial (Etapa 5.6.6.2) =====================

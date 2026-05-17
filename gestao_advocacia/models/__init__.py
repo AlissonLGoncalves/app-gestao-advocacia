@@ -1826,6 +1826,10 @@ class ConfigNFSe(db.Model):
     # 1 e incrementa a cada emissao bem-sucedida.
     nfse_serie_atual = db.Column(db.Integer, nullable=False, default=1)
     nfse_numero_atual = db.Column(db.Integer, nullable=False, default=0)
+    # Etapa 5.6.6.3: contador de eventos. Incrementa a cada pedido de
+    # registro de evento bem-sucedido (cancelamento, substituicao etc).
+    # Vai pro campo nPedRegEvento do XML (0-999 por tipo de evento).
+    nfse_num_evento_atual = db.Column(db.Integer, nullable=False, default=0)
     # === Fim dos campos da Etapa 5.6.1 ===
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
@@ -1853,6 +1857,7 @@ class ConfigNFSe(db.Model):
             "codigo_municipio_ibge": self.codigo_municipio_ibge,
             "nfse_serie_atual": self.nfse_serie_atual,
             "nfse_numero_atual": self.nfse_numero_atual,
+            "nfse_num_evento_atual": self.nfse_num_evento_atual,
             "certificado_nome_titular": self.certificado_nome_titular,
             "certificado_valido_ate": (
                 self.certificado_valido_ate.isoformat()
