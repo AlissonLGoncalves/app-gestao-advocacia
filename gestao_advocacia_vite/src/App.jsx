@@ -468,15 +468,23 @@ const MainLayout = () => {
             <SidebarLink to="/casos" icon={BriefcaseIcon}>
               Casos
             </SidebarLink>
+            {/* PR D3.5 — Sidebar consolidada.
+                /agenda = visao unificada (calendar + lista) — entrada
+                principal pra "o que vence essa semana".
+                /prazos = mesma data, visualizacao Kanban dedicada — pra
+                quem prefere o fluxo de drag-drop. Ambos consomem
+                item_agenda no backend (dual-write D2 garante sync).
+                Badge fica no Kanban porque a metrica 'tarefasAlerta'
+                (IA pendentes + vencidos) eh natural do fluxo kanban. */}
+            <SidebarLink to="/agenda" icon={CalendarDaysIcon}>
+              Agenda
+            </SidebarLink>
             <SidebarLink
               to="/prazos"
               icon={ClipboardDocumentListIcon}
               badge={sidebarCounts.tarefasAlerta}
             >
-              Prazos (Kanban)
-            </SidebarLink>
-            <SidebarLink to="/agenda" icon={CalendarDaysIcon}>
-              Agenda
+              Prazos · Kanban
             </SidebarLink>
 
             {/* === FINANCEIRO === (oculto pra assistente) */}
