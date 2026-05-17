@@ -15,11 +15,7 @@
 //            "compacto" — barra de progresso fina pro topo do form.
 //   onChangeTab: callback opcional pra trocar pra aba Configuracao.
 import React, { useEffect, useState } from 'react'
-import {
-  CheckCircleIcon,
-  ExclamationCircleIcon,
-  ArrowRightIcon,
-} from '@heroicons/react/24/solid'
+import { CheckCircleIcon, ExclamationCircleIcon, ArrowRightIcon } from '@heroicons/react/24/solid'
 import { getConfigNFSe } from '../api/nfse.js'
 
 function ChecklistNFSe({ variant = 'completo', onChangeTab }) {
@@ -46,8 +42,7 @@ function ChecklistNFSe({ variant = 'completo', onChangeTab }) {
   if (loading) {
     return (
       <div className="text-center text-muted py-4 small">
-        <span className="spinner-border spinner-border-sm me-2" /> Verificando
-        configuração...
+        <span className="spinner-border spinner-border-sm me-2" /> Verificando configuração...
       </div>
     )
   }
@@ -59,24 +54,19 @@ function ChecklistNFSe({ variant = 'completo', onChangeTab }) {
     {
       key: 'tipo_documento',
       label: 'Tipo de pessoa do emissor (PF ou PJ) + documento',
-      descricao:
-        'CPF para advogado autônomo, CNPJ para escritório. Define qual cert você precisa.',
-      feito: Boolean(
-        config?.tipo_pessoa_emissor && config?.documento_emissor
-      ),
+      descricao: 'CPF para advogado autônomo, CNPJ para escritório. Define qual cert você precisa.',
+      feito: Boolean(config?.tipo_pessoa_emissor && config?.documento_emissor),
     },
     {
       key: 'codigo_servico',
       label: 'Código de serviço municipal',
-      descricao:
-        'Comum para advocacia: 17.06 (consultoria) ou 17.14 (advocacia).',
+      descricao: 'Comum para advocacia: 17.06 (consultoria) ou 17.14 (advocacia).',
       feito: Boolean(config?.codigo_servico),
     },
     {
       key: 'codigo_ibge',
       label: 'Código IBGE do município (Portal Nacional)',
-      descricao:
-        'Identifica em qual prefeitura a NFS-e é registrada. Consulte no site do IBGE.',
+      descricao: 'Identifica em qual prefeitura a NFS-e é registrada. Consulte no site do IBGE.',
       feito: Boolean(config?.codigo_municipio_ibge),
       so_portal_nacional: true,
     },
@@ -149,19 +139,13 @@ function ChecklistNFSe({ variant = 'completo', onChangeTab }) {
               >
                 <div className="me-3 flex-shrink-0">
                   {item.feito ? (
-                    <CheckCircleIcon
-                      style={{ width: 28, height: 28, color: '#198754' }}
-                    />
+                    <CheckCircleIcon style={{ width: 28, height: 28, color: '#198754' }} />
                   ) : (
-                    <ExclamationCircleIcon
-                      style={{ width: 28, height: 28, color: '#d97706' }}
-                    />
+                    <ExclamationCircleIcon style={{ width: 28, height: 28, color: '#d97706' }} />
                   )}
                 </div>
                 <div className="flex-grow-1">
-                  <div
-                    className={`fw-semibold ${item.feito ? 'text-success' : 'text-dark'}`}
-                  >
+                  <div className={`fw-semibold ${item.feito ? 'text-success' : 'text-dark'}`}>
                     {item.label}
                   </div>
                   <div className="small text-muted">{item.descricao}</div>
@@ -185,8 +169,8 @@ function ChecklistNFSe({ variant = 'completo', onChangeTab }) {
 
           {tudoFeito && (
             <div className="alert alert-success small mt-4 mb-0">
-              ✅ Tudo pronto. Vá em <strong>Recebimentos → Histórico</strong> e
-              clique em <strong>"Emitir NFS-e"</strong> em algum pagamento recebido.
+              ✅ Tudo pronto. Vá em <strong>Recebimentos → Histórico</strong> e clique em{' '}
+              <strong>"Emitir NFS-e"</strong> em algum pagamento recebido.
             </div>
           )}
         </div>

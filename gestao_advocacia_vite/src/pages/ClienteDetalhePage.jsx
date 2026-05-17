@@ -207,7 +207,10 @@ function ClienteDetalhePage() {
               className={`nav-link ${abaAtiva === id ? 'active' : ''}`}
               onClick={() => setAbaAtiva(id)}
             >
-              <Icone style={{ width: 14, height: 14 }} className="me-1 d-inline align-text-bottom" />
+              <Icone
+                style={{ width: 14, height: 14 }}
+                className="me-1 d-inline align-text-bottom"
+              />
               {label}
             </button>
           </li>
@@ -304,9 +307,7 @@ function AbaCasos({ cliente, casos, loading, onNovoCaso, onAbrirCaso }) {
         </button>
       </div>
       {lista.length === 0 ? (
-        <EmptyState
-          texto="Adicione o primeiro caso deste cliente clicando no botão acima."
-        />
+        <EmptyState texto="Adicione o primeiro caso deste cliente clicando no botão acima." />
       ) : (
         <div className="table-responsive">
           <table className="table table-hover mb-0">
@@ -354,11 +355,7 @@ function AbaContratos({ contratos, loading, clienteId, onAbrirContrato }) {
             ? 'Sem contratos ativos para este cliente.'
             : `${lista.length} contrato${lista.length === 1 ? '' : 's'}.`}
         </div>
-        <button
-          type="button"
-          className="btn btn-outline-primary btn-sm"
-          onClick={onAbrirContrato}
-        >
+        <button type="button" className="btn btn-outline-primary btn-sm" onClick={onAbrirContrato}>
           Ir para Contratos
         </button>
       </div>
@@ -374,14 +371,11 @@ function AbaContratos({ contratos, loading, clienteId, onAbrirContrato }) {
               <div>
                 <div className="fw-medium">{co.tipo_honorario || '—'}</div>
                 <div className="small text-muted">
-                  Status: {co.status || '—'} · Assinado em{' '}
-                  {formatDataBR(co.data_assinatura)}
+                  Status: {co.status || '—'} · Assinado em {formatDataBR(co.data_assinatura)}
                 </div>
               </div>
               <div className="text-end">
-                {co.valor_total && (
-                  <div className="fw-bold">{formatBRL(co.valor_total)}</div>
-                )}
+                {co.valor_total && <div className="fw-bold">{formatBRL(co.valor_total)}</div>}
                 {co.percentual_exito && (
                   <div className="small text-muted">{co.percentual_exito}% êxito</div>
                 )}
@@ -427,8 +421,7 @@ function AbaDocumentos({ documentos, loading, onAbrirDocumentos }) {
               <div>
                 <div className="fw-medium">{d.nome_arquivo || d.titulo || '—'}</div>
                 <div className="small text-muted">
-                  {d.tipo_documento || '—'} ·{' '}
-                  {formatDataBR(d.data_upload || d.created_at)}
+                  {d.tipo_documento || '—'} · {formatDataBR(d.data_upload || d.created_at)}
                 </div>
               </div>
               {d.url && (
@@ -521,9 +514,7 @@ function Loading({ texto }) {
 
 function EmptyState({ texto }) {
   return (
-    <div className="text-center text-muted py-4 fst-italic small bg-light rounded">
-      {texto}
-    </div>
+    <div className="text-center text-muted py-4 fst-italic small bg-light rounded">{texto}</div>
   )
 }
 

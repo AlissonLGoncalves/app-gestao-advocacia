@@ -23,7 +23,14 @@ const STATUS_BADGE = {
   Cancelada: { cor: 'bg-dark', label: 'Cancelada' },
 }
 
-const STATUS_ORDEM = ['Todos', 'Autorizada', 'EmProcessamento', 'Pendente', 'Rejeitada', 'Cancelada']
+const STATUS_ORDEM = [
+  'Todos',
+  'Autorizada',
+  'EmProcessamento',
+  'Pendente',
+  'Rejeitada',
+  'Cancelada',
+]
 
 const formatDataHoraBR = (iso) => {
   if (!iso) return '-'
@@ -175,9 +182,7 @@ function EmissoesNFSeList({ onChangeTab }) {
                         <button
                           type="button"
                           className="btn btn-link btn-sm p-0"
-                          onClick={() =>
-                            navigate(`/recebimentos/editar/${e.recebimento_id}`)
-                          }
+                          onClick={() => navigate(`/recebimentos/editar/${e.recebimento_id}`)}
                           title="Abrir recebimento"
                         >
                           #{e.recebimento_id}
@@ -190,13 +195,9 @@ function EmissoesNFSeList({ onChangeTab }) {
                       {e.numero_nfse ? (
                         <>
                           <strong>{e.numero_nfse}</strong>
-                          {e.serie && (
-                            <span className="text-muted small ms-1">/ {e.serie}</span>
-                          )}
+                          {e.serie && <span className="text-muted small ms-1">/ {e.serie}</span>}
                           {e.codigo_verificacao && (
-                            <div className="small text-muted">
-                              cod: {e.codigo_verificacao}
-                            </div>
+                            <div className="small text-muted">cod: {e.codigo_verificacao}</div>
                           )}
                         </>
                       ) : (
@@ -245,9 +246,7 @@ function EmissoesNFSeList({ onChangeTab }) {
                             className="btn btn-outline-primary btn-sm"
                             title="Baixar DANFSe (PDF)"
                           >
-                            <DocumentArrowDownIcon
-                              style={{ width: 14, height: 14 }}
-                            />
+                            <DocumentArrowDownIcon style={{ width: 14, height: 14 }} />
                           </a>
                         )}
                         {e.status === 'Autorizada' && (
@@ -279,9 +278,7 @@ function EmissoesNFSeList({ onChangeTab }) {
         onClose={() => setEmissaoParaCancelar(null)}
         onSucesso={(atualizada) => {
           // Atualiza a linha no state local em vez de refetchar tudo
-          setEmissoes((lista) =>
-            lista.map((e) => (e.id === atualizada.id ? atualizada : e))
-          )
+          setEmissoes((lista) => lista.map((e) => (e.id === atualizada.id ? atualizada : e)))
         }}
       />
     </>

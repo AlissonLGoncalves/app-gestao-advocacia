@@ -43,9 +43,7 @@ function EmitirNFSeButton({ recebimento, emissaoInicial = undefined, variant = '
   const [ultimaEmissao, setUltimaEmissao] = useState(
     emissaoInicial !== undefined ? emissaoInicial : null
   )
-  const [historicoCarregado, setHistoricoCarregado] = useState(
-    emissaoInicial !== undefined
-  )
+  const [historicoCarregado, setHistoricoCarregado] = useState(emissaoInicial !== undefined)
 
   // Carrega ultima emissao desse recebimento ao montar pra mostrar badge.
   // Pula se caller ja passou via emissaoInicial (PR C: agregado em listas).
@@ -93,7 +91,10 @@ function EmitirNFSeButton({ recebimento, emissaoInicial = undefined, variant = '
   const renderBadge = () => {
     if (!historicoCarregado) return null
     if (!ultimaEmissao) return null
-    const cfg = STATUS_BADGE[ultimaEmissao.status] || { cor: 'bg-secondary', label: ultimaEmissao.status }
+    const cfg = STATUS_BADGE[ultimaEmissao.status] || {
+      cor: 'bg-secondary',
+      label: ultimaEmissao.status,
+    }
     return (
       <span className={`badge ${cfg.cor} ms-2`} title={ultimaEmissao.mensagem_erro || ''}>
         NFS-e: {cfg.label}
@@ -102,9 +103,7 @@ function EmitirNFSeButton({ recebimento, emissaoInicial = undefined, variant = '
   }
 
   const podeEmitir =
-    !ultimaEmissao ||
-    ultimaEmissao.status === 'Rejeitada' ||
-    ultimaEmissao.status === 'Cancelada'
+    !ultimaEmissao || ultimaEmissao.status === 'Rejeitada' || ultimaEmissao.status === 'Cancelada'
 
   const ehCompacta = variant === 'compacta'
 
@@ -116,9 +115,7 @@ function EmitirNFSeButton({ recebimento, emissaoInicial = undefined, variant = '
       type="button"
       onClick={() => setAberto(true)}
       className={`btn btn-sm ${
-        ultimaEmissao?.status === 'Autorizada'
-          ? 'btn-outline-success'
-          : 'btn-outline-primary'
+        ultimaEmissao?.status === 'Autorizada' ? 'btn-outline-success' : 'btn-outline-primary'
       } me-1 p-1 lh-1`}
       title={
         podeEmitir
@@ -213,8 +210,8 @@ function EmitirNFSeButton({ recebimento, emissaoInicial = undefined, variant = '
                   </li>
                 </ul>
                 <div className="alert alert-warning small mb-0">
-                  ⚠️ Modo Mock: nenhuma nota real será enviada para a Receita ou prefeitura. Isto
-                  é um teste do fluxo de emissão.
+                  ⚠️ Modo Mock: nenhuma nota real será enviada para a Receita ou prefeitura. Isto é
+                  um teste do fluxo de emissão.
                 </div>
               </div>
               <div className="modal-footer">

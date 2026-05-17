@@ -107,19 +107,14 @@ function UploadCertificadoA1({ config, onConfigChange, tipoPessoa }) {
       <div className={`card border-2 ${corBorda} mb-3`}>
         <div className="card-body">
           <div className="d-flex align-items-start">
-            <DocumentCheckIcon
-              style={{ width: 28, height: 28 }}
-              className={`me-3 ${corTexto}`}
-            />
+            <DocumentCheckIcon style={{ width: 28, height: 28 }} className={`me-3 ${corTexto}`} />
             <div className="flex-grow-1">
               <h6 className="fw-bold mb-1">Certificado A1 carregado</h6>
               <div className="small text-muted mb-1">
-                <strong>Titular:</strong>{' '}
-                {config.certificado_nome_titular || 'desconhecido'}
+                <strong>Titular:</strong> {config.certificado_nome_titular || 'desconhecido'}
               </div>
               <div className="small text-muted">
-                <strong>Validade:</strong>{' '}
-                {formatDataBR(config.certificado_valido_ate)}{' '}
+                <strong>Validade:</strong> {formatDataBR(config.certificado_valido_ate)}{' '}
                 {dias != null && (
                   <span className={dias < 30 ? 'text-warning fw-bold' : 'text-muted'}>
                     {dias > 0 ? `(${dias} dias restantes)` : '(VENCIDO)'}
@@ -163,12 +158,14 @@ function UploadCertificadoA1({ config, onConfigChange, tipoPessoa }) {
           Certificado A1 não carregado
         </h6>
         <p className="small text-muted mb-2">
-          O Portal Nacional NFS-e exige certificado digital ICP-Brasil A1 (mTLS). Faça upload
-          do seu arquivo .pfx com senha — ambos são criptografados antes de salvar.
+          O Portal Nacional NFS-e exige certificado digital ICP-Brasil A1 (mTLS). Faça upload do seu
+          arquivo .pfx com senha — ambos são criptografados antes de salvar.
         </p>
         {tipoPessoa && (
           <div className="alert alert-info py-2 small mb-3">
-            <strong>Você cadastrou como {tipoPessoa === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}.</strong>{' '}
+            <strong>
+              Você cadastrou como {tipoPessoa === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}.
+            </strong>{' '}
             Compre um certificado <strong>{certEsperado}</strong> com a mesma{' '}
             {tipoPessoa === 'PF' ? 'CPF' : 'CNPJ'}. Não vai aceitar cert de outro tipo.
           </div>

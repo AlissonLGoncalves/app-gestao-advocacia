@@ -28,7 +28,6 @@ from .dps_builder import (
     comprimir_e_codificar,
     decodificar_e_descomprimir,
     extrair_dados_nfse,
-    gerar_id_dps,
     montar_dps_xml,
 )
 from .event_builder import (
@@ -42,7 +41,6 @@ from .http_client import (
     resolver_base_url,
 )
 from .signer import assinar_dps, carregar_pfx, descriptografar
-
 
 # Chave de acesso da NFS-e tem **50 posicoes** segundo o Swagger oficial.
 CHAVE_ACESSO_LENGTH = 50

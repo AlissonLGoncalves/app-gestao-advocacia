@@ -23,10 +23,10 @@ import base64
 import hashlib
 import logging
 import os
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 

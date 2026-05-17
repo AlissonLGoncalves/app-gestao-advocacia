@@ -27,7 +27,20 @@ const MESES_PT = [
   'Dezembro',
 ]
 
-const MESES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+const MESES_ABREV = [
+  'Jan',
+  'Fev',
+  'Mar',
+  'Abr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Set',
+  'Out',
+  'Nov',
+  'Dez',
+]
 
 const formatBRL = (v) => {
   const num = typeof v === 'number' ? v : parseFloat(v)
@@ -255,7 +268,9 @@ function RecebimentosHistoricoPage() {
                     className="text-muted small text-uppercase mb-1"
                     style={{ fontSize: '0.75rem', letterSpacing: '0.05em', fontWeight: 600 }}
                   >
-                    {mes ? `Recebido em ${MESES_PT[parseInt(mes, 10) - 1]}/${ano}` : `Selecione um mês`}
+                    {mes
+                      ? `Recebido em ${MESES_PT[parseInt(mes, 10) - 1]}/${ano}`
+                      : `Selecione um mês`}
                   </p>
                   <p
                     className="h3 mb-0 fw-bold text-dark"

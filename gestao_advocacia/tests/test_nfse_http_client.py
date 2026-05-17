@@ -4,20 +4,20 @@ Usa `responses` lib pra mockar o Portal Nacional. Cobre sucesso,
 retries em 5xx/timeout, erro permanente, e validacao de URLs.
 """
 
+from datetime import datetime, timedelta, timezone
+
+import pytest
 import requests
 import responses
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509 import CertificateBuilder, Name, NameAttribute
 from cryptography.x509.oid import NameOID
-from datetime import datetime, timedelta, timezone
-
-import pytest
 
 from nfse.portal_nacional.http_client import (
-    PortalNacionalHTTPError,
     URL_BASE_HOMOLOGACAO,
     URL_BASE_PRODUCAO,
+    PortalNacionalHTTPError,
     request_com_mtls,
     resolver_base_url,
 )

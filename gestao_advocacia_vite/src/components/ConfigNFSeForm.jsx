@@ -7,12 +7,7 @@ import { getConfigNFSe, updateConfigNFSe } from '../api/nfse.js'
 import UploadCertificadoA1 from './UploadCertificadoA1.jsx'
 import ChecklistNFSe from './ChecklistNFSe.jsx'
 
-const REGIMES_TRIBUTARIOS = [
-  'Simples Nacional',
-  'Lucro Presumido',
-  'Lucro Real',
-  'MEI',
-]
+const REGIMES_TRIBUTARIOS = ['Simples Nacional', 'Lucro Presumido', 'Lucro Real', 'MEI']
 
 const GATEWAY_OPCOES = [
   {
@@ -68,8 +63,7 @@ function ConfigNFSeForm() {
         if (cancelado) return
         setForm({
           tipo_pessoa_emissor: data.tipo_pessoa_emissor || 'PJ',
-          documento_emissor:
-            data.documento_emissor || data.cnpj_emissor || '',
+          documento_emissor: data.documento_emissor || data.cnpj_emissor || '',
           inscricao_municipal: data.inscricao_municipal || '',
           razao_social: data.razao_social || '',
           municipio: data.municipio || '',
@@ -85,10 +79,8 @@ function ConfigNFSeForm() {
           nfse_base_url_homologacao: data.nfse_base_url_homologacao || '',
           nfse_base_url_producao: data.nfse_base_url_producao || '',
           codigo_municipio_ibge: data.codigo_municipio_ibge || '',
-          nfse_serie_atual:
-            data.nfse_serie_atual != null ? String(data.nfse_serie_atual) : '1',
-          nfse_numero_atual:
-            data.nfse_numero_atual != null ? String(data.nfse_numero_atual) : '0',
+          nfse_serie_atual: data.nfse_serie_atual != null ? String(data.nfse_serie_atual) : '1',
+          nfse_numero_atual: data.nfse_numero_atual != null ? String(data.nfse_numero_atual) : '0',
         })
         setConfigurado(!!data.configurado)
         setCertInfo({
@@ -120,8 +112,7 @@ function ConfigNFSeForm() {
       const payload = {
         ...form,
         aliquota_iss: form.aliquota_iss === '' ? null : parseFloat(form.aliquota_iss),
-        nfse_serie_atual:
-          form.nfse_serie_atual === '' ? null : parseInt(form.nfse_serie_atual, 10),
+        nfse_serie_atual: form.nfse_serie_atual === '' ? null : parseInt(form.nfse_serie_atual, 10),
         nfse_numero_atual:
           form.nfse_numero_atual === '' ? null : parseInt(form.nfse_numero_atual, 10),
       }
@@ -137,9 +128,7 @@ function ConfigNFSeForm() {
   }
 
   if (loading) {
-    return (
-      <div className="text-center py-5 text-muted">Carregando configuração de NFS-e...</div>
-    )
+    return <div className="text-center py-5 text-muted">Carregando configuração de NFS-e...</div>
   }
 
   return (
@@ -148,10 +137,10 @@ function ConfigNFSeForm() {
       <ChecklistNFSe variant="compacto" />
 
       <div className="alert alert-info py-2 small mb-3">
-        <strong>⚠️ Modo Mock ativo:</strong> nesta versão, a emissão de NFS-e funciona apenas
-        em modo simulado para você testar o fluxo. Nenhuma nota real é enviada à Receita ou
-        prefeitura. A integração com o Portal Nacional NFS-e (gov.br) será habilitada quando
-        o certificado A1 do escritório for cadastrado.
+        <strong>⚠️ Modo Mock ativo:</strong> nesta versão, a emissão de NFS-e funciona apenas em
+        modo simulado para você testar o fluxo. Nenhuma nota real é enviada à Receita ou prefeitura.
+        A integração com o Portal Nacional NFS-e (gov.br) será habilitada quando o certificado A1 do
+        escritório for cadastrado.
       </div>
 
       <h6 className="fw-bold text-dark mt-2 mb-3">Dados do Emissor</h6>
@@ -194,8 +183,8 @@ function ConfigNFSeForm() {
           </label>
         </div>
         <small className="text-muted d-block mt-1">
-          PF emite com <strong>e-CPF A1</strong>, PJ emite com <strong>e-CNPJ A1</strong>.
-          O certificado precisa bater com este cadastro.
+          PF emite com <strong>e-CPF A1</strong>, PJ emite com <strong>e-CNPJ A1</strong>. O
+          certificado precisa bater com este cadastro.
         </small>
       </div>
 
@@ -210,9 +199,7 @@ function ConfigNFSeForm() {
             value={form.documento_emissor}
             onChange={handleChange('documento_emissor')}
             placeholder={
-              form.tipo_pessoa_emissor === 'PF'
-                ? '000.000.000-00'
-                : '00.000.000/0001-00'
+              form.tipo_pessoa_emissor === 'PF' ? '000.000.000-00' : '00.000.000/0001-00'
             }
             maxLength={form.tipo_pessoa_emissor === 'PF' ? 14 : 18}
           />
@@ -313,17 +300,11 @@ function ConfigNFSeForm() {
       <div className="row g-3 mb-3">
         <div className="col-md-6">
           <label className="form-label text-secondary small fw-bold">Ambiente</label>
-          <select
-            className="form-select"
-            value={form.ambiente}
-            onChange={handleChange('ambiente')}
-          >
+          <select className="form-select" value={form.ambiente} onChange={handleChange('ambiente')}>
             <option value="sandbox">Sandbox (homologação)</option>
             <option value="producao">Produção</option>
           </select>
-          <small className="text-muted">
-            Sandbox emite notas de teste; Produção é pra valer.
-          </small>
+          <small className="text-muted">Sandbox emite notas de teste; Produção é pra valer.</small>
         </div>
         <div className="col-md-6">
           <label className="form-label text-secondary small fw-bold">Gateway</label>
@@ -346,14 +327,16 @@ function ConfigNFSeForm() {
         <>
           <h6 className="fw-bold text-dark mt-4 mb-3">Portal Nacional NFS-e (gov.br)</h6>
           <div className="alert alert-info py-2 small mb-3">
-            Para emitir notas pelo Portal Nacional, configure os dados abaixo e faça upload
-            do certificado A1 (.pfx) do escritório. URLs default já apontam para o
-            ambiente oficial — sobrescreva apenas se necessário.
+            Para emitir notas pelo Portal Nacional, configure os dados abaixo e faça upload do
+            certificado A1 (.pfx) do escritório. URLs default já apontam para o ambiente oficial —
+            sobrescreva apenas se necessário.
           </div>
           <div className="alert alert-warning py-2 small mb-3">
-            <strong>⚠️ Antes de emitir, confirme que seu município aderiu ao Portal Nacional.</strong>{' '}
-            ~99,95% da população brasileira já está coberta (todas as capitais e cidades
-            grandes), mas alguns municípios menores ainda mantêm sistema próprio.
+            <strong>
+              ⚠️ Antes de emitir, confirme que seu município aderiu ao Portal Nacional.
+            </strong>{' '}
+            ~99,95% da população brasileira já está coberta (todas as capitais e cidades grandes),
+            mas alguns municípios menores ainda mantêm sistema próprio.
             <br />
             <a
               href="https://www.gov.br/nfse/pt-br/municipios/monitoramento-adesoes"
@@ -397,7 +380,9 @@ function ConfigNFSeForm() {
               />
             </div>
             <div className="col-md-3">
-              <label className="form-label text-secondary small fw-bold">Último número emitido</label>
+              <label className="form-label text-secondary small fw-bold">
+                Último número emitido
+              </label>
               <input
                 type="number"
                 min="0"
@@ -423,9 +408,7 @@ function ConfigNFSeForm() {
               <small className="text-muted">Default oficial. Vazio = usa o default.</small>
             </div>
             <div className="col-md-6">
-              <label className="form-label text-secondary small fw-bold">
-                URL base — Produção
-              </label>
+              <label className="form-label text-secondary small fw-bold">URL base — Produção</label>
               <input
                 type="text"
                 className="form-control"

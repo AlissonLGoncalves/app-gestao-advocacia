@@ -41,16 +41,13 @@ function CancelarNFSeModal({ emissao, onClose, onSucesso }) {
         codMotivo,
       })
       toast.success(
-        eMock
-          ? 'NFS-e cancelada localmente (modo mock).'
-          : 'NFS-e cancelada com sucesso no Portal.'
+        eMock ? 'NFS-e cancelada localmente (modo mock).' : 'NFS-e cancelada com sucesso no Portal.'
       )
       onSucesso?.(atualizada)
       onClose()
     } catch (err) {
       console.error('CancelarNFSeModal: erro ao cancelar', err)
-      const msg =
-        err?.response?.mensagem_erro || err?.message || 'Erro ao cancelar NFS-e.'
+      const msg = err?.response?.mensagem_erro || err?.message || 'Erro ao cancelar NFS-e.'
       toast.error(msg)
     } finally {
       setEnviando(false)
@@ -99,15 +96,11 @@ function CancelarNFSeModal({ emissao, onClose, onSucesso }) {
                 {emissao.numero_nfse || '—'} / {emissao.serie || '—'}
               </dd>
               <dt className="col-sm-4 text-muted">Chave de acesso</dt>
-              <dd className="col-sm-8 font-monospace small">
-                {emissao.gateway_id || '—'}
-              </dd>
+              <dd className="col-sm-8 font-monospace small">{emissao.gateway_id || '—'}</dd>
             </dl>
 
             <div className="mb-3">
-              <label className="form-label small fw-bold mb-1">
-                Código do motivo *
-              </label>
+              <label className="form-label small fw-bold mb-1">Código do motivo *</label>
               <select
                 className="form-select form-select-sm"
                 value={codMotivo}
@@ -128,9 +121,7 @@ function CancelarNFSeModal({ emissao, onClose, onSucesso }) {
             <div className="mb-3">
               <label className="form-label small fw-bold mb-1">
                 Descrição do motivo *{' '}
-                <span className="text-muted fw-normal">
-                  ({motivo.length}/15 mínimo)
-                </span>
+                <span className="text-muted fw-normal">({motivo.length}/15 mínimo)</span>
               </label>
               <textarea
                 className="form-control form-control-sm"

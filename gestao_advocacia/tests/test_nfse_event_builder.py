@@ -26,7 +26,6 @@ from nfse.portal_nacional.event_builder import (
     montar_pedido_cancelamento_por_substituicao,
 )
 
-
 # ===================== gerar_id_ped_reg_evt =====================
 
 

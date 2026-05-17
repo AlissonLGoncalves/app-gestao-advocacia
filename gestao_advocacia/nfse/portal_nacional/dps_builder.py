@@ -23,7 +23,6 @@ from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from xml.etree import ElementTree as ET
 
-
 # Namespace oficial da DPS. TODO 5.6.2: confirmar valor exato ao
 # validar contra XSD oficial.
 DPS_NS = "http://www.sped.fazenda.gov.br/nfse"
