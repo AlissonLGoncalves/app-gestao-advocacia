@@ -140,6 +140,23 @@ def register_financeiro_api(app, api, finance_access_required):
             "notas": fields.String(description="Observacoes livres."),
             "cliente_id": fields.Integer(description="ID do cliente vinculado (opcional)."),
             "caso_id": fields.Integer(description="ID do caso vinculado (opcional)."),
+            "ano_previsao": fields.Integer(
+                description=(
+                    "Ano de previsao de recebimento (YYYY). Util para precatorio/"
+                    "RPV. Independe de data_vencimento."
+                )
+            ),
+            "tipo_recebimento": fields.String(
+                description="Fonte/meio do recebimento.",
+                enum=[
+                    "Diretamente do cliente",
+                    "Precatorio",
+                    "RPV",
+                    "Deposito judicial",
+                    "Acordo extrajudicial",
+                    "Outros",
+                ],
+            ),
             # Aliases retidos por compat com clients antigos (POST/PUT da Fase 0).
             "data_recebimento": fields.Date(
                 description=(
@@ -180,6 +197,8 @@ def register_financeiro_api(app, api, finance_access_required):
             "user_id": fields.Integer,
             "recorrencia_id": fields.Integer(nullable=True),
             "numero_parcela": fields.Integer(nullable=True),
+            "ano_previsao": fields.Integer(nullable=True),
+            "tipo_recebimento": fields.String,
             # Compat retroativa — clientes antigos ainda leem esses campos.
             "data_recebimento": fields.Date(dt_format="iso8601"),
             "recebido": fields.Boolean,

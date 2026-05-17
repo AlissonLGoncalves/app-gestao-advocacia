@@ -26,6 +26,51 @@ from models import Caso, Cliente, Recebimento, RecorrenciaRecebimento
 STATUS_VALIDOS = {"Pendente", "Pago", "Vencido", "Cancelado", "Em Negociacao"}
 STATUS_PAGO = "Pago"
 
+# Tipos validos de recebimento (Etapa 6). Lista fechada — frontend usa
+# dropdown. "Outros" cobre casos atipicos sem mudar codigo.
+TIPOS_RECEBIMENTO_VALIDOS = {
+    "Diretamente do cliente",
+    "Precatorio",
+    "RPV",
+    "Deposito judicial",
+    "Acordo extrajudicial",
+    "Outros",
+}
+
+
+def _validar_ano_previsao(data):
+    """Retorna (ano|None, erro|None). Aceita ausente, None, '' ou int valido."""
+    if "ano_previsao" not in data:
+        return None, None
+    raw = data.get("ano_previsao")
+    if raw in (None, ""):
+        return None, None
+    try:
+        ano = int(raw)
+    except (TypeError, ValueError):
+        return None, "ano_previsao deve ser um numero inteiro (YYYY)."
+    if ano < 1900 or ano > 2200:
+        return None, "ano_previsao fora do intervalo permitido (1900-2200)."
+    return ano, None
+
+
+def _validar_tipo_recebimento(data):
+    """Retorna (tipo|None, erro|None). Aceita ausente, None, '' ou string valida."""
+    if "tipo_recebimento" not in data:
+        return None, None
+    raw = data.get("tipo_recebimento")
+    if raw in (None, ""):
+        return None, None
+    if not isinstance(raw, str):
+        return None, "tipo_recebimento deve ser texto."
+    tipo = raw.strip()
+    if tipo not in TIPOS_RECEBIMENTO_VALIDOS:
+        return (
+            None,
+            f"tipo_recebimento invalido. Use um de: {sorted(TIPOS_RECEBIMENTO_VALIDOS)}",
+        )
+    return tipo, None
+
 
 def _parse_date_optional(raw):
     """Aceita string ISO ou None. Retorna (date|None, erro|None)."""
@@ -199,6 +244,13 @@ def register_recebimentos_routes(
             if err:
                 recebimentos_ns.abort(404, message=err)
 
+            ano_previsao, err = _validar_ano_previsao(data)
+            if err:
+                recebimentos_ns.abort(400, message=err)
+            tipo_recebimento, err = _validar_tipo_recebimento(data)
+            if err:
+                recebimentos_ns.abort(400, message=err)
+
             novo = Recebimento(
                 descricao=data["descricao"],
                 valor=valor_decimal,
@@ -211,6 +263,8 @@ def register_recebimentos_routes(
                 caso_id=caso_id,
                 user_id=user_id,
                 tenant_id=get_tenant_id(),
+                ano_previsao=ano_previsao,
+                tipo_recebimento=tipo_recebimento,
             )
             err = _aplicar_data_pagamento(novo, data, status_novo)
             if err:
@@ -283,6 +337,17 @@ def register_recebimentos_routes(
                 recebimentos_ns.abort(404, message=err)
             recebimento.caso_id = caso_id
             recebimento.cliente_id = cliente_id
+
+            if "ano_previsao" in data:
+                ano_previsao, err = _validar_ano_previsao(data)
+                if err:
+                    recebimentos_ns.abort(400, message=err)
+                recebimento.ano_previsao = ano_previsao
+            if "tipo_recebimento" in data:
+                tipo_recebimento, err = _validar_tipo_recebimento(data)
+                if err:
+                    recebimentos_ns.abort(400, message=err)
+                recebimento.tipo_recebimento = tipo_recebimento
 
             err = _aplicar_data_pagamento(recebimento, data, status_novo)
             if err:

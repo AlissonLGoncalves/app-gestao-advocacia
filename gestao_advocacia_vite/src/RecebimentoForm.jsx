@@ -54,6 +54,17 @@ const FREQUENCIAS = [
 
 const hoje = () => new Date().toISOString().split('T')[0]
 
+// Tipos de recebimento (Etapa 6). Lista fechada espelhando o backend.
+// "Outros" e fallback para casos atipicos.
+const TIPOS_RECEBIMENTO = [
+  'Diretamente do cliente',
+  'Precatorio',
+  'RPV',
+  'Deposito judicial',
+  'Acordo extrajudicial',
+  'Outros',
+]
+
 const initialState = () => ({
   cliente_id: '',
   caso_id: '',
@@ -65,6 +76,10 @@ const initialState = () => ({
   status: 'Pendente',
   forma_pagamento: '',
   notas: '',
+  // Etapa 6: previsao de ano (precatorio/RPV) e tipo de recebimento.
+  // Ambos opcionais. ano_previsao independe de data_vencimento.
+  ano_previsao: '',
+  tipo_recebimento: '',
   // Tipo de criacao (so usado em modo "novo"; edicao sempre eh UNICO).
   tipo: TIPO_UNICO,
   // Campos da serie (so quando tipo != UNICO)
@@ -130,6 +145,13 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
         }
       })
       dados.valor = dados.valor === null || dados.valor === undefined ? '' : String(dados.valor)
+      // Etapa 6: campos novos podem vir null do backend — normalizar pra
+      // string vazia pro select/input controlado nao quebrar.
+      dados.ano_previsao =
+        dados.ano_previsao === null || dados.ano_previsao === undefined
+          ? ''
+          : String(dados.ano_previsao)
+      dados.tipo_recebimento = dados.tipo_recebimento || ''
       // Status default pra registros antigos sem status persistido.
       if (!dados.status) {
         dados.status = recebimentoParaEditar.recebido ? 'Pago' : 'Pendente'
@@ -207,6 +229,12 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
     caso_id: formData.caso_id ? parseInt(formData.caso_id, 10) : null,
     categoria: formData.categoria || null,
     notas: formData.notas || null,
+    // Etapa 6: ano_previsao como int (ou null) e tipo_recebimento string.
+    ano_previsao:
+      formData.ano_previsao === '' || formData.ano_previsao == null
+        ? null
+        : parseInt(formData.ano_previsao, 10),
+    tipo_recebimento: formData.tipo_recebimento || null,
   })
 
   const handleSubmit = async (e) => {
@@ -687,6 +715,51 @@ function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel 
               </div>
             </div>
           )}
+
+          {/* ===== Etapa 6: Tipo de Recebimento + Ano de Previsao ===== */}
+          <div className="row">
+            <div className="col-md-8 mb-3">
+              <label htmlFor="tipo_recebimento_rec" className="form-label form-label-sm">
+                Tipo de Recebimento
+              </label>
+              <select
+                name="tipo_recebimento"
+                id="tipo_recebimento_rec"
+                className="form-select form-select-sm"
+                value={formData.tipo_recebimento || ''}
+                onChange={handleChange}
+              >
+                <option value="">Selecione...</option>
+                {TIPOS_RECEBIMENTO.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <small className="text-muted">
+                Útil para diferenciar precatório, RPV, depósito judicial etc.
+              </small>
+            </div>
+            <div className="col-md-4 mb-3">
+              <label htmlFor="ano_previsao_rec" className="form-label form-label-sm">
+                Ano de Previsão
+              </label>
+              <input
+                type="number"
+                name="ano_previsao"
+                id="ano_previsao_rec"
+                className="form-control form-control-sm"
+                value={formData.ano_previsao || ''}
+                onChange={handleChange}
+                min="1900"
+                max="2200"
+                placeholder="Ex: 2028"
+              />
+              <small className="text-muted">
+                Quando previsão é só do ano (precatório/RPV sem data exata).
+              </small>
+            </div>
+          </div>
 
           {/* ===== Notas ===== */}
           <div className="mb-3">
