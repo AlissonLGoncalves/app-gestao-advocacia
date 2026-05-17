@@ -209,3 +209,149 @@ def test_filtro_por_status(auth_client, db):
     itens = json.loads(response.data)
     assert len(itens) == 1
     assert itens[0]["status"] == "Concluido"
+
+
+# ---------- Endpoints do Kanban (PR D4.1) ----------
+
+
+def test_reorder_atualiza_status_e_posicao(auth_client, db):
+    """Reorder de 3 tarefas entre colunas: distribui status + posicao."""
+    ids = []
+    for i in range(3):
+        res = auth_client.post(
+            "/api/v1/itens-agenda",
+            json={"titulo": f"K{i}", "tipo": "tarefa", "status": "Pendente"},
+        )
+        ids.append(json.loads(res.data)["id"])
+
+    # Distribui: 1 em Pendente, 2 em Em Andamento
+    res = auth_client.put(
+        "/api/v1/itens-agenda/reorder",
+        json={
+            "columns": {
+                "Pendente": [ids[0]],
+                "Em Andamento": [ids[1], ids[2]],
+            }
+        },
+    )
+    assert res.status_code == 200
+    assert json.loads(res.data)["updated"] == 3
+
+    # Confere posicao
+    r0 = json.loads(auth_client.get(f"/api/v1/itens-agenda/{ids[0]}").data)
+    r1 = json.loads(auth_client.get(f"/api/v1/itens-agenda/{ids[1]}").data)
+    r2 = json.loads(auth_client.get(f"/api/v1/itens-agenda/{ids[2]}").data)
+    assert (r0["status"], r0["posicao"]) == ("Pendente", 1)
+    assert (r1["status"], r1["posicao"]) == ("Em Andamento", 1)
+    assert (r2["status"], r2["posicao"]) == ("Em Andamento", 2)
+
+
+def test_reorder_status_invalido_rejeitado(auth_client, db):
+    res = auth_client.put(
+        "/api/v1/itens-agenda/reorder",
+        json={"columns": {"NaoExiste": [1]}},
+    )
+    assert res.status_code == 400
+
+
+def test_reorder_columns_payload_invalido_rejeitado(auth_client, db):
+    res = auth_client.put(
+        "/api/v1/itens-agenda/reorder",
+        json={"columns": "string em vez de dict"},
+    )
+    assert res.status_code == 400
+
+
+def test_reorder_so_mexe_em_tarefa_nao_em_evento(auth_client, db):
+    """Reorder so deve afetar tipo='tarefa'. Eventos sao ignorados."""
+    from datetime import datetime, timedelta, timezone
+
+    inicio_futuro = (
+        (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0).isoformat()
+    )
+    tarefa = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "T", "tipo": "tarefa", "status": "Pendente"},
+    )
+    evento = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "E", "tipo": "evento", "data_inicio": inicio_futuro},
+    )
+    tarefa_id = json.loads(tarefa.data)["id"]
+    evento_id = json.loads(evento.data)["id"]
+
+    # Tenta mover ambos pra "Em Andamento"
+    res = auth_client.put(
+        "/api/v1/itens-agenda/reorder",
+        json={"columns": {"Em Andamento": [tarefa_id, evento_id]}},
+    )
+    assert res.status_code == 200
+    # Apenas a tarefa foi atualizada
+    assert json.loads(res.data)["updated"] == 1
+
+    # Evento mantem status original
+    ev_atual = json.loads(auth_client.get(f"/api/v1/itens-agenda/{evento_id}").data)
+    assert ev_atual["status"] == "Pendente"
+
+
+def test_validar_prazo_marca_validado(auth_client, db):
+    res = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={
+            "titulo": "IA prazo",
+            "tipo": "tarefa",
+            "prazo_calculado_por_ia": True,
+            "prazo_validado": False,
+        },
+    )
+    item_id = json.loads(res.data)["id"]
+
+    res = auth_client.patch(f"/api/v1/itens-agenda/{item_id}/validar-prazo")
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["prazo_validado"] is True
+
+
+def test_validar_prazo_aceita_nova_data_e_prioridade(auth_client, db):
+    res = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "IA prazo 2", "tipo": "tarefa", "prazo_validado": False},
+    )
+    item_id = json.loads(res.data)["id"]
+
+    res = auth_client.patch(
+        f"/api/v1/itens-agenda/{item_id}/validar-prazo",
+        json={"data_vencimento": "2026-12-01", "prioridade": "Alta"},
+    )
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["prazo_validado"] is True
+    assert data["data_vencimento"] is not None
+    assert data["prioridade"] == "Alta"
+
+
+def test_concluir_marca_concluido_e_validado(auth_client, db):
+    res = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "ParaConcluir", "tipo": "tarefa"},
+    )
+    item_id = json.loads(res.data)["id"]
+
+    res = auth_client.patch(f"/api/v1/itens-agenda/{item_id}/concluir")
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["status"] == "Concluido"
+    assert data["prazo_validado"] is True
+
+
+def test_concluir_idempotente(auth_client, db):
+    res = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "X", "tipo": "tarefa", "status": "Concluido"},
+    )
+    item_id = json.loads(res.data)["id"]
+
+    # Concluir item ja concluido nao quebra
+    res = auth_client.patch(f"/api/v1/itens-agenda/{item_id}/concluir")
+    assert res.status_code == 200
+    assert json.loads(res.data)["status"] == "Concluido"

@@ -216,3 +216,115 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
             db.session.commit()
             app.logger.info(f"ItemAgenda {item.id} deletado por user {user_id}.")
             return "", 204
+
+    # --- Endpoints do Kanban (PR D4.1) ---
+    # Reorder + validar-prazo + concluir: mirroram os equivalentes de
+    # /tarefas, mas usando ItemAgenda como fonte. Necessarios pra
+    # PrazosPage (kanban) migrar do legado /tarefas pra /itens-agenda
+    # sem perder funcionalidade.
+
+    @ns.route("/reorder")
+    class ItemAgendaReorderAPI(Resource):
+        """Reordena tarefas no Kanban (drag-drop).
+
+        Body:
+            {"columns": {"Pendente": [12, 5, 3], "Em Andamento": [8]}}
+
+        Para cada coluna, atualiza status=<coluna> e posicao=<indice+1>.
+        IDs desconhecidos sao ignorados silenciosamente (nao vaza
+        existencia cross-tenant). So mexe em itens com tipo='tarefa' —
+        eventos nao tem kanban.
+        """
+
+        @jwt_required()
+        @tenant_scoped
+        @ns.doc(security="jsonWebToken")
+        def put(self):
+            tenant_id = get_tenant_id()
+            data = request.get_json(silent=True) or {}
+            columns = data.get("columns")
+            if not isinstance(columns, dict):
+                return {"message": "Campo 'columns' deve ser um objeto status -> [ids]."}, 400
+
+            todos_ids = []
+            for status, ids in columns.items():
+                if status not in STATUS_VALIDOS:
+                    return {
+                        "message": f"Status invalido na coluna: {status!r}. Aceitos: {sorted(STATUS_VALIDOS)}."
+                    }, 400
+                if not isinstance(ids, list):
+                    return {"message": "Cada coluna precisa ser uma lista de ids."}, 400
+                todos_ids.extend(ids)
+
+            if not todos_ids:
+                return {"updated": 0}, 200
+
+            # Filtra por tenant + tipo='tarefa' (kanban so mexe em tarefas)
+            itens = ItemAgenda.query.filter(
+                ItemAgenda.tenant_id == tenant_id,
+                ItemAgenda.tipo == "tarefa",
+                ItemAgenda.id.in_(todos_ids),
+            ).all()
+            por_id = {i.id: i for i in itens}
+
+            atualizadas = 0
+            for status, ids in columns.items():
+                for indice, item_id in enumerate(ids, start=1):
+                    item = por_id.get(item_id)
+                    if item is None:
+                        continue
+                    item.status = status
+                    item.posicao = indice
+                    atualizadas += 1
+
+            db.session.commit()
+            return {"updated": atualizadas}, 200
+
+    @ns.route("/<int:item_id>/validar-prazo")
+    class ItemAgendaValidarPrazoAPI(Resource):
+        """Marca prazo IA como validado pelo advogado.
+
+        Mirror de /tarefas/{id}/validar-prazo. Aceita opcionalmente nova
+        data_vencimento + prioridade no body. Remove o badge "IA —
+        confirmar prazo" do card no Kanban.
+        """
+
+        @jwt_required()
+        @tenant_scoped
+        @ns.marshal_with(output_dto)
+        @ns.doc(security="jsonWebToken")
+        def patch(self, item_id):
+            item = get_item_or_404(ItemAgenda, item_id)
+            data = request.get_json(silent=True) or {}
+
+            if "data_vencimento" in data:
+                valor, err = _parse_dt(data["data_vencimento"])
+                if err:
+                    return {"message": err}, 400
+                item.data_vencimento = valor
+
+            if "prioridade" in data and data["prioridade"]:
+                item.prioridade = data["prioridade"]
+
+            item.prazo_validado = True
+            db.session.commit()
+            return item
+
+    @ns.route("/<int:item_id>/concluir")
+    class ItemAgendaConcluirAPI(Resource):
+        """Atalho de 1 clique: marca status='Concluido' + prazo_validado=True.
+
+        Mirror de /tarefas/{id}/concluir. Idempotente para itens ja
+        concluidos.
+        """
+
+        @jwt_required()
+        @tenant_scoped
+        @ns.marshal_with(output_dto)
+        @ns.doc(security="jsonWebToken")
+        def patch(self, item_id):
+            item = get_item_or_404(ItemAgenda, item_id)
+            item.status = "Concluido"
+            item.prazo_validado = True
+            db.session.commit()
+            return item

@@ -2,6 +2,18 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
+// PR D4.1 — kanban migrado de /tarefas pra /v1/itens-agenda.
+// /tarefas continua existindo (dual-write D2 mantem sync); sera
+// dropado em D4.2.
+import {
+  listItensAgenda,
+  createItemAgenda,
+  updateItemAgenda,
+  deleteItemAgenda,
+  reorderItensAgenda,
+  validarPrazoItemAgenda,
+  concluirItemAgenda,
+} from '../api/itensAgenda.js'
 import {
   DndContext,
   PointerSensor,
@@ -48,6 +60,51 @@ const COLUNAS = [
   { id: 'Concluído', titulo: 'Concluído', cor: 'success' },
 ]
 const COLUNAS_IDS = COLUNAS.map((c) => c.id)
+
+// PR D4.1 — Adaptadores Kanban (legado) ↔ API ItemAgenda (novo)
+// Mantemos o vocabulario legado ("A Fazer", "Fazendo", "Concluído")
+// dentro do PrazosPage pra reduzir o diff e o risco (esse arquivo tem
+// 1000+ linhas e o kanban eh o workflow principal do usuario).
+// Em D4.3 (cleanup final) migraremos pra "Pendente"/"Em Andamento"/
+// "Concluido" nativos.
+const STATUS_KANBAN_TO_API = {
+  'A Fazer': 'Pendente',
+  Fazendo: 'Em Andamento',
+  'Em Andamento': 'Em Andamento',
+  Concluído: 'Concluido',
+  Concluido: 'Concluido',
+}
+const STATUS_API_TO_KANBAN = {
+  Pendente: 'A Fazer',
+  'Em Andamento': 'Fazendo',
+  Concluido: 'Concluído',
+  Cancelado: 'Concluído', // cancelado mapeia visualmente pra coluna concluida
+}
+
+// Backend ItemAgenda devolve `categoria` em vez de `tipo_tarefa`, e
+// status no vocabulario novo. Esta funcao adapta pra estrutura que o
+// resto do PrazosPage espera.
+function adaptarItem(item) {
+  return {
+    ...item,
+    status: STATUS_API_TO_KANBAN[item.status] || item.status,
+    tipo_tarefa: item.categoria || item.tipo_tarefa,
+  }
+}
+
+// Inverso: payload do kanban (status legado, tipo_tarefa) → payload
+// que /v1/itens-agenda aceita (status novo, categoria, tipo='tarefa').
+function adaptarPayload(payload) {
+  const out = { ...payload, tipo: 'tarefa' }
+  if (payload.status) {
+    out.status = STATUS_KANBAN_TO_API[payload.status] || payload.status
+  }
+  if (payload.tipo_tarefa) {
+    out.categoria = payload.tipo_tarefa
+    delete out.tipo_tarefa
+  }
+  return out
+}
 
 // ── Helpers de data ──────────────────────────────────────────────────────────
 
@@ -124,14 +181,14 @@ export default function PrazosPage() {
   const carregarTarefas = useCallback(async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${API_URL}/tarefas`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) setTarefas(await res.json())
-      else toast.error('Erro ao carregar prazos.')
-    } catch {
-      toast.error('Erro de conexão.')
+      // PR D4.1 — consome /v1/itens-agenda filtrando tipo='tarefa'.
+      // Adaptador converte status (vocab novo → legado) e categoria →
+      // tipo_tarefa pro resto do componente nao mudar.
+      const itens = await listItensAgenda({ tipo: 'tarefa' })
+      setTarefas((Array.isArray(itens) ? itens : []).map(adaptarItem))
+    } catch (err) {
+      console.error('PrazosPage: erro ao carregar tarefas', err)
+      toast.error(err?.message || 'Erro ao carregar prazos.')
     } finally {
       setLoading(false)
     }
@@ -182,27 +239,21 @@ export default function PrazosPage() {
   const handleSalvarTarefa = async (e) => {
     e.preventDefault()
     try {
-      const token = localStorage.getItem('token')
-      const payload = { ...novaTarefa }
+      const payload = adaptarPayload({ ...novaTarefa })
       if (!payload.caso_id) delete payload.caso_id
 
       const isEditing = editandoId !== null
-      const url = isEditing ? `${API_URL}/tarefas/${editandoId}` : `${API_URL}/tarefas`
-      const res = await fetch(url, {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (res.ok) {
-        toast.success(isEditing ? 'Prazo atualizado!' : 'Prazo criado com sucesso!')
-        handleFecharModal()
-        carregarTarefas()
+      if (isEditing) {
+        await updateItemAgenda(editandoId, payload)
       } else {
-        const err = await res.json()
-        toast.error(err.message || 'Erro ao salvar.')
+        await createItemAgenda(payload)
       }
-    } catch {
-      toast.error('Erro na comunicação com servidor.')
+      toast.success(isEditing ? 'Prazo atualizado!' : 'Prazo criado com sucesso!')
+      handleFecharModal()
+      carregarTarefas()
+    } catch (err) {
+      console.error('PrazosPage: erro ao salvar tarefa', err)
+      toast.error(err?.message || 'Erro ao salvar.')
     }
   }
 
@@ -210,54 +261,37 @@ export default function PrazosPage() {
   // "IA - confirmar" do card e marca prazo_validado=true no backend.
   const handleConfirmarPrazo = async (tarefa) => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${API_URL}/tarefas/${tarefa.id}/validar-prazo`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      if (res.ok) {
-        toast.success('Prazo confirmado.')
-        carregarTarefas()
-      } else {
-        toast.error('Falha ao confirmar prazo.')
-      }
-    } catch {
-      toast.error('Erro na comunicação com servidor.')
+      await validarPrazoItemAgenda(tarefa.id)
+      toast.success('Prazo confirmado.')
+      carregarTarefas()
+    } catch (err) {
+      console.error('PrazosPage: erro ao validar prazo', err)
+      toast.error(err?.message || 'Falha ao confirmar prazo.')
     }
   }
 
   // Atalho "ja cumpri / nao era prazo": move pra Concluido com 1 clique.
   const handleConcluirTarefa = async (tarefa) => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${API_URL}/tarefas/${tarefa.id}/concluir`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      })
-      if (res.ok) {
-        toast.success('Tarefa marcada como cumprida.')
-        carregarTarefas()
-      } else {
-        toast.error('Falha ao concluir tarefa.')
-      }
-    } catch {
-      toast.error('Erro na comunicação com servidor.')
+      await concluirItemAgenda(tarefa.id)
+      toast.success('Tarefa marcada como cumprida.')
+      carregarTarefas()
+    } catch (err) {
+      console.error('PrazosPage: erro ao concluir tarefa', err)
+      toast.error(err?.message || 'Falha ao concluir tarefa.')
     }
   }
 
   // Toggle "Concluir" da vista lista — usa PUT simples; posicao é preservada.
   const handleMoverTarefa = async (id, novoStatus) => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${API_URL}/tarefas/${id}`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: novoStatus }),
-      })
-      if (res.ok) carregarTarefas()
-    } catch {
-      toast.error('Falha ao atualizar tarefa.')
+      // Recebe status legado, converte pro vocab da API.
+      const statusApi = STATUS_KANBAN_TO_API[novoStatus] || novoStatus
+      await updateItemAgenda(id, { status: statusApi })
+      carregarTarefas()
+    } catch (err) {
+      console.error('PrazosPage: erro ao mover tarefa', err)
+      toast.error(err?.message || 'Falha ao atualizar tarefa.')
     }
   }
 
@@ -272,15 +306,17 @@ export default function PrazosPage() {
 
   const enviarReorder = useCallback(async (columnsPayload, snapshotAnterior) => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${API_URL}/tarefas/reorder`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columns: columnsPayload }),
-      })
-      if (!res.ok) throw new Error(`reorder ${res.status}`)
-    } catch {
-      toast.error('Não foi possível salvar a nova ordem.')
+      // Converte chaves do payload pra vocab da API:
+      // { 'A Fazer': [...] } → { 'Pendente': [...] }
+      const apiColumns = {}
+      for (const [statusLegado, ids] of Object.entries(columnsPayload)) {
+        const statusApi = STATUS_KANBAN_TO_API[statusLegado] || statusLegado
+        apiColumns[statusApi] = ids
+      }
+      await reorderItensAgenda(apiColumns)
+    } catch (err) {
+      console.error('PrazosPage: erro no reorder', err)
+      toast.error(err?.message || 'Não foi possível salvar a nova ordem.')
       setTarefas(snapshotAnterior)
     }
   }, [])
