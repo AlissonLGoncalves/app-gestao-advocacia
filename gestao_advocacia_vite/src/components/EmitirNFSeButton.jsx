@@ -25,14 +25,32 @@ const STATUS_BADGE = {
   Cancelada: { cor: 'bg-dark', label: 'Cancelada' },
 }
 
-function EmitirNFSeButton({ recebimento }) {
+/**
+ * Botao de emissao de NFS-e + modal de confirmacao.
+ *
+ * Props:
+ *   recebimento     — o registro pra emitir.
+ *   emissaoInicial  — (opcional, PR C) ultima emissao ja conhecida (do
+ *                     caller). Quando passado, pula o fetch interno.
+ *                     Util pra listas onde o caller agrega 1 fetch pra
+ *                     N linhas em vez de N fetches.
+ *   variant         — (opcional) "completa" (default, com label) ou
+ *                     "compacta" (so icone, pra cell de tabela).
+ */
+function EmitirNFSeButton({ recebimento, emissaoInicial = undefined, variant = 'completa' }) {
   const [aberto, setAberto] = useState(false)
   const [emitindo, setEmitindo] = useState(false)
-  const [ultimaEmissao, setUltimaEmissao] = useState(null)
-  const [historicoCarregado, setHistoricoCarregado] = useState(false)
+  const [ultimaEmissao, setUltimaEmissao] = useState(
+    emissaoInicial !== undefined ? emissaoInicial : null
+  )
+  const [historicoCarregado, setHistoricoCarregado] = useState(
+    emissaoInicial !== undefined
+  )
 
   // Carrega ultima emissao desse recebimento ao montar pra mostrar badge.
+  // Pula se caller ja passou via emissaoInicial (PR C: agregado em listas).
   useEffect(() => {
+    if (emissaoInicial !== undefined) return
     let cancelado = false
     listEmissoesNFSe({ recebimento_id: recebimento.id })
       .then((emissoes) => {
@@ -49,7 +67,7 @@ function EmitirNFSeButton({ recebimento }) {
     return () => {
       cancelado = true
     }
-  }, [recebimento.id])
+  }, [recebimento.id, emissaoInicial])
 
   const handleConfirmarEmitir = async () => {
     setEmitindo(true)
@@ -88,32 +106,71 @@ function EmitirNFSeButton({ recebimento }) {
     ultimaEmissao.status === 'Rejeitada' ||
     ultimaEmissao.status === 'Cancelada'
 
+  const ehCompacta = variant === 'compacta'
+
+  // Variante compacta (PR C): so icone num botao 30x30 — combina
+  // visualmente com os outros botoes da action cell. Cor muda conforme
+  // status: verde se ja emitida, outline neutro se nao.
+  const botaoCompacto = (
+    <button
+      type="button"
+      onClick={() => setAberto(true)}
+      className={`btn btn-sm ${
+        ultimaEmissao?.status === 'Autorizada'
+          ? 'btn-outline-success'
+          : 'btn-outline-primary'
+      } me-1 p-1 lh-1`}
+      title={
+        podeEmitir
+          ? 'Emitir NFS-e para este recebimento'
+          : ultimaEmissao?.status === 'Autorizada'
+            ? `NFS-e ${ultimaEmissao.numero_nfse || ''} já emitida`
+            : 'NFS-e em processo'
+      }
+      disabled={!podeEmitir}
+      style={{
+        width: '30px',
+        height: '30px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <DocumentTextIcon style={{ width: 16, height: 16 }} />
+    </button>
+  )
+
+  // Variante completa (default): botao com label + PDF + badge de status.
+  const botaoCompleto = (
+    <div className="d-flex align-items-center gap-1">
+      <button
+        type="button"
+        className="btn btn-outline-primary btn-sm"
+        onClick={() => setAberto(true)}
+        disabled={!podeEmitir}
+        title={podeEmitir ? 'Emitir NFS-e para este pagamento' : 'NFS-e já emitida'}
+      >
+        <DocumentTextIcon style={{ width: 14, height: 14 }} className="me-1" />
+        {ultimaEmissao && !podeEmitir ? 'Emitida' : 'Emitir NFS-e'}
+      </button>
+      {ultimaEmissao?.pdf_url && (
+        <a
+          href={ultimaEmissao.pdf_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-outline-secondary btn-sm"
+          title="Baixar DANFSe"
+        >
+          PDF
+        </a>
+      )}
+      {renderBadge()}
+    </div>
+  )
+
   return (
     <>
-      <div className="d-flex align-items-center gap-1">
-        <button
-          type="button"
-          className="btn btn-outline-primary btn-sm"
-          onClick={() => setAberto(true)}
-          disabled={!podeEmitir}
-          title={podeEmitir ? 'Emitir NFS-e para este pagamento' : 'NFS-e já emitida'}
-        >
-          <DocumentTextIcon style={{ width: 14, height: 14 }} className="me-1" />
-          {ultimaEmissao && !podeEmitir ? 'Emitida' : 'Emitir NFS-e'}
-        </button>
-        {ultimaEmissao?.pdf_url && (
-          <a
-            href={ultimaEmissao.pdf_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-outline-secondary btn-sm"
-            title="Baixar DANFSe"
-          >
-            PDF
-          </a>
-        )}
-        {renderBadge()}
-      </div>
+      {ehCompacta ? botaoCompacto : botaoCompleto}
 
       {aberto && (
         <div
