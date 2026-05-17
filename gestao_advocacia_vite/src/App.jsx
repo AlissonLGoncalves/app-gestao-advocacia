@@ -16,6 +16,7 @@ import ImportarCnjsPage from './pages/ImportarCnjsPage.jsx'
 import BuscarProcessoCnjPage from './pages/BuscarProcessoCnjPage.jsx'
 import RecebimentosPage from './pages/RecebimentosPage.jsx'
 import RecebimentosHistoricoPage from './pages/RecebimentosHistoricoPage.jsx'
+import NotasFiscaisPage from './pages/NotasFiscaisPage.jsx'
 import ContratosPage from './pages/ContratosPage.jsx'
 import DespesasPage from './pages/DespesasPage.jsx'
 import AgendaPage from './pages/AgendaPage.jsx'
@@ -57,6 +58,7 @@ import {
   UsersIcon,
   BriefcaseIcon,
   DocumentTextIcon,
+  ReceiptPercentIcon,
   CurrencyDollarIcon,
   CalendarDaysIcon,
   ChartBarIcon,
@@ -454,6 +456,9 @@ const MainLayout = () => {
                 >
                   Despesas
                 </SidebarLink>
+                <SidebarLink to="/nfse" icon={ReceiptPercentIcon}>
+                  Notas Fiscais
+                </SidebarLink>
               </>
             )}
             <SidebarLink to="/agenda" icon={CalendarDaysIcon}>
@@ -628,6 +633,8 @@ function App() {
           <Route path="despesas" element={<DespesasPage />} />
           <Route path="despesas/novo" element={<DespesasPage />} />
           <Route path="despesas/editar/:despesaId" element={<DespesasPage />} />
+
+          <Route path="nfse" element={<NotasFiscaisPage />} />
 
           <Route path="agenda" element={<AgendaPage />} />
           <Route path="agenda/novo" element={<AgendaPage />} />
