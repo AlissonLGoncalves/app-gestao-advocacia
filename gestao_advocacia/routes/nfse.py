@@ -60,6 +60,11 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
                     "ambiente": "sandbox",
                     "gateway_tipo": "mock",
                     "tem_certificado": False,
+                    "nfse_base_url_homologacao": None,
+                    "nfse_base_url_producao": None,
+                    "codigo_municipio_ibge": None,
+                    "nfse_serie_atual": 1,
+                    "nfse_numero_atual": 0,
                     "configurado": False,
                 }, 200
             return config.to_dict(), 200
@@ -96,6 +101,28 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
             if uf and len(uf) != 2:
                 nfse_ns.abort(400, message="uf deve ter 2 caracteres (ex: SP).")
 
+            # Etapa 5.6.1: campos do Portal Nacional. Validar IBGE so se vier.
+            codigo_ibge_raw = data.get("codigo_municipio_ibge")
+            codigo_ibge = None
+            if codigo_ibge_raw not in (None, ""):
+                codigo_ibge = "".join(c for c in str(codigo_ibge_raw) if c.isdigit())
+                if len(codigo_ibge) != 7:
+                    nfse_ns.abort(
+                        400, message="codigo_municipio_ibge deve ter 7 digitos."
+                    )
+
+            serie_raw = data.get("nfse_serie_atual")
+            numero_raw = data.get("nfse_numero_atual")
+            try:
+                serie_val = int(serie_raw) if serie_raw not in (None, "") else None
+                numero_val = int(numero_raw) if numero_raw not in (None, "") else None
+            except (TypeError, ValueError):
+                nfse_ns.abort(400, message="nfse_serie_atual e nfse_numero_atual devem ser inteiros.")
+            if serie_val is not None and serie_val < 1:
+                nfse_ns.abort(400, message="nfse_serie_atual deve ser >= 1.")
+            if numero_val is not None and numero_val < 0:
+                nfse_ns.abort(400, message="nfse_numero_atual deve ser >= 0.")
+
             config = _ou_cria_config(tenant_id)
             config.cnpj_emissor = data.get("cnpj_emissor")
             config.inscricao_municipal = data.get("inscricao_municipal")
@@ -107,6 +134,19 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
             config.aliquota_iss = aliquota
             config.ambiente = ambiente
             config.gateway_tipo = gateway_tipo
+            # Etapa 5.6.1 — Portal Nacional
+            if "nfse_base_url_homologacao" in data:
+                config.nfse_base_url_homologacao = (
+                    data.get("nfse_base_url_homologacao") or None
+                )
+            if "nfse_base_url_producao" in data:
+                config.nfse_base_url_producao = data.get("nfse_base_url_producao") or None
+            if codigo_ibge_raw is not None:
+                config.codigo_municipio_ibge = codigo_ibge or None
+            if serie_val is not None:
+                config.nfse_serie_atual = serie_val
+            if numero_val is not None:
+                config.nfse_numero_atual = numero_val
 
             db.session.commit()
             app.logger.info(

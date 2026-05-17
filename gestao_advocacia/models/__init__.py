@@ -1795,6 +1795,20 @@ class ConfigNFSe(db.Model):
     # Flag indicando se o tenant ja enviou o certificado A1. Conteudo
     # nao fica no banco — fica no storage do gateway (quando configurado).
     tem_certificado = db.Column(db.Boolean, nullable=False, default=False)
+    # === Etapa 5.6.1: campos para Portal Nacional NFS-e (gov.br) ===
+    # URLs base configuraveis pra cada ambiente. Mantidas opcionais
+    # porque gateway "mock" nao precisa delas. Defaults indicativos
+    # (provaveis) sao aplicados pelo service quando vazias.
+    nfse_base_url_homologacao = db.Column(db.String(300), nullable=True)
+    nfse_base_url_producao = db.Column(db.String(300), nullable=True)
+    # Codigo IBGE do municipio do prestador. Obrigatorio pra montar a
+    # DPS conforme o leiaute (Anexo I do manual oficial out/2025).
+    codigo_municipio_ibge = db.Column(db.String(10), nullable=True)
+    # Numeracao sequencial da DPS — controlada pelo emissor. Comeca em
+    # 1 e incrementa a cada emissao bem-sucedida.
+    nfse_serie_atual = db.Column(db.Integer, nullable=False, default=1)
+    nfse_numero_atual = db.Column(db.Integer, nullable=False, default=0)
+    # === Fim dos campos da Etapa 5.6.1 ===
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -1814,6 +1828,11 @@ class ConfigNFSe(db.Model):
             "ambiente": self.ambiente,
             "gateway_tipo": self.gateway_tipo,
             "tem_certificado": self.tem_certificado,
+            "nfse_base_url_homologacao": self.nfse_base_url_homologacao,
+            "nfse_base_url_producao": self.nfse_base_url_producao,
+            "codigo_municipio_ibge": self.codigo_municipio_ibge,
+            "nfse_serie_atual": self.nfse_serie_atual,
+            "nfse_numero_atual": self.nfse_numero_atual,
             "configurado": bool(self.cnpj_emissor and self.codigo_servico),
         }
 

@@ -132,11 +132,20 @@ class MockGateway(NFSeGatewayBase):
         return EmissaoResultado(status="Cancelada", gateway_id=gateway_id)
 
 
-def get_gateway(tipo: str) -> NFSeGatewayBase:
-    """Factory simples. Por enquanto so retorna mock. Quando o adapter
-    real for criado (PR de Etapa 5.6), adiciona aqui."""
+def get_gateway(tipo: str, config=None) -> NFSeGatewayBase:
+    """Factory dos adapters de NFS-e.
+
+    Args:
+        tipo: valor de ConfigNFSe.gateway_tipo
+        config: ConfigNFSe do tenant (alguns adapters precisam).
+    """
+    if tipo == "portal_nacional":
+        # Import tardio pra evitar circular (portal_nacional importa daqui).
+        from .portal_nacional.gateway import PortalNacionalGateway
+
+        return PortalNacionalGateway(config=config)
     if tipo == "mock":
         return MockGateway()
-    # Outros tipos ainda nao implementados — caem no mock pra nao quebrar
-    # o app. Em producao, o adapter real deve estar registrado aqui.
+    # Tipos nao implementados ainda (focus_nfe, plugnotas) caem no mock
+    # pra nao quebrar o app. Trocar quando os adapters chegarem.
     return MockGateway()
