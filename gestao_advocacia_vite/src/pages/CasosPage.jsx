@@ -50,11 +50,21 @@ function CasosPage() {
     navigate(`/casos/editar/${caso.id}`)
   }
 
-  const handleFormularioFechado = useCallback(() => {
-    setRefreshKey((prevKey) => prevKey + 1)
-    setCasoParaEditar(null) // Limpa o estado de edição
-    navigate('/casos') // Volta para a lista após fechar/salvar o formulário
-  }, [navigate])
+  // PR A do diagnostico: pos-criacao/edicao, navega pra detalhe do caso
+  // (em vez de jogar de volta na lista). Usuario tipicamente cria caso
+  // pra trabalhar nele em seguida (anexar documentos, criar prazos etc).
+  const handleFormularioFechado = useCallback(
+    (caso, isNovo) => {
+      setRefreshKey((prevKey) => prevKey + 1)
+      setCasoParaEditar(null)
+      if (caso?.id) {
+        navigate(`/casos/detalhe/${caso.id}`)
+      } else {
+        navigate('/casos')
+      }
+    },
+    [navigate]
+  )
 
   if (loadingItem && modoFormulario === 'editar') {
     return (

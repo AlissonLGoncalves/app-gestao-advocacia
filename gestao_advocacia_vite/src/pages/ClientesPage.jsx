@@ -58,11 +58,24 @@ function ClientesPage() {
     navigate(`/clientes/editar/${cliente.id}`)
   }
 
-  const handleFormularioFechado = useCallback(() => {
-    setRefreshKey((prevKey) => prevKey + 1)
-    setClienteParaEditar(null) // Limpa o estado de edição
-    navigate('/clientes') // Volta para a lista após fechar/salvar o formulário
-  }, [navigate])
+  // PR A do diagnostico (redirect pos-criacao):
+  // - Cliente novo => navega pro detalhe (/clientes/:id) pra usuario continuar
+  //   trabalhando nele (criar casos, contratos, etc).
+  // - Edicao => volta pro detalhe tambem (refresh da view) em vez de jogar
+  //   na lista; consistente com expectativa "salvei, vou ver o resultado".
+  // - Anonimizacao (LGPD) ou cancelamento => sem entidade, volta pra lista.
+  const handleFormularioFechado = useCallback(
+    (cliente, isNovo) => {
+      setRefreshKey((prevKey) => prevKey + 1)
+      setClienteParaEditar(null)
+      if (cliente?.id) {
+        navigate(`/clientes/${cliente.id}`)
+      } else {
+        navigate('/clientes')
+      }
+    },
+    [navigate]
+  )
 
   if (loadingItem && (modoFormulario === 'editar' || modoFormulario === 'detalhe')) {
     return (

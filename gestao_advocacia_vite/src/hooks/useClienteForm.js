@@ -103,14 +103,16 @@ function useClienteForm({ formData, isEditing, clienteParaEditar, onClienteChang
       }
 
       try {
-        if (isEditing) {
-          await updateCliente(clienteParaEditar.id, dadosParaEnviar)
-        } else {
-          await createCliente(dadosParaEnviar)
-        }
+        // PR A do diagnostico: captura entidade criada/atualizada pra
+        // permitir redirect contextual (lista vs detalhe) no caller.
+        const resultado = isEditing
+          ? await updateCliente(clienteParaEditar.id, dadosParaEnviar)
+          : await createCliente(dadosParaEnviar)
 
         toast.success(`Cliente ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`)
-        if (typeof onClienteChange === 'function') onClienteChange()
+        if (typeof onClienteChange === 'function') {
+          onClienteChange(resultado, !isEditing)
+        }
       } catch (error) {
         toast.error(error.message || 'Erro desconhecido ao salvar o cliente.')
       } finally {
