@@ -151,6 +151,23 @@ body {
   flex: 1;
 }
 
+/* Header de secao da sidebar (Operacional, Financeiro, etc) — labelzinho
+   sutil pra agrupar links sem poluir visualmente. */
+.sidebar-section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sidebar-muted);
+  padding: 0.85rem 0.8rem 0.4rem;
+  margin: 0;
+  opacity: 0.55;
+}
+
+.sidebar-section-label:first-child {
+  padding-top: 0.25rem;
+}
+
 .sidebar-link {
   width: 100%;
   border: 0;
