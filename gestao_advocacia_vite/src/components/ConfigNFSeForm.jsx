@@ -346,6 +346,20 @@ function ConfigNFSeForm() {
             do certificado A1 (.pfx) do escritório. URLs default já apontam para o
             ambiente oficial — sobrescreva apenas se necessário.
           </div>
+          <div className="alert alert-warning py-2 small mb-3">
+            <strong>⚠️ Antes de emitir, confirme que seu município aderiu ao Portal Nacional.</strong>{' '}
+            ~99,95% da população brasileira já está coberta (todas as capitais e cidades
+            grandes), mas alguns municípios menores ainda mantêm sistema próprio.
+            <br />
+            <a
+              href="https://www.gov.br/nfse/pt-br/municipios/monitoramento-adesoes"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="fw-semibold"
+            >
+              Verifique a adesão do seu município no portal gov.br →
+            </a>
+          </div>
 
           {/* Upload do certificado A1 */}
           <UploadCertificadoA1
