@@ -20,11 +20,16 @@ import requests
 logger = logging.getLogger(__name__)
 
 
-# URLs base oficiais do Portal Nacional NFS-e (fonte: gov.br + blogs
-# de integradores 2025-2026). Podem ser sobrescritas em ConfigNFSe ou
-# via env vars NFSE_BASE_URL_HOMOLOGACAO / NFSE_BASE_URL_PRODUCAO.
+# URLs base oficiais do Portal Nacional NFS-e.
+# SEFIN: emissao + eventos + consulta (este modulo).
+# ADN: DANFSe + Parametros Municipais (servicos separados).
+# Fontes: Swagger oficial + https://www.gov.br/nfse/.../apis-prod-restrita-e-producao
 URL_BASE_HOMOLOGACAO = "https://sefin.producaorestrita.nfse.gov.br/SefinNacional"
 URL_BASE_PRODUCAO = "https://sefin.nfse.gov.br/SefinNacional"
+
+# ADN (Ambiente de Dados Nacional) — onde ficam DANFSe e Parametros Municipais.
+URL_ADN_HOMOLOGACAO = "https://adn.producaorestrita.nfse.gov.br"
+URL_ADN_PRODUCAO = "https://adn.nfse.gov.br"
 
 # Timeouts (segundos). Anexo do manual recomenda 30s pra emissao.
 TIMEOUT_PADRAO = 30
@@ -33,6 +38,21 @@ TIMEOUT_PADRAO = 30
 # exponencial com jitter pequeno.
 MAX_TENTATIVAS = 3
 BACKOFF_BASE = 0.5  # segundos
+
+
+def resolver_adn_url(config) -> str:
+    """Base URL do ADN (DANFSe + Parametros Municipais). Diferente da
+    SEFIN porque sao servicos separados (host diferente, sem mTLS no
+    DANFSe). Override via env var NFSE_ADN_URL_PRODUCAO/HOMOLOGACAO."""
+    ambiente = (getattr(config, "ambiente", None) or "sandbox").lower()
+    if ambiente == "producao":
+        return (
+            os.environ.get("NFSE_ADN_URL_PRODUCAO", "").rstrip("/") or URL_ADN_PRODUCAO
+        )
+    return (
+        os.environ.get("NFSE_ADN_URL_HOMOLOGACAO", "").rstrip("/")
+        or URL_ADN_HOMOLOGACAO
+    )
 
 
 def resolver_base_url(config) -> str:
