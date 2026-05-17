@@ -19,6 +19,7 @@ from flask_restx import Resource
 from extensions import db
 from helpers import get_item_or_404, get_tenant_id, query_for_tenant, tenant_scoped
 from models import ConfigNFSe, EmissaoNFSe, Recebimento
+from nfse.gateway import get_gateway
 from nfse.portal_nacional.signer import criptografar, extrair_metadata_pfx
 from nfse.service import emitir as nfse_emitir
 
@@ -362,3 +363,109 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
         def get(self, emissao_id):
             emissao = get_item_or_404(EmissaoNFSe, emissao_id)
             return emissao.to_dict(), 200
+
+    # ===== Cancelar uma emissao autorizada (Etapa 5.6.6.3 + UI PR 4) =====
+    @nfse_ns.route("/emissoes/<int:emissao_id>/cancelar")
+    @nfse_ns.param("emissao_id", "ID da EmissaoNFSe a cancelar")
+    class EmissaoNFSeCancelarAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @finance_access_required
+        @nfse_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Cancela uma NFS-e autorizada via evento e101101 (cancelamento "
+                "simples). Body: { motivo: string >=15 chars, cod_motivo: "
+                "1|2|9 } onde 1=Erro emissao, 2=Servico nao prestado, 9=Outros."
+            ),
+        )
+        def post(self, emissao_id):
+            emissao = get_item_or_404(EmissaoNFSe, emissao_id)
+
+            if emissao.status != "Autorizada":
+                nfse_ns.abort(
+                    400,
+                    message=(
+                        f"NFS-e nao pode ser cancelada — status atual e "
+                        f"{emissao.status!r}. So e possivel cancelar notas "
+                        f"em status 'Autorizada'."
+                    ),
+                )
+            if not emissao.gateway_id:
+                nfse_ns.abort(
+                    400,
+                    message=(
+                        "NFS-e sem chave de acesso no registro. Nao foi "
+                        "emitida pelo Portal Nacional ou emissao em modo Mock "
+                        "(notas mock nao podem ser canceladas no portal real)."
+                    ),
+                )
+
+            data = request.get_json() or {}
+            motivo = (data.get("motivo") or "").strip()
+            if len(motivo) < 15:
+                nfse_ns.abort(
+                    400,
+                    message="motivo precisa ter ao menos 15 caracteres.",
+                )
+
+            cod_motivo_raw = data.get("cod_motivo", 9)
+            try:
+                cod_motivo = int(cod_motivo_raw)
+            except (TypeError, ValueError):
+                nfse_ns.abort(400, message="cod_motivo invalido.")
+            if cod_motivo not in (1, 2, 9):
+                nfse_ns.abort(
+                    400,
+                    message=(
+                        "cod_motivo deve ser 1 (Erro na emissao), "
+                        "2 (Servico nao prestado) ou 9 (Outros)."
+                    ),
+                )
+
+            # Mock nao executa via portal — bloqueia explicitamente pra evitar
+            # gerar confusao em modo de teste. Quando emissao.gateway_tipo
+            # === "mock", retorna 400 com mensagem clara.
+            if emissao.gateway_tipo == "mock":
+                # Mas pra UX de teste, vamos permitir marcar como cancelada
+                # localmente sem chamar gateway. Util pra advogado treinar
+                # o fluxo antes de ligar producao.
+                emissao.status = "Cancelada"
+                emissao.mensagem_erro = f"Cancelamento simulado (mock). Motivo: {motivo[:200]}"
+                db.session.commit()
+                app.logger.info(
+                    f"Emissao mock {emissao_id} cancelada localmente "
+                    f"(tenant {get_tenant_id()})."
+                )
+                return emissao.to_dict(), 200
+
+            # Producao: chama o gateway real. Carrega config pra montar XML
+            # de evento, assinar, GZip+Base64 e POST.
+            tenant_id = get_tenant_id()
+            config = ConfigNFSe.query.filter_by(tenant_id=tenant_id).first()
+            if config is None:
+                nfse_ns.abort(
+                    400, message="ConfigNFSe nao encontrada — configure em Settings."
+                )
+
+            gateway = get_gateway(emissao.gateway_tipo, config=config)
+            resultado = gateway.cancelar(
+                emissao.gateway_id, motivo=motivo, cod_motivo=cod_motivo
+            )
+
+            if resultado.status == "Cancelada":
+                emissao.status = "Cancelada"
+                emissao.mensagem_erro = None
+                db.session.commit()
+                app.logger.info(
+                    f"Emissao {emissao_id} cancelada via {emissao.gateway_tipo} "
+                    f"(tenant {tenant_id}, motivo cod={cod_motivo})."
+                )
+                return emissao.to_dict(), 200
+
+            # Falha: nao altera status da emissao, so reporta o erro.
+            return {
+                "status": resultado.status,
+                "mensagem_erro": resultado.mensagem_erro,
+                "emissao": emissao.to_dict(),
+            }, 400

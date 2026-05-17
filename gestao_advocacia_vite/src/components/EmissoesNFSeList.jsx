@@ -12,6 +12,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import { listEmissoesNFSe } from '../api/nfse.js'
+import CancelarNFSeModal from './CancelarNFSeModal.jsx'
 
 const STATUS_BADGE = {
   Autorizada: { cor: 'bg-success', label: 'Autorizada' },
@@ -49,6 +50,8 @@ function EmissoesNFSeList() {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('Todos')
+  // PR 4: modal de cancelamento. emissaoParaCancelar=null => modal fechado.
+  const [emissaoParaCancelar, setEmissaoParaCancelar] = useState(null)
 
   const recarregar = async () => {
     setLoading(true)
@@ -246,8 +249,8 @@ function EmissoesNFSeList() {
                           <button
                             type="button"
                             className="btn btn-outline-danger btn-sm"
-                            title="Cancelar NFS-e (em breve)"
-                            disabled
+                            title="Cancelar NFS-e"
+                            onClick={() => setEmissaoParaCancelar(e)}
                           >
                             <XCircleIcon style={{ width: 14, height: 14 }} />
                           </button>
@@ -265,6 +268,17 @@ function EmissoesNFSeList() {
           </div>
         </div>
       )}
+
+      <CancelarNFSeModal
+        emissao={emissaoParaCancelar}
+        onClose={() => setEmissaoParaCancelar(null)}
+        onSucesso={(atualizada) => {
+          // Atualiza a linha no state local em vez de refetchar tudo
+          setEmissoes((lista) =>
+            lista.map((e) => (e.id === atualizada.id ? atualizada : e))
+          )
+        }}
+      />
     </>
   )
 }
