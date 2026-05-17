@@ -13,6 +13,7 @@ from .dashboard import register_dashboard_routes
 from .documentos import register_documentos_routes
 from .eventos import register_eventos_routes
 from .financeiro_registry import register_financeiro_api
+from .itens_agenda import register_itens_agenda_routes
 from .nfse import register_nfse_routes
 from .notificacoes import register_notificacoes_routes
 from .portal import register_portal_routes
@@ -49,6 +50,10 @@ def register_api_routes(app, api, finance_access_required):
     modelos_ns = Namespace("modelos", description="Modelos editaveis de documentos juridicos")
     notificacoes_ns = Namespace("notificacoes", description="Notificacoes in-app do usuario")
     nfse_ns = Namespace("nfse", description="Emissao de Notas Fiscais de Servico eletronicas")
+    itens_agenda_ns = Namespace(
+        "itens-agenda",
+        description="Modelo unificado Prazos/Tarefas/Eventos (PR D — em paralelo a /tarefas e /eventos)",
+    )
 
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
@@ -67,6 +72,7 @@ def register_api_routes(app, api, finance_access_required):
     api.add_namespace(modelos_ns)
     api.add_namespace(notificacoes_ns)
     api.add_namespace(nfse_ns)
+    api.add_namespace(itens_agenda_ns)
 
     user_model_dto = auth_ns.model(
         "UserRegistration",
@@ -498,10 +504,102 @@ def register_api_routes(app, api, finance_access_required):
         },
     )
 
+    # DTOs do modelo unificado ItemAgenda (PR D1). Schema rico que
+    # absorve tanto o vocabulario de TarefaPrazo quanto de EventoAgenda.
+    item_agenda_input_dto = itens_agenda_ns.model(
+        "ItemAgendaInput",
+        {
+            "tipo": fields.String(
+                description="Discriminador: 'tarefa' (kanban) ou 'evento' (calendario)",
+                enum=["tarefa", "evento"],
+                default="tarefa",
+            ),
+            "categoria": fields.String(
+                description="Categoria semantica",
+                enum=[
+                    "Prazo",
+                    "Audiencia",
+                    "Reuniao",
+                    "Peticionamento",
+                    "Ligacao",
+                    "Lembrete",
+                    "Outros",
+                ],
+            ),
+            "titulo": fields.String(required=True, description="Titulo"),
+            "descricao": fields.String(description="Detalhes"),
+            "status": fields.String(
+                description="Status unificado",
+                enum=["Pendente", "Em Andamento", "Concluido", "Cancelado"],
+                default="Pendente",
+            ),
+            "prioridade": fields.String(
+                description="Prioridade",
+                enum=["Baixa", "Normal", "Alta", "Urgente"],
+                default="Normal",
+            ),
+            "data_inicio": fields.DateTime(
+                description="Data/hora inicio (obrigatorio se tipo=evento)"
+            ),
+            "data_fim": fields.DateTime(description="Data/hora fim do evento (opcional)"),
+            "data_vencimento": fields.DateTime(
+                description="Data fatal (tarefas; opcional)"
+            ),
+            "posicao": fields.Integer(description="Ordem no kanban (so tarefa)"),
+            "caso_id": fields.Integer(description="Caso vinculado (opcional)"),
+            "publicacao_djen_id": fields.Integer(
+                description="Publicacao DJEN que originou o item (opcional)"
+            ),
+            "prazo_validado": fields.Boolean(
+                description="Prazo IA ja validado pelo usuario", default=True
+            ),
+            "prazo_calculado_por_ia": fields.Boolean(default=False),
+            "prazo_dias_origem": fields.Integer(),
+            "origem_id": fields.String(description="ID externo (integracoes)"),
+            "notificacoes_enviadas": fields.Raw(description="JSON de notificacoes enviadas"),
+            "legacy_tarefa_id": fields.Integer(
+                description="ID do TarefaPrazo de origem (D2 dual-write)"
+            ),
+            "legacy_evento_id": fields.Integer(
+                description="ID do EventoAgenda de origem (D2 dual-write)"
+            ),
+        },
+    )
+    item_agenda_output_dto = itens_agenda_ns.model(
+        "ItemAgendaOutput",
+        {
+            "id": fields.Integer(readonly=True),
+            "tipo": fields.String,
+            "categoria": fields.String,
+            "titulo": fields.String,
+            "descricao": fields.String,
+            "status": fields.String,
+            "prioridade": fields.String,
+            "data_inicio": fields.String,
+            "data_fim": fields.String,
+            "data_vencimento": fields.String,
+            "data_criacao": fields.String,
+            "posicao": fields.Integer,
+            "user_id": fields.Integer,
+            "caso_id": fields.Integer,
+            "publicacao_djen_id": fields.Integer,
+            "prazo_validado": fields.Boolean,
+            "prazo_calculado_por_ia": fields.Boolean,
+            "prazo_dias_origem": fields.Integer,
+            "origem_id": fields.String,
+            "notificacoes_enviadas": fields.Raw,
+            "legacy_tarefa_id": fields.Integer,
+            "legacy_evento_id": fields.Integer,
+        },
+    )
+
     register_dashboard_routes(app, dashboard_ns)
     register_notificacoes_routes(app, notificacoes_ns)
     register_nfse_routes(app, nfse_ns, finance_access_required)
     register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_model_dto)
+    register_itens_agenda_routes(
+        app, itens_agenda_ns, item_agenda_input_dto, item_agenda_output_dto
+    )
     register_documentos_routes(app, documentos_ns, documento_model_dto)
     register_procuracoes_routes(app, procuracoes_ns, procuracao_model_dto)
     register_financeiro_api(app, api, finance_access_required)
