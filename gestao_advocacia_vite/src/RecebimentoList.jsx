@@ -624,6 +624,24 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                           {r.categoria}
                         </span>
                       )}
+                      {r.tipo_recebimento && (
+                        <span
+                          className="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle"
+                          style={{ fontSize: '0.65rem' }}
+                          title="Tipo de recebimento"
+                        >
+                          {r.tipo_recebimento}
+                        </span>
+                      )}
+                      {r.ano_previsao && (
+                        <span
+                          className="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"
+                          style={{ fontSize: '0.65rem' }}
+                          title="Ano de previsão de recebimento"
+                        >
+                          Previsto: {r.ano_previsao}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-3 py-2">{r.cliente_nome || '-'}</td>

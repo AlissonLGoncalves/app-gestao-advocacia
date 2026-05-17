@@ -1022,6 +1022,16 @@ class Recebimento(db.Model):
     )
     # Para PARCELADO: 3 de 12. Para RECORRENTE: numero sequencial.
     numero_parcela = db.Column(db.Integer, nullable=True)
+    # === Etapa 6 (pedido do Emerson via WhatsApp) ===
+    # Ano de previsao de recebimento — independente de data_vencimento.
+    # Util pra precatorio/RPV que demoram anos e o advogado so sabe "deve
+    # cair em 2028". Quando o pagamento sai de verdade, vira data_pagamento.
+    ano_previsao = db.Column(db.Integer, nullable=True, index=True)
+    # Fonte/meio do recebimento. Diferente de "categoria" (natureza do
+    # dinheiro: honorario, acordo, consultoria). Opcoes validas:
+    # "Diretamente do cliente" | "Precatorio" | "RPV" |
+    # "Deposito judicial" | "Acordo extrajudicial" | "Outros".
+    tipo_recebimento = db.Column(db.String(50), nullable=True, index=True)
     # === Fim dos campos adicionados ===
     caso_id = db.Column(
         db.Integer, db.ForeignKey("caso.id", name="fk_recebimento_caso_id"), nullable=True
@@ -1064,6 +1074,8 @@ class Recebimento(db.Model):
             "contrato_id": self.contrato_id,
             "recorrencia_id": self.recorrencia_id,
             "numero_parcela": self.numero_parcela,
+            "ano_previsao": self.ano_previsao,
+            "tipo_recebimento": self.tipo_recebimento,
             # Deprecated mas devolvidos por compat retroativa.
             "data_recebimento": (
                 self.data_recebimento.isoformat() if self.data_recebimento else None
