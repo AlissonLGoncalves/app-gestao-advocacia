@@ -18,9 +18,11 @@ import { toast } from 'react-toastify'
 import { exportarParaPDF } from './utils/pdfGenerator.js'
 import { api } from './api/client.js'
 import { deleteRecebimento, listRecebimentos, marcarRecebimentoPago } from './api/financeiro.js'
+import { listEmissoesNFSe } from './api/nfse.js'
 import { useConfirm } from './hooks/useConfirm.jsx'
 import useListData from './hooks/useListData.js'
 import EmptyState from './components/EmptyState.jsx'
+import EmitirNFSeButton from './components/EmitirNFSeButton.jsx'
 
 function RecebimentoList({ onEditRecebimento, refreshKey }) {
   const { confirm, ConfirmDialog } = useConfirm()
@@ -36,6 +38,10 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
   const [quickFilter, setQuickFilter] = useState('todos') // todos|programados|atrasados|pagos
   // Marcar como Pago inline (loading por linha)
   const [markingPaidId, setMarkingPaidId] = useState(null)
+  // PR C: mapa recebimento_id -> ultima emissao NFS-e. 1 fetch agregado em
+  // vez de N fetches (1 por linha). Atualiza ao montar e quando refreshKey
+  // muda (apos criar/editar recebimento).
+  const [emissoesPorRecebimento, setEmissoesPorRecebimento] = useState({})
   const [dataVencimentoInicio, setDataVencimentoInicio] = useState('')
   const [dataVencimentoFim, setDataVencimentoFim] = useState('')
   const [dataRecebimentoInicio, setDataRecebimentoInicio] = useState('')
@@ -127,6 +133,34 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
   useEffect(() => {
     fetchClientesECasosParaFiltro()
   }, [fetchClientesECasosParaFiltro])
+
+  // PR C: fetch agregado de emissoes NFS-e. 1 request pra todas em vez
+  // de N (1 por linha). Atualiza junto com refreshKey pra captar emissoes
+  // criadas via modal de emissao.
+  useEffect(() => {
+    let cancelado = false
+    listEmissoesNFSe()
+      .then((emissoes) => {
+        if (cancelado) return
+        const lista = Array.isArray(emissoes) ? emissoes : []
+        // Mapa: recebimento_id -> emissao mais recente (lista ja vem
+        // ordenada por created_at desc no backend).
+        const map = {}
+        for (const e of lista) {
+          if (e.recebimento_id && !map[e.recebimento_id]) {
+            map[e.recebimento_id] = e
+          }
+        }
+        setEmissoesPorRecebimento(map)
+      })
+      .catch((err) => {
+        // NFS-e pode nem estar configurada; nao bloqueia a lista.
+        console.warn('RecebimentoList: erro ao buscar emissoes NFSe', err)
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [refreshKey])
 
   /**
    * Marcar como Pago inline (botao direto na linha). Faz PUT mandando
@@ -704,6 +738,14 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
                           <CheckCircleIcon style={{ width: '16px', height: '16px' }} />
                         )}
                       </button>
+                    )}
+                    {/* PR C: Emitir NFS-e inline pra recebimentos pagos. */}
+                    {statusEfetivo === 'Pago' && (
+                      <EmitirNFSeButton
+                        recebimento={r}
+                        emissaoInicial={emissoesPorRecebimento[r.id] || null}
+                        variant="compacta"
+                      />
                     )}
                     <button
                       onClick={() => onEditRecebimento(r)}
