@@ -28,7 +28,9 @@ const GATEWAY_OPCOES = [
 
 function ConfigNFSeForm() {
   const [form, setForm] = useState({
-    cnpj_emissor: '',
+    // Etapa 5.6.5: tipo de pessoa do emissor (PF = autonomo, PJ = escritorio)
+    tipo_pessoa_emissor: 'PJ',
+    documento_emissor: '',
     inscricao_municipal: '',
     razao_social: '',
     municipio: '',
@@ -64,7 +66,9 @@ function ConfigNFSeForm() {
       .then((data) => {
         if (cancelado) return
         setForm({
-          cnpj_emissor: data.cnpj_emissor || '',
+          tipo_pessoa_emissor: data.tipo_pessoa_emissor || 'PJ',
+          documento_emissor:
+            data.documento_emissor || data.cnpj_emissor || '',
           inscricao_municipal: data.inscricao_municipal || '',
           razao_social: data.razao_social || '',
           municipio: data.municipio || '',
@@ -147,19 +151,72 @@ function ConfigNFSeForm() {
       </div>
 
       <h6 className="fw-bold text-dark mt-2 mb-3">Dados do Emissor</h6>
+
+      {/* Etapa 5.6.5: tipo de pessoa do emissor (PF/PJ) */}
+      <div className="mb-3">
+        <label className="form-label text-secondary small fw-bold">Tipo do Emissor *</label>
+        <div className="btn-group w-100" role="group" aria-label="Tipo de pessoa">
+          <input
+            type="radio"
+            className="btn-check"
+            id="tipo_pf"
+            checked={form.tipo_pessoa_emissor === 'PF'}
+            onChange={() =>
+              setForm((prev) => ({
+                ...prev,
+                tipo_pessoa_emissor: 'PF',
+                documento_emissor: '',
+              }))
+            }
+          />
+          <label className="btn btn-outline-primary" htmlFor="tipo_pf">
+            Pessoa Física (advogado autônomo)
+          </label>
+          <input
+            type="radio"
+            className="btn-check"
+            id="tipo_pj"
+            checked={form.tipo_pessoa_emissor === 'PJ'}
+            onChange={() =>
+              setForm((prev) => ({
+                ...prev,
+                tipo_pessoa_emissor: 'PJ',
+                documento_emissor: '',
+              }))
+            }
+          />
+          <label className="btn btn-outline-primary" htmlFor="tipo_pj">
+            Pessoa Jurídica (escritório / sociedade)
+          </label>
+        </div>
+        <small className="text-muted d-block mt-1">
+          PF emite com <strong>e-CPF A1</strong>, PJ emite com <strong>e-CNPJ A1</strong>.
+          O certificado precisa bater com este cadastro.
+        </small>
+      </div>
+
       <div className="row g-3 mb-3">
         <div className="col-md-6">
-          <label className="form-label text-secondary small fw-bold">CNPJ do Emissor *</label>
+          <label className="form-label text-secondary small fw-bold">
+            {form.tipo_pessoa_emissor === 'PF' ? 'CPF do Emissor *' : 'CNPJ do Emissor *'}
+          </label>
           <input
             type="text"
             className="form-control"
-            value={form.cnpj_emissor}
-            onChange={handleChange('cnpj_emissor')}
-            placeholder="00.000.000/0001-00"
+            value={form.documento_emissor}
+            onChange={handleChange('documento_emissor')}
+            placeholder={
+              form.tipo_pessoa_emissor === 'PF'
+                ? '000.000.000-00'
+                : '00.000.000/0001-00'
+            }
+            maxLength={form.tipo_pessoa_emissor === 'PF' ? 14 : 18}
           />
         </div>
         <div className="col-md-6">
-          <label className="form-label text-secondary small fw-bold">Razão Social</label>
+          <label className="form-label text-secondary small fw-bold">
+            {form.tipo_pessoa_emissor === 'PF' ? 'Nome Completo' : 'Razão Social'}
+          </label>
           <input
             type="text"
             className="form-control"
@@ -291,7 +348,11 @@ function ConfigNFSeForm() {
           </div>
 
           {/* Upload do certificado A1 */}
-          <UploadCertificadoA1 config={certInfo} onConfigChange={setCertInfo} />
+          <UploadCertificadoA1
+            config={certInfo}
+            onConfigChange={setCertInfo}
+            tipoPessoa={form.tipo_pessoa_emissor}
+          />
           <div className="row g-3 mb-3">
             <div className="col-md-6">
               <label className="form-label text-secondary small fw-bold">

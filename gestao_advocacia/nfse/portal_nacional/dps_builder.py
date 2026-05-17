@@ -58,13 +58,36 @@ def _so_digitos(s: str | None) -> str | None:
 
 
 def gerar_id_dps(*, cnpj_emissor: str, serie: int, numero: int) -> str:
-    """Chave de idempotencia da DPS. Formato indicativo:
-    `DPS{CNPJ}{SERIE:5}{NUMERO:15}`. Anexo I do manual define o leiaute
-    formal; este valor e usado tanto como chave de negocio (dedupe no
-    nosso lado) quanto vai pro campo idDps do XML.
+    """Chave de idempotencia da DPS. Formato:
+    `DPS{DOCUMENTO}{SERIE:5}{NUMERO:15}` onde DOCUMENTO e CPF (11) ou
+    CNPJ (14), zero-padded a esquerda pra 14 chars.
+
+    Nome do parametro mantido como `cnpj_emissor` por compat retroativa
+    mas aceita qualquer string de digitos (CPF ou CNPJ).
     """
-    cnpj_digitos = _so_digitos(cnpj_emissor) or "00000000000000"
-    return f"DPS{cnpj_digitos:0>14}{serie:05d}{numero:015d}"
+    digitos = _so_digitos(cnpj_emissor) or "00000000000000"
+    return f"DPS{digitos:0>14}{serie:05d}{numero:015d}"
+
+
+def _documento_emissor(config) -> str:
+    """Retorna documento do emissor (digitos puros). Tolera config antiga
+    que so tinha cnpj_emissor."""
+    doc = (
+        _so_digitos(getattr(config, "documento_emissor", None))
+        or _so_digitos(getattr(config, "cnpj_emissor", None))
+        or ""
+    )
+    return doc
+
+
+def _tipo_pessoa_emissor(config) -> str:
+    """Retorna "PF" ou "PJ". Default PJ pra retrocompat com configs antigas."""
+    tipo = (getattr(config, "tipo_pessoa_emissor", None) or "").upper()
+    if tipo in ("PF", "PJ"):
+        return tipo
+    # Deduz pelo tamanho do documento se nao especificado.
+    doc = _documento_emissor(config)
+    return "PF" if len(doc) == 11 else "PJ"
 
 
 def montar_dps_xml(payload, config, *, serie: int, numero: int) -> str:
@@ -124,11 +147,18 @@ def montar_dps_xml(payload, config, *, serie: int, numero: int) -> str:
     """
     ET.register_namespace("", DPS_NS)
 
-    cnpj = _so_digitos(config.cnpj_emissor) or "00000000000000"
+    tipo_pessoa = _tipo_pessoa_emissor(config)
+    documento = _documento_emissor(config)
+    if not documento:
+        # Fallback pra nao quebrar montagem; gateway rejeita antes de chegar aqui.
+        documento = "00000000000" if tipo_pessoa == "PF" else "00000000000000"
     im = _so_digitos(config.inscricao_municipal)
     municipio_ibge = config.codigo_municipio_ibge or "0000000"
 
-    id_dps = gerar_id_dps(cnpj_emissor=cnpj, serie=serie, numero=numero)
+    # id_dps usa o documento do emissor (CPF=11 ou CNPJ=14 digitos).
+    # Mantemos o campo do helper como "cnpj_emissor" por compat — qualquer
+    # documento de digitos serve.
+    id_dps = gerar_id_dps(cnpj_emissor=documento, serie=serie, numero=numero)
     tp_amb = "2" if (config.ambiente or "sandbox").lower() != "producao" else "1"
 
     root = ET.Element(f"{{{DPS_NS}}}DPS")
@@ -148,7 +178,11 @@ def montar_dps_xml(payload, config, *, serie: int, numero: int) -> str:
     ET.SubElement(inf, f"{{{DPS_NS}}}cLocEmi").text = municipio_ibge
 
     prest = ET.SubElement(inf, f"{{{DPS_NS}}}prest")
-    ET.SubElement(prest, f"{{{DPS_NS}}}CNPJ").text = cnpj
+    # Etapa 5.6.5: bloco do prestador respeita tipo de pessoa.
+    if tipo_pessoa == "PF":
+        ET.SubElement(prest, f"{{{DPS_NS}}}CPF").text = documento
+    else:
+        ET.SubElement(prest, f"{{{DPS_NS}}}CNPJ").text = documento
     if im:
         ET.SubElement(prest, f"{{{DPS_NS}}}IM").text = im
 

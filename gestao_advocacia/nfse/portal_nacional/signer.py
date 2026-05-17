@@ -114,8 +114,31 @@ def carregar_pfx(pfx_bytes: bytes, senha: str) -> tuple[bytes, bytes]:
     return key_pem, cert_pem
 
 
+def _extrair_documento_do_cn(cn: str) -> tuple[str, str] | tuple[None, None]:
+    """Tenta extrair tipo de pessoa + documento do CommonName do cert.
+
+    Formato canonico ICP-Brasil: "NOME DA PESSOA:DOCUMENTO" onde
+    DOCUMENTO eh CPF (11) ou CNPJ (14). Retorna (tipo, documento_digitos)
+    ou (None, None) se nao conseguir extrair.
+    """
+    if not cn or ":" not in cn:
+        return None, None
+    parte_final = cn.rsplit(":", 1)[-1]
+    digitos = "".join(c for c in parte_final if c.isdigit())
+    if len(digitos) == 11:
+        return "PF", digitos
+    if len(digitos) == 14:
+        return "PJ", digitos
+    return None, None
+
+
 def extrair_metadata_pfx(pfx_bytes: bytes, senha: str) -> dict[str, Any]:
-    """Lê titular (CN) e validade do certificado para exibir na UI."""
+    """Lê titular (CN), validade e tipo/documento do certificado.
+
+    Etapa 5.6.5: extrai tambem tipo_pessoa (PF|PJ) e documento (CPF|CNPJ)
+    a partir do CN do certificado pra validacao estrita contra o cadastro
+    do tenant. Se nao conseguir parsear, retorna None nos dois campos.
+    """
     try:
         _key, cert, _add = pkcs12.load_key_and_certificates(
             pfx_bytes, senha.encode("utf-8") if senha else None
@@ -139,9 +162,13 @@ def extrair_metadata_pfx(pfx_bytes: bytes, senha: str) -> dict[str, Any]:
     except AttributeError:
         valido_ate = cert.not_valid_after  # type: ignore[attr-defined]
 
+    tipo_pessoa, documento = _extrair_documento_do_cn(nome_titular or "")
+
     return {
         "nome_titular": (nome_titular or "")[:300],
         "valido_ate": valido_ate.date() if isinstance(valido_ate, datetime) else None,
+        "tipo_pessoa": tipo_pessoa,  # "PF" | "PJ" | None
+        "documento": documento,  # digitos puros ou None
     }
 
 
