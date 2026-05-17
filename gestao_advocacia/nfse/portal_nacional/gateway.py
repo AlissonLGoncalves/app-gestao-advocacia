@@ -24,13 +24,54 @@ import json
 import logging
 
 from ..gateway import EmissaoPayload, EmissaoResultado, NFSeGatewayBase
-from .dps_builder import comprimir_e_codificar, montar_dps_xml
+from .dps_builder import (
+    comprimir_e_codificar,
+    decodificar_e_descomprimir,
+    extrair_dados_nfse,
+    gerar_id_dps,
+    montar_dps_xml,
+)
 from .http_client import (
     PortalNacionalHTTPError,
     request_com_mtls,
     resolver_base_url,
 )
 from .signer import assinar_dps, carregar_pfx, descriptografar
+
+
+# Chave de acesso da NFS-e tem **50 posicoes** segundo o Swagger oficial.
+CHAVE_ACESSO_LENGTH = 50
+
+
+def _formatar_mensagens(mensagens: list) -> str:
+    """Formata lista de MensagemProcessamento ({codigo, descricao, complemento})
+    do Swagger oficial em string legivel."""
+    if not mensagens:
+        return ""
+    partes = []
+    for m in mensagens[:5]:
+        if not isinstance(m, dict):
+            partes.append(str(m))
+            continue
+        codigo = m.get("codigo") or ""
+        desc = m.get("descricao") or m.get("mensagem") or ""
+        comp = m.get("complemento") or ""
+        formatado = f"[{codigo}] {desc}" if codigo else desc
+        if comp:
+            formatado += f" ({comp})"
+        partes.append(formatado.strip())
+    return " | ".join(p for p in partes if p)
+
+
+def _danfse_url(chave: str, ambiente: str) -> str:
+    """URL do PDF/DANFSe no ADN (servico separado do SEFIN).
+
+    Baseado em https://adn.{producaorestrita}?.nfse.gov.br/danfse/...
+    Formato exato pode variar; chave eh o suficiente pra o usuario
+    consultar via portal web caso o link nao funcione direto.
+    """
+    sub = "producaorestrita." if ambiente != "producao" else ""
+    return f"https://adn.{sub}nfse.gov.br/danfse/{chave}"
 
 logger = logging.getLogger(__name__)
 
@@ -130,8 +171,15 @@ class PortalNacionalGateway(NFSeGatewayBase):
                 mensagem_erro=f"Erro de comunicacao com o Portal: {exc!s}",
             )
 
-        # 5. Parsear resposta. Estrutura segue o Swagger oficial. Manual
-        # nao expoe schema fechado ainda, entao tolerar variacoes.
+        # 5. Parsear resposta. Schema oficial do Swagger:
+        # Sucesso (201): NFSePostResponseSucesso = {
+        #   tipoAmbiente, versaoAplicativo, dataHoraProcessamento,
+        #   idDps, chaveAcesso, nfseXmlGZipB64, alertas[]
+        # }
+        # Erro (400/403/500): NFSePostResponseErro = {
+        #   tipoAmbiente, versaoAplicativo, dataHoraProcessamento,
+        #   idDPS, erros[] (MensagemProcessamento)
+        # }
         try:
             body = resp.json()
         except (ValueError, json.JSONDecodeError):
@@ -140,48 +188,46 @@ class PortalNacionalGateway(NFSeGatewayBase):
                 mensagem_erro="Portal retornou resposta nao-JSON.",
             )
 
-        # Campos esperados (nomes do Swagger contribuintesissqn):
-        chave = body.get("chaveAcesso") or body.get("chave_acesso")
-        numero_nfse = body.get("nNFSe") or body.get("numero")
-        serie_nfse = body.get("serie") or str(serie)
-        codigo_verif = body.get("codVerif") or body.get("codigo_verificacao")
-        # URLs do XML/PDF — manual sugere campos `linkXmlNfse` e
-        # `linkDanfse` mas pode variar.
-        xml_url = body.get("linkXmlNfse") or body.get("xml_url")
-        pdf_url = body.get("linkDanfse") or body.get("pdf_url")
-
-        # Status: presenca de chave de acesso indica autorizada.
+        chave = body.get("chaveAcesso")
         if chave:
-            # Incrementa numero atual no config (commit do caller).
+            # Sucesso. Descompactar nfseXmlGZipB64 e extrair numero/
+            # serie/codverif do XML autorizado (Swagger nao publica
+            # esses campos no JSON da resposta).
             self.config.nfse_numero_atual = numero
+            nfse_xml_b64 = body.get("nfseXmlGZipB64") or ""
+            dados_extras = {}
+            if nfse_xml_b64:
+                try:
+                    nfse_xml = decodificar_e_descomprimir(nfse_xml_b64)
+                    dados_extras = extrair_dados_nfse(nfse_xml)
+                except Exception as exc:
+                    logger.warning("Falha ao descompactar NFS-e retornada: %s", exc)
+
+            alertas = body.get("alertas") or []
+            mensagem_alerta = _formatar_mensagens(alertas) if alertas else None
+
             return EmissaoResultado(
                 status="Autorizada",
                 gateway_id=str(chave),
-                numero_nfse=str(numero_nfse) if numero_nfse else None,
-                serie=str(serie_nfse) if serie_nfse else None,
-                codigo_verificacao=str(codigo_verif) if codigo_verif else None,
-                xml_url=xml_url,
-                pdf_url=pdf_url,
+                numero_nfse=dados_extras.get("numero_nfse"),
+                serie=dados_extras.get("serie") or str(serie),
+                codigo_verificacao=dados_extras.get("codigo_verificacao"),
+                # XML inline (nao e URL). UI pode armazenar e regerar
+                # se quiser, mas linkamos pro DANFSe que e o PDF.
+                xml_url=None,
+                pdf_url=_danfse_url(str(chave), self.config.ambiente or "sandbox"),
+                # Alertas nao impedem autorizacao, mas viajam pro caller
+                # via mensagem_erro pra ficarem visiveis (UI decide se
+                # exibe como warning).
+                mensagem_erro=mensagem_alerta,
             )
 
-        # Sem chave -> portal aceitou em processamento assincrono ou
-        # rejeitou. Mensagens de erro tipicamente em `mensagens` ou `erros`.
-        mensagens = body.get("mensagens") or body.get("erros") or []
-        if mensagens:
-            erro_txt = "; ".join(
-                str(m.get("descricao") or m.get("mensagem") or m) for m in mensagens[:5]
-            )
+        # Resposta de erro estruturada
+        erros = body.get("erros") or []
+        if erros:
             return EmissaoResultado(
                 status="Rejeitada",
-                mensagem_erro=erro_txt[:1000],
-            )
-
-        # Caso de processamento async (raro no Portal Nacional, mas possivel).
-        protocolo = body.get("protocolo") or body.get("idProcessamento")
-        if protocolo:
-            return EmissaoResultado(
-                status="EmProcessamento",
-                gateway_id=str(protocolo),
+                mensagem_erro=_formatar_mensagens(erros)[:1000],
             )
 
         return EmissaoResultado(
@@ -191,11 +237,28 @@ class PortalNacionalGateway(NFSeGatewayBase):
 
     # ===================== Consulta =====================
 
+    def _validar_chave_acesso(self, chave: str) -> str | None:
+        """Swagger: 'A chave de acesso consultada deve conter 50 numeros'."""
+        if not chave:
+            return "Chave de acesso vazia."
+        digitos = "".join(c for c in chave if c.isdigit())
+        if len(digitos) != CHAVE_ACESSO_LENGTH:
+            return (
+                f"Chave de acesso deve ter {CHAVE_ACESSO_LENGTH} digitos "
+                f"(recebido: {len(digitos)})."
+            )
+        return None
+
     def consultar_status(self, gateway_id: str) -> EmissaoResultado:
         if not self.config or not getattr(self.config, "tem_certificado", False):
             return EmissaoResultado(
                 status="Rejeitada", mensagem_erro="Sem certificado para consultar."
             )
+        # Valida formato da chave antes de bater no portal
+        erro_chave = self._validar_chave_acesso(gateway_id)
+        if erro_chave:
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=erro_chave)
+
         try:
             key_pem, cert_pem = self._carregar_cert_pem()
         except Exception as exc:
@@ -212,6 +275,19 @@ class PortalNacionalGateway(NFSeGatewayBase):
                     status="Rejeitada",
                     mensagem_erro="NFS-e nao encontrada no Portal (404).",
                 )
+            # Tenta extrair erros estruturados do body
+            try:
+                body = json.loads(exc.body)
+                erro_struct = body.get("erro")
+                if isinstance(erro_struct, dict):
+                    msg = _formatar_mensagens([erro_struct])
+                    if msg:
+                        return EmissaoResultado(
+                            status="Rejeitada",
+                            mensagem_erro=f"Portal {exc.status_code}: {msg}",
+                        )
+            except (json.JSONDecodeError, AttributeError):
+                pass
             return EmissaoResultado(
                 status="Rejeitada",
                 mensagem_erro=f"Portal {exc.status_code}: {exc.body[:300]}",
@@ -221,14 +297,104 @@ class PortalNacionalGateway(NFSeGatewayBase):
                 status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}"
             )
 
-        # Resposta e XML em GZip+Base64 OU JSON com metadados — tolerar.
+        # Sucesso (200): NFSeGetResponseSucesso = {tipoAmbiente,
+        # versaoAplicativo, dataHoraProcessamento, chaveAcesso,
+        # nfseXmlGZipB64}. Se temos chaveAcesso, nota foi autorizada.
         try:
             body = resp.json()
-            status = body.get("status") or "Autorizada"
-            return EmissaoResultado(status=status, gateway_id=gateway_id)
+            if body.get("chaveAcesso"):
+                return EmissaoResultado(status="Autorizada", gateway_id=gateway_id)
+            return EmissaoResultado(
+                status="Rejeitada",
+                mensagem_erro="Resposta sem chaveAcesso.",
+            )
         except (ValueError, json.JSONDecodeError):
-            # Era XML mesmo — sucesso (significa nota autorizada).
             return EmissaoResultado(status="Autorizada", gateway_id=gateway_id)
+
+    # ===================== Idempotencia via DPS (Swagger HEAD/GET /dps/{id}) =====================
+
+    def dps_ja_processada(self, id_dps: str) -> bool | None:
+        """HEAD /dps/{id} — confirma se uma DPS ja foi recebida pelo Portal.
+
+        Util pra idempotencia: antes de re-enviar uma DPS apos timeout,
+        checar se o Portal ja a processou.
+
+        Returns:
+            True  — DPS encontrada (200)
+            False — DPS nao encontrada (404)
+            None  — erro de rede ou cert; nao foi possivel determinar
+        """
+        if not self.config or not getattr(self.config, "tem_certificado", False):
+            return None
+        try:
+            key_pem, cert_pem = self._carregar_cert_pem()
+        except Exception:
+            return None
+        url = f"{resolver_base_url(self.config)}/dps/{id_dps}"
+        try:
+            request_com_mtls("HEAD", url, cert_pem=cert_pem, key_pem=key_pem)
+            return True
+        except PortalNacionalHTTPError as exc:
+            if exc.status_code == 404:
+                return False
+            return None
+        except Exception:
+            return None
+
+    def consultar_dps(self, id_dps: str) -> EmissaoResultado:
+        """GET /dps/{id} — devolve a chave de acesso da NFS-e gerada por
+        uma DPS. Util pra recuperar dados quando o POST /nfse timeout
+        mas a DPS ja foi processada.
+
+        Schema da resposta: DpsGetResponse = {tipoAmbiente,
+        versaoAplicativo, dataHoraProcessamento, idDps, chaveAcesso}.
+        """
+        if not self.config or not getattr(self.config, "tem_certificado", False):
+            return EmissaoResultado(
+                status="Rejeitada", mensagem_erro="Sem certificado para consultar DPS."
+            )
+        try:
+            key_pem, cert_pem = self._carregar_cert_pem()
+        except Exception as exc:
+            return EmissaoResultado(
+                status="Rejeitada", mensagem_erro=f"Falha ao carregar cert: {exc!s}"
+            )
+        url = f"{resolver_base_url(self.config)}/dps/{id_dps}"
+        try:
+            resp = request_com_mtls("GET", url, cert_pem=cert_pem, key_pem=key_pem)
+        except PortalNacionalHTTPError as exc:
+            if exc.status_code == 404:
+                return EmissaoResultado(
+                    status="Rejeitada",
+                    mensagem_erro="DPS nao encontrada no Portal (404). "
+                    "Provavelmente nao foi enviada ainda.",
+                )
+            return EmissaoResultado(
+                status="Rejeitada",
+                mensagem_erro=f"Portal {exc.status_code}: {exc.body[:300]}",
+            )
+        except Exception as exc:
+            return EmissaoResultado(
+                status="Rejeitada", mensagem_erro=f"Erro de rede: {exc!s}"
+            )
+
+        try:
+            body = resp.json()
+        except (ValueError, json.JSONDecodeError):
+            return EmissaoResultado(
+                status="Rejeitada", mensagem_erro="Resposta nao-JSON do Portal."
+            )
+        chave = body.get("chaveAcesso")
+        if chave:
+            return EmissaoResultado(
+                status="Autorizada",
+                gateway_id=str(chave),
+                pdf_url=_danfse_url(str(chave), self.config.ambiente or "sandbox"),
+            )
+        return EmissaoResultado(
+            status="Rejeitada",
+            mensagem_erro="Resposta sem chaveAcesso.",
+        )
 
     # ===================== Cancelamento =====================
 
@@ -237,11 +403,18 @@ class PortalNacionalGateway(NFSeGatewayBase):
             return EmissaoResultado(
                 status="Rejeitada", mensagem_erro="Sem certificado para cancelar."
             )
+        erro_chave = self._validar_chave_acesso(gateway_id)
+        if erro_chave:
+            return EmissaoResultado(status="Rejeitada", mensagem_erro=erro_chave)
         if not motivo or len(motivo.strip()) < 15:
             return EmissaoResultado(
                 status="Rejeitada",
                 mensagem_erro="Motivo do cancelamento precisa ter ao menos 15 caracteres.",
             )
+        # NOTA 5.6.6.2 (pendente): o Swagger oficial exige body
+        # `pedidoRegistroEventoXmlGZipB64` (XML de evento assinado),
+        # nao o JSON {tipoEvento, motivo} que usamos abaixo. Quando o
+        # event_builder for implementado, trocar o body aqui.
         try:
             key_pem, cert_pem = self._carregar_cert_pem()
         except Exception as exc:

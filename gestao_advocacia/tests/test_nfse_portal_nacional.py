@@ -269,8 +269,30 @@ def _pfx_de_teste():
     return criptografar(pfx), criptografar(senha.encode())
 
 
+def _nfse_xml_b64_mockada(numero="42", serie="1", cod_verif="ABC12345"):
+    """Constroi um nfseXmlGZipB64 fake pro mock — XML simples que o
+    extrair_dados_nfse consegue parsear."""
+    from nfse.portal_nacional.dps_builder import comprimir_e_codificar
+
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<NFSe xmlns="http://www.sped.fazenda.gov.br/nfse">'
+        f"<infNFSe>"
+        f"<nNFSe>{numero}</nNFSe>"
+        f"<serie>{serie}</serie>"
+        f"<codVerif>{cod_verif}</codVerif>"
+        f"<dhEmi>2026-05-17T15:00:00-03:00</dhEmi>"
+        f"</infNFSe>"
+        f"</NFSe>"
+    )
+    return comprimir_e_codificar(xml)
+
+
 def test_emitir_e2e_sucesso_com_http_mock(db):
-    """Fluxo completo: monta DPS → assina → comprime → POST mockado → parseia."""
+    """Fluxo completo: monta DPS → assina → comprime → POST mockado → parseia.
+
+    Resposta do mock segue o NFSePostResponseSucesso do Swagger oficial.
+    """
     import responses
 
     from nfse.portal_nacional.gateway import PortalNacionalGateway
@@ -283,33 +305,81 @@ def test_emitir_e2e_sucesso_com_http_mock(db):
         nfse_base_url_homologacao="https://portal.example.com/SefinNacional",
     )
 
+    chave = "3" * 50  # 50 digitos como exige Swagger
     with responses.RequestsMock() as rsp:
         rsp.add(
             responses.POST,
             "https://portal.example.com/SefinNacional/nfse",
             json={
-                "chaveAcesso": "35201234567890000190",
-                "nNFSe": "42",
-                "serie": "1",
-                "codVerif": "ABC12345",
-                "linkXmlNfse": "https://portal/xml/42",
-                "linkDanfse": "https://portal/pdf/42",
+                "tipoAmbiente": 2,
+                "versaoAplicativo": "1.0",
+                "dataHoraProcessamento": "2026-05-17T15:00:00-03:00",
+                "idDps": "DPS123",
+                "chaveAcesso": chave,
+                "nfseXmlGZipB64": _nfse_xml_b64_mockada(),
             },
-            status=200,
+            status=201,
         )
 
         g = PortalNacionalGateway(config=config)
         res = g.emitir(_payload())
 
     assert res.status == "Autorizada"
-    assert res.gateway_id == "35201234567890000190"
+    assert res.gateway_id == chave
+    # Numero/serie/codverif vem do XML embutido em nfseXmlGZipB64
     assert res.numero_nfse == "42"
+    assert res.serie == "1"
     assert res.codigo_verificacao == "ABC12345"
-    assert res.pdf_url == "https://portal/pdf/42"
+    # pdf_url e construida apontando pro ADN
+    assert res.pdf_url.startswith("https://adn.")
+    assert chave in res.pdf_url
+
+
+def test_emitir_e2e_com_alertas_ainda_autoriza(db):
+    """Resposta de sucesso com alertas[] — gateway autoriza mas passa
+    a mensagem do alerta como aviso."""
+    import responses
+
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+        nfse_base_url_homologacao="https://portal.example.com/api",
+    )
+    chave = "1" * 50
+    with responses.RequestsMock() as rsp:
+        rsp.add(
+            responses.POST,
+            "https://portal.example.com/api/nfse",
+            json={
+                "tipoAmbiente": 2,
+                "versaoAplicativo": "1.0",
+                "dataHoraProcessamento": "2026-05-17T15:00:00-03:00",
+                "idDps": "DPS999",
+                "chaveAcesso": chave,
+                "nfseXmlGZipB64": _nfse_xml_b64_mockada(),
+                "alertas": [
+                    {
+                        "codigo": "A001",
+                        "descricao": "Aliquota arredondada",
+                        "complemento": "",
+                    }
+                ],
+            },
+            status=201,
+        )
+        g = PortalNacionalGateway(config=config)
+        res = g.emitir(_payload())
+    assert res.status == "Autorizada"
+    assert "A001" in (res.mensagem_erro or "")
+    assert "Aliquota" in (res.mensagem_erro or "")
 
 
 def test_emitir_e2e_portal_rejeita_400_com_mensagens(db):
-    """Portal devolve 400 com lista de mensagens — gateway expoe ao user."""
+    """Portal devolve 400 com erros estruturados (MensagemProcessamento)."""
     import responses
 
     from nfse.portal_nacional.gateway import PortalNacionalGateway
@@ -328,16 +398,27 @@ def test_emitir_e2e_portal_rejeita_400_com_mensagens(db):
             "https://portal.example.com/api/nfse",
             status=400,
             json={
-                "mensagens": [
-                    {"descricao": "Codigo de servico invalido para o municipio."}
-                ]
+                "tipoAmbiente": 2,
+                "versaoAplicativo": "1.0",
+                "dataHoraProcessamento": "2026-05-17T15:00:00-03:00",
+                "idDPS": "DPS-X",
+                "erros": [
+                    {
+                        "codigo": "E0042",
+                        "descricao": "Codigo de servico invalido para o municipio.",
+                        "complemento": "cTribNac=17.06",
+                    }
+                ],
             },
         )
         g = PortalNacionalGateway(config=config)
         res = g.emitir(_payload())
 
     assert res.status == "Rejeitada"
-    assert "400" in res.mensagem_erro or "Codigo" in res.mensagem_erro
+    # Codigo + descricao + complemento aparecem na mensagem
+    assert "E0042" in res.mensagem_erro
+    assert "servico invalido" in res.mensagem_erro
+    assert "17.06" in res.mensagem_erro
 
 
 def test_emitir_e2e_5xx_persistente(db):
@@ -386,7 +467,8 @@ def test_cancelar_motivo_curto_rejeita(db):
         certificado_senha_encrypted=senha_enc,
     )
     g = PortalNacionalGateway(config=config)
-    res = g.cancelar("chave-x", motivo="curto")
+    # Chave valida (50 digitos), motivo curto
+    res = g.cancelar("5" * 50, motivo="curto")
     assert res.status == "Rejeitada"
     assert "15" in res.mensagem_erro
 
@@ -403,18 +485,225 @@ def test_cancelar_e2e_sucesso(db):
         certificado_senha_encrypted=senha_enc,
         nfse_base_url_homologacao="https://portal.example.com/api",
     )
+    chave = "2" * 50
     with responses.RequestsMock() as rsp:
         rsp.add(
             responses.POST,
-            "https://portal.example.com/api/nfse/chave-xyz/eventos",
+            f"https://portal.example.com/api/nfse/{chave}/eventos",
             json={"ok": True},
             status=200,
         )
         g = PortalNacionalGateway(config=config)
         res = g.cancelar(
-            "chave-xyz",
+            chave,
             motivo="Cancelamento solicitado pelo cliente em 17/05/2026.",
         )
 
     assert res.status == "Cancelada"
-    assert res.gateway_id == "chave-xyz"
+    assert res.gateway_id == chave
+
+
+def test_consultar_status_chave_curta_rejeita(db):
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+    )
+    g = PortalNacionalGateway(config=config)
+    res = g.consultar_status("12345")  # so 5 digitos
+    assert res.status == "Rejeitada"
+    assert "50" in res.mensagem_erro
+
+
+def test_cancelar_chave_curta_rejeita(db):
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+    )
+    g = PortalNacionalGateway(config=config)
+    res = g.cancelar(
+        "12345",  # so 5 digitos
+        motivo="Motivo qualquer com mais de 15 caracteres aqui",
+    )
+    assert res.status == "Rejeitada"
+    assert "50" in res.mensagem_erro
+
+
+def test_dps_ja_processada_retorna_true_em_200(db):
+    """HEAD /dps/{id} retorna 200 -> True."""
+    import responses
+
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+        nfse_base_url_homologacao="https://portal.example.com/api",
+    )
+    with responses.RequestsMock() as rsp:
+        rsp.add(
+            responses.HEAD,
+            "https://portal.example.com/api/dps/DPS-XYZ",
+            status=200,
+        )
+        g = PortalNacionalGateway(config=config)
+        assert g.dps_ja_processada("DPS-XYZ") is True
+
+
+def test_dps_ja_processada_retorna_false_em_404(db):
+    import responses
+
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+        nfse_base_url_homologacao="https://portal.example.com/api",
+    )
+    with responses.RequestsMock() as rsp:
+        rsp.add(
+            responses.HEAD,
+            "https://portal.example.com/api/dps/DPS-NAO-EXISTE",
+            status=404,
+        )
+        g = PortalNacionalGateway(config=config)
+        assert g.dps_ja_processada("DPS-NAO-EXISTE") is False
+
+
+def test_consultar_dps_retorna_chave_acesso(db):
+    """GET /dps/{id} retorna chaveAcesso -> recupera info pra retomar."""
+    import responses
+
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+        nfse_base_url_homologacao="https://portal.example.com/api",
+    )
+    chave = "9" * 50
+    with responses.RequestsMock() as rsp:
+        rsp.add(
+            responses.GET,
+            "https://portal.example.com/api/dps/DPS-ABC",
+            json={
+                "tipoAmbiente": 2,
+                "versaoAplicativo": "1.0",
+                "dataHoraProcessamento": "2026-05-17T15:00:00-03:00",
+                "idDps": "DPS-ABC",
+                "chaveAcesso": chave,
+            },
+            status=200,
+        )
+        g = PortalNacionalGateway(config=config)
+        res = g.consultar_dps("DPS-ABC")
+    assert res.status == "Autorizada"
+    assert res.gateway_id == chave
+    assert res.pdf_url and chave in res.pdf_url
+
+
+def test_consultar_dps_404_devolve_rejeitada(db):
+    import responses
+
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+        nfse_base_url_homologacao="https://portal.example.com/api",
+    )
+    with responses.RequestsMock() as rsp:
+        rsp.add(
+            responses.GET,
+            "https://portal.example.com/api/dps/DPS-NAO-EXISTE",
+            status=404,
+            json={
+                "tipoAmbiente": 2,
+                "versaoAplicativo": "1.0",
+                "dataHoraProcessamento": "2026-05-17T15:00:00-03:00",
+                "erro": {"codigo": "E404", "descricao": "DPS nao encontrada"},
+            },
+        )
+        g = PortalNacionalGateway(config=config)
+        res = g.consultar_dps("DPS-NAO-EXISTE")
+    assert res.status == "Rejeitada"
+    assert "nao foi enviada" in res.mensagem_erro.lower()
+
+
+# ===================== extrair_dados_nfse =====================
+
+
+def test_extrair_dados_nfse_parseia_xml_padrao(db):
+    from nfse.portal_nacional.dps_builder import extrair_dados_nfse
+
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<NFSe xmlns="http://www.sped.fazenda.gov.br/nfse">'
+        "<infNFSe>"
+        "<nNFSe>100</nNFSe>"
+        "<serie>2</serie>"
+        "<codVerif>XYZ123</codVerif>"
+        "</infNFSe>"
+        "</NFSe>"
+    )
+    dados = extrair_dados_nfse(xml)
+    assert dados["numero_nfse"] == "100"
+    assert dados["serie"] == "2"
+    assert dados["codigo_verificacao"] == "XYZ123"
+
+
+def test_extrair_dados_nfse_xml_invalido_devolve_dict_vazio(db):
+    from nfse.portal_nacional.dps_builder import extrair_dados_nfse
+
+    assert extrair_dados_nfse("nao e xml") == {}
+
+
+def test_formatar_mensagens_swagger_schema():
+    """Formata MensagemProcessamento (codigo+descricao+complemento)."""
+    from nfse.portal_nacional.gateway import _formatar_mensagens
+
+    txt = _formatar_mensagens(
+        [
+            {
+                "codigo": "E001",
+                "descricao": "Erro grave",
+                "complemento": "campo X",
+            },
+            {"codigo": "W099", "descricao": "Aviso menor", "complemento": ""},
+        ]
+    )
+    assert "[E001]" in txt
+    assert "Erro grave" in txt
+    assert "campo X" in txt
+    assert "[W099]" in txt
+    assert "Aviso menor" in txt
+    # Pipe separa os 2
+    assert "|" in txt
+
+
+def test_formatar_mensagens_sem_codigo_so_descricao():
+    from nfse.portal_nacional.gateway import _formatar_mensagens
+
+    txt = _formatar_mensagens([{"descricao": "So texto"}])
+    assert txt == "So texto"
+
+
+def test_formatar_mensagens_lista_vazia():
+    from nfse.portal_nacional.gateway import _formatar_mensagens
+
+    assert _formatar_mensagens([]) == ""
