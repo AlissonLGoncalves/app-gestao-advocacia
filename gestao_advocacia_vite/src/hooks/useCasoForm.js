@@ -194,7 +194,11 @@ function useCasoForm({
           await persistirTextoOrigem(responseData.id, token)
         }
         if (criarEvento && !isEditing) await criarEventoAgenda(responseData.id, token)
-        if (typeof onCasoChange === 'function') onCasoChange()
+        // PR A do diagnostico: passa o caso criado/atualizado + flag isNovo
+        // pra o caller decidir redirect (lista vs detalhe).
+        if (typeof onCasoChange === 'function') {
+          onCasoChange(responseData, !isEditing)
+        }
       } catch (error) {
         toast.error(error.message || 'Erro desconhecido ao salvar o caso.')
       } finally {
