@@ -7,6 +7,10 @@ from flask_restx import Resource
 from extensions import db
 from helpers import get_item_or_404, get_list_query, get_tenant_id, tenant_scoped
 from models import EventoAgenda
+from services.itens_agenda_sync import (
+    delete_item_do_evento,
+    sync_evento,
+)
 
 
 def register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_model_dto):
@@ -51,6 +55,9 @@ def register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_mode
                 tenant_id=get_tenant_id(),
             )
             db.session.add(novo_evento)
+            # PR D2: flush garante novo_evento.id antes do sync.
+            db.session.flush()
+            sync_evento(novo_evento)
             db.session.commit()
             app.logger.info(
                 f"Novo evento '{novo_evento.titulo}' (ID: {novo_evento.id}) criado para usuario ID {user_id}."
@@ -96,6 +103,7 @@ def register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_mode
             evento.tipo_evento = data.get("tipo_evento", evento.tipo_evento)
             evento.prioridade = data.get("prioridade", evento.prioridade)
             evento.status_evento = data.get("status_evento", evento.status_evento)
+            sync_evento(evento)  # PR D2: dual-write
             db.session.commit()
             app.logger.info(f"Evento ID {evento.id} atualizado pelo usuario ID {user_id}.")
             return evento
@@ -107,6 +115,7 @@ def register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_mode
         def delete(self, evento_id_param):
             user_id = get_jwt_identity()
             evento = get_item_or_404(EventoAgenda, evento_id_param)
+            delete_item_do_evento(evento.id)  # PR D2: dual-write
             db.session.delete(evento)
             db.session.commit()
             app.logger.info(

@@ -8,6 +8,10 @@ from sqlalchemy import func
 from extensions import db
 from helpers import get_item_or_404, get_list_query, get_tenant_id, tenant_scoped
 from models import PublicacaoDJEN, TarefaPrazo
+from services.itens_agenda_sync import (
+    delete_item_da_tarefa,
+    sync_tarefa,
+)
 
 
 def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto):
@@ -98,6 +102,12 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
             if pub_djen and not pub_djen.lida:
                 pub_djen.lida = True
 
+            # PR D2: flush para garantir tarefa.id antes do sync, depois
+            # cria o espelho em item_agenda. Ambas escritas comitam juntas
+            # — se o sync falhar, a tarefa nao eh persistida (atomico).
+            db.session.flush()
+            sync_tarefa(nova_tarefa)
+
             db.session.commit()
             return nova_tarefa, 201
 
@@ -139,6 +149,7 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
             por_id = {t.id: t for t in tarefas}
 
             atualizadas = 0
+            tarefas_alteradas = []
             for status, ids in columns.items():
                 for indice, tarefa_id in enumerate(ids, start=1):
                     tarefa = por_id.get(tarefa_id)
@@ -146,7 +157,13 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
                         continue
                     tarefa.status = status
                     tarefa.posicao = indice
+                    tarefas_alteradas.append(tarefa)
                     atualizadas += 1
+
+            # PR D2: replica em item_agenda. Reorder mexe em status+posicao,
+            # ambos refletidos no espelho.
+            for tarefa in tarefas_alteradas:
+                sync_tarefa(tarefa)
 
             db.session.commit()
             return {"updated": atualizadas}, 200
@@ -179,6 +196,7 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
                 tarefa.prioridade = data["prioridade"]
 
             tarefa.prazo_validado = True
+            sync_tarefa(tarefa)  # PR D2: dual-write
             db.session.commit()
             return tarefa
 
@@ -198,6 +216,7 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
             tarefa = get_item_or_404(TarefaPrazo, id)
             tarefa.status = "Concluído"
             tarefa.prazo_validado = True
+            sync_tarefa(tarefa)  # PR D2: dual-write
             db.session.commit()
             return tarefa
 
@@ -238,6 +257,7 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
                     except ValueError:
                         pass
 
+            sync_tarefa(tarefa)  # PR D2: dual-write
             db.session.commit()
             return tarefa
 
@@ -247,6 +267,7 @@ def register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto
         @tarefas_ns.doc(security="jsonWebToken")
         def delete(self, id):
             tarefa = get_item_or_404(TarefaPrazo, id)
+            delete_item_da_tarefa(tarefa.id)  # PR D2: dual-write
             db.session.delete(tarefa)
             db.session.commit()
             return "", 204
