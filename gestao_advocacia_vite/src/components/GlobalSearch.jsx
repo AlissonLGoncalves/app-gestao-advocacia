@@ -64,6 +64,25 @@ export default function GlobalSearch() {
     handleClose()
   }
 
+  // PR 5: Ctrl+K (ou Cmd+K no Mac) abre busca de qualquer tela.
+  // O tooltip ja prometia o atalho mas nunca tinha sido implementado.
+  // Inspirado no padrao do GitHub, Linear, Slack, VS Code.
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault()
+        if (open) {
+          handleClose()
+        } else {
+          handleOpen()
+        }
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
@@ -178,7 +197,7 @@ export default function GlobalSearch() {
                   key={c.id}
                   className="btn btn-light border-0 w-100 text-start px-3 py-2 d-flex align-items-center gap-2"
                   style={{ borderRadius: 0, fontSize: '0.88rem' }}
-                  onClick={() => handleSelect(`/clientes/editar/${c.id}`)}
+                  onClick={() => handleSelect(`/clientes/${c.id}`)}
                 >
                   <div className="p-1 rounded bg-primary-subtle flex-shrink-0">
                     <UsersIcon style={{ width: 12, height: 12, color: '#2563eb' }} />

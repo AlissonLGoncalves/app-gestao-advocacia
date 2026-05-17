@@ -404,6 +404,34 @@ const MainLayout = () => {
     return finalTitle.charAt(0).toUpperCase() + finalTitle.slice(1)
   }
 
+  // PR 5 (polimentos): subtitulo contextual por pagina. Substitui o
+  // "Organizado e fluido, como seu escritorio precisa" que se repetia
+  // identico em TODA pagina (ruido visual sem informacao util).
+  const getPageSubtitle = () => {
+    const path = location.pathname.toLowerCase()
+    const seg = path.split('/').filter(Boolean)[0] || 'dashboard'
+    const map = {
+      dashboard: 'Visão geral do escritório',
+      clientes: 'Cadastros e gestão da carteira',
+      casos: 'Processos e casos jurídicos',
+      prazos: 'Kanban de prazos e tarefas',
+      recebimentos: 'Lançamentos a receber e histórico de pagamentos',
+      contratos: 'Contratos de honorários',
+      despesas: 'Lançamentos a pagar e pagas',
+      nfse: 'Emissão e gerenciamento de Notas Fiscais de Serviço',
+      agenda: 'Compromissos, audiências e prazos com data',
+      documentos: 'Anexos e arquivos do escritório',
+      modelos: 'Modelos editáveis de peças jurídicas',
+      djen: 'Publicações capturadas do Diário de Justiça Eletrônico',
+      relatorios: 'Relatórios gerenciais e financeiros',
+      configuracoes: 'Configurações do escritório, equipe e plano',
+      integracoes: 'Integrações com sistemas externos',
+      perfil: 'Suas informações pessoais e segurança',
+      admin: 'Backoffice — gerencia tenants e solicitações',
+    }
+    return map[seg] || 'Patronus — Sistema Jurídico'
+  }
+
   // Valor do contexto memoizado pra nao recriar a cada render.
   const sidebarCtxValue = React.useMemo(() => ({ onClose: closeSidebar }), [closeSidebar])
 
@@ -560,9 +588,7 @@ const MainLayout = () => {
               </button>
               <div>
                 <h1>{getPageTitle()}</h1>
-                <small className="app-header-meta text-muted">
-                  Organizado e fluido, como seu escritorio precisa
-                </small>
+                <small className="app-header-meta text-muted">{getPageSubtitle()}</small>
               </div>
             </div>
             <div className="d-flex align-items-center gap-2 ms-auto">
