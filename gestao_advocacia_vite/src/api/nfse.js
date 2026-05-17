@@ -67,3 +67,22 @@ export function uploadCertificadoA1(arquivo, senha) {
 export function removerCertificadoA1() {
   return api.del('/nfse/certificado')
 }
+
+/**
+ * Cancela uma NFS-e ja autorizada (evento e101101).
+ *
+ * POST /nfse/emissoes/<id>/cancelar
+ * Body: { motivo: string >=15 chars, cod_motivo: 1|2|9 }
+ *   1 = Erro na emissao
+ *   2 = Servico nao prestado
+ *   9 = Outros
+ *
+ * Em modo mock, cancela localmente sem chamar portal real.
+ * Em producao, monta XML de evento, assina XMLDSIG e POST com mTLS.
+ */
+export function cancelarEmissaoNFSe(emissaoId, { motivo, codMotivo }) {
+  return api.post(`/nfse/emissoes/${emissaoId}/cancelar`, {
+    motivo,
+    cod_motivo: codMotivo,
+  })
+}
