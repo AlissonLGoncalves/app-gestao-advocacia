@@ -1792,9 +1792,18 @@ class ConfigNFSe(db.Model):
     # Tipo de gateway/adapter: "mock" (default ate adapter real),
     # "portal_nacional" (gov.br), "focus_nfe", "plugnotas".
     gateway_tipo = db.Column(db.String(30), nullable=False, default="mock")
-    # Flag indicando se o tenant ja enviou o certificado A1. Conteudo
-    # nao fica no banco — fica no storage do gateway (quando configurado).
+    # Flag indicando se o tenant ja enviou o certificado A1. Setado
+    # automaticamente quando certificado_pfx_encrypted nao e None.
     tem_certificado = db.Column(db.Boolean, nullable=False, default=False)
+    # Etapa 5.6.2: storage do certificado A1 (.pfx) criptografado com
+    # Fernet usando NFSE_CERT_ENCRYPTION_KEY (env var). LargeBinary cabe
+    # arquivos de ate alguns MB (pfx tipico tem 4-10 KB).
+    certificado_pfx_encrypted = db.Column(db.LargeBinary, nullable=True)
+    certificado_senha_encrypted = db.Column(db.LargeBinary, nullable=True)
+    # Metadata extraida do cert no momento do upload (ajuda UI mostrar
+    # info ao usuario sem precisar descriptografar tudo de novo).
+    certificado_nome_titular = db.Column(db.String(300), nullable=True)
+    certificado_valido_ate = db.Column(db.Date, nullable=True)
     # === Etapa 5.6.1: campos para Portal Nacional NFS-e (gov.br) ===
     # URLs base configuraveis pra cada ambiente. Mantidas opcionais
     # porque gateway "mock" nao precisa delas. Defaults indicativos
@@ -1833,6 +1842,12 @@ class ConfigNFSe(db.Model):
             "codigo_municipio_ibge": self.codigo_municipio_ibge,
             "nfse_serie_atual": self.nfse_serie_atual,
             "nfse_numero_atual": self.nfse_numero_atual,
+            "certificado_nome_titular": self.certificado_nome_titular,
+            "certificado_valido_ate": (
+                self.certificado_valido_ate.isoformat()
+                if self.certificado_valido_ate
+                else None
+            ),
             "configurado": bool(self.cnpj_emissor and self.codigo_servico),
         }
 
