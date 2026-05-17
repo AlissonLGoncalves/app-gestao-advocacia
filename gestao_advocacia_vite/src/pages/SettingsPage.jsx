@@ -572,7 +572,6 @@ function SettingsPage() {
             </div>
           )}
 
-
           {/* ABA: AUDITORIA LGPD */}
           {activeTab === 'auditoria' && userRole === 'admin' && (
             <div className="card shadow-sm border-0 rounded-4">

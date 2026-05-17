@@ -2,7 +2,6 @@
 dps_builder. Sem dependencia de certificado A1 ou HTTP real.
 """
 
-from decimal import Decimal
 from xml.etree import ElementTree as ET
 
 from models import ConfigNFSe
@@ -15,7 +14,6 @@ from nfse.portal_nacional.dps_builder import (
     montar_dps_xml,
 )
 from nfse.portal_nacional.gateway import PortalNacionalGateway
-
 
 # ===================== dps_builder =====================
 
@@ -425,8 +423,8 @@ def test_emitir_e2e_5xx_persistente(db):
     """3 tentativas 503 -> Rejeitada com mensagem do portal."""
     import responses
 
-    from nfse.portal_nacional.gateway import PortalNacionalGateway
     from nfse.portal_nacional import http_client
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
 
     pfx_enc, senha_enc = _pfx_de_teste()
     config = _config(

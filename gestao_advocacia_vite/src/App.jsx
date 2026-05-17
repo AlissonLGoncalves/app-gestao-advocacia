@@ -119,9 +119,7 @@ const SidebarLink = ({ to, icon: IconComponent, children, badge, badgeCor = 'dan
 
 // Header de secao da sidebar (agrupa links visualmente).
 // PR #250: substitui sequencia flat de 15 itens por grupos.
-const SidebarSection = ({ children }) => (
-  <div className="sidebar-section-label">{children}</div>
-)
+const SidebarSection = ({ children }) => <div className="sidebar-section-label">{children}</div>
 
 // onboarding-wizard: gate que checa /tenant/onboarding-status uma vez por sessao
 // e redireciona para /onboarding se o tenant ainda nao completou o wizard.

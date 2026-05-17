@@ -7,7 +7,6 @@
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 import responses
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -21,7 +20,6 @@ from nfse.portal_nacional.http_client import (
     URL_ADN_PRODUCAO,
     resolver_adn_url,
 )
-
 
 # ===================== resolver_adn_url =====================
 

@@ -21,9 +21,7 @@ function NotasFiscaisPage() {
   // Tab vem do hash da URL (#emissoes ou #configuracao) pra permitir
   // links diretos e preservar aba ao recarregar.
   const hashAtual = (location.hash || '').replace('#', '')
-  const abaInicial = Object.values(ABAS).includes(hashAtual)
-    ? hashAtual
-    : ABAS.EMISSOES
+  const abaInicial = Object.values(ABAS).includes(hashAtual) ? hashAtual : ABAS.EMISSOES
   const [abaAtiva, setAbaAtiva] = useState(abaInicial)
 
   // Mantem hash da URL sincronizado com a aba selecionada.
@@ -41,8 +39,8 @@ function NotasFiscaisPage() {
           Notas Fiscais de Serviço
         </h2>
         <p className="text-muted small mb-0">
-          Emissão, consulta e gerenciamento de NFS-e diretamente pelo app via Portal
-          Nacional NFS-e (gov.br).
+          Emissão, consulta e gerenciamento de NFS-e diretamente pelo app via Portal Nacional NFS-e
+          (gov.br).
         </p>
       </div>
 
@@ -79,9 +77,7 @@ function NotasFiscaisPage() {
       {/* Conteudo das abas */}
       <div className="card border-0 shadow-sm">
         <div className="card-body p-3 p-md-4">
-          {abaAtiva === ABAS.EMISSOES && (
-            <EmissoesNFSeList onChangeTab={setAbaAtiva} />
-          )}
+          {abaAtiva === ABAS.EMISSOES && <EmissoesNFSeList onChangeTab={setAbaAtiva} />}
           {abaAtiva === ABAS.CONFIG && <ConfigNFSeForm />}
         </div>
       </div>
