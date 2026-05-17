@@ -113,9 +113,7 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
             if codigo_ibge_raw not in (None, ""):
                 codigo_ibge = "".join(c for c in str(codigo_ibge_raw) if c.isdigit())
                 if len(codigo_ibge) != 7:
-                    nfse_ns.abort(
-                        400, message="codigo_municipio_ibge deve ter 7 digitos."
-                    )
+                    nfse_ns.abort(400, message="codigo_municipio_ibge deve ter 7 digitos.")
 
             serie_raw = data.get("nfse_serie_atual")
             numero_raw = data.get("nfse_numero_atual")
@@ -123,7 +121,9 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
                 serie_val = int(serie_raw) if serie_raw not in (None, "") else None
                 numero_val = int(numero_raw) if numero_raw not in (None, "") else None
             except (TypeError, ValueError):
-                nfse_ns.abort(400, message="nfse_serie_atual e nfse_numero_atual devem ser inteiros.")
+                nfse_ns.abort(
+                    400, message="nfse_serie_atual e nfse_numero_atual devem ser inteiros."
+                )
             if serie_val is not None and serie_val < 1:
                 nfse_ns.abort(400, message="nfse_serie_atual deve ser >= 1.")
             if numero_val is not None and numero_val < 0:
@@ -132,9 +132,7 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
             # Etapa 5.6.5: validacao de tipo de pessoa + documento.
             tipo_pessoa = (data.get("tipo_pessoa_emissor") or "PJ").upper()
             if tipo_pessoa not in ("PF", "PJ"):
-                nfse_ns.abort(
-                    400, message="tipo_pessoa_emissor deve ser 'PF' ou 'PJ'."
-                )
+                nfse_ns.abort(400, message="tipo_pessoa_emissor deve ser 'PF' ou 'PJ'.")
             # Aceita "documento_emissor" (preferido) ou "cnpj_emissor" (legado).
             doc_raw = data.get("documento_emissor")
             if doc_raw is None:
@@ -145,16 +143,14 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
                     nfse_ns.abort(
                         400,
                         message=(
-                            "Para tipo_pessoa_emissor=PF, documento deve ser "
-                            "CPF (11 digitos)."
+                            "Para tipo_pessoa_emissor=PF, documento deve ser " "CPF (11 digitos)."
                         ),
                     )
                 if tipo_pessoa == "PJ" and len(doc_digitos) != 14:
                     nfse_ns.abort(
                         400,
                         message=(
-                            "Para tipo_pessoa_emissor=PJ, documento deve ser "
-                            "CNPJ (14 digitos)."
+                            "Para tipo_pessoa_emissor=PJ, documento deve ser " "CNPJ (14 digitos)."
                         ),
                     )
 
@@ -174,9 +170,7 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
             config.gateway_tipo = gateway_tipo
             # Etapa 5.6.1 — Portal Nacional
             if "nfse_base_url_homologacao" in data:
-                config.nfse_base_url_homologacao = (
-                    data.get("nfse_base_url_homologacao") or None
-                )
+                config.nfse_base_url_homologacao = data.get("nfse_base_url_homologacao") or None
             if "nfse_base_url_producao" in data:
                 config.nfse_base_url_producao = data.get("nfse_base_url_producao") or None
             if codigo_ibge_raw is not None:
@@ -444,14 +438,10 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
             tenant_id = get_tenant_id()
             config = ConfigNFSe.query.filter_by(tenant_id=tenant_id).first()
             if config is None:
-                nfse_ns.abort(
-                    400, message="ConfigNFSe nao encontrada — configure em Settings."
-                )
+                nfse_ns.abort(400, message="ConfigNFSe nao encontrada — configure em Settings.")
 
             gateway = get_gateway(emissao.gateway_tipo, config=config)
-            resultado = gateway.cancelar(
-                emissao.gateway_id, motivo=motivo, cod_motivo=cod_motivo
-            )
+            resultado = gateway.cancelar(emissao.gateway_id, motivo=motivo, cod_motivo=cod_motivo)
 
             if resultado.status == "Cancelada":
                 emissao.status = "Cancelada"

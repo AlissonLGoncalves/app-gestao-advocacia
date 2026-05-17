@@ -207,9 +207,7 @@ def backfill_all(
     processados = 0
     for tarefa in tarefa_q.yield_per(batch_size):
         existia = (
-            db.session.query(ItemAgenda.id)
-            .filter(ItemAgenda.legacy_tarefa_id == tarefa.id)
-            .first()
+            db.session.query(ItemAgenda.id).filter(ItemAgenda.legacy_tarefa_id == tarefa.id).first()
             is not None
         )
         sync_tarefa(tarefa)
@@ -234,9 +232,7 @@ def backfill_all(
     processados = 0
     for evento in evento_q.yield_per(batch_size):
         existia = (
-            db.session.query(ItemAgenda.id)
-            .filter(ItemAgenda.legacy_evento_id == evento.id)
-            .first()
+            db.session.query(ItemAgenda.id).filter(ItemAgenda.legacy_evento_id == evento.id).first()
             is not None
         )
         sync_evento(evento)
@@ -254,7 +250,5 @@ def backfill_all(
         db.session.rollback()
 
     stats["finished_at"] = datetime.utcnow().isoformat()
-    logger.info(
-        "backfill_itens_agenda concluido: %s", stats
-    )
+    logger.info("backfill_itens_agenda concluido: %s", stats)
     return stats

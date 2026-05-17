@@ -124,9 +124,7 @@ def test_request_4xx_nao_retry_levanta(cert_e_key_pem):
         body='{"erro": "DPS invalida"}',
     )
     with pytest.raises(PortalNacionalHTTPError) as exc:
-        request_com_mtls(
-            "POST", "https://x.example/nfse", cert_pem=cert, key_pem=key, json_body={}
-        )
+        request_com_mtls("POST", "https://x.example/nfse", cert_pem=cert, key_pem=key, json_body={})
     assert exc.value.status_code == 400
     assert "DPS invalida" in exc.value.body
     # 4xx nao retentou
@@ -152,9 +150,7 @@ def test_request_5xx_persistente_levanta(cert_e_key_pem):
         responses.add(responses.POST, "https://x.example/n", status=503, body="down")
 
     with pytest.raises(PortalNacionalHTTPError) as exc:
-        request_com_mtls(
-            "POST", "https://x.example/n", cert_pem=cert, key_pem=key, json_body={}
-        )
+        request_com_mtls("POST", "https://x.example/n", cert_pem=cert, key_pem=key, json_body={})
     assert exc.value.status_code == 503
     # 3 tentativas
     assert len(responses.calls) == 3
@@ -169,8 +165,6 @@ def test_request_connection_error_retry(cert_e_key_pem):
         body=requests.ConnectionError("timeout"),
     )
     responses.add(responses.POST, "https://x.example/n", json={"ok": 1}, status=200)
-    resp = request_com_mtls(
-        "POST", "https://x.example/n", cert_pem=cert, key_pem=key, json_body={}
-    )
+    resp = request_com_mtls("POST", "https://x.example/n", cert_pem=cert, key_pem=key, json_body={})
     assert resp.status_code == 200
     assert len(responses.calls) == 2

@@ -7,14 +7,11 @@ from datetime import datetime, timedelta, timezone
 
 
 def _futuro_iso(dias=3):
-    return (
-        (datetime.now(timezone.utc) + timedelta(days=dias))
-        .replace(microsecond=0)
-        .isoformat()
-    )
+    return (datetime.now(timezone.utc) + timedelta(days=dias)).replace(microsecond=0).isoformat()
 
 
 # ---------- Listagem ----------
+
 
 def test_list_vazia(auth_client, db):
     response = auth_client.get("/api/v1/itens-agenda")
@@ -23,6 +20,7 @@ def test_list_vazia(auth_client, db):
 
 
 # ---------- Criacao de tarefa (tipo=tarefa) ----------
+
 
 def test_criar_tarefa_minima(auth_client, db):
     # Tarefa nao exige data_inicio — pode existir so no kanban sem
@@ -59,6 +57,7 @@ def test_criar_tarefa_com_vencimento(auth_client, db):
 
 # ---------- Criacao de evento (tipo=evento) ----------
 
+
 def test_criar_evento_exige_data_inicio(auth_client, db):
     # Evento sem data_inicio deve falhar com 400.
     response = auth_client.post(
@@ -87,10 +86,9 @@ def test_criar_evento_sucesso(auth_client, db):
 
 # ---------- Validacoes ----------
 
+
 def test_titulo_obrigatorio(auth_client, db):
-    response = auth_client.post(
-        "/api/v1/itens-agenda", json={"tipo": "tarefa"}
-    )
+    response = auth_client.post("/api/v1/itens-agenda", json={"tipo": "tarefa"})
     assert response.status_code == 400
 
 
@@ -123,6 +121,7 @@ def test_data_invalida_rejeitada(auth_client, db):
 
 
 # ---------- Detalhe / Update / Delete ----------
+
 
 def test_get_detalhe(auth_client, db):
     post = auth_client.post(
@@ -168,6 +167,7 @@ def test_delete(auth_client, db):
 
 
 # ---------- Filtros ----------
+
 
 def test_filtro_por_tipo(auth_client, db):
     auth_client.post(

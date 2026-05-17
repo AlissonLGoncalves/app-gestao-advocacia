@@ -12,11 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 
 def _futuro_iso(dias=3):
-    return (
-        (datetime.now(timezone.utc) + timedelta(days=dias))
-        .replace(microsecond=0)
-        .isoformat()
-    )
+    return (datetime.now(timezone.utc) + timedelta(days=dias)).replace(microsecond=0).isoformat()
 
 
 # ---------- Dual-write em /tarefas ----------
@@ -67,9 +63,7 @@ def test_put_tarefa_atualiza_item_agenda(auth_client, db):
 def test_delete_tarefa_remove_item_agenda(auth_client, db):
     from models import ItemAgenda
 
-    res_post = auth_client.post(
-        "/api/v1/tarefas", json={"titulo": "ParaDeletar"}
-    )
+    res_post = auth_client.post("/api/v1/tarefas", json={"titulo": "ParaDeletar"})
     tarefa_id = json.loads(res_post.data)["id"]
     assert ItemAgenda.query.filter_by(legacy_tarefa_id=tarefa_id).count() == 1
 
@@ -81,9 +75,7 @@ def test_delete_tarefa_remove_item_agenda(auth_client, db):
 def test_patch_concluir_atualiza_status_item(auth_client, db):
     from models import ItemAgenda
 
-    res_post = auth_client.post(
-        "/api/v1/tarefas", json={"titulo": "Concluir"}
-    )
+    res_post = auth_client.post("/api/v1/tarefas", json={"titulo": "Concluir"})
     tarefa_id = json.loads(res_post.data)["id"]
 
     res = auth_client.patch(f"/api/v1/tarefas/{tarefa_id}/concluir")
@@ -192,6 +184,7 @@ def test_backfill_dry_run_nao_persiste(auth_client, db, app):
     # dado legado pre-existente).
     from models import User as _User
     from services.itens_agenda_sync import backfill_all
+
     user_id = auth_client.user["id"]
     user = _User.query.get(user_id)
     tenant_id = user.tenant_id
@@ -220,12 +213,11 @@ def test_backfill_apply_persiste_e_eh_idempotente(auth_client, db, app):
     from models import EventoAgenda, ItemAgenda, TarefaPrazo
     from models import User as _User
     from services.itens_agenda_sync import backfill_all
+
     user_id = auth_client.user["id"]
     user = _User.query.get(user_id)
     tenant_id = user.tenant_id
-    tarefa = TarefaPrazo(
-        titulo="Legada T", status="Fazendo", user_id=user_id, tenant_id=tenant_id
-    )
+    tarefa = TarefaPrazo(titulo="Legada T", status="Fazendo", user_id=user_id, tenant_id=tenant_id)
     evento = EventoAgenda(
         titulo="Legado E",
         data_inicio=datetime.utcnow() + timedelta(days=1),
@@ -259,12 +251,8 @@ def test_backfill_apply_persiste_e_eh_idempotente(auth_client, db, app):
     assert stats2["eventos_novos"] == 0
     assert stats2["tarefas_atualizadas"] >= 1
     assert stats2["eventos_atualizados"] >= 1
-    assert (
-        ItemAgenda.query.filter_by(legacy_tarefa_id=tarefa.id).count() == 1
-    )
-    assert (
-        ItemAgenda.query.filter_by(legacy_evento_id=evento.id).count() == 1
-    )
+    assert ItemAgenda.query.filter_by(legacy_tarefa_id=tarefa.id).count() == 1
+    assert ItemAgenda.query.filter_by(legacy_evento_id=evento.id).count() == 1
     # IDs preservados
     assert ItemAgenda.query.filter_by(legacy_tarefa_id=tarefa.id).first().id == item_t_id
     assert ItemAgenda.query.filter_by(legacy_evento_id=evento.id).first().id == item_e_id
@@ -290,6 +278,6 @@ def test_status_mapping_tarefa(auth_client, db):
         assert res.status_code == 201
         tarefa_id = json.loads(res.data)["id"]
         item = ItemAgenda.query.filter_by(legacy_tarefa_id=tarefa_id).first()
-        assert item.status == status_esperado, (
-            f"Esperado {status_esperado}, obtido {item.status} para {status_tarefa}"
-        )
+        assert (
+            item.status == status_esperado
+        ), f"Esperado {status_esperado}, obtido {item.status} para {status_tarefa}"

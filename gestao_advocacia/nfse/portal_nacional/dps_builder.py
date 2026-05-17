@@ -201,9 +201,7 @@ def montar_dps_xml(payload, config, *, serie: int, numero: int) -> str:
     loc_prest = ET.SubElement(serv, f"{{{DPS_NS}}}locPrest")
     ET.SubElement(loc_prest, f"{{{DPS_NS}}}cLocPrestacao").text = municipio_ibge
     c_serv = ET.SubElement(serv, f"{{{DPS_NS}}}cServ")
-    ET.SubElement(c_serv, f"{{{DPS_NS}}}cTribNac").text = (
-        payload.codigo_servico or "17.06"
-    )
+    ET.SubElement(c_serv, f"{{{DPS_NS}}}cTribNac").text = payload.codigo_servico or "17.06"
     ET.SubElement(serv, f"{{{DPS_NS}}}descServ").text = (payload.descricao_servico or "")[:2000]
 
     valores = ET.SubElement(inf, f"{{{DPS_NS}}}valores")

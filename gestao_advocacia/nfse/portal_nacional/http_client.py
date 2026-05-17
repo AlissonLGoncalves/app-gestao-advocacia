@@ -46,13 +46,8 @@ def resolver_adn_url(config) -> str:
     DANFSe). Override via env var NFSE_ADN_URL_PRODUCAO/HOMOLOGACAO."""
     ambiente = (getattr(config, "ambiente", None) or "sandbox").lower()
     if ambiente == "producao":
-        return (
-            os.environ.get("NFSE_ADN_URL_PRODUCAO", "").rstrip("/") or URL_ADN_PRODUCAO
-        )
-    return (
-        os.environ.get("NFSE_ADN_URL_HOMOLOGACAO", "").rstrip("/")
-        or URL_ADN_HOMOLOGACAO
-    )
+        return os.environ.get("NFSE_ADN_URL_PRODUCAO", "").rstrip("/") or URL_ADN_PRODUCAO
+    return os.environ.get("NFSE_ADN_URL_HOMOLOGACAO", "").rstrip("/") or URL_ADN_HOMOLOGACAO
 
 
 def resolver_base_url(config) -> str:

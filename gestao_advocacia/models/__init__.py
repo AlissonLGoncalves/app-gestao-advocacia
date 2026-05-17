@@ -2002,9 +2002,7 @@ class ConfigNFSe(db.Model):
             "nfse_num_evento_atual": self.nfse_num_evento_atual,
             "certificado_nome_titular": self.certificado_nome_titular,
             "certificado_valido_ate": (
-                self.certificado_valido_ate.isoformat()
-                if self.certificado_valido_ate
-                else None
+                self.certificado_valido_ate.isoformat() if self.certificado_valido_ate else None
             ),
             "configurado": bool(self.documento_emissor and self.codigo_servico),
         }
