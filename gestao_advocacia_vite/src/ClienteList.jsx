@@ -45,6 +45,10 @@ function ClienteList({ onEditCliente, refreshKey }) {
   const [clienteCasos, setClienteCasos] = useState({})
   const [loadingCasos, setLoadingCasos] = useState({})
 
+  const abrirDetalheDoCliente = (clienteId) => {
+    navigate(`/clientes/${clienteId}`)
+  }
+
   const abrirCasosDoCliente = (clienteId) => {
     navigate(`/casos?cliente_id=${clienteId}`)
   }
@@ -408,8 +412,8 @@ function ClienteList({ onEditCliente, refreshKey }) {
                     <button
                       type="button"
                       className="btn btn-link p-0 align-baseline fw-semibold text-decoration-underline"
-                      onClick={() => abrirCasosDoCliente(cliente.id)}
-                      title="Abrir casos/processos deste cliente"
+                      onClick={() => abrirDetalheDoCliente(cliente.id)}
+                      title="Abrir página do cliente (dados, casos, contratos, etc)"
                     >
                       {cliente.nome_razao_social}
                     </button>
@@ -444,7 +448,7 @@ function ClienteList({ onEditCliente, refreshKey }) {
                     <button
                       onClick={() => handleToggleExpand(cliente.id)}
                       className={`btn btn-sm me-1 p-1 lh-1 ${expandedRowId === cliente.id ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      title="Ver Processos / Casos"
+                      title="Pré-visualizar casos (expandir linha)"
                       style={{
                         width: '30px',
                         height: '30px',

@@ -14,22 +14,21 @@ function ClientesPage() {
   const [clienteParaEditar, setClienteParaEditar] = useState(null)
   const [loadingItem, setLoadingItem] = useState(false) // Estado para carregamento do item para edição
 
-  // Determina se o formulário deve ser mostrado e em qual modo com base na URL
-  const urlPath = location.pathname.toLowerCase() // Normaliza para minúsculas para segurança
+  // Determina se o formulário deve ser mostrado e em qual modo com base na URL.
+  // PR #249: rota /clientes/:id agora vai direto pra ClienteDetalhePage (em
+  // App.jsx); aqui so cuidamos de /novo e /editar.
+  const urlPath = location.pathname.toLowerCase()
   const mostrarFormulario =
     (urlPath.includes('/clientes/novo') && !urlPath.includes('/clientes/novo/procuracao')) ||
-    urlPath.startsWith('/clientes/editar/') ||
-    /^\/clientes\/\d+$/.test(urlPath)
+    urlPath.startsWith('/clientes/editar/')
   const modoFormulario = urlPath.includes('/clientes/novo')
     ? 'novo'
     : urlPath.startsWith('/clientes/editar/')
       ? 'editar'
-      : /^\/clientes\/\d+$/.test(urlPath)
-        ? 'detalhe'
-        : null
+      : null
   // Busca dados do cliente para edição se estiver no modo de edição e clienteId estiver presente
   useEffect(() => {
-    if ((modoFormulario === 'editar' || modoFormulario === 'detalhe') && params.clienteId) {
+    if (modoFormulario === 'editar' && params.clienteId) {
       setLoadingItem(true)
       getCliente(params.clienteId)
         .then((data) => setClienteParaEditar(data))
