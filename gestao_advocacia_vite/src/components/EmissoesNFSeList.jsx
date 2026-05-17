@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { listEmissoesNFSe } from '../api/nfse.js'
 import CancelarNFSeModal from './CancelarNFSeModal.jsx'
+import ChecklistNFSe from './ChecklistNFSe.jsx'
 
 const STATUS_BADGE = {
   Autorizada: { cor: 'bg-success', label: 'Autorizada' },
@@ -44,7 +45,7 @@ const truncarChave = (chave) => {
   return `${s.slice(0, 6)}...${s.slice(-6)}`
 }
 
-function EmissoesNFSeList() {
+function EmissoesNFSeList({ onChangeTab }) {
   const navigate = useNavigate()
   const [emissoes, setEmissoes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -140,11 +141,15 @@ function EmissoesNFSeList() {
       </div>
 
       {filtradas.length === 0 ? (
-        <div className="text-center text-muted py-5">
-          {filtroStatus === 'Todos'
-            ? 'Nenhuma NFS-e emitida ainda. Vá ao Histórico de Pagamentos Recebidos e clique em "Emitir NFS-e" em algum recebimento pago.'
-            : `Nenhuma emissão com status "${filtroStatus}".`}
-        </div>
+        filtroStatus === 'Todos' && emissoes.length === 0 ? (
+          // Lista totalmente vazia (nunca emitiu) — empty state guiado.
+          <ChecklistNFSe variant="completo" onChangeTab={onChangeTab} />
+        ) : (
+          // Filtro aplicado mas sem resultados — empty state simples.
+          <div className="text-center text-muted py-5">
+            Nenhuma emissão com status &quot;{filtroStatus}&quot;.
+          </div>
+        )
       ) : (
         <div className="table-responsive">
           <table className="table table-hover">

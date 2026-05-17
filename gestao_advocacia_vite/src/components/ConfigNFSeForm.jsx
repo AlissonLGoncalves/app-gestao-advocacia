@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import { getConfigNFSe, updateConfigNFSe } from '../api/nfse.js'
 import UploadCertificadoA1 from './UploadCertificadoA1.jsx'
+import ChecklistNFSe from './ChecklistNFSe.jsx'
 
 const REGIMES_TRIBUTARIOS = [
   'Simples Nacional',
@@ -143,6 +144,9 @@ function ConfigNFSeForm() {
 
   return (
     <form onSubmit={handleSubmit}>
+      {/* PR B do diagnostico: barra de progresso no topo mostra o que falta. */}
+      <ChecklistNFSe variant="compacto" />
+
       <div className="alert alert-info py-2 small mb-3">
         <strong>⚠️ Modo Mock ativo:</strong> nesta versão, a emissão de NFS-e funciona apenas
         em modo simulado para você testar o fluxo. Nenhuma nota real é enviada à Receita ou
