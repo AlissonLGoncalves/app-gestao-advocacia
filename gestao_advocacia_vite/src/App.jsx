@@ -69,6 +69,7 @@ import {
   XMarkIcon,
   ScaleIcon,
   Cog6ToothIcon,
+  PuzzlePieceIcon,
   ClipboardDocumentListIcon,
   NewspaperIcon,
   UserCircleIcon,
@@ -115,6 +116,12 @@ const SidebarLink = ({ to, icon: IconComponent, children, badge, badgeCor = 'dan
     </NavLink>
   )
 }
+
+// Header de secao da sidebar (agrupa links visualmente).
+// PR #250: substitui sequencia flat de 15 itens por grupos.
+const SidebarSection = ({ children }) => (
+  <div className="sidebar-section-label">{children}</div>
+)
 
 // onboarding-wizard: gate que checa /tenant/onboarding-status uma vez por sessao
 // e redireciona para /onboarding se o tenant ainda nao completou o wizard.
@@ -422,9 +429,12 @@ const MainLayout = () => {
           </div>
 
           <nav className="sidebar-nav">
+            {/* === OPERACIONAL === */}
             <SidebarLink to="/dashboard" icon={HomeIcon}>
               Dashboard
             </SidebarLink>
+
+            <SidebarSection>Operacional</SidebarSection>
             <SidebarLink to="/clientes" icon={UsersIcon}>
               Clientes
             </SidebarLink>
@@ -438,8 +448,14 @@ const MainLayout = () => {
             >
               Prazos (Kanban)
             </SidebarLink>
+            <SidebarLink to="/agenda" icon={CalendarDaysIcon}>
+              Agenda
+            </SidebarLink>
+
+            {/* === FINANCEIRO === (oculto pra assistente) */}
             {userRole !== 'assistente' && (
               <>
+                <SidebarSection>Financeiro</SidebarSection>
                 <SidebarLink
                   to="/recebimentos"
                   icon={CurrencyDollarIcon}
@@ -462,14 +478,14 @@ const MainLayout = () => {
                 </SidebarLink>
               </>
             )}
-            <SidebarLink to="/agenda" icon={CalendarDaysIcon}>
-              Agenda
-            </SidebarLink>
+
+            {/* === DOCUMENTOS & PUBLICAÇÕES === */}
+            <SidebarSection>Documentos & Publicações</SidebarSection>
             <SidebarLink to="/documentos" icon={DocumentTextIcon}>
               Documentos
             </SidebarLink>
             <SidebarLink to="/modelos" icon={DocumentTextIcon}>
-              Modelos
+              Modelos de Documento
             </SidebarLink>
             <SidebarLink
               to="/djen"
@@ -479,21 +495,28 @@ const MainLayout = () => {
             >
               DJEN — Publicações
             </SidebarLink>
+
+            {/* === ANÁLISE === */}
+            <SidebarSection>Análise</SidebarSection>
             <SidebarLink to="/relatorios" icon={ChartBarIcon}>
               Relatórios
             </SidebarLink>
+
+            {/* === SISTEMA === */}
+            <SidebarSection>Sistema</SidebarSection>
             <SidebarLink to="/configuracoes" icon={Cog6ToothIcon}>
               Configurações SaaS
             </SidebarLink>
-            <SidebarLink to="/integracoes" icon={Cog6ToothIcon}>
+            <SidebarLink to="/integracoes" icon={PuzzlePieceIcon}>
               Integrações
             </SidebarLink>
             <SidebarLink to="/perfil" icon={UserCircleIcon}>
               Meu Perfil
             </SidebarLink>
-            {/* admin-fase0: itens visiveis apenas para superadmin */}
+            {/* === ADMINISTRAÇÃO === so visivel pra superadmin */}
             {userRole === 'superadmin' && (
               <>
+                <SidebarSection>Administração</SidebarSection>
                 <SidebarLink to="/admin/tenants" icon={BuildingOffice2Icon}>
                   Backoffice
                 </SidebarLink>
