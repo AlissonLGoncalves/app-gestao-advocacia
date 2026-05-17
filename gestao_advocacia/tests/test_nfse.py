@@ -71,7 +71,10 @@ def test_get_config_vazia_devolve_esqueleto(auth_client, db):
 
 def test_put_config_cria_quando_nao_existe(auth_client, db):
     data = _configurar_nfse(auth_client)
-    assert data["cnpj_emissor"] == "12.345.678/0001-90"
+    # Etapa 5.6.5: documento e normalizado para digitos puros no backend
+    assert data["documento_emissor"] == "12345678000190"
+    assert data["cnpj_emissor"] == "12345678000190"  # alias sincronizado
+    assert data["tipo_pessoa_emissor"] == "PJ"
     assert data["codigo_servico"] == "17.06"
     assert data["uf"] == "SP"
     assert data["configurado"] is True

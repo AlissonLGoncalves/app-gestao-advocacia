@@ -1774,7 +1774,16 @@ class ConfigNFSe(db.Model):
         unique=True,
         index=True,
     )
-    # Dados do emissor (advogado/escritorio)
+    # === Dados do emissor (advogado/escritorio) ===
+    # Etapa 5.6.5: app suporta tanto advogado PF (autonomo) quanto PJ
+    # (escritorio). Cada tipo usa certificado diferente: e-CPF (PF) ou
+    # e-CNPJ (PJ). documento_emissor guarda CPF (11) ou CNPJ (14).
+    # "PF" | "PJ". Default "PJ" pra retrocompat com configs antigas que
+    # so tinham cnpj_emissor.
+    tipo_pessoa_emissor = db.Column(db.String(2), nullable=False, default="PJ")
+    documento_emissor = db.Column(db.String(20), nullable=True)
+    # DEPRECATED: mantido sincronizado com documento_emissor quando
+    # tipo_pessoa_emissor='PJ'. Codigo legado le isso.
     cnpj_emissor = db.Column(db.String(20), nullable=True)
     inscricao_municipal = db.Column(db.String(30), nullable=True)
     razao_social = db.Column(db.String(200), nullable=True)
@@ -1826,7 +1835,9 @@ class ConfigNFSe(db.Model):
     def to_dict(self):
         return {
             "id": self.id,
-            "cnpj_emissor": self.cnpj_emissor,
+            "tipo_pessoa_emissor": self.tipo_pessoa_emissor,
+            "documento_emissor": self.documento_emissor,
+            "cnpj_emissor": self.cnpj_emissor,  # alias deprecated
             "inscricao_municipal": self.inscricao_municipal,
             "razao_social": self.razao_social,
             "municipio": self.municipio,
@@ -1848,7 +1859,7 @@ class ConfigNFSe(db.Model):
                 if self.certificado_valido_ate
                 else None
             ),
-            "configurado": bool(self.cnpj_emissor and self.codigo_servico),
+            "configurado": bool(self.documento_emissor and self.codigo_servico),
         }
 
 

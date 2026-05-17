@@ -71,7 +71,7 @@ def montar_payload(recebimento: Recebimento, config: ConfigNFSe | None) -> Emiss
         recebimento_id=recebimento.id,
         descricao_servico=descricao,
         valor=_to_float(recebimento.valor),
-        cnpj_emissor=config.cnpj_emissor,
+        cnpj_emissor=(config.documento_emissor or config.cnpj_emissor),
         inscricao_municipal=config.inscricao_municipal,
         razao_social=config.razao_social,
         municipio=config.municipio,

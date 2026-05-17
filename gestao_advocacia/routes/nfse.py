@@ -128,8 +128,40 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
             if numero_val is not None and numero_val < 0:
                 nfse_ns.abort(400, message="nfse_numero_atual deve ser >= 0.")
 
+            # Etapa 5.6.5: validacao de tipo de pessoa + documento.
+            tipo_pessoa = (data.get("tipo_pessoa_emissor") or "PJ").upper()
+            if tipo_pessoa not in ("PF", "PJ"):
+                nfse_ns.abort(
+                    400, message="tipo_pessoa_emissor deve ser 'PF' ou 'PJ'."
+                )
+            # Aceita "documento_emissor" (preferido) ou "cnpj_emissor" (legado).
+            doc_raw = data.get("documento_emissor")
+            if doc_raw is None:
+                doc_raw = data.get("cnpj_emissor")
+            doc_digitos = "".join(c for c in (doc_raw or "") if c.isdigit()) or None
+            if doc_digitos:
+                if tipo_pessoa == "PF" and len(doc_digitos) != 11:
+                    nfse_ns.abort(
+                        400,
+                        message=(
+                            "Para tipo_pessoa_emissor=PF, documento deve ser "
+                            "CPF (11 digitos)."
+                        ),
+                    )
+                if tipo_pessoa == "PJ" and len(doc_digitos) != 14:
+                    nfse_ns.abort(
+                        400,
+                        message=(
+                            "Para tipo_pessoa_emissor=PJ, documento deve ser "
+                            "CNPJ (14 digitos)."
+                        ),
+                    )
+
             config = _ou_cria_config(tenant_id)
-            config.cnpj_emissor = data.get("cnpj_emissor")
+            config.tipo_pessoa_emissor = tipo_pessoa
+            config.documento_emissor = doc_digitos
+            # Sincroniza alias deprecated cnpj_emissor pra retrocompat.
+            config.cnpj_emissor = doc_digitos if tipo_pessoa == "PJ" else None
             config.inscricao_municipal = data.get("inscricao_municipal")
             config.razao_social = data.get("razao_social")
             config.municipio = data.get("municipio")
@@ -192,7 +224,41 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
             except ValueError as exc:
                 nfse_ns.abort(400, message=str(exc))
 
+            # Etapa 5.6.5: validacao estrita do tipo+documento do cert
+            # contra o cadastro do emissor.
             config = _ou_cria_config(tenant_id)
+            tipo_cadastrado = (config.tipo_pessoa_emissor or "").upper()
+            doc_cadastrado = "".join(
+                c for c in (config.documento_emissor or config.cnpj_emissor or "") if c.isdigit()
+            )
+            tipo_cert = meta.get("tipo_pessoa")
+            doc_cert = meta.get("documento")
+
+            if tipo_cadastrado and tipo_cert and tipo_cadastrado != tipo_cert:
+                friendly = {
+                    "PF": "e-CPF (Pessoa Fisica)",
+                    "PJ": "e-CNPJ (Pessoa Juridica)",
+                }
+                nfse_ns.abort(
+                    400,
+                    message=(
+                        f"Tipo do certificado nao bate com o cadastro. "
+                        f"Cadastro: {friendly.get(tipo_cadastrado, tipo_cadastrado)}. "
+                        f"Certificado: {friendly.get(tipo_cert, tipo_cert)}. "
+                        f"Verifique se voce comprou o tipo correto de cert."
+                    ),
+                )
+
+            if doc_cadastrado and doc_cert and doc_cadastrado != doc_cert:
+                nfse_ns.abort(
+                    400,
+                    message=(
+                        f"Documento do certificado ({doc_cert}) nao bate com o "
+                        f"documento cadastrado ({doc_cadastrado}). Use o certificado "
+                        f"emitido para o mesmo CPF/CNPJ do cadastro."
+                    ),
+                )
+
             config.certificado_pfx_encrypted = criptografar(pfx_bytes)
             config.certificado_senha_encrypted = criptografar(senha.encode("utf-8"))
             config.certificado_nome_titular = meta["nome_titular"]

@@ -22,7 +22,10 @@ const diasAteVencer = (iso) => {
   return Math.floor((v - hoje) / (1000 * 60 * 60 * 24))
 }
 
-function UploadCertificadoA1({ config, onConfigChange }) {
+function UploadCertificadoA1({ config, onConfigChange, tipoPessoa }) {
+  // tipoPessoa: 'PF' | 'PJ' — usado pra mostrar hint sobre tipo de cert
+  // correto. Vem do ConfigNFSeForm pai.
+  const certEsperado = tipoPessoa === 'PF' ? 'e-CPF A1' : 'e-CNPJ A1'
   const [arquivo, setArquivo] = useState(null)
   const [senha, setSenha] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -159,10 +162,17 @@ function UploadCertificadoA1({ config, onConfigChange }) {
           />
           Certificado A1 não carregado
         </h6>
-        <p className="small text-muted mb-3">
-          O Portal Nacional NFS-e exige certificado digital ICP-Brasil A1 ou A3 (mTLS). Faça
-          upload do seu arquivo .pfx com senha — ambos são criptografados antes de salvar.
+        <p className="small text-muted mb-2">
+          O Portal Nacional NFS-e exige certificado digital ICP-Brasil A1 (mTLS). Faça upload
+          do seu arquivo .pfx com senha — ambos são criptografados antes de salvar.
         </p>
+        {tipoPessoa && (
+          <div className="alert alert-info py-2 small mb-3">
+            <strong>Você cadastrou como {tipoPessoa === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}.</strong>{' '}
+            Compre um certificado <strong>{certEsperado}</strong> com a mesma{' '}
+            {tipoPessoa === 'PF' ? 'CPF' : 'CNPJ'}. Não vai aceitar cert de outro tipo.
+          </div>
+        )}
         <form onSubmit={handleUpload}>
           <div className="row g-2 align-items-end">
             <div className="col-md-6">
