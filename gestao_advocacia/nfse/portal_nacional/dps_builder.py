@@ -230,3 +230,38 @@ def decodificar_e_descomprimir(b64_gz: str) -> str:
     """Operacao inversa. Util pros tests e pra processar respostas."""
     gz = base64.b64decode(b64_gz.encode("ascii"))
     return gzip.decompress(gz).decode("utf-8")
+
+
+# Namespaces possiveis no XML da NFS-e autorizada. O Swagger nao
+# documenta o leiaute, mas pelo padrao SPED/Fazenda o namespace eh
+# sped.fazenda.gov.br/nfse. Toleramos variacoes via match com
+# wildcard ({*}) no findtext.
+def extrair_dados_nfse(nfse_xml: str) -> dict:
+    """Extrai campos da NFS-e autorizada (numero, serie, codigo de
+    verificacao, etc) do XML retornado em nfseXmlGZipB64.
+
+    O Swagger nao publica o schema da NFS-e, entao tentamos campos
+    com nomes comuns (`nNFSe`, `serie`, `codVerif`, `dhEmi`) com
+    fallback pra None. Retorna dict com chaves estaveis pro caller
+    nao precisar fazer parsing.
+    """
+    from xml.etree import ElementTree as ET  # noqa: PLC0415
+
+    try:
+        root = ET.fromstring(nfse_xml)
+    except ET.ParseError:
+        return {}
+
+    def t(tag):
+        # Match em qualquer namespace
+        elem = root.find(f".//{{*}}{tag}")
+        return elem.text if elem is not None and elem.text else None
+
+    # Tenta varios nomes possiveis pra cada campo
+    return {
+        "numero_nfse": t("nNFSe") or t("numeroNFSe") or t("nNFSeMun"),
+        "serie": t("serie") or t("serieNFSe"),
+        "codigo_verificacao": t("codVerif") or t("codigoVerificacao"),
+        "data_emissao": t("dhEmi") or t("dataEmissao"),
+        "chave_acesso": t("chNFSe") or t("chaveAcesso"),
+    }
