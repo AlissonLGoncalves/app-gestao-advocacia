@@ -187,24 +187,27 @@ def test_gateway_falta_codigo_municipio_rejeita():
 
 
 def test_gateway_sem_certificado_rejeita_com_mensagem_clara():
-    """Mesmo com tudo configurado, sem cert ainda nao emite (5.6.2 pendente)."""
+    """Sem flag tem_certificado, pede pro user fazer upload."""
     g = PortalNacionalGateway(config=_config(tem_certificado=False))
     res = g.emitir(_payload())
     assert res.status == "Rejeitada"
-    assert "5.6.2" in res.mensagem_erro or "certificado" in res.mensagem_erro.lower()
+    assert "upload" in res.mensagem_erro.lower() or "certificado" in res.mensagem_erro.lower()
 
 
-def test_gateway_com_cert_falso_monta_dps_mas_ainda_rejeita():
-    """Com tem_certificado=True, passa da validacao mas falha em 5.6.3."""
-    g = PortalNacionalGateway(config=_config(tem_certificado=True))
+def test_gateway_com_flag_mas_sem_pfx_no_banco_rejeita():
+    """Flag tem_certificado=True mas certificado_pfx_encrypted None — incoerente."""
+    g = PortalNacionalGateway(
+        config=_config(tem_certificado=True, certificado_pfx_encrypted=None)
+    )
     res = g.emitir(_payload())
-    # Por enquanto rejeita citando 5.6.2/5.6.3
     assert res.status == "Rejeitada"
-    assert "5.6" in res.mensagem_erro
+    assert "banco" in res.mensagem_erro.lower() or "reenvie" in res.mensagem_erro.lower()
 
 
 def test_gateway_valor_zero_rejeita():
-    g = PortalNacionalGateway(config=_config(tem_certificado=True))
+    g = PortalNacionalGateway(
+        config=_config(tem_certificado=True, certificado_pfx_encrypted=b"x")
+    )
     res = g.emitir(_payload(valor=0))
     assert res.status == "Rejeitada"
     assert "positivo" in res.mensagem_erro.lower()
@@ -223,3 +226,195 @@ def test_factory_get_gateway_mock_continua_funcionando():
 
     g = get_gateway("mock")
     assert isinstance(g, MockGateway)
+
+
+# ===================== Integracao end-to-end (cert auto-assinado + HTTP mock) =====================
+
+
+def _pfx_de_teste():
+    """Helper: gera .pfx auto-assinado e criptografa pra config fake."""
+    from datetime import datetime, timedelta, timezone
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    from cryptography.x509.oid import NameOID
+
+    from nfse.portal_nacional.signer import criptografar
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name(
+        [x509.NameAttribute(NameOID.COMMON_NAME, "TESTE:12345678000190")]
+    )
+    agora = datetime.now(timezone.utc)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(agora - timedelta(days=1))
+        .not_valid_after(agora + timedelta(days=180))
+        .sign(key, hashes.SHA256())
+    )
+    senha = "s3nh4"
+    pfx = pkcs12.serialize_key_and_certificates(
+        name=b"t",
+        key=key,
+        cert=cert,
+        cas=None,
+        encryption_algorithm=serialization.BestAvailableEncryption(senha.encode()),
+    )
+    return criptografar(pfx), criptografar(senha.encode())
+
+
+def test_emitir_e2e_sucesso_com_http_mock(db):
+    """Fluxo completo: monta DPS → assina → comprime → POST mockado → parseia."""
+    import responses
+
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+        nfse_base_url_homologacao="https://portal.example.com/SefinNacional",
+    )
+
+    with responses.RequestsMock() as rsp:
+        rsp.add(
+            responses.POST,
+            "https://portal.example.com/SefinNacional/nfse",
+            json={
+                "chaveAcesso": "35201234567890000190",
+                "nNFSe": "42",
+                "serie": "1",
+                "codVerif": "ABC12345",
+                "linkXmlNfse": "https://portal/xml/42",
+                "linkDanfse": "https://portal/pdf/42",
+            },
+            status=200,
+        )
+
+        g = PortalNacionalGateway(config=config)
+        res = g.emitir(_payload())
+
+    assert res.status == "Autorizada"
+    assert res.gateway_id == "35201234567890000190"
+    assert res.numero_nfse == "42"
+    assert res.codigo_verificacao == "ABC12345"
+    assert res.pdf_url == "https://portal/pdf/42"
+
+
+def test_emitir_e2e_portal_rejeita_400_com_mensagens(db):
+    """Portal devolve 400 com lista de mensagens — gateway expoe ao user."""
+    import responses
+
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+        nfse_base_url_homologacao="https://portal.example.com/api",
+    )
+
+    with responses.RequestsMock() as rsp:
+        rsp.add(
+            responses.POST,
+            "https://portal.example.com/api/nfse",
+            status=400,
+            json={
+                "mensagens": [
+                    {"descricao": "Codigo de servico invalido para o municipio."}
+                ]
+            },
+        )
+        g = PortalNacionalGateway(config=config)
+        res = g.emitir(_payload())
+
+    assert res.status == "Rejeitada"
+    assert "400" in res.mensagem_erro or "Codigo" in res.mensagem_erro
+
+
+def test_emitir_e2e_5xx_persistente(db):
+    """3 tentativas 503 -> Rejeitada com mensagem do portal."""
+    import responses
+
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+    from nfse.portal_nacional import http_client
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+        nfse_base_url_homologacao="https://portal.example.com/api",
+    )
+
+    # Acelera o test: sem backoff
+    original_base = http_client.BACKOFF_BASE
+    http_client.BACKOFF_BASE = 0
+    try:
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsp:
+            for _ in range(5):
+                rsp.add(
+                    responses.POST,
+                    "https://portal.example.com/api/nfse",
+                    status=503,
+                    body="down",
+                )
+            g = PortalNacionalGateway(config=config)
+            res = g.emitir(_payload())
+    finally:
+        http_client.BACKOFF_BASE = original_base
+
+    assert res.status == "Rejeitada"
+    assert "503" in res.mensagem_erro
+
+
+def test_cancelar_motivo_curto_rejeita(db):
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+    )
+    g = PortalNacionalGateway(config=config)
+    res = g.cancelar("chave-x", motivo="curto")
+    assert res.status == "Rejeitada"
+    assert "15" in res.mensagem_erro
+
+
+def test_cancelar_e2e_sucesso(db):
+    import responses
+
+    from nfse.portal_nacional.gateway import PortalNacionalGateway
+
+    pfx_enc, senha_enc = _pfx_de_teste()
+    config = _config(
+        tem_certificado=True,
+        certificado_pfx_encrypted=pfx_enc,
+        certificado_senha_encrypted=senha_enc,
+        nfse_base_url_homologacao="https://portal.example.com/api",
+    )
+    with responses.RequestsMock() as rsp:
+        rsp.add(
+            responses.POST,
+            "https://portal.example.com/api/nfse/chave-xyz/eventos",
+            json={"ok": True},
+            status=200,
+        )
+        g = PortalNacionalGateway(config=config)
+        res = g.cancelar(
+            "chave-xyz",
+            motivo="Cancelamento solicitado pelo cliente em 17/05/2026.",
+        )
+
+    assert res.status == "Cancelada"
+    assert res.gateway_id == "chave-xyz"

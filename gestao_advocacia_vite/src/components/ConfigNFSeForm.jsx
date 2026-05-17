@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import { getConfigNFSe, updateConfigNFSe } from '../api/nfse.js'
+import UploadCertificadoA1 from './UploadCertificadoA1.jsx'
 
 const REGIMES_TRIBUTARIOS = [
   'Simples Nacional',
@@ -48,6 +49,13 @@ function ConfigNFSeForm() {
   const [configurado, setConfigurado] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  // Etapa 5.6.2: info do certificado A1. Nao vai no form (separado) porque
+  // upload e feito por endpoint dedicado /nfse/certificado.
+  const [certInfo, setCertInfo] = useState({
+    tem_certificado: false,
+    certificado_nome_titular: null,
+    certificado_valido_ate: null,
+  })
 
   useEffect(() => {
     let cancelado = false
@@ -78,6 +86,11 @@ function ConfigNFSeForm() {
             data.nfse_numero_atual != null ? String(data.nfse_numero_atual) : '0',
         })
         setConfigurado(!!data.configurado)
+        setCertInfo({
+          tem_certificado: !!data.tem_certificado,
+          certificado_nome_titular: data.certificado_nome_titular || null,
+          certificado_valido_ate: data.certificado_valido_ate || null,
+        })
       })
       .catch((err) => {
         console.error('ConfigNFSeForm: erro ao carregar', err)
@@ -271,15 +284,14 @@ function ConfigNFSeForm() {
       {form.gateway_tipo === 'portal_nacional' && (
         <>
           <h6 className="fw-bold text-dark mt-4 mb-3">Portal Nacional NFS-e (gov.br)</h6>
-          <div className="alert alert-warning py-2 small mb-3">
-            ⚠️ Adapter Portal Nacional está em construção:
-            <ul className="mb-0 mt-1">
-              <li>✅ Montagem da DPS XML (sub-etapa 5.6.1) — pronta</li>
-              <li>⏳ Assinatura XMLDSIG + certificado A1 (5.6.2) — pendente</li>
-              <li>⏳ Chamada HTTP mTLS real (5.6.3) — pendente</li>
-            </ul>
-            Por enquanto, escolha &quot;Mock&quot; para testar o fluxo.
+          <div className="alert alert-info py-2 small mb-3">
+            Para emitir notas pelo Portal Nacional, configure os dados abaixo e faça upload
+            do certificado A1 (.pfx) do escritório. URLs default já apontam para o
+            ambiente oficial — sobrescreva apenas se necessário.
           </div>
+
+          {/* Upload do certificado A1 */}
+          <UploadCertificadoA1 config={certInfo} onConfigChange={setCertInfo} />
           <div className="row g-3 mb-3">
             <div className="col-md-6">
               <label className="form-label text-secondary small fw-bold">
@@ -327,8 +339,9 @@ function ConfigNFSeForm() {
                 className="form-control"
                 value={form.nfse_base_url_homologacao}
                 onChange={handleChange('nfse_base_url_homologacao')}
-                placeholder="https://..."
+                placeholder="https://sefin.producaorestrita.nfse.gov.br/SefinNacional"
               />
+              <small className="text-muted">Default oficial. Vazio = usa o default.</small>
             </div>
             <div className="col-md-6">
               <label className="form-label text-secondary small fw-bold">
@@ -339,8 +352,9 @@ function ConfigNFSeForm() {
                 className="form-control"
                 value={form.nfse_base_url_producao}
                 onChange={handleChange('nfse_base_url_producao')}
-                placeholder="https://..."
+                placeholder="https://sefin.nfse.gov.br/SefinNacional"
               />
+              <small className="text-muted">Default oficial. Vazio = usa o default.</small>
             </div>
           </div>
         </>

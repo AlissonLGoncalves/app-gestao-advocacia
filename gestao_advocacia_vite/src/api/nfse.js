@@ -47,3 +47,23 @@ export function listEmissoesNFSe(params = {}) {
 export function getEmissaoNFSe(id) {
   return api.get(`/nfse/emissoes/${id}`)
 }
+
+/**
+ * Upload do certificado A1 (.pfx). Etapa 5.6.2.
+ *
+ * Multipart form-data: campo "arquivo" (File) + "senha" (string).
+ * Backend valida o .pfx, extrai titular + validade, criptografa
+ * com Fernet e salva. Retorna { tem_certificado, nome_titular,
+ * valido_ate } pra UI mostrar feedback.
+ */
+export function uploadCertificadoA1(arquivo, senha) {
+  const form = new FormData()
+  form.append('arquivo', arquivo)
+  form.append('senha', senha)
+  // api.post nao trata FormData diretamente — bypassa o JSON wrapper.
+  return api.postForm('/nfse/certificado', form)
+}
+
+export function removerCertificadoA1() {
+  return api.del('/nfse/certificado')
+}

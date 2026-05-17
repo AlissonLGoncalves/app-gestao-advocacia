@@ -19,7 +19,12 @@ from flask_restx import Resource
 from extensions import db
 from helpers import get_item_or_404, get_tenant_id, query_for_tenant, tenant_scoped
 from models import ConfigNFSe, EmissaoNFSe, Recebimento
+from nfse.portal_nacional.signer import criptografar, extrair_metadata_pfx
 from nfse.service import emitir as nfse_emitir
+
+# Limite de tamanho do .pfx (10 MB e folgado pra certificados que tipicamente
+# tem ~5-10 KB; tudo acima e suspeito).
+MAX_PFX_BYTES = 10 * 1024 * 1024
 
 GATEWAY_TIPOS_VALIDOS = {"mock", "portal_nacional", "focus_nfe", "plugnotas"}
 AMBIENTES_VALIDOS = {"sandbox", "producao"}
@@ -153,6 +158,78 @@ def register_nfse_routes(app, nfse_ns, finance_access_required):
                 f"ConfigNFSe atualizada para tenant {tenant_id} (gateway={gateway_tipo})."
             )
             return config.to_dict(), 200
+
+    # ===== Upload e gerenciamento de certificado A1 (Etapa 5.6.2) =====
+    @nfse_ns.route("/certificado")
+    class CertificadoNFSeAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @finance_access_required
+        @nfse_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Upload de certificado A1 (.pfx) com senha. Body como "
+                "multipart/form-data: campos 'arquivo' (file) e 'senha' (str)."
+            ),
+        )
+        def post(self):
+            tenant_id = get_tenant_id()
+            if "arquivo" not in request.files:
+                nfse_ns.abort(400, message="Campo 'arquivo' (.pfx) obrigatorio.")
+            arquivo = request.files["arquivo"]
+            senha = (request.form.get("senha") or "").strip()
+            if not senha:
+                nfse_ns.abort(400, message="Senha do certificado obrigatoria.")
+            pfx_bytes = arquivo.read()
+            if not pfx_bytes:
+                nfse_ns.abort(400, message="Arquivo vazio.")
+            if len(pfx_bytes) > MAX_PFX_BYTES:
+                nfse_ns.abort(400, message="Arquivo excede 10 MB.")
+
+            # Valida o pfx + extrai metadata antes de gravar.
+            try:
+                meta = extrair_metadata_pfx(pfx_bytes, senha)
+            except ValueError as exc:
+                nfse_ns.abort(400, message=str(exc))
+
+            config = _ou_cria_config(tenant_id)
+            config.certificado_pfx_encrypted = criptografar(pfx_bytes)
+            config.certificado_senha_encrypted = criptografar(senha.encode("utf-8"))
+            config.certificado_nome_titular = meta["nome_titular"]
+            config.certificado_valido_ate = meta["valido_ate"]
+            config.tem_certificado = True
+            db.session.commit()
+            app.logger.info(
+                f"Certificado A1 carregado para tenant {tenant_id} "
+                f"(titular={meta['nome_titular']!r}, valido_ate={meta['valido_ate']})."
+            )
+            return {
+                "tem_certificado": True,
+                "certificado_nome_titular": config.certificado_nome_titular,
+                "certificado_valido_ate": (
+                    config.certificado_valido_ate.isoformat()
+                    if config.certificado_valido_ate
+                    else None
+                ),
+            }, 201
+
+        @jwt_required()
+        @tenant_scoped
+        @finance_access_required
+        @nfse_ns.doc(security="jsonWebToken")
+        def delete(self):
+            tenant_id = get_tenant_id()
+            config = ConfigNFSe.query.filter_by(tenant_id=tenant_id).first()
+            if config is None or not config.tem_certificado:
+                return "", 204
+            config.certificado_pfx_encrypted = None
+            config.certificado_senha_encrypted = None
+            config.certificado_nome_titular = None
+            config.certificado_valido_ate = None
+            config.tem_certificado = False
+            db.session.commit()
+            app.logger.info(f"Certificado A1 removido para tenant {tenant_id}.")
+            return "", 204
 
     @nfse_ns.route("/emitir/<int:recebimento_id>")
     @nfse_ns.param("recebimento_id", "ID do Recebimento a emitir nota")
