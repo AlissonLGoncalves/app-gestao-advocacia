@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { API_URL } from '../config.js' // Importa API_URL
 import { toast } from 'react-toastify' // Para notificações
+// PR D4.2 — Atividades do caso lê de /v1/itens-agenda em vez de /tarefas
+import { listItensAgenda, concluirItemAgenda, deleteItemAgenda } from '../api/itensAgenda.js'
 import {
   atualizarCasoViaDjen,
   gerarResumoCaso,
@@ -113,11 +115,20 @@ function CasoDetalhePage() {
       const dataMovCNJ = await listPublicacoesDjenCaso(casoId)
       setPublicacoesDjen(dataMovCNJ)
 
-      // Buscar Prazos/Tarefas Vinculados
-      const resTarefas = await fetch(`${API_URL}/tarefas`, { headers: authHeaders })
-      if (resTarefas.ok) {
-        const dataTarefas = await resTarefas.json()
-        setPrazos(dataTarefas.filter((t) => t.caso_id === parseInt(casoId)))
+      // PR D4.2 — busca itens da agenda vinculados ao caso. Backend
+      // aceita filtro caso_id direto (mais eficiente que filtrar no
+      // cliente como antes). Filtramos tipo=tarefa pra manter a
+      // semantica original da aba "Atividades" (so prazos, nao eventos
+      // — eventos do caso aparecem na agenda unificada).
+      try {
+        const itens = await listItensAgenda({
+          tipo: 'tarefa',
+          caso_id: parseInt(casoId),
+        })
+        setPrazos(Array.isArray(itens) ? itens : [])
+      } catch (errTarefas) {
+        console.warn('CasoDetalhePage: erro ao buscar prazos do caso', errTarefas)
+        setPrazos([])
       }
     } catch (err) {
       console.error('Erro ao buscar dados do caso ou movimentações:', err)
@@ -138,14 +149,11 @@ function CasoDetalhePage() {
   // ciclo Kanban<>DJEN.
   const recarregarPrazos = async () => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${API_URL}/tarefas`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const itens = await listItensAgenda({
+        tipo: 'tarefa',
+        caso_id: parseInt(casoId),
       })
-      if (res.ok) {
-        const data = await res.json()
-        setPrazos(data.filter((t) => t.caso_id === parseInt(casoId)))
-      }
+      setPrazos(Array.isArray(itens) ? itens : [])
     } catch (e) {
       console.error('Erro ao recarregar prazos:', e)
     }
@@ -153,19 +161,12 @@ function CasoDetalhePage() {
 
   const handleConcluirTarefa = async (tarefa) => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${API_URL}/tarefas/${tarefa.id}/concluir`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      })
-      if (res.ok) {
-        toast.success('Tarefa marcada como cumprida.')
-        recarregarPrazos()
-      } else {
-        toast.error('Falha ao concluir tarefa.')
-      }
-    } catch {
-      toast.error('Erro na comunicação com servidor.')
+      await concluirItemAgenda(tarefa.id)
+      toast.success('Tarefa marcada como cumprida.')
+      recarregarPrazos()
+    } catch (err) {
+      console.error('CasoDetalhePage: erro ao concluir', err)
+      toast.error(err?.message || 'Falha ao concluir tarefa.')
     }
   }
 
@@ -176,19 +177,12 @@ function CasoDetalhePage() {
     )
     if (!ok) return
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${API_URL}/tarefas/${tarefa.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) {
-        toast.success('Prazo excluído.')
-        recarregarPrazos()
-      } else {
-        toast.error('Falha ao excluir.')
-      }
-    } catch {
-      toast.error('Erro na comunicação com servidor.')
+      await deleteItemAgenda(tarefa.id)
+      toast.success('Prazo excluído.')
+      recarregarPrazos()
+    } catch (err) {
+      console.error('CasoDetalhePage: erro ao excluir', err)
+      toast.error(err?.message || 'Falha ao excluir.')
     }
   }
 

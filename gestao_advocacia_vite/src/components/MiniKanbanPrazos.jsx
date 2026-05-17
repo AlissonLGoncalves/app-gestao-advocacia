@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { API_URL } from '../config.js'
+import { listItensAgenda } from '../api/itensAgenda.js'
 import {
   ExclamationCircleIcon,
   ClockIcon,
@@ -137,11 +137,10 @@ export default function MiniKanbanPrazos() {
   useEffect(() => {
     const carregar = async () => {
       try {
-        const token = localStorage.getItem('token')
-        const res = await fetch(`${API_URL}/tarefas`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) setTarefas(await res.json())
+        // PR D4.2 — usa /v1/itens-agenda. Filtra tipo=tarefa pra preservar
+        // semantica do MiniKanban (so prazos, nao eventos).
+        const itens = await listItensAgenda({ tipo: 'tarefa' })
+        setTarefas(Array.isArray(itens) ? itens : [])
       } catch {
         // widget secundario — silencia falhas
       } finally {
