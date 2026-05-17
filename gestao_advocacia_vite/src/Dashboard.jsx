@@ -13,6 +13,7 @@ import {
   BriefcaseIcon as BriefcaseIconSolid,
   CreditCardIcon as CreditCardIconSolid,
   ArrowTrendingDownIcon as TrendingDownIconSolid,
+  ArrowTrendingUpIcon as TrendingUpIconSolid,
   ClockIcon as PrazoIconSolid,
   CalendarDaysIcon as EventoIconSolid,
 } from '@heroicons/react/24/solid'
@@ -164,6 +165,10 @@ function Dashboard({ mudarSecao }) {
     despesasProgramadasQtd: 0,
     despesasAtrasadasValor: 0,
     despesasAtrasadasQtd: 0,
+    recebimentosPagosMesValor: 0,
+    recebimentosPagosMesQtd: 0,
+    recebimentosPagosAnoValor: 0,
+    recebimentosPagosAnoQtd: 0,
     djenPendentesTriagem: 0,
     djenNaoLidas: 0,
   })
@@ -208,6 +213,11 @@ function Dashboard({ mudarSecao }) {
         despesasProgramadasQtd: data.despesas_programadas?.quantidade ?? 0,
         despesasAtrasadasValor: data.despesas_atrasadas?.valor_total ?? 0,
         despesasAtrasadasQtd: data.despesas_atrasadas?.quantidade ?? 0,
+        // Pagamentos efetivamente recebidos (status=Pago) no mes/ano corrente.
+        recebimentosPagosMesValor: data.recebimentos_pagos_mes?.valor_total ?? 0,
+        recebimentosPagosMesQtd: data.recebimentos_pagos_mes?.quantidade ?? 0,
+        recebimentosPagosAnoValor: data.recebimentos_pagos_ano?.valor_total ?? 0,
+        recebimentosPagosAnoQtd: data.recebimentos_pagos_ano?.quantidade ?? 0,
         djenPendentesTriagem: data.alertas_djen?.pendentes_triagem ?? 0,
         djenNaoLidas: data.alertas_djen?.nao_lidas ?? 0,
       })
@@ -599,6 +609,29 @@ function Dashboard({ mudarSecao }) {
             icon={CreditCardIconSolid}
             colorClass="text-danger"
             bgColorClass="bg-danger-subtle"
+            onClick={() => handleCardClick('RECEBIMENTOS')}
+          />
+        </div>
+      </div>
+      {/* ── Linha Pagamentos Recebidos (caixa do mes/ano) ─────────────────── */}
+      <div className="row mt-3 g-3">
+        <div className="col-sm-6 col-lg-6">
+          <StatCard
+            title="Recebido neste Mês"
+            value={`${stats.recebimentosPagosMesQtd} (R$ ${stats.recebimentosPagosMesValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+            icon={TrendingUpIconSolid}
+            colorClass="text-success"
+            bgColorClass="bg-success-subtle"
+            onClick={() => handleCardClick('RECEBIMENTOS')}
+          />
+        </div>
+        <div className="col-sm-6 col-lg-6">
+          <StatCard
+            title="Recebido no Ano"
+            value={`${stats.recebimentosPagosAnoQtd} (R$ ${stats.recebimentosPagosAnoValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+            icon={TrendingUpIconSolid}
+            colorClass="text-success"
+            bgColorClass="bg-success-subtle"
             onClick={() => handleCardClick('RECEBIMENTOS')}
           />
         </div>

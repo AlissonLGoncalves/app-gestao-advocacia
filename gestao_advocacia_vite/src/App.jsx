@@ -15,6 +15,7 @@ import CasoDetalhePage from './pages/CasoDetalhePage.jsx'
 import ImportarCnjsPage from './pages/ImportarCnjsPage.jsx'
 import BuscarProcessoCnjPage from './pages/BuscarProcessoCnjPage.jsx'
 import RecebimentosPage from './pages/RecebimentosPage.jsx'
+import RecebimentosHistoricoPage from './pages/RecebimentosHistoricoPage.jsx'
 import ContratosPage from './pages/ContratosPage.jsx'
 import DespesasPage from './pages/DespesasPage.jsx'
 import AgendaPage from './pages/AgendaPage.jsx'
@@ -618,6 +619,7 @@ function App() {
           <Route path="prazos" element={<PrazosPage />} />
 
           <Route path="recebimentos" element={<RecebimentosPage />} />
+          <Route path="recebimentos/historico" element={<RecebimentosHistoricoPage />} />
           <Route path="recebimentos/novo" element={<RecebimentosPage />} />
           <Route path="recebimentos/editar/:recebimentoId" element={<RecebimentosPage />} />
 

@@ -83,7 +83,16 @@ function RecebimentosPage() {
   }
   return (
     <>
-      <BotaoAdicionar texto="Adicionar Novo Recebimento" onClick={handleAdicionarClick} />
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <BotaoAdicionar texto="Adicionar Novo Recebimento" onClick={handleAdicionarClick} />
+        <button
+          type="button"
+          className="btn btn-outline-success btn-sm"
+          onClick={() => navigate('/recebimentos/historico')}
+        >
+          Ver histórico de pagamentos recebidos
+        </button>
+      </div>
       <RecebimentoList key={refreshKey} onEditRecebimento={handleEditarRecebimento} />
     </>
   )
