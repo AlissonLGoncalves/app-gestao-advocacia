@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from './config.js'
 import { listProximos } from './api/agenda.js'
+import { listItensAgenda } from './api/itensAgenda.js'
 import { syncDjen, listOabs } from './api/djen.js'
 import MovimentacoesRecentes from './components/MovimentacoesRecentes.jsx'
 import OnboardingChecklist from './components/OnboardingChecklist.jsx'
@@ -240,23 +241,29 @@ function Dashboard({ mudarSecao }) {
 
   const fetchTarefasAlerta = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) return
-      const res = await fetch(`${API_URL}/tarefas`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) return
-      const tarefas = await res.json()
+      // PR D4.2 — usa /v1/itens-agenda filtrando tipo=tarefa.
+      // status no vocab novo: 'Concluido' (sem acento).
+      const itens = await listItensAgenda({ tipo: 'tarefa' })
+      const lista = Array.isArray(itens) ? itens : []
       const hoje = hojeLocal()
-      const vencidas = tarefas.filter(
-        (t) => t.data_vencimento && t.data_vencimento < hoje && t.status !== 'Concluído'
-      ).length
-      const vencendoHoje = tarefas.filter(
-        (t) => t.data_vencimento && t.data_vencimento === hoje && t.status !== 'Concluído'
-      ).length
-      setTarefasAlerta({ vencidas, vencendoHoje })
-    } catch {
-      // silently ignore
+      // data_vencimento pode vir como 'YYYY-MM-DD' ou ISO; comparamos
+      // como prefixo de 10 chars pra cobrir ambos.
+      const ehVencida = (t) =>
+        t.data_vencimento &&
+        String(t.data_vencimento).slice(0, 10) < hoje &&
+        t.status !== 'Concluido' &&
+        t.status !== 'Cancelado'
+      const ehHoje = (t) =>
+        t.data_vencimento &&
+        String(t.data_vencimento).slice(0, 10) === hoje &&
+        t.status !== 'Concluido' &&
+        t.status !== 'Cancelado'
+      setTarefasAlerta({
+        vencidas: lista.filter(ehVencida).length,
+        vencendoHoje: lista.filter(ehHoje).length,
+      })
+    } catch (err) {
+      console.warn('Dashboard: erro ao buscar tarefas alerta', err)
     }
   }, [])
 

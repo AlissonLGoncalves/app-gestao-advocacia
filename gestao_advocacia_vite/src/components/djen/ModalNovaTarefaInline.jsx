@@ -94,16 +94,20 @@ export default function ModalNovaTarefaInline({ pub, casos = [], onClose, onCria
     }
     setSalvando(true)
     try {
+      // PR D4.2 — usa /v1/itens-agenda em vez de /tarefas
+      // categoria (vocab novo) substitui tipo_tarefa; status default
+      // 'Pendente' equivale ao antigo 'A Fazer'.
       const payload = {
+        tipo: 'tarefa',
         titulo: titulo.trim(),
         descricao: descricao.trim() || null,
         data_vencimento: dataVencimento ? `${dataVencimento}T23:59:00` : null,
         prioridade,
-        tipo_tarefa: tipoTarefa,
+        categoria: tipoTarefa,
         publicacao_djen_id: pub.id,
         caso_id: casoId ? Number(casoId) : null,
       }
-      const tarefa = await api.post('/tarefas/', payload)
+      const tarefa = await api.post('/itens-agenda/', payload)
       toast.success('Tarefa criada e publicação marcada como tratada.')
       if (onCriada) onCriada(tarefa)
       onClose?.()
