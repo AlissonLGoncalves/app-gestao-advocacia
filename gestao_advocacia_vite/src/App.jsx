@@ -17,6 +17,7 @@ import BuscarProcessoCnjPage from './pages/BuscarProcessoCnjPage.jsx'
 import RecebimentosPage from './pages/RecebimentosPage.jsx'
 import RecebimentosHistoricoPage from './pages/RecebimentosHistoricoPage.jsx'
 import NotasFiscaisPage from './pages/NotasFiscaisPage.jsx'
+import ClienteDetalhePage from './pages/ClienteDetalhePage.jsx'
 import ContratosPage from './pages/ContratosPage.jsx'
 import DespesasPage from './pages/DespesasPage.jsx'
 import AgendaPage from './pages/AgendaPage.jsx'
@@ -612,7 +613,10 @@ function App() {
           <Route path="clientes/novo" element={<ClientesPage />} />
           <Route path="clientes/novo/procuracao" element={<NovoClientePorProcuracao />} />
           <Route path="clientes/editar/:clienteId" element={<ClientesPage />} />
-          <Route path="clientes/:clienteId" element={<ClientesPage />} />
+          {/* PR #249: drill-down do cliente. /clientes/:id agora abre pagina
+              de detalhe com abas (Dados, Casos, Contratos, Documentos,
+              Hist Financeiro) em vez do form de edicao read-only antigo. */}
+          <Route path="clientes/:clienteId" element={<ClienteDetalhePage />} />
 
           <Route path="casos" element={<CasosPage />} />
           <Route path="casos/novo" element={<CasosPage />} />
