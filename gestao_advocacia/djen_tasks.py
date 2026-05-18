@@ -564,34 +564,28 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
 DJEN_AUTO_TAREFA_MAX_IDADE_DIAS_PADRAO = 60
 
 
-def _criar_tarefa_de_publicacao(db, TarefaPrazo, pub, max_idade_dias=None):
-    """Cria TarefaPrazo automaticamente a partir de PublicacaoDJEN importante.
+def _criar_tarefa_de_publicacao(db, _ignored, pub, max_idade_dias=None):
+    """Cria ItemAgenda (tipo='tarefa') automaticamente a partir de
+    PublicacaoDJEN importante (PR D4.4 — migrado de TarefaPrazo).
 
     Feature Kanban<>DJEN — fecha o ciclo Cliente -> Caso -> Intimacao -> Prazo.
     So' cria se:
-      - pub.importante is True (classificada como relevante)
-      - pub.caso_id nao e' None (sem caso vinculado, vai pra Triagem manual)
-      - nao existe TarefaPrazo com publicacao_djen_id=pub.id (idempotente)
+      - pub.importante is True
+      - pub.caso_id nao e' None
+      - nao existe ItemAgenda(tipo='tarefa') com publicacao_djen_id=pub.id
       - data_disponibilizacao nao e' mais antiga que ``max_idade_dias``
-        (default 60d). Publicacoes mais antigas tipicamente ja foram cumpridas
-        offline e cardar elas como "vencido ha N dias" so polui o Kanban.
 
-    Prazo calculado pela tabela de regras em djen_prazo_calculator.calcular_prazo.
-    Nasce com prazo_validado=False e prazo_calculado_por_ia=True — o card no
-    Kanban exibe badge "IA — confirmar prazo" ate o advogado confirmar.
-
-    Retorna a TarefaPrazo criada (adicionada na sessao, sem commit) ou None
-    se condicoes nao foram atendidas.
+    O 2o argumento (legado: TarefaPrazo class) eh ignorado e mantido por
+    compat com callers — PR D4.4 deletou TarefaPrazo do models.
     """
     from datetime import date, timedelta  # noqa: PLC0415
 
     from djen_prazo_calculator import calcular_prazo  # noqa: PLC0415
+    from models import ItemAgenda  # noqa: PLC0415
 
     if not pub or pub.importante is not True or pub.caso_id is None:
         return None
 
-    # Filtro de idade: ignora publicacoes muito antigas pra nao gerar prazo
-    # ja vencido ha meses. Configuravel via DJEN_AUTO_TAREFA_MAX_IDADE_DIAS.
     if max_idade_dias is None:
         try:
             max_idade_dias = int(
@@ -606,14 +600,12 @@ def _criar_tarefa_de_publicacao(db, TarefaPrazo, pub, max_idade_dias=None):
             return None
 
     # Idempotencia: pub ja deu origem a uma tarefa?
-    existe = TarefaPrazo.query.filter_by(publicacao_djen_id=pub.id).first()
+    existe = ItemAgenda.query.filter_by(publicacao_djen_id=pub.id, tipo="tarefa").first()
     if existe is not None:
         return None
 
     calc = calcular_prazo(pub.tipo_comunicacao, pub.texto, pub.data_disponibilizacao)
 
-    # Titulo curto pro card. Prefere tipo_comunicacao + numero do processo;
-    # texto bruto da DJEN tem ruido (cabecalho de tribunal etc).
     tipo_label = (pub.tipo_comunicacao or "Intimacao").strip().capitalize()
     proc_label = pub.numero_processo_mascara or pub.numero_processo or ""
     titulo = f"{tipo_label}: {proc_label}".strip(": ").strip()
@@ -630,17 +622,22 @@ def _criar_tarefa_de_publicacao(db, TarefaPrazo, pub, max_idade_dias=None):
         descricao_parts.append(f"Trecho: {trecho}")
     descricao = "\n\n".join(descricao_parts) or None
 
-    tarefa = TarefaPrazo(
+    # Vocabulario ItemAgenda:
+    #   - status="Pendente" (era "A Fazer")
+    #   - categoria="Prazo" (era tipo_tarefa)
+    #   - tipo="tarefa" (discriminador novo)
+    tarefa = ItemAgenda(
         tenant_id=pub.tenant_id,
         user_id=pub.user_id,
         caso_id=pub.caso_id,
         publicacao_djen_id=pub.id,
+        tipo="tarefa",
+        categoria="Prazo",
         titulo=titulo,
         descricao=descricao,
-        status="A Fazer",
+        status="Pendente",
         prioridade=calc["prioridade"],
         data_vencimento=calc["data_vencimento"],
-        tipo_tarefa="Prazo",
         origem_id=f"djen:{pub.id}",
         posicao=0,
         prazo_validado=False,
@@ -667,31 +664,34 @@ def limpar_prazos_vencidos_antigos(app, tenant_id=None, dias_minimos=60):
     from datetime import date, timedelta  # noqa: PLC0415
 
     from extensions import db  # noqa: PLC0415
-    from models import TarefaPrazo  # noqa: PLC0415
+    from models import ItemAgenda  # noqa: PLC0415
 
     logger = logging.getLogger(__name__)
     corte = date.today() - timedelta(days=dias_minimos)
 
+    # PR D4.4 — usa ItemAgenda(tipo='tarefa') no vocab novo
+    # ("Concluido" sem acento, "Cancelado" tambem nao conta).
     q = (
-        TarefaPrazo.query.filter(TarefaPrazo.prazo_calculado_por_ia.is_(True))
-        .filter(TarefaPrazo.prazo_validado.is_(False))
-        .filter(TarefaPrazo.status != "Concluído")
-        .filter(TarefaPrazo.data_vencimento.isnot(None))
-        .filter(db.func.date(TarefaPrazo.data_vencimento) < corte)
+        ItemAgenda.query.filter(ItemAgenda.tipo == "tarefa")
+        .filter(ItemAgenda.prazo_calculado_por_ia.is_(True))
+        .filter(ItemAgenda.prazo_validado.is_(False))
+        .filter(~ItemAgenda.status.in_(["Concluido", "Cancelado"]))
+        .filter(ItemAgenda.data_vencimento.isnot(None))
+        .filter(db.func.date(ItemAgenda.data_vencimento) < corte)
     )
     if tenant_id is not None:
         q = q.filter_by(tenant_id=tenant_id)
 
     afetadas = q.all()
     for t in afetadas:
-        t.status = "Concluído"
+        t.status = "Concluido"
         t.prazo_validado = True
 
     if afetadas:
         db.session.commit()
         logger.info(
             f"Kanban<>DJEN: limpou {len(afetadas)} prazo(s) vencido(s) ha mais de "
-            f"{dias_minimos} dia(s) (status -> Concluído)."
+            f"{dias_minimos} dia(s) (status -> Concluido)."
         )
     return len(afetadas)
 
@@ -710,15 +710,17 @@ def executar_auto_criacao_tarefas(app, tenant_id=None):
     Retorna o numero de tarefas criadas no commit.
     """
     from extensions import db  # noqa: PLC0415
-    from models import PublicacaoDJEN, TarefaPrazo  # noqa: PLC0415
+    from models import ItemAgenda, PublicacaoDJEN  # noqa: PLC0415
 
     logger = logging.getLogger(__name__)
     tarefas_max = int(app.config.get("DJEN_AUTO_TAREFA_MAX_POR_RUN", 200))
 
-    # NOT IN subquery: pubs sem tarefa associada via publicacao_djen_id.
+    # PR D4.4 — subquery em ItemAgenda(tipo='tarefa') pra detectar
+    # pubs ja transformadas em prazo.
     sub_pubs_com_tarefa = (
-        db.session.query(TarefaPrazo.publicacao_djen_id)
-        .filter(TarefaPrazo.publicacao_djen_id.isnot(None))
+        db.session.query(ItemAgenda.publicacao_djen_id)
+        .filter(ItemAgenda.tipo == "tarefa")
+        .filter(ItemAgenda.publicacao_djen_id.isnot(None))
         .subquery()
     )
     q = (
@@ -732,7 +734,7 @@ def executar_auto_criacao_tarefas(app, tenant_id=None):
 
     total = 0
     for pub in pubs:
-        if _criar_tarefa_de_publicacao(db, TarefaPrazo, pub) is not None:
+        if _criar_tarefa_de_publicacao(db, None, pub) is not None:
             total += 1
     if total:
         db.session.commit()

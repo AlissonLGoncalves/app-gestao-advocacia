@@ -143,8 +143,6 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
                 prazo_dias_origem=data.get("prazo_dias_origem"),
                 origem_id=data.get("origem_id"),
                 notificacoes_enviadas=data.get("notificacoes_enviadas") or {},
-                legacy_tarefa_id=data.get("legacy_tarefa_id"),
-                legacy_evento_id=data.get("legacy_evento_id"),
             )
             db.session.add(item)
             # Marca pub como tratada (lida=true) — idempotente.

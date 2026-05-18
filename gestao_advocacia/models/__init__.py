@@ -84,12 +84,8 @@ class User(db.Model):
     clientes = db.relationship(
         "Cliente", backref="advogado_responsavel", lazy="dynamic", foreign_keys="Cliente.user_id"
     )
-    eventos_agenda = db.relationship(
-        "EventoAgenda",
-        backref="criador_evento",
-        lazy="dynamic",
-        foreign_keys="EventoAgenda.user_id",
-    )
+    # PR D4.4 — relacionamentos eventos_agenda e tarefas_prazo removidos
+    # junto com os models legados. ItemAgenda eh agora a fonte unica.
     documentos = db.relationship(
         "Documento", backref="uploader_documento", lazy="dynamic", foreign_keys="Documento.user_id"
     )
@@ -107,12 +103,6 @@ class User(db.Model):
         backref="responsavel_contrato",
         lazy="dynamic",
         foreign_keys="ContratoHonorario.user_id",
-    )
-    tarefas_prazo = db.relationship(
-        "TarefaPrazo",
-        backref="responsavel_tarefa",
-        lazy="dynamic",
-        foreign_keys="TarefaPrazo.user_id",
     )
 
     def set_password(self, password):
@@ -304,9 +294,8 @@ class Caso(db.Model):
         lazy="dynamic",
         cascade="all, delete-orphan",
     )
-    tarefas_caso = db.relationship(
-        "TarefaPrazo", backref="caso_tarefa_associado", lazy="dynamic", cascade="all, delete-orphan"
-    )
+    # PR D4.4 — tarefas_caso (TarefaPrazo) removido. Tarefas vinculadas
+    # ao caso sao acessiveis via ItemAgenda.query.filter_by(caso_id=...).
     # Alias read-only para Caso.cliente. O backref de Cliente.casos ja cria
     # Caso.cliente_associado, mas varios pontos do codigo (caso_model_dto,
     # GET /casos/buscar-processo-local, triagem DJEN) usam c.cliente — que
@@ -526,49 +515,8 @@ def log_audit(acao, tabela_afetada, registro_id=None, detalhes=""):
         logging.getLogger(__name__).warning(f"Falha ao registrar AuditLog: {str(e)}")
 
 
-class EventoAgenda(db.Model):
-    __tablename__ = "evento_agenda"
-    id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(
-        db.Integer, db.ForeignKey("tenant.id", name="fk_evento_tenant_id"), nullable=True
-    )
-    titulo = db.Column(db.String(100), nullable=False)
-    data_inicio = db.Column(db.DateTime, nullable=False)
-    data_fim = db.Column(db.DateTime, nullable=True)
-    descricao = db.Column(db.Text, nullable=True)
-
-    # NOVAS COLUNAS PARA ALERTAS AUTOMÁTICOS
-    tipo_evento = db.Column(
-        db.String(50), nullable=True, default="Outros"
-    )  # Prazo, Audiência, Reunião, Outros
-    prioridade = db.Column(
-        db.String(30), nullable=True, default="Normal"
-    )  # Baixa, Normal, Alta, Urgente
-    status_evento = db.Column(
-        db.String(30), nullable=True, default="Pendente"
-    )  # Pendente, Concluído, Cancelado
-    notificacoes_enviadas = db.Column(
-        db.JSON, nullable=True, default=dict
-    )  # Guarda estado {"7d": True, "3d": False}
-
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("user.id", name="fk_evento_user_id"), nullable=False
-    )
-    __table_args__ = (db.Index("ix_evento_agenda_tenant_created", "tenant_id", "data_inicio"),)
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "title": self.titulo,
-            "start": self.data_inicio.isoformat(),
-            "end": self.data_fim.isoformat() if self.data_fim else None,
-            "description": self.descricao,
-            "tipo_evento": self.tipo_evento,
-            "prioridade": self.prioridade,
-            "status_evento": self.status_evento,
-            "notificacoes_enviadas": self.notificacoes_enviadas,
-            "user_id": self.user_id,
-        }
+# PR D4.4 — EventoAgenda removido. ItemAgenda(tipo='evento') eh a fonte
+# unica desde D1. Tabela evento_agenda dropada na migration deste PR.
 
 
 class Documento(db.Model):
@@ -1115,82 +1063,8 @@ class Recebimento(db.Model):
         }
 
 
-class TarefaPrazo(db.Model):
-    __tablename__ = "tarefa_prazo"
-    id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(
-        db.Integer, db.ForeignKey("tenant.id", name="fk_tarefaprazo_tenant_id"), nullable=True
-    )
-    titulo = db.Column(db.String(250), nullable=False)
-    descricao = db.Column(db.Text, nullable=True)
-    status = db.Column(
-        db.String(50), nullable=True, default="A Fazer"
-    )  # A Fazer, Fazendo, Concluído
-    prioridade = db.Column(
-        db.String(50), nullable=True, default="Normal"
-    )  # Baixa, Normal, Alta, Urgente
-    data_vencimento = db.Column(db.DateTime, nullable=True)
-    tipo_tarefa = db.Column(
-        db.String(50), nullable=True, default="Prazo"
-    )  # Prazo, Peticionamento, Reunião, Ligação, Outros
-    origem_id = db.Column(db.String(100), nullable=True)  # Ex: ID do MNI
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
-    posicao = db.Column(db.Integer, nullable=True, default=0)
-
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("user.id", name="fk_tarefaprazo_user_id"), nullable=False
-    )
-    caso_id = db.Column(
-        db.Integer, db.ForeignKey("caso.id", name="fk_tarefaprazo_caso_id"), nullable=True
-    )
-    # Epic #3 (#177): vinculo bidirecional com a publicacao DJEN que originou
-    # a tarefa. Permite a UI marcar a publicacao como "tratada" e linkar de
-    # volta da tarefa pra publicacao. Nullable: tarefas criadas manualmente
-    # (sem origem DJEN) ficam com NULL.
-    publicacao_djen_id = db.Column(
-        db.Integer,
-        db.ForeignKey("publicacao_djen.id", name="fk_tarefaprazo_publicacao_djen_id"),
-        nullable=True,
-        index=True,
-    )
-    # Feature Kanban<>DJEN: marca tarefas geradas pelo auto-fluxo DJEN cujo
-    # prazo foi calculado pela tabela de regras + classificacao IA. Card no
-    # Kanban exibe badge "IA — confirmar prazo" enquanto prazo_validado=False.
-    # Tarefas criadas manualmente nascem com prazo_validado=True.
-    prazo_validado = db.Column(db.Boolean, nullable=False, default=True)
-    prazo_calculado_por_ia = db.Column(db.Boolean, nullable=False, default=False)
-    # Numero de dias da regra aplicada (5/10/15/30). Util para auditoria.
-    prazo_dias_origem = db.Column(db.Integer, nullable=True)
-    __table_args__ = (
-        db.Index("ix_tarefa_prazo_tenant_created", "tenant_id", "data_criacao"),
-        db.Index("ix_tarefa_prazo_tenant_status_posicao", "tenant_id", "status", "posicao"),
-        db.Index("ix_tarefa_prazo_prazo_validado", "tenant_id", "prazo_validado"),
-    )
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "titulo": self.titulo,
-            "descricao": self.descricao,
-            "status": self.status,
-            "prioridade": self.prioridade,
-            # Frontend espera 'YYYY-MM-DD' (split('-') + <input type=date>);
-            # mandar isoformat() completo ('2026-05-04T00:00:00') quebrava o
-            # parser e o input ficava vazio. Retornamos so a parte da data.
-            "data_vencimento": (
-                self.data_vencimento.date().isoformat() if self.data_vencimento else None
-            ),
-            "tipo_tarefa": self.tipo_tarefa,
-            "origem_id": self.origem_id,
-            "posicao": self.posicao,
-            "user_id": self.user_id,
-            "caso_id": self.caso_id,
-            "publicacao_djen_id": self.publicacao_djen_id,
-            "prazo_validado": bool(self.prazo_validado),
-            "prazo_calculado_por_ia": bool(self.prazo_calculado_por_ia),
-            "prazo_dias_origem": self.prazo_dias_origem,
-            "data_criacao": self.data_criacao.isoformat() if self.data_criacao else None,
-        }
+# PR D4.4 — TarefaPrazo removido. ItemAgenda(tipo='tarefa') eh a fonte
+# unica desde D1. Tabela tarefa_prazo dropada na migration deste PR.
 
 
 class ItemAgenda(db.Model):
@@ -1290,10 +1164,9 @@ class ItemAgenda(db.Model):
     # Notificacoes (de EventoAgenda) — estado de envio {"7d": True, ...}.
     notificacoes_enviadas = db.Column(db.JSON, nullable=True, default=dict)
 
-    # Rastreamento da migracao (D2/D3): aponta pro registro de origem na
-    # tabela legada. Permite dual-write idempotente. Removido em D4.
-    legacy_tarefa_id = db.Column(db.Integer, nullable=True, index=True)
-    legacy_evento_id = db.Column(db.Integer, nullable=True, index=True)
+    # PR D4.4 — legacy_tarefa_id / legacy_evento_id removidos. Eram usados
+    # apenas pelo backfill (D2) pra evitar duplicar dados durante a
+    # transicao. Apos D4.4 drop, nao ha mais tabelas legadas que referenciar.
 
     __table_args__ = (
         db.Index(
@@ -1330,8 +1203,6 @@ class ItemAgenda(db.Model):
             "prazo_dias_origem": self.prazo_dias_origem,
             "origem_id": self.origem_id,
             "notificacoes_enviadas": self.notificacoes_enviadas,
-            "legacy_tarefa_id": self.legacy_tarefa_id,
-            "legacy_evento_id": self.legacy_evento_id,
         }
 
 
