@@ -20,10 +20,10 @@ from models import (
     Cliente,
     ContratoHonorario,
     Documento,
+    ItemAgenda,
     MovimentacaoCNJ,
     ProcuracaoAnalise,
     PublicacaoDJEN,
-    TarefaPrazo,
     User,
     log_audit,
 )
@@ -1868,10 +1868,12 @@ def register_casos_routes(
                     }
                 )
 
-            for tarefa in TarefaPrazo.query.filter_by(
-                tenant_id=tenant_id, caso_id=caso_db.id
+            # PR D4.3 — timeline le de ItemAgenda (tipo='tarefa') em vez
+            # de TarefaPrazo. Mantem o mesmo schema de saida (tipo_tarefa
+            # vem de item.categoria) pra UI nao mudar.
+            for tarefa in ItemAgenda.query.filter_by(
+                tenant_id=tenant_id, caso_id=caso_db.id, tipo="tarefa"
             ).all():
-                # Usa data_vencimento como ancora; cai para data_criacao se ausente.
                 if tarefa.data_vencimento:
                     data_iso = tarefa.data_vencimento.isoformat()
                 elif tarefa.data_criacao:
@@ -1888,7 +1890,7 @@ def register_casos_routes(
                         "metadata": {
                             "status": tarefa.status,
                             "prioridade": tarefa.prioridade,
-                            "tipo_tarefa": tarefa.tipo_tarefa,
+                            "tipo_tarefa": tarefa.categoria,
                         },
                     }
                 )

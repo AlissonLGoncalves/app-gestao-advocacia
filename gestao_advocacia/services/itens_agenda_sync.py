@@ -1,18 +1,16 @@
 # services/itens_agenda_sync.py
-# Servico de sincronizacao TarefaPrazo/EventoAgenda → ItemAgenda (PR D2).
+# Backfill TarefaPrazo/EventoAgenda → ItemAgenda (PR D2/D4.3).
 #
-# Estrategia Expand → Migrate → Contract:
-#   - D1 (mergeado): tabela item_agenda criada paralela.
-#   - D2 (este PR): dual-write em /tarefas e /eventos + backfill idempotente.
-#     Toda escrita nos endpoints legados replica em item_agenda; o backfill
-#     popula os dados ja existentes. Mantemos os endpoints legados como
-#     fonte de verdade ainda — eh dual-write, nao migracao destrutiva.
-#   - D3: frontend migra pra /v1/itens-agenda.
-#   - D4: dropa /tarefas e /eventos.
+# Status PR D4.3:
+#   - Dual-write removido (legacy routes deletadas em D4.3).
+#   - Funcoes mantidas porque o backfill_all() ainda eh util pra
+#     re-sincronizar caso drift acumule. Tabelas legadas continuam
+#     ate D4.4 (drop).
 #
-# Idempotencia: cada ItemAgenda carrega legacy_tarefa_id ou legacy_evento_id
-# apontando pro registro de origem. Re-rodar backfill ou re-chamar
-# upsert_* nao duplica — atualiza o registro existente.
+# Idempotencia: cada ItemAgenda carrega legacy_tarefa_id ou
+# legacy_evento_id apontando pro registro de origem. Re-rodar
+# backfill_all() nao duplica — atualiza in-place via SELECT ... WHERE
+# legacy_*_id = X.
 
 from __future__ import annotations
 
@@ -119,13 +117,8 @@ def sync_tarefa(tarefa: TarefaPrazo) -> ItemAgenda:
     return item
 
 
-def delete_item_da_tarefa(tarefa_id: int) -> int:
-    """Remove o ItemAgenda espelho quando a TarefaPrazo eh deletada.
-
-    Retorna o numero de registros removidos (0 ou 1).
-    """
-    count = ItemAgenda.query.filter_by(legacy_tarefa_id=tarefa_id).delete()
-    return count
+# PR D4.3: delete_item_da_tarefa removido — sem dual-write, nao ha
+# escritas em TarefaPrazo que precisem propagar pra item_agenda.
 
 
 # ---------- Sync EventoAgenda -> ItemAgenda ----------
@@ -161,9 +154,7 @@ def sync_evento(evento: EventoAgenda) -> ItemAgenda:
     return item
 
 
-def delete_item_do_evento(evento_id: int) -> int:
-    count = ItemAgenda.query.filter_by(legacy_evento_id=evento_id).delete()
-    return count
+# PR D4.3: delete_item_do_evento removido (mesma razao acima).
 
 
 # ---------- Backfill ----------

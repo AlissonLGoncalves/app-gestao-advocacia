@@ -10,7 +10,7 @@ from flask_restx import Resource
 
 from extensions import db
 from helpers import get_item_or_404, get_list_query, get_tenant_id, tenant_scoped
-from models import ItemAgenda
+from models import ItemAgenda, PublicacaoDJEN
 
 # Whitelist de valores aceitos para tipo/status/categoria. Mantemos
 # permissivo o suficiente pra absorver dados legados (D2 backfill) sem
@@ -106,8 +106,25 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
                     "message": f"status invalido: {status!r}. Valores aceitos: {sorted(STATUS_VALIDOS)}."
                 }, 400
 
+            # Side-effects herdados de /tarefas (PR D4.3): se vier
+            # publicacao_djen_id, valida tenant, auto-deriva caso_id
+            # se omitido, e marca a pub como 'lida' (tratada). Preserva
+            # o fluxo Kanban<>DJEN da Epic #3.
+            tenant_id = get_tenant_id()
+            publicacao_djen_id = data.get("publicacao_djen_id")
+            caso_id = data.get("caso_id")
+            pub_djen = None
+            if publicacao_djen_id:
+                pub_djen = PublicacaoDJEN.query.filter_by(
+                    id=int(publicacao_djen_id), tenant_id=tenant_id
+                ).first()
+                if not pub_djen:
+                    return {"message": "Publicacao DJEN nao encontrada."}, 404
+                if not caso_id and pub_djen.caso_id:
+                    caso_id = pub_djen.caso_id
+
             item = ItemAgenda(
-                tenant_id=get_tenant_id(),
+                tenant_id=tenant_id,
                 user_id=user_id,
                 tipo=tipo,
                 categoria=data.get("categoria") or "Outros",
@@ -119,8 +136,8 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
                 data_fim=data_fim,
                 data_vencimento=data_vencimento,
                 posicao=data.get("posicao", 0),
-                caso_id=data.get("caso_id"),
-                publicacao_djen_id=data.get("publicacao_djen_id"),
+                caso_id=caso_id,
+                publicacao_djen_id=int(publicacao_djen_id) if publicacao_djen_id else None,
                 prazo_validado=bool(data.get("prazo_validado", True)),
                 prazo_calculado_por_ia=bool(data.get("prazo_calculado_por_ia", False)),
                 prazo_dias_origem=data.get("prazo_dias_origem"),
@@ -130,6 +147,9 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
                 legacy_evento_id=data.get("legacy_evento_id"),
             )
             db.session.add(item)
+            # Marca pub como tratada (lida=true) — idempotente.
+            if pub_djen and not pub_djen.lida:
+                pub_djen.lida = True
             db.session.commit()
             app.logger.info(
                 f"ItemAgenda criado (id={item.id}, tipo={item.tipo}, "
