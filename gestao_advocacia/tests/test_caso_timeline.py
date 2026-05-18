@@ -47,7 +47,7 @@ def test_timeline_agrega_documento_e_tarefa_ordenado_desc(auth_client, db):
     # Tarefa com vencimento futuro (mais nova).
     futuro = (date.today() + timedelta(days=10)).isoformat()
     res_tarefa = auth_client.post(
-        "/api/v1/tarefas",
+        "/api/v1/itens-agenda/",
         json={
             "titulo": "Peticionar resposta",
             "data_vencimento": futuro,
@@ -161,7 +161,7 @@ def test_timeline_nao_inclui_recursos_de_outros_casos_do_mesmo_tenant(auth_clien
 
     # Tarefa vinculada apenas ao caso_b.
     auth_client.post(
-        "/api/v1/tarefas",
+        "/api/v1/itens-agenda/",
         json={
             "titulo": "Tarefa do caso B",
             "data_vencimento": (date.today() + timedelta(days=5)).isoformat(),

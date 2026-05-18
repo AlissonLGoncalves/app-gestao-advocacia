@@ -344,6 +344,50 @@ def test_concluir_marca_concluido_e_validado(auth_client, db):
     assert data["prazo_validado"] is True
 
 
+# ---------- Side-effects DJEN (PR D4.3 — portado de /tarefas) ----------
+
+
+def test_post_com_publicacao_djen_marca_pub_lida(auth_client, db):
+    """POST com publicacao_djen_id deve marcar a pub como lida=True."""
+    from models import PublicacaoDJEN, User
+
+    user_id = auth_client.user["id"]
+    user = User.query.get(user_id)
+    tenant_id = user.tenant_id
+
+    pub = PublicacaoDJEN(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        numero_processo="0000001-23.2024.8.26.0000",
+        sigla_tribunal="TJSP",
+        texto="Teste",
+        lida=False,
+    )
+    db.session.add(pub)
+    db.session.commit()
+
+    res = auth_client.post(
+        "/api/v1/itens-agenda/",
+        json={
+            "titulo": "Resposta",
+            "tipo": "tarefa",
+            "publicacao_djen_id": pub.id,
+        },
+    )
+    assert res.status_code == 201, res.data
+
+    db.session.refresh(pub)
+    assert pub.lida is True
+
+
+def test_post_com_publicacao_djen_inexistente_retorna_404(auth_client, db):
+    res = auth_client.post(
+        "/api/v1/itens-agenda/",
+        json={"titulo": "x", "tipo": "tarefa", "publicacao_djen_id": 99999},
+    )
+    assert res.status_code == 404
+
+
 def test_concluir_idempotente(auth_client, db):
     res = auth_client.post(
         "/api/v1/itens-agenda",

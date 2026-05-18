@@ -13,10 +13,9 @@ from models import (
     Caso,
     Cliente,
     Despesa,
-    EventoAgenda,
+    ItemAgenda,
     PublicacaoDJEN,
     Recebimento,
-    TarefaPrazo,
     User,
 )
 
@@ -115,12 +114,17 @@ def register_dashboard_routes(app, dashboard_ns):
             despesas_atrasadas_qtd = len(despesas_atrasadas)
             despesas_atrasadas_valor = sum(float(d.valor) for d in despesas_atrasadas)
 
+            # PR D4.3 — proximos eventos lidos de item_agenda (tipo=evento).
+            # EventoAgenda permanece como fallback caso item_agenda esteja
+            # vazia (transicao), mas D4.4 drop fara essa branch morta.
             agora = datetime.utcnow()
             proximos_eventos = (
-                EventoAgenda.query.filter(
-                    EventoAgenda.user_id == user_id, EventoAgenda.data_inicio >= agora
+                ItemAgenda.query.filter(
+                    ItemAgenda.user_id == user_id,
+                    ItemAgenda.tipo == "evento",
+                    ItemAgenda.data_inicio >= agora,
                 )
-                .order_by(EventoAgenda.data_inicio.asc())
+                .order_by(ItemAgenda.data_inicio.asc())
                 .limit(5)
                 .all()
             )
@@ -192,25 +196,33 @@ def register_dashboard_routes(app, dashboard_ns):
                 solicitacoes_pendentes = 0
 
             try:
-                tarefas_vencidas = TarefaPrazo.query.filter(
-                    TarefaPrazo.user_id == user_id,
-                    TarefaPrazo.status != "Concluído",
-                    TarefaPrazo.data_vencimento.isnot(None),
-                    db.func.date(TarefaPrazo.data_vencimento) < hoje,
+                # PR D4.3 — badges contam itens da nova tabela item_agenda.
+                # Filtra tipo='tarefa' pra manter semantica do badge (so
+                # prazos, nao eventos). Status no vocab novo: "Concluido"
+                # sem acento; "Cancelado" tambem nao conta como pendente.
+                ativos_filter = ~ItemAgenda.status.in_(["Concluido", "Cancelado"])
+                tarefas_vencidas = ItemAgenda.query.filter(
+                    ItemAgenda.user_id == user_id,
+                    ItemAgenda.tipo == "tarefa",
+                    ativos_filter,
+                    ItemAgenda.data_vencimento.isnot(None),
+                    db.func.date(ItemAgenda.data_vencimento) < hoje,
                 ).count()
-                tarefas_vencendo_hoje = TarefaPrazo.query.filter(
-                    TarefaPrazo.user_id == user_id,
-                    TarefaPrazo.status != "Concluído",
-                    TarefaPrazo.data_vencimento.isnot(None),
-                    db.func.date(TarefaPrazo.data_vencimento) == hoje,
+                tarefas_vencendo_hoje = ItemAgenda.query.filter(
+                    ItemAgenda.user_id == user_id,
+                    ItemAgenda.tipo == "tarefa",
+                    ativos_filter,
+                    ItemAgenda.data_vencimento.isnot(None),
+                    db.func.date(ItemAgenda.data_vencimento) == hoje,
                 ).count()
                 # Feature Kanban<>DJEN: prazos gerados pela IA que ainda
                 # nao foram confirmados pelo advogado. Entra no badge do
                 # menu Prazos como sinal de "tem coisa pra revisar".
-                tarefas_aguardando_confirmacao = TarefaPrazo.query.filter(
-                    TarefaPrazo.user_id == user_id,
-                    TarefaPrazo.status != "Concluído",
-                    TarefaPrazo.prazo_validado.is_(False),
+                tarefas_aguardando_confirmacao = ItemAgenda.query.filter(
+                    ItemAgenda.user_id == user_id,
+                    ItemAgenda.tipo == "tarefa",
+                    ativos_filter,
+                    ItemAgenda.prazo_validado.is_(False),
                 ).count()
             except Exception:
                 db.session.rollback()

@@ -11,7 +11,6 @@ from .casos import register_casos_routes
 from .clientes import register_clientes_routes
 from .dashboard import register_dashboard_routes
 from .documentos import register_documentos_routes
-from .eventos import register_eventos_routes
 from .financeiro_registry import register_financeiro_api
 from .itens_agenda import register_itens_agenda_routes
 from .nfse import register_nfse_routes
@@ -20,7 +19,6 @@ from .portal import register_portal_routes
 from .procuracoes import register_procuracoes_routes
 from .projudi import register_projudi_routes
 from .relatorios import register_relatorios_routes
-from .tarefas import register_tarefas_routes
 from .tenant import register_tenant_routes
 
 
@@ -36,11 +34,9 @@ def register_api_routes(app, api, finance_access_required):
     auth_ns = Namespace("auth", description="Operacoes de Autenticacao")
     clientes_ns = Namespace("clientes", description="Operacoes de Clientes")
     casos_ns = Namespace("casos", description="Operacoes de Casos Juridicos")
-    eventos_ns = Namespace("eventos", description="Operacoes de Eventos da Agenda")
     documentos_ns = Namespace("documentos", description="Operacoes de Documentos")
     dashboard_ns = Namespace("dashboard", description="Dados agregados para o Dashboard")
     audit_ns = Namespace("auditoria", description="Trilhas de Auditoria e Logs (LGPD)")
-    tarefas_ns = Namespace("tarefas", description="Operacoes de Prazos e Tarefas")
     djen_ns = Namespace("djen", description="Publicacoes DJEN")
     procuracoes_ns = Namespace("procuracoes", description="Analise de procuracoes via Gemini")
     tenant_ns = Namespace("tenant", description="Dados do Escritorio (Tenant)")
@@ -58,11 +54,9 @@ def register_api_routes(app, api, finance_access_required):
     api.add_namespace(auth_ns)
     api.add_namespace(clientes_ns)
     api.add_namespace(casos_ns)
-    api.add_namespace(eventos_ns)
     api.add_namespace(documentos_ns)
     api.add_namespace(dashboard_ns)
     api.add_namespace(audit_ns)
-    api.add_namespace(tarefas_ns)
     api.add_namespace(djen_ns)
     api.add_namespace(procuracoes_ns)
     api.add_namespace(tenant_ns)
@@ -372,35 +366,8 @@ def register_api_routes(app, api, finance_access_required):
         movimentacao_cnj_output_model_dto,
     )
 
-    evento_input_model_dto = eventos_ns.model(
-        "EventoInput",
-        {
-            "titulo": fields.String(required=True, description="Titulo do evento"),
-            "data_inicio": fields.DateTime(
-                required=True, description="Data/hora inicio (ISO 8601)"
-            ),
-            "data_fim": fields.DateTime(description="Data/hora fim (ISO 8601)"),
-            "descricao": fields.String(description="Descricao extra"),
-            "tipo_evento": fields.String(description="Prazo, Audiencia, Reuniao, Outros"),
-            "prioridade": fields.String(description="Baixa, Normal, Alta, Urgente"),
-            "status_evento": fields.String(description="Pendente, Concluido, Cancelado"),
-        },
-    )
-    evento_model_dto = eventos_ns.model(
-        "EventoOutput",
-        {
-            "id": fields.Integer(readonly=True),
-            "title": fields.String(attribute="titulo", description="Titulo (FullCalendar)"),
-            "start": fields.DateTime(attribute="data_inicio", dt_format="iso8601"),
-            "end": fields.DateTime(attribute="data_fim", dt_format="iso8601", nullable=True),
-            "description": fields.String(attribute="descricao", nullable=True),
-            "tipo_evento": fields.String,
-            "prioridade": fields.String,
-            "status_evento": fields.String,
-            "notificacoes_enviadas": fields.Raw(description="Controle de notificacoes"),
-            "user_id": fields.Integer(description="ID do usuario criador"),
-        },
-    )
+    # PR D4.3 — DTOs de EventoInput/Output e TarefaInput/Output removidos.
+    # ItemAgenda DTOs (definidos mais abaixo) substituem ambos.
 
     documento_model_dto = documentos_ns.model(
         "DocumentoOutput",
@@ -425,82 +392,6 @@ def register_api_routes(app, api, finance_access_required):
             "arquivo_hash": fields.String(description="SHA256 do arquivo"),
             "criado_em": fields.DateTime(dt_format="iso8601"),
             "processado_em": fields.DateTime(dt_format="iso8601", nullable=True),
-        },
-    )
-
-    tarefa_input_model_dto = tarefas_ns.model(
-        "TarefaInput",
-        {
-            "titulo": fields.String(required=True, description="Titulo abreviado"),
-            "descricao": fields.String(description="Detalhes"),
-            "status": fields.String(
-                description="Status da tarefa",
-                default="A Fazer",
-                enum=["A Fazer", "Fazendo", "Concluido"],
-            ),
-            "prioridade": fields.String(
-                description="Prioridade",
-                default="Normal",
-                enum=["Baixa", "Normal", "Alta", "Urgente"],
-            ),
-            "data_vencimento": fields.DateTime(description="Data fatal/vencimento (ISO 8601)"),
-            "tipo_tarefa": fields.String(description="Tipo"),
-            "origem_id": fields.String(description="ID na integracao"),
-            "caso_id": fields.Integer(description="ID do caso associado"),
-            # Epic #3 (#177): permite criar tarefa diretamente a partir de
-            # uma publicacao DJEN. Quando informado, marca a pub como lida
-            # e deriva caso_id automaticamente se nao foi explicitado.
-            "publicacao_djen_id": fields.Integer(
-                description="ID da publicacao DJEN que originou a tarefa"
-            ),
-        },
-    )
-
-    tarefa_model_dto = tarefas_ns.model(
-        "TarefaOutput",
-        {
-            "id": fields.Integer(readonly=True),
-            "titulo": fields.String,
-            "descricao": fields.String,
-            "status": fields.String,
-            "prioridade": fields.String,
-            "data_vencimento": fields.DateTime(dt_format="iso8601"),
-            "tipo_tarefa": fields.String,
-            "origem_id": fields.String,
-            "posicao": fields.Integer,
-            "data_criacao": fields.DateTime(dt_format="iso8601"),
-            "user_id": fields.Integer,
-            "caso_id": fields.Integer,
-            "publicacao_djen_id": fields.Integer,
-            # Feature Kanban<>DJEN: campos para o card do Kanban exibir
-            # cliente + caso sem precisar de chamada adicional ao backend.
-            "cliente_id": fields.Integer(
-                attribute=lambda t: getattr(
-                    getattr(t, "caso_tarefa_associado", None), "cliente_id", None
-                )
-            ),
-            "cliente_nome": fields.String(
-                attribute=lambda t: getattr(
-                    getattr(getattr(t, "caso_tarefa_associado", None), "cliente_associado", None),
-                    "nome_razao_social",
-                    None,
-                )
-            ),
-            "numero_processo": fields.String(
-                attribute=lambda t: getattr(
-                    getattr(t, "caso_tarefa_associado", None), "numero_processo", None
-                )
-            ),
-            "caso_area": fields.String(
-                attribute=lambda t: getattr(
-                    getattr(t, "caso_tarefa_associado", None), "area_direito", None
-                )
-            ),
-            # Defesa contra "prazo errado pela IA": campos para o card mostrar
-            # badge de revisao e permitir confirmacao.
-            "prazo_validado": fields.Boolean,
-            "prazo_calculado_por_ia": fields.Boolean,
-            "prazo_dias_origem": fields.Integer,
         },
     )
 
@@ -594,7 +485,8 @@ def register_api_routes(app, api, finance_access_required):
     register_dashboard_routes(app, dashboard_ns)
     register_notificacoes_routes(app, notificacoes_ns)
     register_nfse_routes(app, nfse_ns, finance_access_required)
-    register_eventos_routes(app, eventos_ns, evento_input_model_dto, evento_model_dto)
+    # PR D4.3 — register_eventos_routes e register_tarefas_routes removidos.
+    # /v1/itens-agenda eh a fonte unica desde D3/D4.1/D4.2.
     register_itens_agenda_routes(
         app, itens_agenda_ns, item_agenda_input_dto, item_agenda_output_dto
     )
@@ -619,7 +511,6 @@ def register_api_routes(app, api, finance_access_required):
         app.logger.warning(f"Rotas DJEN nao carregadas: {e_djen}")
 
     register_auditoria_routes(audit_ns, audit_log_model_dto)
-    register_tarefas_routes(tarefas_ns, tarefa_input_model_dto, tarefa_model_dto)
     register_tenant_routes(tenant_ns)
     register_relatorios_routes(relatorios_ns, finance_access_required)
     register_portal_routes(portal_ns)

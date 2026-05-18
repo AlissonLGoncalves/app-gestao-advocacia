@@ -85,15 +85,17 @@ def _make_base_data(client, token, tag):
 
 
 def _make_evento(client, token, tag):
+    # PR D4.3 — migrado de /eventos pra /itens-agenda (tipo='evento').
     inicio = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
     fim = (datetime.now(timezone.utc) + timedelta(days=2, hours=1)).isoformat()
     resp = _auth_json(
         client,
         "post",
-        "/api/v1/eventos",
+        "/api/v1/itens-agenda/",
         token,
         {
-            "tipo_evento": "ReuniÃ£o",
+            "tipo": "evento",
+            "categoria": "Reuniao",
             "titulo": f"Evento {tag}",
             "data_inicio": inicio,
             "data_fim": fim,
@@ -178,17 +180,19 @@ def _make_contrato(client, token, cliente_id, caso_id, tag):
 
 
 def _make_tarefa(client, token, caso_id, tag):
+    # PR D4.3 — migrado de /tarefas pra /itens-agenda (tipo='tarefa').
     resp = _auth_json(
         client,
         "post",
-        "/api/v1/tarefas",
+        "/api/v1/itens-agenda/",
         token,
         {
+            "tipo": "tarefa",
             "titulo": f"Tarefa {tag}",
             "descricao": "Prazo de teste",
-            "status": "A Fazer",
+            "status": "Pendente",
             "prioridade": "Normal",
-            "tipo_tarefa": "Prazo",
+            "categoria": "Prazo",
             "caso_id": caso_id,
             "data_vencimento": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
         },
@@ -315,12 +319,15 @@ def tenants_setup(client, app, db):
     [
         ("/api/v1/clientes", "clientes", "cliente", "Cliente 1", "Cliente 2"),
         ("/api/v1/casos", "casos", "caso", "Caso 1", "Caso 2"),
-        ("/api/v1/eventos", "eventos", "evento", "Evento 1", "Evento 2"),
+        # PR D4.3 — /eventos e /tarefas removidos; sao acessiveis via
+        # /itens-agenda (tipo=evento/tarefa). Isolamento testado pelos
+        # ids inseridos via _make_evento/_make_tarefa, que agora usam
+        # /itens-agenda. Listamos pela nova rota.
+        ("/api/v1/itens-agenda", None, "evento", "Evento 1", "Evento 2"),
         ("/api/v1/documentos", "documentos", "documento", "Documento 1", "Documento 2"),
         ("/api/v1/despesas", "despesas", "despesa", "Despesa 1", "Despesa 2"),
         ("/api/v1/recebimentos", "recebimentos", "recebimento", "Recebimento 1", "Recebimento 2"),
         ("/api/v1/contratos", "contratos", "contrato", "Contrato 1", "Contrato 2"),
-        ("/api/v1/tarefas", "tarefas", "tarefa", "Tarefa 1", "Tarefa 2"),
         ("/api/v1/djen/oabs", None, "oab", "90001", "90002"),
     ],
 )
@@ -371,13 +378,14 @@ def test_listagens_nunca_vazam_outro_tenant(
         (
             "evento",
             "evento",
-            "/api/v1/eventos/{id}",
-            "/api/v1/eventos/{id}",
+            "/api/v1/itens-agenda/{id}",
+            "/api/v1/itens-agenda/{id}",
             "put",
-            "/api/v1/eventos/{id}",
+            "/api/v1/itens-agenda/{id}",
             {
+                "tipo": "evento",
                 "titulo": "Evento atualizado",
-                "tipo_evento": "ReuniÃ£o",
+                "categoria": "Reuniao",
                 "data_inicio": (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(),
             },
         ),
@@ -436,10 +444,10 @@ def test_listagens_nunca_vazam_outro_tenant(
         (
             "tarefa",
             "tarefa",
-            "/api/v1/tarefas/{id}",
-            "/api/v1/tarefas/{id}",
+            "/api/v1/itens-agenda/{id}",
+            "/api/v1/itens-agenda/{id}",
             "put",
-            "/api/v1/tarefas/{id}",
+            "/api/v1/itens-agenda/{id}",
             {"titulo": "Tarefa atualizada"},
         ),
         ("oab", "oab", None, None, None, "/api/v1/djen/oabs/{id}", None),
