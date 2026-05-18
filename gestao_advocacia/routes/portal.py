@@ -4,7 +4,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource
 
 from extensions import db
-from models import Caso, Cliente, Documento, EventoAgenda, Recebimento, User
+from models import Caso, Cliente, Documento, ItemAgenda, Recebimento, User
 
 
 def register_portal_routes(portal_ns):
@@ -49,12 +49,16 @@ def register_portal_routes(portal_ns):
             ]
 
             agora = datetime.utcnow()
+            # PR D4.4 — migrado de EventoAgenda pra ItemAgenda(tipo='evento').
+            # Mantemos a chave 'tipo_evento' na resposta JSON pra nao
+            # quebrar clientes do portal — mapeada de item.categoria.
             eventos_raw = (
-                EventoAgenda.query.filter(
-                    EventoAgenda.tenant_id == user.tenant_id,
-                    EventoAgenda.data_inicio >= agora,
+                ItemAgenda.query.filter(
+                    ItemAgenda.tenant_id == user.tenant_id,
+                    ItemAgenda.tipo == "evento",
+                    ItemAgenda.data_inicio >= agora,
                 )
-                .order_by(EventoAgenda.data_inicio.asc())
+                .order_by(ItemAgenda.data_inicio.asc())
                 .limit(10)
                 .all()
             )
@@ -64,7 +68,7 @@ def register_portal_routes(portal_ns):
                     "titulo": e.titulo,
                     "data_inicio": e.data_inicio.isoformat() if e.data_inicio else None,
                     "data_fim": e.data_fim.isoformat() if e.data_fim else None,
-                    "tipo_evento": e.tipo_evento,
+                    "tipo_evento": e.categoria,
                     "descricao": e.descricao,
                 }
                 for e in eventos_raw

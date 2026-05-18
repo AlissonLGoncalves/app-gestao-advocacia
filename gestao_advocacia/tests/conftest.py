@@ -29,13 +29,12 @@ from models import (
     DjenOabMonitoramento,
     DjenVinculoDecisao,
     Documento,
-    EventoAgenda,
+    ItemAgenda,
     LoginAudit,
     MovimentacaoCNJ,
     ProcuracaoAnalise,
     PublicacaoDJEN,
     Recebimento,
-    TarefaPrazo,
     Tenant,
     User,
 )
@@ -53,10 +52,10 @@ class TwoTenantsFixture(NamedTuple):
     cliente_b: Cliente
     caso_a: Caso
     caso_b: Caso
-    tarefa_a: TarefaPrazo
-    tarefa_b: TarefaPrazo
-    evento_a: EventoAgenda
-    evento_b: EventoAgenda
+    tarefa_a: ItemAgenda
+    tarefa_b: ItemAgenda
+    evento_a: ItemAgenda
+    evento_b: ItemAgenda
     documento_a: Documento
     documento_b: Documento
     mov_cnj_a: MovimentacaoCNJ
@@ -253,14 +252,21 @@ def two_tenants(db) -> TwoTenantsFixture:
     db.session.add_all([caso_a, caso_b])
     db.session.flush()
 
-    tarefa_a = TarefaPrazo(
+    # PR D4.4 — TarefaPrazo e EventoAgenda removidos. Fixtures usam
+    # ItemAgenda agora (tipo=tarefa | tipo=evento). Mantemos os nomes
+    # 'tarefa_a/b' e 'evento_a/b' no NamedTuple pra nao quebrar callers.
+    tarefa_a = ItemAgenda(
+        tipo="tarefa",
         titulo="TEST-A-tarefa",
+        status="Pendente",
         user_id=admin_a.id,
         tenant_id=tenant_a.id,
         caso_id=caso_a.id,
     )
-    tarefa_b = TarefaPrazo(
+    tarefa_b = ItemAgenda(
+        tipo="tarefa",
         titulo="TEST-B-tarefa",
+        status="Pendente",
         user_id=admin_b.id,
         tenant_id=tenant_b.id,
         caso_id=caso_b.id,
@@ -268,14 +274,18 @@ def two_tenants(db) -> TwoTenantsFixture:
     db.session.add_all([tarefa_a, tarefa_b])
 
     _evento_data_inicio = datetime(2026, 1, 1, 10, 0, 0)
-    evento_a = EventoAgenda(
+    evento_a = ItemAgenda(
+        tipo="evento",
         titulo="TEST-A-evento",
+        status="Pendente",
         data_inicio=_evento_data_inicio,
         user_id=admin_a.id,
         tenant_id=tenant_a.id,
     )
-    evento_b = EventoAgenda(
+    evento_b = ItemAgenda(
+        tipo="evento",
         titulo="TEST-B-evento",
+        status="Pendente",
         data_inicio=_evento_data_inicio,
         user_id=admin_b.id,
         tenant_id=tenant_b.id,

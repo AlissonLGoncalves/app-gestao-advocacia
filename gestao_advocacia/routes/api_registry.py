@@ -446,12 +446,6 @@ def register_api_routes(app, api, finance_access_required):
             "prazo_dias_origem": fields.Integer(),
             "origem_id": fields.String(description="ID externo (integracoes)"),
             "notificacoes_enviadas": fields.Raw(description="JSON de notificacoes enviadas"),
-            "legacy_tarefa_id": fields.Integer(
-                description="ID do TarefaPrazo de origem (D2 dual-write)"
-            ),
-            "legacy_evento_id": fields.Integer(
-                description="ID do EventoAgenda de origem (D2 dual-write)"
-            ),
         },
     )
     item_agenda_output_dto = itens_agenda_ns.model(
@@ -477,8 +471,6 @@ def register_api_routes(app, api, finance_access_required):
             "prazo_dias_origem": fields.Integer,
             "origem_id": fields.String,
             "notificacoes_enviadas": fields.Raw,
-            "legacy_tarefa_id": fields.Integer,
-            "legacy_evento_id": fields.Integer,
         },
     )
 

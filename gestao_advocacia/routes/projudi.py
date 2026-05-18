@@ -21,10 +21,10 @@ from models import (
     Caso,
     Cliente,
     Documento,
+    ItemAgenda,
     MovimentacaoCNJ,
     ProjudiAgentToken,
     ProjudiSyncLog,
-    TarefaPrazo,
     User,
     log_audit,
 )
@@ -585,21 +585,25 @@ def register_projudi_routes(app, projudi_ns):
                         # Idempotencia do prazo: nao cria se ja existe um prazo
                         # com mesmo (caso_id, vencimento, tipo) — evita
                         # duplicar quando o agent re-envia mov antiga.
+                        # PR D4.4 — usa ItemAgenda(tipo='tarefa') no vocab novo.
                         ja_existe = (
-                            TarefaPrazo.query.filter_by(
+                            ItemAgenda.query.filter_by(
                                 tenant_id=tenant_id,
                                 caso_id=caso.id,
-                                tipo_tarefa="Prazo",
+                                tipo="tarefa",
+                                categoria="Prazo",
                                 data_vencimento=venc,
                             )
-                            .filter(TarefaPrazo.titulo.like(f"%{titulo_prazo(info['tipo'])[:30]}%"))
+                            .filter(ItemAgenda.titulo.like(f"%{titulo_prazo(info['tipo'])[:30]}%"))
                             .first()
                         )
                         if not ja_existe:
-                            tarefa = TarefaPrazo(
+                            tarefa = ItemAgenda(
                                 tenant_id=tenant_id,
                                 user_id=user_id,
                                 caso_id=caso.id,
+                                tipo="tarefa",
+                                categoria="Prazo",
                                 titulo=titulo_prazo(info["tipo"], cnj)[:250],
                                 descricao=(
                                     f"Detectado automaticamente do PROJUDI.\n\n"
@@ -609,10 +613,9 @@ def register_projudi_routes(app, projudi_ns):
                                     f"Fonte: {info.get('fonte', 'regex')}\n\n"
                                     f"Movimentação:\n{descricao[:500]}"
                                 ),
-                                status="A Fazer",
+                                status="Pendente",
                                 prioridade=prioridade_por_dias_ate_vencer(venc.date()),
                                 data_vencimento=venc,
-                                tipo_tarefa="Prazo",
                                 origem_id=f"projudi:{fingerprint}" if fingerprint else None,
                             )
                             db.session.add(tarefa)
@@ -860,32 +863,32 @@ def register_projudi_routes(app, projudi_ns):
                 desc_parts.append("Origem: PROJUDI (Aguardando Cumprimento)")
                 descricao = "\n".join(desc_parts)[:4000]
 
-                # Idempotencia: origem_id ja existe?
-                existente = TarefaPrazo.query.filter_by(
-                    tenant_id=tenant_id, origem_id=origem_id
+                # Idempotencia: origem_id ja existe? PR D4.4 — usa ItemAgenda.
+                existente = ItemAgenda.query.filter_by(
+                    tenant_id=tenant_id, tipo="tarefa", origem_id=origem_id
                 ).first()
                 if existente:
-                    # Atualiza prioridade (pode ter mudado conforme aproxima vencimento)
-                    # NAO sobrescreve titulo/descricao/status — usuario pode ter editado.
-                    if (
-                        existente.prioridade != prioridade
-                        and (existente.status or "").lower() != "concluído"
+                    # Status concluido (vocab novo) = "Concluido" ou "Cancelado"
+                    if existente.prioridade != prioridade and existente.status not in (
+                        "Concluido",
+                        "Cancelado",
                     ):
                         existente.prioridade = prioridade
                     if not existente.data_vencimento:
                         existente.data_vencimento = datetime.combine(data_venc, datetime.min.time())
                     atualizadas += 1
                 else:
-                    novo = TarefaPrazo(
+                    novo = ItemAgenda(
                         tenant_id=tenant_id,
                         user_id=user_id,
                         caso_id=caso.id,
+                        tipo="tarefa",
+                        categoria="Prazo",
                         titulo=titulo,
                         descricao=descricao,
-                        status="A Fazer",
+                        status="Pendente",
                         prioridade=prioridade,
                         data_vencimento=datetime.combine(data_venc, datetime.min.time()),
-                        tipo_tarefa="Prazo",
                         origem_id=origem_id,
                     )
                     db.session.add(novo)
