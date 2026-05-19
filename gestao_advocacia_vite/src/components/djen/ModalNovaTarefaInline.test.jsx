@@ -71,7 +71,7 @@ describe('ModalNovaTarefaInline', () => {
     expect(select.value).toBe('7')
   })
 
-  it('chama POST /tarefas/ com publicacao_djen_id e fecha ao salvar', async () => {
+  it('chama POST /itens-agenda/ com publicacao_djen_id e fecha ao salvar', async () => {
     postMock.mockResolvedValue({ id: 99, titulo: 'Cumprir intimação' })
     const onClose = vi.fn()
     const onCriada = vi.fn()
@@ -82,10 +82,12 @@ describe('ModalNovaTarefaInline', () => {
 
     await waitFor(() => expect(postMock).toHaveBeenCalled())
     expect(postMock).toHaveBeenCalledWith(
-      '/tarefas/',
+      '/itens-agenda/',
       expect.objectContaining({
+        tipo: 'tarefa',
         publicacao_djen_id: 42,
         prioridade: 'Alta',
+        categoria: 'Prazo',
       })
     )
     await waitFor(() => expect(onCriada).toHaveBeenCalled())
