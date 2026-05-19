@@ -103,3 +103,16 @@ export function concluirItemAgenda(id) {
 export function tratarItemAgenda(id, opts) {
   return api.post(`/itens-agenda/${id}/tratar`, opts)
 }
+
+/**
+ * Histórico de ações (Onda 2). Retorna AuditLog filtrado por este item,
+ * ordenado por data_hora desc (mais recente primeiro).
+ *
+ * Cada entrada: { id, acao, detalhes, data_hora, user_id, username }
+ * Ações típicas: 'item_agenda_tratar_cumpri', 'item_agenda_tratar_cancelar',
+ * 'item_agenda_tratar_reabrir', 'item_agenda_concluir',
+ * 'item_agenda_validar_prazo'.
+ */
+export function getHistoricoItemAgenda(id) {
+  return api.get(`/itens-agenda/${id}/historico`)
+}

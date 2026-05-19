@@ -21,8 +21,11 @@ import {
   BriefcaseIcon,
   CalendarIcon,
   NewspaperIcon,
+  ClockIcon,
+  DocumentArrowUpIcon,
 } from '@heroicons/react/24/outline'
-import { tratarItemAgenda } from '../api/itensAgenda.js'
+import { tratarItemAgenda, getHistoricoItemAgenda } from '../api/itensAgenda.js'
+import { API_URL } from '../config.js'
 
 // Calcula dias relativos: positivo=vencido ha N dias, negativo=falta N dias
 function diasRelativos(dataVencimento) {
@@ -45,6 +48,34 @@ function formatDataBR(iso) {
   }
 }
 
+// Onda 2 — formata data/hora completa pra timeline
+function formatDataHora(iso) {
+  if (!iso) return ''
+  try {
+    return new Date(iso).toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
+}
+
+// Onda 2 — traduz acao raw do AuditLog pra label legível ao usuário
+const ACAO_LABEL = {
+  item_agenda_concluir: '✓ Concluiu (atalho 1-click)',
+  item_agenda_validar_prazo: '✓ Validou prazo (IA confirmado)',
+  item_agenda_tratar_cumpri: '📝 Tratou — Cumpri / peticionei',
+  item_agenda_tratar_cancelar: '🚫 Tratou — Cancelou prazo',
+  item_agenda_tratar_reabrir: '🔄 Tratou — Reabriu prazo',
+}
+function formatAcao(acaoRaw) {
+  return ACAO_LABEL[acaoRaw] || acaoRaw
+}
+
 const STATUS_LABEL = {
   Pendente: { texto: 'Pendente', cor: 'bg-secondary' },
   'Em Andamento': { texto: 'Em Andamento', cor: 'bg-info text-dark' },
@@ -59,13 +90,59 @@ const STATUS_LABEL = {
 function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
   const [acaoSelecionada, setAcaoSelecionada] = useState(null) // 'cumpri' | 'cancelar' | 'reabrir' | null
   const [comoTratado, setComoTratado] = useState('')
+  const [peticaoId, setPeticaoId] = useState('') // doc cumpridora
+  const [docsDoCaso, setDocsDoCaso] = useState([])
   const [salvando, setSalvando] = useState(false)
+  // Onda 2 — historico + sua expansao
+  const [historicoAberto, setHistoricoAberto] = useState(false)
+  const [historico, setHistorico] = useState(null) // null=nao carregou, []=carregou-vazio, [...]=ok
+  const [carregandoHist, setCarregandoHist] = useState(false)
 
   // Pre-popula como_tratado com valor existente quando reabre o modal
   useEffect(() => {
     setComoTratado(item?.como_tratado || '')
+    setPeticaoId(item?.peticao_cumpridora_id ? String(item.peticao_cumpridora_id) : '')
     setAcaoSelecionada(null)
+    setHistoricoAberto(false)
+    setHistorico(null)
   }, [item?.id])
+
+  // Onda 2 — carrega documentos do caso pra select de peticao cumpridora.
+  // So consultamos quando o item tem caso_id (sem caso, nao tem doc).
+  useEffect(() => {
+    if (!item?.caso_id) {
+      setDocsDoCaso([])
+      return
+    }
+    const token = localStorage.getItem('token')
+    fetch(`${API_URL}/documentos?caso_id=${item.caso_id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setDocsDoCaso(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        console.warn('TratarPrazoModal: erro ao buscar docs do caso', err)
+      })
+  }, [item?.caso_id])
+
+  // Lazy-load do historico quando usuario expande
+  const handleToggleHistorico = async () => {
+    const novoEstado = !historicoAberto
+    setHistoricoAberto(novoEstado)
+    if (novoEstado && historico === null && !carregandoHist) {
+      setCarregandoHist(true)
+      try {
+        const data = await getHistoricoItemAgenda(item.id)
+        setHistorico(Array.isArray(data) ? data : [])
+      } catch (err) {
+        console.error('TratarPrazoModal: erro ao buscar historico', err)
+        toast.error('Falha ao carregar histórico.')
+        setHistorico([])
+      } finally {
+        setCarregandoHist(false)
+      }
+    }
+  }
 
   if (!item) return null
 
@@ -89,10 +166,15 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
 
     setSalvando(true)
     try {
-      await tratarItemAgenda(item.id, {
+      const payload = {
         acao: acaoSelecionada,
         como_tratado: comoTratado.trim() || null,
-      })
+      }
+      // Onda 2 — anexa petição cumpridora só se acao=cumpri e foi selecionada
+      if (acaoSelecionada === 'cumpri' && peticaoId) {
+        payload.peticao_cumpridora_id = parseInt(peticaoId, 10)
+      }
+      await tratarItemAgenda(item.id, payload)
       const msg =
         acaoSelecionada === 'cumpri'
           ? 'Prazo marcado como cumprido.'
@@ -299,6 +381,84 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
                 <small className="text-muted">Texto livre. Fica no histórico do prazo.</small>
               </div>
             )}
+
+            {/* Onda 2 — Vincular petição cumpridora (só quando acao=cumpri
+                e existem docs no caso) */}
+            {acaoSelecionada === 'cumpri' && item.caso_id && docsDoCaso.length > 0 && (
+              <div className="mb-3">
+                <label className="form-label small text-muted">
+                  <DocumentArrowUpIcon
+                    style={{ width: 14, height: 14 }}
+                    className="me-1 align-text-bottom d-inline"
+                  />
+                  Petição que cumpriu este prazo (opcional)
+                </label>
+                <select
+                  className="form-select"
+                  value={peticaoId}
+                  onChange={(e) => setPeticaoId(e.target.value)}
+                  disabled={salvando}
+                >
+                  <option value="">— Nenhum / informo depois —</option>
+                  {docsDoCaso.map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      {doc.nome_arquivo}
+                    </option>
+                  ))}
+                </select>
+                <small className="text-muted">
+                  Vincula um documento do caso já carregado em Documentos.
+                </small>
+              </div>
+            )}
+
+            {/* Onda 2 — Histórico colapsável (timeline) */}
+            <div className="mt-3 border-top pt-3">
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0 text-decoration-none d-flex align-items-center gap-2"
+                onClick={handleToggleHistorico}
+                disabled={salvando}
+              >
+                <ClockIcon style={{ width: 14, height: 14 }} />
+                <span className="fw-semibold">
+                  {historicoAberto ? 'Ocultar' : 'Ver'} histórico de ações
+                </span>
+              </button>
+              {historicoAberto && (
+                <div className="mt-2">
+                  {carregandoHist && (
+                    <div className="text-muted small">
+                      <div className="spinner-border spinner-border-sm me-2" role="status" />
+                      Carregando histórico...
+                    </div>
+                  )}
+                  {!carregandoHist && historico && historico.length === 0 && (
+                    <div className="text-muted small fst-italic">
+                      Nenhuma ação registrada ainda neste prazo.
+                    </div>
+                  )}
+                  {!carregandoHist && historico && historico.length > 0 && (
+                    <ul className="list-unstyled mb-0">
+                      {historico.map((h) => (
+                        <li key={h.id} className="py-1 border-bottom border-light small">
+                          <div className="d-flex justify-content-between gap-2">
+                            <span className="fw-semibold text-dark">{formatAcao(h.acao)}</span>
+                            <span className="text-muted">{formatDataHora(h.data_hora)}</span>
+                          </div>
+                          {h.detalhes && <div className="text-muted">{h.detalhes}</div>}
+                          {h.username && (
+                            <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                              por {h.username}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="modal-footer justify-content-between">

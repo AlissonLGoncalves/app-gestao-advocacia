@@ -10,7 +10,7 @@ from flask_restx import Resource
 
 from extensions import db
 from helpers import get_item_or_404, get_list_query, get_tenant_id, tenant_scoped
-from models import ItemAgenda, PublicacaoDJEN
+from models import AuditLog, ItemAgenda, PublicacaoDJEN, log_audit
 
 # Whitelist de valores aceitos para tipo/status/categoria. Mantemos
 # permissivo o suficiente pra absorver dados legados (D2 backfill) sem
@@ -325,6 +325,12 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
                 item.prioridade = data["prioridade"]
 
             item.prazo_validado = True
+            log_audit(
+                acao="item_agenda_validar_prazo",
+                tabela_afetada="item_agenda",
+                registro_id=item.id,
+                detalhes=f"titulo={item.titulo}",
+            )
             db.session.commit()
             return item
 
@@ -344,6 +350,12 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
             item = get_item_or_404(ItemAgenda, item_id)
             item.status = "Concluido"
             item.prazo_validado = True
+            log_audit(
+                acao="item_agenda_concluir",
+                tabela_afetada="item_agenda",
+                registro_id=item.id,
+                detalhes=f"titulo={item.titulo}",
+            )
             db.session.commit()
             return item
 
@@ -416,5 +428,56 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
                 item.status = "Pendente"
                 item.tratado_em = None
 
+            # Onda 2 — audit log da acao, antes do commit pra atrelar.
+            detalhes_audit = f"acao={acao} titulo={item.titulo[:80]}"
+            if como_tratado:
+                detalhes_audit += f" | como_tratado={como_tratado[:120]}"
+            if peticao_id:
+                detalhes_audit += f" | peticao_id={peticao_id}"
+            log_audit(
+                acao=f"item_agenda_tratar_{acao}",
+                tabela_afetada="item_agenda",
+                registro_id=item.id,
+                detalhes=detalhes_audit,
+            )
+
             db.session.commit()
             return item
+
+    @ns.route("/<int:item_id>/historico")
+    class ItemAgendaHistoricoAPI(Resource):
+        """Retorna timeline de acoes no item (criar, validar, concluir, tratar).
+
+        Lê de AuditLog filtrando por tabela_afetada='item_agenda' +
+        registro_id=item_id. Frontend renderiza como timeline visual no
+        TratarPrazoModal (Onda 2.3).
+
+        Ordem: mais recente primeiro (cronologica reversa).
+        """
+
+        @jwt_required()
+        @tenant_scoped
+        @ns.doc(security="jsonWebToken")
+        def get(self, item_id):
+            # 404 se nao pertence ao tenant (tenant scope via AuditLog.tenant_id)
+            item = get_item_or_404(ItemAgenda, item_id)
+            logs = (
+                AuditLog.query.filter_by(
+                    tabela_afetada="item_agenda",
+                    registro_id=item.id,
+                    tenant_id=item.tenant_id,
+                )
+                .order_by(AuditLog.data_hora.desc())
+                .all()
+            )
+            return [
+                {
+                    "id": log.id,
+                    "acao": log.acao,
+                    "detalhes": log.detalhes,
+                    "data_hora": log.data_hora.isoformat() if log.data_hora else None,
+                    "user_id": log.user_id,
+                    "username": log.usuario.username if log.usuario else None,
+                }
+                for log in logs
+            ], 200
