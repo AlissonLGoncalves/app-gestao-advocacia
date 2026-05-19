@@ -162,9 +162,11 @@ function DespesaList({ onEditDespesa, refreshKey }) {
       const status = d.status || (d.pago ? 'Pago' : 'Pendente')
       const venc = d.data_vencimento
       if (quickFilter === 'programadas') {
-        return status !== 'Pago' && status !== 'Cancelado' && venc && venc >= hojeISO
+        if (status === 'Programado') return true
+        return status === 'Pendente' && (!venc || venc >= hojeISO)
       }
       if (quickFilter === 'atrasadas') {
+        if (status === 'Programado') return false
         return status !== 'Pago' && status !== 'Cancelado' && venc && venc < hojeISO
       }
       if (quickFilter === 'pagas') {
@@ -235,6 +237,9 @@ function DespesaList({ onEditDespesa, refreshKey }) {
       case 'Pendente':
       case 'A Pagar':
         return 'bg-warning-subtle text-warning-emphasis'
+      case 'Programado':
+      case 'Programada':
+        return 'bg-primary-subtle text-primary-emphasis'
       case 'Vencido':
       case 'Vencida':
         return 'bg-danger-subtle text-danger-emphasis'

@@ -23,7 +23,7 @@ from helpers import get_item_or_404, get_list_query, get_tenant_id, query_for_te
 from models import Caso, Cliente, Despesa, RecorrenciaDespesa
 
 # Status validos (mesmo set do Recebimento — uniformidade no app).
-STATUS_VALIDOS = {"Pendente", "Pago", "Vencido", "Cancelado", "Em Negociacao"}
+STATUS_VALIDOS = {"Pendente", "Programado", "Pago", "Vencido", "Cancelado", "Em Negociacao"}
 STATUS_PAGO = "Pago"
 
 

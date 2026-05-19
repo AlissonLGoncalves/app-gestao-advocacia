@@ -23,7 +23,7 @@ const TIPO_UNICO = 'UNICO'
 const TIPO_RECORRENTE = 'RECORRENTE'
 const TIPO_PARCELADO = 'PARCELADO'
 
-const STATUS_OPCOES = ['Pendente', 'Pago', 'Vencido', 'Cancelado', 'Em Negociacao']
+const STATUS_OPCOES = ['Pendente', 'Programado', 'Pago', 'Vencido', 'Cancelado', 'Em Negociacao']
 
 const CATEGORIAS = [
   'Honorarios Advocaticios',
