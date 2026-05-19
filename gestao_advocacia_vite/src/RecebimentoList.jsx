@@ -34,7 +34,9 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
   const [clienteFilter, setClienteFilter] = useState('')
   const [casoFilter, setCasoFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  // "Programados" = pendentes com vencimento futuro. Filtro rapido botaozinho.
+  // "Programados" = status="Programado" (explicito) OU pendentes com
+  // vencimento futuro/sem data (legado, antes do status existir).
+  // Filtro rapido botaozinho.
   const [quickFilter, setQuickFilter] = useState('todos') // todos|programados|atrasados|pagos
   // Marcar como Pago inline (loading por linha)
   const [markingPaidId, setMarkingPaidId] = useState(null)
@@ -197,9 +199,11 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
       const status = r.status || (r.recebido ? 'Pago' : 'Pendente')
       const venc = r.data_vencimento
       if (quickFilter === 'programados') {
-        return status !== 'Pago' && status !== 'Cancelado' && venc && venc >= hojeISO
+        if (status === 'Programado') return true
+        return status === 'Pendente' && (!venc || venc >= hojeISO)
       }
       if (quickFilter === 'atrasados') {
+        if (status === 'Programado') return false
         return status !== 'Pago' && status !== 'Cancelado' && venc && venc < hojeISO
       }
       if (quickFilter === 'pagos') {
@@ -268,6 +272,8 @@ function RecebimentoList({ onEditRecebimento, refreshKey }) {
         return 'bg-success-subtle text-success-emphasis'
       case 'Pendente':
         return 'bg-warning-subtle text-warning-emphasis'
+      case 'Programado':
+        return 'bg-primary-subtle text-primary-emphasis'
       case 'Vencido':
         return 'bg-danger-subtle text-danger-emphasis'
       case 'Cancelado':
