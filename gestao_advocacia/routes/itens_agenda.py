@@ -346,3 +346,75 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
             item.prazo_validado = True
             db.session.commit()
             return item
+
+    # --- Tratamento (Onda 1) ---
+    # Endpoint dedicado pra registrar como o prazo foi tratado.
+    # Distinto de PATCH /concluir (que so muda status):
+    #   - acao='cumpri'   → status=Concluido + tratado_em=now + como_tratado
+    #   - acao='cancelar' → status=Cancelado + tratado_em=now + como_tratado
+    #   - acao='reabrir'  → status=Pendente + limpa tratado_em (reabertura)
+    # Idempotente: re-rodar com mesma acao nao quebra.
+
+    ACOES_TRATAMENTO = {"cumpri", "cancelar", "reabrir"}
+
+    @ns.route("/<int:item_id>/tratar")
+    class ItemAgendaTratarAPI(Resource):
+        """Registra o tratamento dado ao prazo pelo advogado."""
+
+        @jwt_required()
+        @tenant_scoped
+        @ns.marshal_with(output_dto)
+        @ns.doc(security="jsonWebToken")
+        def post(self, item_id):
+            from datetime import datetime as _dt  # noqa: PLC0415
+
+            item = get_item_or_404(ItemAgenda, item_id)
+            data = request.get_json(silent=True) or {}
+
+            acao = (data.get("acao") or "").strip()
+            if acao not in ACOES_TRATAMENTO:
+                return {
+                    "message": (
+                        f"Acao invalida: {acao!r}. " f"Aceitas: {sorted(ACOES_TRATAMENTO)}."
+                    )
+                }, 400
+
+            como_tratado = (data.get("como_tratado") or "").strip() or None
+            peticao_id = data.get("peticao_cumpridora_id")
+
+            # Validar peticao_cumpridora pertence ao tenant (defesa contra
+            # cross-tenant). Documento.id resolvido via FK ja restringe ao
+            # banco; aqui adicionamos check explicito.
+            if peticao_id is not None:
+                from models import Documento  # noqa: PLC0415
+
+                pet = Documento.query.filter_by(
+                    id=int(peticao_id), tenant_id=item.tenant_id
+                ).first()
+                if not pet:
+                    return {"message": "Peticao cumpridora nao encontrada neste tenant."}, 404
+
+            if acao == "cumpri":
+                item.status = "Concluido"
+                item.prazo_validado = True
+                item.tratado_em = _dt.utcnow()
+                if como_tratado is not None:
+                    item.como_tratado = como_tratado
+                if peticao_id is not None:
+                    item.peticao_cumpridora_id = int(peticao_id)
+            elif acao == "cancelar":
+                item.status = "Cancelado"
+                item.prazo_validado = True
+                item.tratado_em = _dt.utcnow()
+                if como_tratado is not None:
+                    item.como_tratado = como_tratado
+            elif acao == "reabrir":
+                # Reabre o prazo: limpa tratado_em e volta pra Pendente.
+                # Preserva como_tratado/peticao_cumpridora_id no historico
+                # (nao apagamos — viram referencia do "ja tentei tratar
+                # mas voltou").
+                item.status = "Pendente"
+                item.tratado_em = None
+
+            db.session.commit()
+            return item

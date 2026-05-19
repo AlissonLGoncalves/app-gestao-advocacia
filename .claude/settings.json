@@ -3,7 +3,13 @@
     "allow": [
       "Bash(python -c ' *)",
       "Bash(python -m flask db migrate -m \"add portal_cliente_id to user\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(j['name'], j['conclusion'], j['databaseId']\\) for j in data['jobs']]\")",
+      "Bash(curl -s https://pypi.org/pypi/idna/3.15/json)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(f['filename']+' '+f['digests']['sha256'] for f in d['urls']\\)\\)\")",
+      "Bash(flyctl machines *)",
+      "Bash(python -m py_compile gestao_advocacia/djen_worker.py)",
+      "Bash(python -m py_compile c:/Users/aliss/app-gestao-advocacia/gestao_advocacia/djen_worker.py)"
     ]
   }
 }

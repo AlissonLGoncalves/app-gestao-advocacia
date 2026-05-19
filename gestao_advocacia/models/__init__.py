@@ -1164,6 +1164,21 @@ class ItemAgenda(db.Model):
     # Notificacoes (de EventoAgenda) — estado de envio {"7d": True, ...}.
     notificacoes_enviadas = db.Column(db.JSON, nullable=True, default=dict)
 
+    # PR "Tratar Prazo" (Onda 1) — registro de como o advogado tratou
+    # o prazo. Distinto de status=Concluido pois:
+    #   - status = onde o card vive (kanban A Fazer/Em Andamento/Concluido)
+    #   - tratado_em = TIMESTAMP de quando o tratamento foi registrado
+    #   - como_tratado = texto livre ("peticionei contestacao", "prazo nao
+    #     era meu — equivoco do tribunal", "aditei prorrogacao 5 dias")
+    #   - peticao_cumpridora_id = doc que prova o cumprimento (opcional)
+    tratado_em = db.Column(db.DateTime, nullable=True)
+    como_tratado = db.Column(db.Text, nullable=True)
+    peticao_cumpridora_id = db.Column(
+        db.Integer,
+        db.ForeignKey("documento.id", name="fk_item_agenda_peticao_cumpridora_id"),
+        nullable=True,
+    )
+
     # PR D4.4 — legacy_tarefa_id / legacy_evento_id removidos. Eram usados
     # apenas pelo backfill (D2) pra evitar duplicar dados durante a
     # transicao. Apos D4.4 drop, nao ha mais tabelas legadas que referenciar.
@@ -1203,6 +1218,9 @@ class ItemAgenda(db.Model):
             "prazo_dias_origem": self.prazo_dias_origem,
             "origem_id": self.origem_id,
             "notificacoes_enviadas": self.notificacoes_enviadas,
+            "tratado_em": self.tratado_em.isoformat() if self.tratado_em else None,
+            "como_tratado": self.como_tratado,
+            "peticao_cumpridora_id": self.peticao_cumpridora_id,
         }
 
 

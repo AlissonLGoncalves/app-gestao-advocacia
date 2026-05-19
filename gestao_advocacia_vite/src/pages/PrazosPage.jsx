@@ -38,6 +38,7 @@ import {
 } from '../utils/kanbanReorder.js'
 import PrioridadeBadge from '../components/ui/PrioridadeBadge.jsx'
 import SlaBar from '../components/ui/SlaBar.jsx'
+import TratarPrazoModal from '../components/TratarPrazoModal.jsx'
 import {
   PlusIcon,
   ClockIcon,
@@ -176,6 +177,10 @@ export default function PrazosPage() {
   const [editandoId, setEditandoId] = useState(null)
   const [novaTarefa, setNovaTarefa] = useState(TAREFA_VAZIA)
 
+  // Onda 1 — modal de tratamento (separado do form de edicao). Click na
+  // linha abre tratamento; icone-lapis abre edicao (mesmo de antes).
+  const [tratandoTarefa, setTratandoTarefa] = useState(null)
+
   const [draggingId, setDraggingId] = useState(null)
 
   const carregarTarefas = useCallback(async () => {
@@ -234,6 +239,22 @@ export default function PrazosPage() {
     })
     setEditandoId(t.id)
     setShowModal(true)
+  }
+
+  // Onda 1 — abre o modal de tratamento. UI internamente trabalha com
+  // vocabulario legado (status "A Fazer"/"Fazendo"/"Concluído"), mas
+  // o TratarPrazoModal espera o vocabulario novo do backend
+  // (Pendente/Em Andamento/Concluido). Convertendo aqui.
+  const handleAbrirTratamento = (t) => {
+    setTratandoTarefa({
+      ...t,
+      status: STATUS_KANBAN_TO_API[t.status] || t.status,
+    })
+  }
+
+  const handleTratamentoSalvo = () => {
+    setTratandoTarefa(null)
+    carregarTarefas()
   }
 
   const handleSalvarTarefa = async (e) => {
@@ -418,6 +439,7 @@ export default function PrazosPage() {
               key={grupo.label}
               grupo={grupo}
               casos={casos}
+              onTratar={handleAbrirTratamento}
               onEditar={handleEditarTarefa}
               onConcluir={(t) =>
                 handleMoverTarefa(t.id, t.status === 'Concluído' ? 'A Fazer' : 'Concluído')
@@ -528,6 +550,16 @@ export default function PrazosPage() {
         </DndContext>
       ) : (
         renderLista()
+      )}
+
+      {/* Onda 1 — Modal de Tratamento (click na linha abre este) */}
+      {tratandoTarefa && (
+        <TratarPrazoModal
+          item={tratandoTarefa}
+          onTratado={handleTratamentoSalvo}
+          onClose={() => setTratandoTarefa(null)}
+          onEditarDados={handleEditarTarefa}
+        />
       )}
 
       {/* ── Modal Criar / Editar ─────────────────────────────────────────── */}
@@ -928,7 +960,7 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, onConclui
 
 // ── Sub-componente GrupoLista (vista lista) ──────────────────────────────────
 
-function GrupoLista({ grupo, casos, onEditar, onConcluir }) {
+function GrupoLista({ grupo, casos, onTratar, onEditar, onConcluir }) {
   const [collapsed, setCollapsed] = useState(grupo.collapsed ?? false)
 
   return (
@@ -973,20 +1005,20 @@ function GrupoLista({ grupo, casos, onEditar, onConcluir }) {
                   const casoVinculado = casos.find((c) => c.id === t.caso_id)
                   const overdue = isOverdue(t)
                   return (
-                    // Linha inteira clicavel — abre editar. Botoes internos
-                    // (concluir, editar) usam stopPropagation pra nao
-                    // duplo-disparar. Feedback de prod do Emerson em
-                    // 17/05/2026: "deveria ser clicavel em qualquer parte
-                    // da LINHA".
+                    // Linha inteira clicavel — abre TRATAMENTO (Onda 1).
+                    // Feedback Emerson: "precisa ser uma janela para fazer
+                    // o tratamento mesmo do prazo vencido". Click =
+                    // tratamento; icone-lapis (separado, com stopPropagation)
+                    // = editar dados crus.
                     <tr
                       key={t.id}
-                      onClick={() => onEditar(t)}
+                      onClick={() => onTratar(t)}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
-                          onEditar(t)
+                          onTratar(t)
                         }
                       }}
                       style={{

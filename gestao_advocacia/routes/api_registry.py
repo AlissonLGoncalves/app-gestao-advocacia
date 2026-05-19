@@ -471,6 +471,10 @@ def register_api_routes(app, api, finance_access_required):
             "prazo_dias_origem": fields.Integer,
             "origem_id": fields.String,
             "notificacoes_enviadas": fields.Raw,
+            # Tratamento (Onda 1) — registro de como o advogado tratou
+            "tratado_em": fields.String,
+            "como_tratado": fields.String,
+            "peticao_cumpridora_id": fields.Integer,
         },
     )
 
