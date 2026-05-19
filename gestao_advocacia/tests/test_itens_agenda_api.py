@@ -520,3 +520,58 @@ def test_tratar_idempotente(auth_client, db):
     # Segunda chamada sobrescreve como_tratado (intencional — usuario
     # atualizando o que fez)
     assert data["como_tratado"] == "segunda"
+
+
+# ---------- Endpoint Histórico (Onda 2) ----------
+
+
+def test_historico_inclui_acoes_anteriores(auth_client, db):
+    """GET /historico retorna timeline de tratar/concluir/validar via AuditLog."""
+    post = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "Hist test", "tipo": "tarefa"},
+    )
+    item_id = json.loads(post.data)["id"]
+
+    # Sequencia: concluir → tratar cumpri → reabrir
+    auth_client.patch(f"/api/v1/itens-agenda/{item_id}/concluir")
+    auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "cumpri", "como_tratado": "peticionei"},
+    )
+    auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "reabrir"},
+    )
+
+    res = auth_client.get(f"/api/v1/itens-agenda/{item_id}/historico")
+    assert res.status_code == 200
+    historico = json.loads(res.data)
+    # Pelo menos 3 entradas (uma por acao). data_hora desc.
+    assert len(historico) >= 3
+    acoes = [h["acao"] for h in historico]
+    # Mais recente primeiro: reabrir → cumpri → concluir
+    assert acoes[0] == "item_agenda_tratar_reabrir"
+    assert acoes[1] == "item_agenda_tratar_cumpri"
+    assert acoes[2] == "item_agenda_concluir"
+    # username preenchido
+    assert historico[0]["username"] is not None
+
+
+def test_historico_vazio_se_item_recem_criado(auth_client, db):
+    """Item sem audit log (criado mas nenhuma acao) retorna lista vazia."""
+    post = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "Recem criado", "tipo": "tarefa"},
+    )
+    item_id = json.loads(post.data)["id"]
+
+    res = auth_client.get(f"/api/v1/itens-agenda/{item_id}/historico")
+    assert res.status_code == 200
+    assert json.loads(res.data) == []
+
+
+def test_historico_404_se_item_de_outro_tenant(auth_client, db):
+    """Item de outro tenant retorna 404 (nao vaza existencia)."""
+    res = auth_client.get("/api/v1/itens-agenda/99999/historico")
+    assert res.status_code == 404
