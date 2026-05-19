@@ -399,3 +399,124 @@ def test_concluir_idempotente(auth_client, db):
     res = auth_client.patch(f"/api/v1/itens-agenda/{item_id}/concluir")
     assert res.status_code == 200
     assert json.loads(res.data)["status"] == "Concluido"
+
+
+# ---------- Endpoint Tratar (Onda 1) ----------
+
+
+def test_tratar_acao_cumpri(auth_client, db):
+    """Acao=cumpri marca Concluido + tratado_em + como_tratado."""
+    post = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "Contestar", "tipo": "tarefa"},
+    )
+    item_id = json.loads(post.data)["id"]
+
+    res = auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "cumpri", "como_tratado": "Peticionei contestação"},
+    )
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["status"] == "Concluido"
+    assert data["tratado_em"] is not None
+    assert data["como_tratado"] == "Peticionei contestação"
+    assert data["prazo_validado"] is True
+
+
+def test_tratar_acao_cancelar(auth_client, db):
+    """Acao=cancelar marca Cancelado + tratado_em."""
+    post = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "Prazo equivocado", "tipo": "tarefa"},
+    )
+    item_id = json.loads(post.data)["id"]
+
+    res = auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "cancelar", "como_tratado": "Não era meu cliente"},
+    )
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["status"] == "Cancelado"
+    assert data["tratado_em"] is not None
+    assert data["como_tratado"] == "Não era meu cliente"
+
+
+def test_tratar_acao_reabrir(auth_client, db):
+    """Acao=reabrir limpa tratado_em e volta Pendente, preserva como_tratado."""
+    post = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "Mudei de ideia", "tipo": "tarefa"},
+    )
+    item_id = json.loads(post.data)["id"]
+
+    # Primeiro cumpre
+    auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "cumpri", "como_tratado": "Resolvi"},
+    )
+
+    # Depois reabre
+    res = auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "reabrir"},
+    )
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["status"] == "Pendente"
+    assert data["tratado_em"] is None
+    # Historico preservado
+    assert data["como_tratado"] == "Resolvi"
+
+
+def test_tratar_acao_invalida(auth_client, db):
+    post = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "X", "tipo": "tarefa"},
+    )
+    item_id = json.loads(post.data)["id"]
+
+    res = auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "voar"},
+    )
+    assert res.status_code == 400
+
+
+def test_tratar_peticao_inexistente_retorna_404(auth_client, db):
+    post = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "X", "tipo": "tarefa"},
+    )
+    item_id = json.loads(post.data)["id"]
+
+    res = auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "cumpri", "peticao_cumpridora_id": 99999},
+    )
+    assert res.status_code == 404
+
+
+def test_tratar_idempotente(auth_client, db):
+    """Rodar tratar 2x com cumpri nao quebra."""
+    post = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "X", "tipo": "tarefa"},
+    )
+    item_id = json.loads(post.data)["id"]
+
+    auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "cumpri", "como_tratado": "primeira"},
+    )
+    res = auth_client.post(
+        f"/api/v1/itens-agenda/{item_id}/tratar",
+        json={"acao": "cumpri", "como_tratado": "segunda"},
+    )
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["status"] == "Concluido"
+    # Segunda chamada sobrescreve como_tratado (intencional — usuario
+    # atualizando o que fez)
+    assert data["como_tratado"] == "segunda"

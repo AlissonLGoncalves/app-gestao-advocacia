@@ -88,3 +88,18 @@ export function validarPrazoItemAgenda(id, opts = {}) {
 export function concluirItemAgenda(id) {
   return api.patch(`/itens-agenda/${id}/concluir`, {})
 }
+
+/**
+ * Tratamento de prazo (Onda 1).
+ *
+ * Acoes:
+ *   - 'cumpri'  → marca Concluido, registra como_tratado, vincula peticao
+ *   - 'cancelar'→ marca Cancelado (prazo nao era seu / equivoco)
+ *   - 'reabrir' → volta pra Pendente (limpa tratado_em, preserva texto)
+ *
+ * @param {number} id
+ * @param {object} opts - { acao, como_tratado?, peticao_cumpridora_id? }
+ */
+export function tratarItemAgenda(id, opts) {
+  return api.post(`/itens-agenda/${id}/tratar`, opts)
+}
