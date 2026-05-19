@@ -919,7 +919,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         # TODOS, criando death spiral (so o sync limpa pendentes via auto-vinculo).
         tenants_bloqueados: set = set()
         if not force:
-            backlog_limit = int(app.config.get("DJEN_SYNC_BACKLOG_LIMIT", 50))
+            backlog_limit = int(app.config.get("DJEN_SYNC_BACKLOG_LIMIT", 500))
             if tenant_id is not None:
                 backlog_count = PublicacaoDJEN.query.filter_by(
                     tenant_id=tenant_id, status_origem="pendente"

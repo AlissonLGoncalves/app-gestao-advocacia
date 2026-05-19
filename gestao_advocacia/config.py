@@ -145,6 +145,12 @@ class Config:
     DJEN_BUSCAR_TODOS_TRIBUNAIS = (
         os.environ.get("DJEN_BUSCAR_TODOS_TRIBUNAIS", "True").lower() == "true"
     )
+    # Quantas publicacoes com status_origem='pendente' um tenant pode ter antes
+    # do sync diario pular aquele tenant (forca o usuario a fazer a triagem
+    # antes de buscar mais). Antes era 50 hardcoded no djen_tasks.py — baixo
+    # demais pra escritorios com OAB ativa de varios anos. Subido pra 500.
+    # Pode ser ajustado via env var sem precisar de deploy.
+    DJEN_SYNC_BACKLOG_LIMIT = int(os.environ.get("DJEN_SYNC_BACKLOG_LIMIT", 500))
     DJEN_ENABLED_TENANTS = os.environ.get("DJEN_ENABLED_TENANTS", "")  # CSV: 1,2,3
     DJEN_ROLLOUT_PERCENT = int(os.environ.get("DJEN_ROLLOUT_PERCENT", 100))  # 10, 50, 100
 

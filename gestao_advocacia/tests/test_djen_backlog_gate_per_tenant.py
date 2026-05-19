@@ -65,6 +65,27 @@ def test_scheduler_multitenant_pula_apenas_tenant_estourado(app, db, two_tenants
     assert "11111" not in oabs_consultadas
 
 
+def test_config_carrega_backlog_limit_de_env_var(monkeypatch):
+    """Regressao: DJEN_SYNC_BACKLOG_LIMIT antes nao existia em config.py —
+    so era lido via app.config.get(..., 50) com default hardcoded. Isso fazia
+    `flyctl secrets set DJEN_SYNC_BACKLOG_LIMIT=X` nao ter efeito nenhum em
+    prod. Agora vem do Config base e respeita env var.
+
+    Nao toca em ConfigTest (teste-only) — esse fica intencionalmente minimo.
+    """
+    import importlib
+
+    monkeypatch.setenv("DJEN_SYNC_BACKLOG_LIMIT", "1234")
+    import config
+
+    importlib.reload(config)
+    try:
+        assert config.Config.DJEN_SYNC_BACKLOG_LIMIT == 1234
+    finally:
+        monkeypatch.delenv("DJEN_SYNC_BACKLOG_LIMIT", raising=False)
+        importlib.reload(config)
+
+
 def test_singletenant_mantem_short_circuit(app, db, two_tenants, monkeypatch):
     """Chamada single-tenant (manual /sync ou worker) mantem o comportamento
     legado: se o tenant alvo esta em backlog, retorna skipped imediatamente."""
