@@ -912,24 +912,50 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         data_inicio = data_fim - timedelta(days=janela_dias)
 
         # ── Verificação de backlog: pula sync se fila de triagem pendente for grande ──
+        # No modo single-tenant (chamada manual via /api/v1/djen/sync), pula o
+        # tenant inteiro. No modo multi-tenant (scheduler diario, tenant_id=None),
+        # agrupa por tenant e bloqueia APENAS os individualmente estourados —
+        # antes desse fix, o COUNT global fazia 1 tenant ruim travar o sync de
+        # TODOS, criando death spiral (so o sync limpa pendentes via auto-vinculo).
+        tenants_bloqueados: set = set()
         if not force:
-            backlog_limit = int(app.config.get("DJEN_SYNC_BACKLOG_LIMIT", 50))
-            backlog_query = PublicacaoDJEN.query.filter_by(status_origem="pendente")
+            backlog_limit = int(app.config.get("DJEN_SYNC_BACKLOG_LIMIT", 500))
             if tenant_id is not None:
-                backlog_query = backlog_query.filter_by(tenant_id=tenant_id)
-            backlog_count = backlog_query.count()
-            if backlog_count > backlog_limit:
-                logger.warning(
-                    "JOB DJEN: sync pulado — backlog de %d pendentes (limite: %d). "
-                    "Processe a triagem antes de buscar novas publicações.",
-                    backlog_count,
-                    backlog_limit,
+                backlog_count = PublicacaoDJEN.query.filter_by(
+                    tenant_id=tenant_id, status_origem="pendente"
+                ).count()
+                if backlog_count > backlog_limit:
+                    logger.warning(
+                        "JOB DJEN: sync pulado — backlog de %d pendentes (limite: %d). "
+                        "Processe a triagem antes de buscar novas publicações.",
+                        backlog_count,
+                        backlog_limit,
+                    )
+                    return {
+                        "ok": False,
+                        "skipped": True,
+                        "reason": f"backlog={backlog_count} > limit={backlog_limit}",
+                    }
+            else:
+                rows = (
+                    db.session.query(
+                        PublicacaoDJEN.tenant_id,
+                        db.func.count(PublicacaoDJEN.id),
+                    )
+                    .filter(PublicacaoDJEN.status_origem == "pendente")
+                    .group_by(PublicacaoDJEN.tenant_id)
+                    .all()
                 )
-                return {
-                    "ok": False,
-                    "skipped": True,
-                    "reason": f"backlog={backlog_count} > limit={backlog_limit}",
+                tenants_bloqueados = {
+                    tid for tid, c in rows if tid is not None and (c or 0) > backlog_limit
                 }
+                if tenants_bloqueados:
+                    logger.warning(
+                        "JOB DJEN: %d tenant(s) com backlog > %d pulados neste run: %s",
+                        len(tenants_bloqueados),
+                        backlog_limit,
+                        sorted(tenants_bloqueados),
+                    )
 
         logger.info(
             "JOB DJEN: iniciando monitoramento de publicações "
@@ -972,6 +998,8 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         logger.info(f"JOB DJEN: {len(oabs_monitoradas)} OAB(s) monitorada(s).")
 
         for oab_mon in oabs_monitoradas:
+            if oab_mon.tenant_id in tenants_bloqueados:
+                continue
             logger.info(
                 f"JOB DJEN: buscando por OAB {oab_mon.numero_oab}/{oab_mon.uf_oab or '--'} "
                 f"(tenant: {oab_mon.tenant_id})"
@@ -1050,6 +1078,8 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
         logger.info(f"JOB DJEN: {len(casos)} caso(s) para verificar por processo.")
 
         for caso in casos:
+            if caso.tenant_id in tenants_bloqueados:
+                continue
             logger.info(f"JOB DJEN: buscando processo {caso.numero_processo} (caso {caso.id})")
             try:
                 sigla_tribunal = _inferir_sigla_tribunal_por_numero_processo(caso.numero_processo)
@@ -1170,6 +1200,7 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             "publicacoes_classificadas": total_classificadas,
             "tarefas_auto_criadas": total_tarefas_criadas,
             "erros": erros,
+            "tenants_pulados_por_backlog": sorted(tenants_bloqueados),
         }
 
 
