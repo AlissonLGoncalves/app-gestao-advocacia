@@ -973,12 +973,35 @@ function GrupoLista({ grupo, casos, onEditar, onConcluir }) {
                   const casoVinculado = casos.find((c) => c.id === t.caso_id)
                   const overdue = isOverdue(t)
                   return (
-                    <tr key={t.id} style={overdue ? { backgroundColor: '#fff5f5' } : {}}>
+                    // Linha inteira clicavel — abre editar. Botoes internos
+                    // (concluir, editar) usam stopPropagation pra nao
+                    // duplo-disparar. Feedback de prod do Emerson em
+                    // 17/05/2026: "deveria ser clicavel em qualquer parte
+                    // da LINHA".
+                    <tr
+                      key={t.id}
+                      onClick={() => onEditar(t)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          onEditar(t)
+                        }
+                      }}
+                      style={{
+                        cursor: 'pointer',
+                        ...(overdue ? { backgroundColor: '#fff5f5' } : {}),
+                      }}
+                    >
                       <td style={{ width: 36, paddingLeft: 16 }}>
                         <button
                           className="btn btn-sm p-0"
                           title={t.status === 'Concluído' ? 'Reabrir' : 'Marcar como concluído'}
-                          onClick={() => onConcluir(t)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onConcluir(t)
+                          }}
                           style={{ color: t.status === 'Concluído' ? '#16a34a' : '#d1d5db' }}
                         >
                           <CheckCircleIcon style={{ width: 20, height: 20 }} />
@@ -1041,7 +1064,10 @@ function GrupoLista({ grupo, casos, onEditar, onConcluir }) {
                         <button
                           className="btn btn-link btn-sm p-0 text-muted"
                           title="Editar"
-                          onClick={() => onEditar(t)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onEditar(t)
+                          }}
                         >
                           <PencilSquareIcon style={{ width: 15, height: 15 }} />
                         </button>
