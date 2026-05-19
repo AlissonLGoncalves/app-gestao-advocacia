@@ -30,7 +30,18 @@ os.environ.setdefault("CNJ_JOB_ENABLED", "False")
 from app import create_app, db  # noqa: E402
 
 POLL_INTERVAL_SECONDS = int(os.environ.get("DJEN_WORKER_POLL_INTERVAL", "5"))
-MAX_JOB_AGE_HOURS = int(os.environ.get("DJEN_WORKER_MAX_JOB_AGE_HOURS", "24"))
+# Reduzido de 24h para 30min (incidente 2026-05-19): redeploys no Fly derrubavam
+# o worker no meio de um job, deixando running travado por ate 24h e bloqueando
+# todos os syncs do tenant via de-dup no enqueue. Sync DJEN tipico leva <2min;
+# 30min e margem confortavel pra rate-limit e respostas lentas da ComunicaAPI.
+MAX_RUNNING_MINUTES = int(os.environ.get("DJEN_WORKER_MAX_RUNNING_MINUTES", "30"))
+# Pending sem worker: se enqueue acontece com worker down, job fica pending pra
+# sempre. Maximo razoavel: 10min (5s de poll * margem). Apos isso, marca failed
+# pra que o tenant possa reenfileirar.
+MAX_PENDING_MINUTES = int(os.environ.get("DJEN_WORKER_MAX_PENDING_MINUTES", "10"))
+# Cleanup roda a cada N ciclos. 12 * 5s = 1min. Cheap o suficiente pra rodar
+# frequente sem martelar o DB.
+CLEANUP_EVERY_N_CYCLES = int(os.environ.get("DJEN_WORKER_CLEANUP_CYCLES", "12"))
 
 
 def _setup_logger():
@@ -130,50 +141,87 @@ def _process_job(app, job, logger):
 
 
 def _cleanup_stuck_jobs(session, logger):
-    """Re-enfileira jobs que ficaram em status=running por mais de MAX_JOB_AGE_HOURS.
+    """Reaper de jobs travados — running ou pending orfaos.
 
-    Acontece se worker crashar no meio de um job. Sem isso, a linha
-    fica running para sempre e a de-duplicacao do endpoint bloqueia
-    novos syncs do tenant.
+    - `running` > MAX_RUNNING_MINUTES: worker crashou no meio (ou redeploy).
+      Sem isso, a linha fica running pra sempre e a de-duplicacao do endpoint
+      bloqueia novos syncs do tenant.
+    - `pending` > MAX_PENDING_MINUTES: ninguem pegou (worker estava down quando
+      foi enfileirado). Sync DJEN tipico processa em <2min; pending > 10min
+      indica orfao.
+
+    Em ambos os casos: marca failed pra liberar o tenant pra reenfileirar.
     """
     from datetime import timedelta
 
     from models import DjenSyncJob
 
-    cutoff = datetime.utcnow() - timedelta(hours=MAX_JOB_AGE_HOURS)
-    stuck = (
+    agora = datetime.utcnow()
+    running_cutoff = agora - timedelta(minutes=MAX_RUNNING_MINUTES)
+    pending_cutoff = agora - timedelta(minutes=MAX_PENDING_MINUTES)
+
+    stuck_running = (
         session.query(DjenSyncJob)
-        .filter(DjenSyncJob.status == "running", DjenSyncJob.iniciado_em < cutoff)
+        .filter(DjenSyncJob.status == "running", DjenSyncJob.iniciado_em < running_cutoff)
         .all()
     )
-    for j in stuck:
+    for j in stuck_running:
         logger.warning(
-            f"reaping_stuck_job id={j.id} iniciado_em={j.iniciado_em} "
-            f"running_for={(datetime.utcnow() - j.iniciado_em)}"
+            f"reaping_stuck_running id={j.id} tenant_id={j.tenant_id} "
+            f"iniciado_em={j.iniciado_em} running_for={(agora - j.iniciado_em)}"
         )
         j.status = "failed"
-        j.erro = f"Worker reaped: stuck running > {MAX_JOB_AGE_HOURS}h"
-        j.concluido_em = datetime.utcnow()
-    if stuck:
+        j.erro = f"Worker reaped: stuck running > {MAX_RUNNING_MINUTES}min"
+        j.concluido_em = agora
+
+    stuck_pending = (
+        session.query(DjenSyncJob)
+        .filter(DjenSyncJob.status == "pending", DjenSyncJob.criado_em < pending_cutoff)
+        .all()
+    )
+    for j in stuck_pending:
+        logger.warning(
+            f"reaping_stuck_pending id={j.id} tenant_id={j.tenant_id} "
+            f"criado_em={j.criado_em} pending_for={(agora - j.criado_em)}"
+        )
+        j.status = "failed"
+        j.erro = f"Worker reaped: stuck pending > {MAX_PENDING_MINUTES}min (worker indisponivel?)"
+        j.concluido_em = agora
+
+    if stuck_running or stuck_pending:
         session.commit()
+        logger.info(
+            f"reaper_summary running_reaped={len(stuck_running)} "
+            f"pending_reaped={len(stuck_pending)}"
+        )
 
 
 def main():
     logger = _setup_logger()
     logger.info(
         f"starting djen_worker poll_interval={POLL_INTERVAL_SECONDS}s "
-        f"max_job_age={MAX_JOB_AGE_HOURS}h"
+        f"max_running={MAX_RUNNING_MINUTES}min max_pending={MAX_PENDING_MINUTES}min"
     )
 
     app = create_app()
+
+    # Cleanup imediato no startup. Cobre o caso de redeploy/restart enquanto
+    # havia job em execucao — a maquina antiga morreu sem fechar a linha do DB,
+    # entao a primeira coisa que a nova maquina faz e marcar esses jobs como
+    # failed pra liberar a fila do tenant.
+    with app.app_context():
+        try:
+            _cleanup_stuck_jobs(db.session, logger)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"startup_cleanup_error: {e}", exc_info=True)
+
     cleanup_counter = 0
 
     while True:
         try:
             with app.app_context():
-                # Cleanup de jobs travados a cada ~10 min (120 ciclos de 5s)
                 cleanup_counter += 1
-                if cleanup_counter >= 120:
+                if cleanup_counter >= CLEANUP_EVERY_N_CYCLES:
                     _cleanup_stuck_jobs(db.session, logger)
                     cleanup_counter = 0
 
