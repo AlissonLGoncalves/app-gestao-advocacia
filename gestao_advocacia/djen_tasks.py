@@ -1053,23 +1053,20 @@ def job_monitorar_djen(app, lookback_days=None, tenant_id=None, force=False):
             logger.info(f"JOB DJEN: buscando processo {caso.numero_processo} (caso {caso.id})")
             try:
                 sigla_tribunal = _inferir_sigla_tribunal_por_numero_processo(caso.numero_processo)
-                if buscar_todos_tribunais:
-                    data, items = _consultar_processo_em_todos_tribunais(
-                        numero_processo=caso.numero_processo,
-                        sigla_tribunal=sigla_tribunal,
-                        data_inicio=data_inicio,
-                        data_fim=data_fim,
-                        logger=logger,
-                        siglas_tribunais=siglas_tribunais,
-                    )
-                else:
-                    data, items = _consultar_processo_com_fallback(
-                        numero_processo=caso.numero_processo,
-                        sigla_tribunal=sigla_tribunal,
-                        data_inicio=data_inicio,
-                        data_fim=data_fim,
-                        logger=logger,
-                    )
+                # Bug-fix 2026-05-19: SEMPRE usar fallback simples (sigla
+                # inferida + None) para processo. Cada CNJ pertence a UM
+                # tribunal unico, identificavel pela propria numeracao —
+                # iterar 40+ tribunais explode o rate limit e nunca acha
+                # nada (logs mostravam HTTP 429 constante).
+                # buscar_todos_tribunais=True continua valido SO pra OAB
+                # (advogado pode atuar em multiplos tribunais).
+                data, items = _consultar_processo_com_fallback(
+                    numero_processo=caso.numero_processo,
+                    sigla_tribunal=sigla_tribunal,
+                    data_inicio=data_inicio,
+                    data_fim=data_fim,
+                    logger=logger,
+                )
                 total_itens_encontrados += len(items)
                 user = User.query.get(caso.user_id)
                 tenant_id_caso = user.tenant_id if user else None
