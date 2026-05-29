@@ -1,7 +1,8 @@
-"""Testes do modulo de Notificacoes (model + endpoints + cron job)."""
+"""Testes do modulo de Notificacoes (model + endpoints + cron job + e-mail N3)."""
 
 import json
 from datetime import date, datetime, timedelta
+from unittest.mock import patch
 
 from extensions import db
 from models import Notificacao
@@ -192,3 +193,71 @@ def test_cron_cria_para_despesa_atrasada(auth_client, db, app):
     notifs = Notificacao.query.filter_by(tipo="despesa_atrasada").all()
     assert len(notifs) == 1
     assert notifs[0].link.startswith("/despesas/editar/")
+
+
+# ===== N3: e-mail de vencimento (opt-in) =====
+
+
+def test_me_expoe_preferencia_email_default_true(auth_client, db):
+    res = auth_client.get("/api/v1/auth/me")
+    assert res.status_code == 200
+    assert json.loads(res.data)["notif_email_vencimentos"] is True
+
+
+def test_put_me_atualiza_preferencia_email(auth_client, db):
+    res = auth_client.put("/api/v1/auth/me", json={"notif_email_vencimentos": False})
+    assert res.status_code == 200
+    assert json.loads(res.data)["notif_email_vencimentos"] is False
+    # persiste
+    res2 = auth_client.get("/api/v1/auth/me")
+    assert json.loads(res2.data)["notif_email_vencimentos"] is False
+
+
+def test_cron_envia_email_quando_optin_ativo(auth_client, db, app):
+    """Por padrao (opt-in True), cron dispara e-mail pra notif nova."""
+    em_3 = (date.today() + timedelta(days=3)).isoformat()
+    _criar_recebimento_via_api(auth_client, em_3)
+
+    # enviar_email eh importado dentro de _enviar_email_se_optin
+    # (from mail_service import enviar_email), entao patcha-se no modulo origem.
+    with patch("mail_service.enviar_email") as mock_email:
+        mock_email.return_value = True
+        job_verificar_vencimentos(app)
+
+    # E-mail deve ter sido chamado ao menos 1x (a notif criada)
+    assert mock_email.called
+
+
+def test_cron_nao_envia_email_quando_optout(auth_client, db, app):
+    """Com opt-out (False), cron cria notif in-app mas NAO envia e-mail."""
+    # Desliga preferencia do user logado
+    res_me = auth_client.get("/api/v1/auth/me")
+    json.loads(res_me.data)["id"]
+    auth_client.put("/api/v1/auth/me", json={"notif_email_vencimentos": False})
+
+    em_3 = (date.today() + timedelta(days=3)).isoformat()
+    _criar_recebimento_via_api(auth_client, em_3)
+
+    with patch("mail_service.enviar_email") as mock_email:
+        mock_email.return_value = True
+        job_verificar_vencimentos(app)
+
+    # Notif in-app criada, mas e-mail NAO enviado
+    assert Notificacao.query.filter_by(tipo="recebimento_vencendo").count() == 1
+    assert not mock_email.called
+
+
+def test_cron_idempotente_nao_reenvia_email(auth_client, db, app):
+    """Rodar 2x: e-mail so na 1a (2a cai no dedupe e nao reenvia)."""
+    em_3 = (date.today() + timedelta(days=3)).isoformat()
+    _criar_recebimento_via_api(auth_client, em_3)
+
+    with patch("mail_service.enviar_email") as mock_email:
+        mock_email.return_value = True
+        job_verificar_vencimentos(app)
+        primeira = mock_email.call_count
+        job_verificar_vencimentos(app)
+        segunda = mock_email.call_count
+
+    assert primeira == 1
+    assert segunda == 1  # nao reenviou na 2a rodada

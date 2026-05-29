@@ -26,6 +26,7 @@ function PerfilPage() {
     numero_oab: '',
     sigla_oab_tribunal: '',
     cpf: '',
+    notif_email_vencimentos: true,
   })
   const [historico, setHistorico] = useState([])
 
@@ -50,6 +51,7 @@ function PerfilPage() {
             numero_oab: data.numero_oab || '',
             sigla_oab_tribunal: data.sigla_oab_tribunal || '',
             cpf: data.cpf || '',
+            notif_email_vencimentos: data.notif_email_vencimentos !== false,
           })
         } else {
           toast.error('Não foi possível carregar seus dados de perfil.')
@@ -71,8 +73,8 @@ function PerfilPage() {
   }, [])
 
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
+    const { name, value, type, checked } = e.target
+    setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const handleSubmit = async (e) => {
@@ -85,6 +87,7 @@ function PerfilPage() {
         nome_completo: form.nome_completo || null,
         numero_oab: form.numero_oab || null,
         sigla_oab_tribunal: form.sigla_oab_tribunal || null,
+        notif_email_vencimentos: form.notif_email_vencimentos,
       }
 
       if (!cpfPreenchido && form.cpf) {
@@ -196,6 +199,28 @@ function PerfilPage() {
                   {cpfPreenchido && (
                     <small className="text-muted">CPF já cadastrado e bloqueado para edição.</small>
                   )}
+                </div>
+
+                <div className="col-12">
+                  <label className="form-label fw-semibold mb-2">Notificações</label>
+                  <div className="form-check form-switch">
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      className="form-check-input"
+                      id="notif_email_vencimentos"
+                      name="notif_email_vencimentos"
+                      checked={form.notif_email_vencimentos}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                    <label className="form-check-label" htmlFor="notif_email_vencimentos">
+                      Receber e-mail sobre recebimentos e despesas a vencer
+                    </label>
+                  </div>
+                  <small className="text-muted">
+                    As notificações no sino (🔔) continuam ativas independente desta opção.
+                  </small>
                 </div>
               </div>
 

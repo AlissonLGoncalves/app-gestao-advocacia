@@ -74,6 +74,10 @@ class User(db.Model):
     numero_oab = db.Column(db.String(30), nullable=True)
     sigla_oab_tribunal = db.Column(db.String(10), nullable=True)
     djen_monitoramento_ativo = db.Column(db.Boolean, nullable=True, default=True)
+    # N3 Notificacoes: opt-in de e-mail pros avisos de vencimento (recebimentos/
+    # despesas). Default True; usuario pode desligar em /perfil. As notificacoes
+    # in-app (sino) continuam independente desta flag.
+    notif_email_vencimentos = db.Column(db.Boolean, nullable=False, default=True)
     portal_cliente_id = db.Column(
         db.Integer, db.ForeignKey("cliente.id", name="fk_user_portal_cliente_id"), nullable=True
     )
@@ -123,6 +127,9 @@ class User(db.Model):
             "tipo_pessoa": self.tipo_pessoa,
             "cpf": self.cpf,
             "portal_cliente_id": self.portal_cliente_id,
+            "notif_email_vencimentos": (
+                self.notif_email_vencimentos if self.notif_email_vencimentos is not None else True
+            ),
         }
 
 
