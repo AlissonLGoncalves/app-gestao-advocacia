@@ -348,6 +348,11 @@ def register_api_routes(app, api, finance_access_required):
             ),
             "data_ultima_verificacao_cnj": fields.DateTime(dt_format="iso8601", nullable=True),
             "movimentacoes_cnj_count": fields.Integer,
+            # Transiente: na criacao via POST, quantas publicacoes DJEN pendentes
+            # foram vinculadas a este caso na hora. Ausente nas demais respostas.
+            "publicacoes_djen_vinculadas": fields.Integer(
+                attribute=lambda c: getattr(c, "publicacoes_djen_vinculadas", None)
+            ),
         },
     )
 
