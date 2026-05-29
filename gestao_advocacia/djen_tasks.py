@@ -461,15 +461,36 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
     # so vinculamos automaticamente quando caso_id veio None.
     status_origem_default = "pendente"
 
-    # 1) Tentativa por numero de processo exato (caminho original).
+    # 1) Tentativa por numero de processo (CNJ) — match NORMALIZADO.
+    # Antes era filter_by(numero_processo=numero_proc) exato: falhava quando o
+    # caso foi cadastrado com mascara (0000295-92.2017.8.16.0075) e a pub vinha
+    # com formato diferente (so digitos, ou mascara distinta) — embora fosse o
+    # MESMO processo. Agora normalizamos os dois lados removendo "." e "-"
+    # (unicos separadores do formato CNJ). func.replace funciona em SQLite
+    # (testes) e PostgreSQL (prod). Tenta exato primeiro (usa indice), depois
+    # o normalizado como fallback.
     if caso_id is None and numero_proc:
         try:
+            import re as _re  # noqa: PLC0415
+
+            from sqlalchemy import func  # noqa: PLC0415
+
             from models import Caso  # noqa: PLC0415
 
             caso_match = Caso.query.filter_by(
                 tenant_id=tenant_id,
                 numero_processo=numero_proc,
             ).first()
+            if not caso_match:
+                cnj_dig = _re.sub(r"\D", "", str(numero_proc))
+                # >= 20 digitos = CNJ completo; evita match espurio de numeros curtos.
+                if len(cnj_dig) >= 20:
+                    caso_match = Caso.query.filter(
+                        Caso.tenant_id == tenant_id,
+                        Caso.numero_processo.isnot(None),
+                        func.replace(func.replace(Caso.numero_processo, ".", ""), "-", "")
+                        == cnj_dig,
+                    ).first()
             if caso_match:
                 caso_id = caso_match.id
                 status_origem_default = "criado_automaticamente"

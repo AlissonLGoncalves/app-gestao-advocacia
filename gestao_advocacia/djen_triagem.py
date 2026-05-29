@@ -281,6 +281,7 @@ def construir_indices_auto_vinculo(Cliente, Caso, tenant_id):
     iterar muitas publicacoes — evita N+1 queries.
 
     Retorna dict com:
+    - cnj_to_caso_id: {numero_processo_digitos: caso_id}  (match mais forte)
     - cpf_to_caso_id: {cpf_digitos: caso_id}
     - nome_norm_to_caso_id: {nome_normalizado: caso_id}
     """
@@ -295,6 +296,29 @@ def construir_indices_auto_vinculo(Cliente, Caso, tenant_id):
         .order_by(Caso.id.desc())
         .all()
     )
+
+    # Indice por numero de processo (CNJ) — o match MAIS FORTE e inequivoco.
+    # Inclui TODOS os casos do tenant com numero_processo (mesmo arquivados):
+    # uma intimacao do numero X pertence ao processo X, periodo. Diferente de
+    # CPF/nome (que podem mapear varios casos), o CNJ eh identificador unico.
+    # Query separada e barata (so a coluna numero_processo importa).
+    cnj_to_caso_id = {}
+    casos_com_cnj = (
+        Caso.query.filter(
+            Caso.tenant_id == tenant_id,
+            Caso.numero_processo.isnot(None),
+            Caso.numero_processo != "",
+        )
+        .order_by(Caso.id.desc())
+        .all()
+    )
+    for caso in casos_com_cnj:
+        cnj_dig = re.sub(r"\D", "", caso.numero_processo or "")
+        # >= 20 digitos = numero CNJ completo. Evita match espurio de numeros
+        # curtos/antigos. Mantem o primeiro (casos ordenados por id desc =
+        # mais recente vence em caso de duplicata do mesmo numero).
+        if len(cnj_dig) >= 20 and cnj_dig not in cnj_to_caso_id:
+            cnj_to_caso_id[cnj_dig] = caso.id
 
     # Mapa cliente_id -> caso_id (mais recente)
     cliente_to_caso = {}
@@ -321,6 +345,7 @@ def construir_indices_auto_vinculo(Cliente, Caso, tenant_id):
                 nome_norm_to_caso_id[nome_norm] = caso_id
 
     return {
+        "cnj_to_caso_id": cnj_to_caso_id,
         "cpf_to_caso_id": cpf_to_caso_id,
         "nome_norm_to_caso_id": nome_norm_to_caso_id,
     }
@@ -332,8 +357,17 @@ def tentar_auto_vincular_via_indices(analise, indices):
 
     Retorna caso_id ou None.
     """
+    cnj_to_caso = indices.get("cnj_to_caso_id") or {}
     cpf_to_caso = indices.get("cpf_to_caso_id") or {}
     nome_to_caso = indices.get("nome_norm_to_caso_id") or {}
+
+    # 0) Numero de processo (CNJ) exato — precedencia MAXIMA. O numero eh
+    # identificador unico do processo; se bate, a intimacao e daquele caso.
+    numero = analise.get("numero_processo")
+    if numero:
+        cnj_dig = re.sub(r"\D", "", str(numero))
+        if len(cnj_dig) >= 20 and cnj_dig in cnj_to_caso:
+            return cnj_to_caso[cnj_dig]
 
     # 1) CPF/CNPJ exato
     documentos = [re.sub(r"\D", "", d) for d in (analise.get("documentos_extraidos") or []) if d]
