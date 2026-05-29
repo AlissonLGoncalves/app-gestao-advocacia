@@ -89,7 +89,9 @@ def _inferir_tribunal(text):
 # num campo só. Agora paramos antes da próxima label.
 _STOP_LABELS_RE = (
     r"advogad[oa]?(?:\(a\))?|procurador(?:\(a\))?|representante|"
-    r"reu(?:\(s\))?\s*[:\-]|requerid[oa]s?\s*[:\-]|executad[oa]s?\s*[:\-]|"
+    # r[eé]u: para o campo anterior tambem em "RÉU:" acentuado (nao so "REU:").
+    r"r[eé]u(?:\(s\))?\s*[:\-]|requerid[oa]s?\s*[:\-]|reclamad[oa]s?\s*[:\-]|"
+    r"reclamante\s*[:\-]|executad[oa]s?\s*[:\-]|"
     r"impetrad[oa]s?\s*[:\-]|polo\s*passivo\s*[:\-]|polo\s*ativo\s*[:\-]|"
     r"requerente\s*[:\-]|exequente\s*[:\-]|impetrante\s*[:\-]|autor\(s\)\s*[:\-]|"
     r"despach[oa]|decis[ãa]o|sentenc[ae]|intima[cç][ãa]o|"
@@ -198,6 +200,7 @@ def analisar_publicacao(publicacao):
             r"autor\(s\)",
             r"autor(?:a)?",
             r"requerente",
+            r"reclamante",  # autor na Justica do Trabalho
             r"exequente",
             r"polo\s*ativo",
             r"impetrante",
@@ -206,12 +209,17 @@ def analisar_publicacao(publicacao):
     reus = _extract_labeled_entities(
         texto_total,
         [
-            r"reu\(s\)",
-            r"reu",
-            r"requerido",
-            r"executado",
+            # r[eé]u: aceita "REU" e "RÉU" (acentuado). re.IGNORECASE NAO ignora
+            # acento, entao sem o [eé] o label "reu" nunca casava "RÉU:" — que eh
+            # justamente como o DJEN escreve. Bug: polo passivo vinha vazio em
+            # publicacoes (trabalhista, civel) que usam "RÉU:".
+            r"r[eé]u\(s\)",
+            r"r[eé]u",
+            r"requerid[oa]s?",
+            r"reclamad[oa]s?",
+            r"executad[oa]s?",
             r"polo\s*passivo",
-            r"impetrado",
+            r"impetrad[oa]s?",
         ],
     )
     representantes = _extract_labeled_entities(
