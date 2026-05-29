@@ -92,6 +92,58 @@ def test_texto_real_campos_processuais_extraidos():
     assert resultado["comarca"].startswith("CORNELIO PROCOPIO")
 
 
+# ---------------------------------------------------------------------------
+# Acentos e termos trabalhistas (bug: "RÉU:" acentuado nao era extraido,
+# pois re.IGNORECASE nao ignora acento — polo passivo vinha vazio)
+# ---------------------------------------------------------------------------
+
+# Texto real do tipo que vinha com partes_reus VAZIO (Justica do Trabalho,
+# usa "RÉU:" acentuado).
+TEXTO_TRABALHISTA = (
+    "PODER JUDICIARIO JUSTICA DO TRABALHO TRIBUNAL REGIONAL DO TRABALHO DA 9 REGIAO "
+    "VARA DO TRABALHO DE CORNELIO PROCOPIO ATSum 0000772-27.2025.5.09.0093 "
+    "AUTOR: MARIA ANGELA VICTOR MARCELINO "
+    "RÉU: JOSE MOACIR FERRACINI E OUTROS (3) "
+    "INTIMACAO Fica V. Sa. intimado para tomar ciencia da Sentenca."
+)
+
+
+def test_extrai_reu_acentuado():
+    """'RÉU:' (acentuado) deve popular partes_reus — antes vinha vazio."""
+    resultado = analisar_publicacao(MockPub(TEXTO_TRABALHISTA))
+    reus_norm = [normalizar_nome(r) for r in resultado["partes_reus"]]
+    assert any(
+        "jose moacir ferracini" in r for r in reus_norm
+    ), f"réu acentuado não extraído: {resultado['partes_reus']}"
+
+
+def test_extrai_autor_e_separa_do_reu_acentuado():
+    """Autor não deve 'vazar' pro nome do réu (stop label cobre RÉU acentuado)."""
+    resultado = analisar_publicacao(MockPub(TEXTO_TRABALHISTA))
+    autoras_norm = [normalizar_nome(a) for a in resultado["partes_autoras"]]
+    assert any(
+        "maria angela victor marcelino" in a for a in autoras_norm
+    ), f"autor não extraído: {resultado['partes_autoras']}"
+    # autor não pode conter "RÉU"/"JOSE" colado
+    assert all(
+        "jose" not in a for a in autoras_norm
+    ), f"autor vazou pro réu: {resultado['partes_autoras']}"
+
+
+def test_extrai_reclamante_reclamado_trabalhista():
+    """Termos trabalhistas RECLAMANTE/RECLAMADO também são reconhecidos."""
+    texto = (
+        "Processo: 0000772-27.2025.5.09.0093 "
+        "RECLAMANTE: JOAO DA SILVA "
+        "RECLAMADO: EMPRESA ACME LTDA"
+    )
+    resultado = analisar_publicacao(MockPub(texto))
+    autoras = [normalizar_nome(a) for a in resultado["partes_autoras"]]
+    reus = [normalizar_nome(r) for r in resultado["partes_reus"]]
+    assert any("joao da silva" in a for a in autoras), f"reclamante: {resultado['partes_autoras']}"
+    assert any("empresa acme" in r for r in reus), f"reclamado: {resultado['partes_reus']}"
+
+
 def test_extrai_nome_juiz_do_texto():
     texto = (
         "Processo: 0005555-44.2025.8.16.0001\n"
