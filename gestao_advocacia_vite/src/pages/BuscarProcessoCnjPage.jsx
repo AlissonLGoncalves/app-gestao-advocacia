@@ -10,8 +10,21 @@ import {
   ExclamationTriangleIcon,
   ArrowPathIcon,
   BuildingLibraryIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline'
-import { buscarProcessoOnDemand } from '../api/casos.js'
+import { buscarProcessoOnDemand, createCaso } from '../api/casos.js'
+import { createCliente, listClientes } from '../api/clientes.js'
+
+// Converte valor da causa textual ("R$ 1.500,00" ou "1500.00") em número.
+function parseValorCausa(valor) {
+  if (valor === null || valor === undefined || valor === '') return null
+  if (typeof valor === 'number') return valor
+  const txt = String(valor).replace('R$', '').trim()
+  if (!txt) return null
+  const normalizado = txt.includes(',') ? txt.replace(/\./g, '').replace(',', '.') : txt
+  const num = Number(normalizado)
+  return Number.isFinite(num) ? num : null
+}
 
 const ERRO_LEGIVEL = {
   cnj_invalido: 'Número CNJ inválido. Verifique e tente novamente.',
@@ -29,6 +42,87 @@ function BuscarProcessoCnjPage() {
   const [cnj, setCnj] = useState('')
   const [buscando, setBuscando] = useState(false)
   const [resposta, setResposta] = useState(null)
+
+  // Fluxo "Criar caso com estes dados" (modal)
+  const [modalCriar, setModalCriar] = useState(false)
+  const [papelCliente, setPapelCliente] = useState('autor') // autor | reu
+  const [clienteSel, setClienteSel] = useState('novo') // 'novo' | id
+  const [tipoNovo, setTipoNovo] = useState('PF')
+  const [tituloCaso, setTituloCaso] = useState('')
+  const [clientes, setClientes] = useState([])
+  const [criando, setCriando] = useState(false)
+
+  const r = resposta?.resultado
+  const poloAtivoNome = (r?.polo_ativo || [])[0]?.nome || ''
+  const poloPassivoNome = (r?.polo_passivo || [])[0]?.nome || ''
+  // Nome do cliente (lado escolhido) e parte contraria (lado oposto)
+  const nomeClientePadrao = papelCliente === 'autor' ? poloAtivoNome : poloPassivoNome
+  const parteContraria = papelCliente === 'autor' ? poloPassivoNome : poloAtivoNome
+
+  const abrirModalCriar = async () => {
+    setTituloCaso(r?.titulo_sugerido || (r?.cnj_normalizado ? `Processo ${r.cnj_normalizado}` : ''))
+    // Default: cliente eh o polo ativo (autor) — caso mais comum
+    setPapelCliente('autor')
+    setClienteSel('novo')
+    setTipoNovo('PF')
+    setModalCriar(true)
+    try {
+      const data = await listClientes({ sort_by: 'nome_razao_social', order: 'asc' })
+      setClientes(Array.isArray(data) ? data : data?.clientes || [])
+    } catch {
+      setClientes([])
+    }
+  }
+
+  const handleCriarCaso = async () => {
+    if (!tituloCaso.trim()) {
+      toast.warn('Informe um título para o caso.')
+      return
+    }
+    setCriando(true)
+    try {
+      // 1) resolve cliente: existente ou novo (com o nome do polo escolhido)
+      let clienteId = clienteSel
+      if (clienteSel === 'novo') {
+        if (!nomeClientePadrao.trim()) {
+          toast.warn('Não há nome de parte para criar o cliente. Selecione um cliente existente.')
+          setCriando(false)
+          return
+        }
+        const novo = await createCliente({
+          nome_razao_social: nomeClientePadrao.trim(),
+          tipo_pessoa: tipoNovo,
+        })
+        clienteId = novo.id
+      }
+      // 2) cria o caso com os dados do tribunal pre-preenchidos
+      const caso = await createCaso({
+        titulo: tituloCaso.trim(),
+        cliente_id: parseInt(clienteId, 10),
+        numero_processo: r.cnj_normalizado || cnj.trim(),
+        tipo_acao: r.classe_acao || null,
+        vara_juizo: r.vara_juizo || null,
+        instancia: r.instancia || null,
+        data_distribuicao: r.data_distribuicao || null,
+        valor_causa: parseValorCausa(r.valor_causa),
+        parte_contraria: parteContraria || null,
+        status: 'Ativo',
+      })
+      toast.success('Caso criado com os dados do tribunal!')
+      const vinc = caso?.publicacoes_djen_vinculadas || 0
+      if (vinc > 0) {
+        toast.info(`${vinc} intimação(ões) do DJEN deste processo foram vinculadas ao caso.`, {
+          autoClose: 7000,
+        })
+      }
+      setModalCriar(false)
+      navigate(`/casos/detalhe/${caso.id}`)
+    } catch (err) {
+      toast.error(err?.message || 'Falha ao criar o caso.')
+    } finally {
+      setCriando(false)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -75,7 +169,7 @@ function BuscarProcessoCnjPage() {
 
   const renderResultado = () => {
     if (!resposta?.resultado) return null
-    const r = resposta.resultado
+    const r = resposta.resultado // eslint-disable-line no-shadow
     if (!r.sucesso) {
       return (
         <div className="alert alert-warning d-flex gap-2 align-items-start">
@@ -92,7 +186,19 @@ function BuscarProcessoCnjPage() {
         <div className="card-header bg-success-subtle py-2 px-3 d-flex align-items-center gap-2">
           <CheckCircleIcon style={{ width: 16, height: 16 }} className="text-success" />
           <h6 className="mb-0">Processo encontrado</h6>
-          {r.fonte && <span className="badge bg-light text-muted ms-auto">via {r.fonte}</span>}
+          {r.fonte && <span className="badge bg-light text-muted">via {r.fonte}</span>}
+          {/* So oferece criar quando ainda NAO existe caso com esse numero */}
+          {!resposta?.ja_cadastrado && (
+            <button
+              type="button"
+              className="btn btn-sm btn-success ms-auto d-inline-flex align-items-center gap-1"
+              onClick={abrirModalCriar}
+              data-testid="btn-criar-caso-da-busca"
+            >
+              <PlusIcon style={{ width: 14, height: 14 }} />
+              Criar caso com estes dados
+            </button>
+          )}
         </div>
         <div className="card-body">
           {r.titulo_sugerido && <h5 className="mb-3">{r.titulo_sugerido}</h5>}
@@ -258,6 +364,146 @@ function BuscarProcessoCnjPage() {
       {renderTribunal()}
       {renderJaCadastrado()}
       {renderResultado()}
+
+      {/* Modal: criar caso com os dados do tribunal */}
+      {modalCriar && r && (
+        <>
+          <div className="modal show d-block" tabIndex="-1" role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content">
+                <div className="modal-header py-2">
+                  <h6 className="modal-title">
+                    <PlusIcon style={{ width: 16, height: 16 }} className="me-1" />
+                    Criar caso com os dados do tribunal
+                  </h6>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    aria-label="Fechar"
+                    onClick={() => setModalCriar(false)}
+                    disabled={criando}
+                  />
+                </div>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label form-label-sm">Título do caso</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      value={tituloCaso}
+                      onChange={(e) => setTituloCaso(e.target.value)}
+                      disabled={criando}
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label form-label-sm d-block">Meu cliente é o:</label>
+                    <div className="btn-group btn-group-sm" role="group">
+                      <button
+                        type="button"
+                        className={`btn ${papelCliente === 'autor' ? 'btn-primary' : 'btn-outline-primary'}`}
+                        onClick={() => {
+                          setPapelCliente('autor')
+                          setClienteSel('novo')
+                        }}
+                        disabled={criando}
+                      >
+                        Autor {poloAtivoNome && `(${poloAtivoNome})`}
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${papelCliente === 'reu' ? 'btn-primary' : 'btn-outline-primary'}`}
+                        onClick={() => {
+                          setPapelCliente('reu')
+                          setClienteSel('novo')
+                        }}
+                        disabled={criando}
+                      >
+                        Réu {poloPassivoNome && `(${poloPassivoNome})`}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mb-2">
+                    <label className="form-label form-label-sm">Cliente</label>
+                    <select
+                      className="form-select form-select-sm"
+                      value={clienteSel}
+                      onChange={(e) => setClienteSel(e.target.value)}
+                      disabled={criando}
+                    >
+                      <option value="novo">
+                        ➕ Criar novo cliente{nomeClientePadrao ? `: ${nomeClientePadrao}` : ''}
+                      </option>
+                      {clientes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome_razao_social}
+                        </option>
+                      ))}
+                    </select>
+                    {clienteSel === 'novo' && !nomeClientePadrao && (
+                      <small className="text-danger d-block mt-1">
+                        O tribunal não retornou o nome do {papelCliente}. Escolha um cliente
+                        existente ou troque o polo.
+                      </small>
+                    )}
+                  </div>
+
+                  {clienteSel === 'novo' && nomeClientePadrao && (
+                    <div className="mb-2">
+                      <label className="form-label form-label-sm">Tipo do novo cliente</label>
+                      <select
+                        className="form-select form-select-sm"
+                        style={{ maxWidth: 120 }}
+                        value={tipoNovo}
+                        onChange={(e) => setTipoNovo(e.target.value)}
+                        disabled={criando}
+                      >
+                        <option value="PF">PF</option>
+                        <option value="PJ">PJ</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="bg-light rounded p-2 small text-muted mt-3">
+                    Será criado com: nº <code>{r.cnj_normalizado}</code>
+                    {r.classe_acao && <> · {r.classe_acao}</>}
+                    {r.vara_juizo && <> · {r.vara_juizo}</>}
+                    {parteContraria && (
+                      <>
+                        {' '}
+                        · parte contrária: <strong>{parteContraria}</strong>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="modal-footer py-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => setModalCriar(false)}
+                    disabled={criando}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-success"
+                    onClick={handleCriarCaso}
+                    disabled={criando}
+                  >
+                    {criando && (
+                      <span className="spinner-border spinner-border-sm me-2" role="status" />
+                    )}
+                    Criar caso
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop show" />
+        </>
+      )}
     </div>
   )
 }
