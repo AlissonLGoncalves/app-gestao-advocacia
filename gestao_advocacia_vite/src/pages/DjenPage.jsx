@@ -651,7 +651,8 @@ export default function DjenPage() {
         )
       } else {
         toast.info(
-          `Nenhuma publicação pôde ser vinculada automaticamente (${ainda} ainda pendentes — precisam de cliente cadastrado com CPF/CNPJ ou nome compatível).`
+          `Nenhum vínculo automático possível. As ${ainda} pendentes são de processos ainda não cadastrados como caso (e sem cliente com CPF/CNPJ ou nome compatível). Use "Criar cliente e caso" — a partir daí, novas intimações desse processo já chegam vinculadas.`,
+          { autoClose: 8000 }
         )
       }
       await carregarTriagem()
@@ -1716,7 +1717,7 @@ export default function DjenPage() {
                       </button>
                       <button
                         className="btn btn-warning btn-sm"
-                        title="Reprocessa todas as pendentes vinculando automaticamente quando o CPF/CNPJ ou nome do cliente estiver cadastrado"
+                        title="Reprocessa as pendentes e vincula automaticamente quando o número do processo, CPF/CNPJ ou nome do cliente já estiver cadastrado"
                         disabled={autoVinculandoPendentes || triagemTotal === 0}
                         onClick={autoVincularPendentes}
                       >
