@@ -368,3 +368,94 @@ def test_gerar_resumo_caso_com_publicacoes_djen_persiste_descricao(auth_client, 
 
     caso_atualizado = db.session.get(Caso, caso_id)
     assert caso_atualizado.descricao == resumo_gerado
+
+
+# ---------------------------------------------------------------------------
+# Ao criar caso, vincular intimacoes DJEN PENDENTES do mesmo numero na hora
+# (fecha o ciclo do auto-vinculo: cadastrou processo -> intimacoes aparecem
+# no caso imediatamente, sem esperar o cron)
+# ---------------------------------------------------------------------------
+
+CNJ_VINCULO = "0000472-75.2025.8.16.0075"
+CNJ_VINCULO_DIGITOS = "00004727520258160075"
+
+
+def _criar_pub_pendente(db, tenant_id, user_id, numero_processo, djen_id):
+    pub = PublicacaoDJEN(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        caso_id=None,
+        triagem_ignorada=False,
+        numero_processo=numero_processo,
+        djen_id=djen_id,
+        data_disponibilizacao=date(2026, 5, 1),
+        tipo_comunicacao="Intimação",
+        texto="Intima-se para manifestacao.",
+        sigla_tribunal="TJPR",
+    )
+    db.session.add(pub)
+    db.session.commit()
+    return pub
+
+
+def test_criar_caso_vincula_pendentes_mesmo_numero(auth_client, db):
+    cliente_id = criar_cliente_teste(auth_client)
+    # Descobre tenant/user do cliente recem-criado
+    cli_user = db.session.execute(
+        db.text("SELECT tenant_id, user_id FROM cliente WHERE id = :i"), {"i": cliente_id}
+    ).first()
+    tenant_id, user_id = cli_user[0], cli_user[1]
+
+    # 2 pendentes do mesmo processo (uma com mascara, outra so digitos)
+    p1 = _criar_pub_pendente(db, tenant_id, user_id, CNJ_VINCULO, 90001)
+    p2 = _criar_pub_pendente(db, tenant_id, user_id, CNJ_VINCULO_DIGITOS, 90002)
+    # 1 de outro processo — NAO deve vincular
+    p3 = _criar_pub_pendente(db, tenant_id, user_id, "5001234-80.2024.4.04.7100", 90003)
+
+    res = auth_client.post(
+        "/api/v1/casos",
+        json={**CASO_BASE, "cliente_id": cliente_id, "numero_processo": CNJ_VINCULO},
+    )
+    assert res.status_code == 201, res.data
+    data = json.loads(res.data)
+    caso_id = data["id"]
+    # DTO informa quantas vincularam
+    assert data["publicacoes_djen_vinculadas"] == 2
+
+    db.session.refresh(p1)
+    db.session.refresh(p2)
+    db.session.refresh(p3)
+    assert p1.caso_id == caso_id
+    assert p2.caso_id == caso_id  # match normalizado (so digitos)
+    assert p3.caso_id is None  # outro processo, intacto
+
+
+def test_criar_caso_nao_vincula_ignoradas(auth_client, db):
+    cliente_id = criar_cliente_teste(auth_client)
+    cli_user = db.session.execute(
+        db.text("SELECT tenant_id, user_id FROM cliente WHERE id = :i"), {"i": cliente_id}
+    ).first()
+    tenant_id, user_id = cli_user[0], cli_user[1]
+
+    pub = _criar_pub_pendente(db, tenant_id, user_id, CNJ_VINCULO, 90010)
+    pub.triagem_ignorada = True
+    db.session.commit()
+
+    res = auth_client.post(
+        "/api/v1/casos",
+        json={**CASO_BASE, "cliente_id": cliente_id, "numero_processo": CNJ_VINCULO},
+    )
+    assert res.status_code == 201, res.data
+    assert json.loads(res.data)["publicacoes_djen_vinculadas"] == 0
+    db.session.refresh(pub)
+    assert pub.caso_id is None  # ignorada continua fora
+
+
+def test_criar_caso_sem_numero_nao_vincula(auth_client, db):
+    cliente_id = criar_cliente_teste(auth_client)
+    res = auth_client.post(
+        "/api/v1/casos",
+        json={"titulo": "Sem numero", "cliente_id": cliente_id, "status": "Ativo"},
+    )
+    assert res.status_code == 201, res.data
+    assert json.loads(res.data)["publicacoes_djen_vinculadas"] == 0

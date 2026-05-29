@@ -188,6 +188,15 @@ function useCasoForm({
           : await createCaso(dadosParaEnviar)
 
         toast.success(`Caso ${isEditing ? 'atualizado' : 'adicionado'} com sucesso!`)
+        // Avisa quando intimacoes DJEN ja pendentes foram vinculadas a este
+        // caso na criacao (fecha o ciclo do auto-vinculo por numero).
+        const vinculadas = responseData?.publicacoes_djen_vinculadas || 0
+        if (!isEditing && vinculadas > 0) {
+          toast.info(
+            `${vinculadas} intimação(ões) do DJEN deste processo já foram vinculadas a este caso.`,
+            { autoClose: 7000 }
+          )
+        }
         // Persiste o markdown do auto-preenchimento (se houver) como Documento
         // vinculado. Acontece em paralelo com a criacao de eventos.
         if (textoExtraido && responseData.id) {

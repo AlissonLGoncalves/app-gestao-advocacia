@@ -49,6 +49,47 @@ def register_casos_routes(
             return f"{digitos[0:4]}-{digitos[4:6]}-{digitos[6:8]}"
         return ""
 
+    def _vincular_pendentes_djen_ao_caso(caso):
+        """Vincula a `caso` as publicacoes DJEN PENDENTES (sem caso, nao
+        ignoradas) cujo numero de processo bate com o do caso — na hora.
+
+        Fecha o ciclo do auto-vinculo (#284): antes, ao cadastrar um caso, as
+        intimacoes daquele processo ja capturadas ficavam na fila de triagem
+        ate o cron rodar. Agora aparecem dentro do caso imediatamente.
+
+        Match NORMALIZADO (remove ./-), igual ao da ingestao. So pra CNJ
+        completo (>= 20 digitos). Retorna a quantidade vinculada.
+        """
+        import re as _re  # noqa: PLC0415
+
+        from sqlalchemy import func as _func  # noqa: PLC0415
+
+        if not caso.numero_processo:
+            return 0
+        cnj_dig = _re.sub(r"\D", "", caso.numero_processo)
+        if len(cnj_dig) < 20:
+            return 0
+        try:
+            pendentes = (
+                query_for_tenant(PublicacaoDJEN)
+                .filter(
+                    PublicacaoDJEN.caso_id.is_(None),
+                    PublicacaoDJEN.triagem_ignorada.is_(False),
+                    PublicacaoDJEN.numero_processo.isnot(None),
+                    _func.replace(_func.replace(PublicacaoDJEN.numero_processo, ".", ""), "-", "")
+                    == cnj_dig,
+                )
+                .all()
+            )
+            for pub in pendentes:
+                pub.caso_id = caso.id
+                if hasattr(pub, "status_origem"):
+                    pub.status_origem = "criado_automaticamente"
+            return len(pendentes)
+        except Exception as exc:
+            app.logger.warning(f"Falha ao vincular pendentes DJEN ao caso {caso.id}: {exc}")
+            return 0
+
     def _preencher_caso_from_data(caso, data):
         """Helper para preencher campos do caso a partir dos dados recebidos."""
         caso.titulo = data.get("titulo", caso.titulo)
@@ -960,6 +1001,9 @@ def register_casos_routes(
 
             db.session.add(novo_caso)
             db.session.flush()
+            # Vincula intimacoes DJEN ja pendentes deste numero de processo —
+            # aparecem no caso na hora, sem esperar o cron (fecha o ciclo #284).
+            vinculadas = _vincular_pendentes_djen_ao_caso(novo_caso)
             log_audit(
                 "CREATE",
                 "Caso",
@@ -968,8 +1012,11 @@ def register_casos_routes(
             )
             db.session.commit()
             app.logger.info(
-                f"Novo caso '{novo_caso.titulo}' (ID: {novo_caso.id}) criado para usuário ID {user_id}."
+                f"Novo caso '{novo_caso.titulo}' (ID: {novo_caso.id}) criado para usuário "
+                f"ID {user_id}. {vinculadas} publicacao(oes) DJEN vinculada(s) na criacao."
             )
+            # Atributo transiente lido pelo DTO pra UI informar o vinculo.
+            novo_caso.publicacoes_djen_vinculadas = vinculadas
             return novo_caso, 201
 
     @casos_ns.route("/<int:caso_id_param>")
