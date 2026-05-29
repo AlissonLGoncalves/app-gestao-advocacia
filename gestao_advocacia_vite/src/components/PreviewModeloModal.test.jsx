@@ -75,8 +75,13 @@ describe('PreviewModeloModal', () => {
 
     fireEvent.change(screen.getByTestId('preview-cliente-select'), { target: { value: '1' } })
 
+    // O select de casos so habilita quando (a) clienteId esta setado E (b) os
+    // casos terminaram de carregar (fetch async no mount). O waitFor(listClientes)
+    // acima nao garante que listCasos ja resolveu — por isso o assert sincrono
+    // anterior era flaky (casosDoCliente ainda []  => disabled=true). waitFor
+    // espera o re-render apos os casos carregarem.
     const casoSelect = screen.getByTestId('preview-caso-select')
-    expect(casoSelect).not.toBeDisabled()
+    await waitFor(() => expect(casoSelect).not.toBeDisabled())
     // Cliente 1 só tem caso 10, não 11
     const opcoes = Array.from(casoSelect.querySelectorAll('option')).map((o) => o.value)
     expect(opcoes).toContain('10')
