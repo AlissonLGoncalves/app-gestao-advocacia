@@ -861,8 +861,9 @@ def registrar_rotas_djen(
             security="jsonWebToken",
             description=(
                 "Reprocessa todas as publicacoes pendentes do tenant aplicando "
-                "auto-vinculo por CPF/CNPJ ou nome de cliente cadastrado. "
-                "Resolve o backlog de pubs ingeridas antes do auto-vinculo expandido."
+                "auto-vinculo por numero de processo (CNJ), CPF/CNPJ ou nome de "
+                "cliente cadastrado. Resolve o backlog de pubs ingeridas antes do "
+                "auto-vinculo expandido."
             ),
         )
         @jwt_required()
