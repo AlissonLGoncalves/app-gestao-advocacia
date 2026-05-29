@@ -682,10 +682,8 @@ function CasoList({ onEditCaso, refreshKey }) {
                         role="button"
                         className="text-primary text-decoration-underline"
                         style={{ cursor: 'pointer' }}
-                        title="Ver publicações DJEN deste processo"
-                        onClick={() =>
-                          navigate(`/djen?processo=${encodeURIComponent(caso.numero_processo)}`)
-                        }
+                        title="Abrir o processo (movimentações e publicações vinculadas)"
+                        onClick={() => navigate(`/casos/detalhe/${caso.id}?tab=historico`)}
                       >
                         {caso.numero_processo}
                       </span>
