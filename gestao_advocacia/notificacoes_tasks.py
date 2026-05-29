@@ -22,13 +22,62 @@ from datetime import date, datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 
 from extensions import db
-from models import Despesa, Notificacao, Recebimento
+from models import Despesa, Notificacao, Recebimento, User
+
+# App atual injetado pelo job_verificar_vencimentos pra logar/enviar email.
+# Modulo-level pra nao precisar passar app por toda cadeia de helpers.
+_current_app = None
+
+
+def _enviar_email_se_optin(notif):
+    """Dispara e-mail do aviso de vencimento se o usuario tiver opt-in ativo.
+
+    Best-effort: falha de e-mail nunca derruba a criacao da notificacao
+    (que ja foi commitada). Usa o mail_service existente (modo simulacao
+    quando SMTP nao configurado).
+    """
+    if _current_app is None:
+        return
+    try:
+        user = User.query.get(notif.user_id)
+        if not user or not user.email:
+            return
+        # Default True quando a coluna ainda esta NULL (registros pre-migration).
+        optin = user.notif_email_vencimentos
+        if optin is False:
+            return
+
+        from mail_service import enviar_email
+
+        cor = {
+            "danger": "#dc3545",
+            "warning": "#fd7e14",
+            "info": "#0dcaf0",
+        }.get(notif.severidade, "#0d6efd")
+        corpo_html = (
+            f'<div style="font-family:Arial,sans-serif;max-width:520px">'
+            f'<h2 style="color:{cor};margin:0 0 8px">{notif.titulo}</h2>'
+            f'<p style="font-size:15px;color:#333">{notif.mensagem or ""}</p>'
+            f'<p style="font-size:13px;color:#888;margin-top:16px">'
+            f"Voce recebe este aviso porque tem notificacoes de vencimento por "
+            f"e-mail ativas. Para desativar, acesse seu Perfil no Patronus.</p>"
+            f"</div>"
+        )
+        corpo_texto = f"{notif.titulo}\n\n{notif.mensagem or ''}"
+        enviar_email(
+            _current_app, user.email, f"[Patronus] {notif.titulo}", corpo_html, corpo_texto
+        )
+    except Exception as e:
+        # Best-effort — nao propaga
+        if _current_app is not None:
+            _current_app.logger.warning(f"Falha ao enviar email de vencimento: {e}")
 
 
 def _criar_notificacao(user_id, tenant_id, dedupe_key, **kwargs):
     """Cria uma Notificacao com unique constraint em (user_id, dedupe_key).
 
-    Retorna True se criou, False se ja existia (IntegrityError tolerado).
+    Retorna True se criou (e dispara e-mail opt-in), False se ja existia
+    (IntegrityError tolerado — e nao reenvia e-mail).
     """
     notif = Notificacao(
         user_id=user_id,
@@ -40,11 +89,14 @@ def _criar_notificacao(user_id, tenant_id, dedupe_key, **kwargs):
     db.session.add(notif)
     try:
         db.session.commit()
-        return True
     except IntegrityError:
         # ja existe (provavelmente cron rodou de novo) — OK, segue
         db.session.rollback()
         return False
+    # So envia e-mail pra notificacao recem-criada (idempotencia: nao
+    # reenvia em re-execucoes do cron, porque ai cai no IntegrityError acima).
+    _enviar_email_se_optin(notif)
+    return True
 
 
 def _processar_recebimentos(hoje, criados_log):
@@ -153,7 +205,9 @@ def _processar_despesas(hoje, criados_log):
 
 def job_verificar_vencimentos(app):
     """Entrypoint do APScheduler — rodar dentro de app_context."""
+    global _current_app
     with app.app_context():
+        _current_app = app
         try:
             hoje = date.today()
             criados = []
@@ -163,3 +217,5 @@ def job_verificar_vencimentos(app):
         except Exception as e:
             app.logger.exception(f"job_verificar_vencimentos falhou: {e}")
             db.session.rollback()
+        finally:
+            _current_app = None

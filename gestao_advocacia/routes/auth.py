@@ -1092,6 +1092,10 @@ def register_auth_routes(
                     return {"message": "CPF inválido."}, 400
                 user.cpf = format_cpf(cpf)
 
+            # N3: preferencia de e-mail de avisos de vencimento (opt-out).
+            if "notif_email_vencimentos" in data:
+                user.notif_email_vencimentos = bool(data.get("notif_email_vencimentos"))
+
             db.session.commit()
             return user.to_dict(), 200
 

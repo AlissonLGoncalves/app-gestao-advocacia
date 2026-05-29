@@ -116,6 +116,14 @@ def register_api_routes(app, api, finance_access_required):
             "portal_cliente_id": fields.Integer(
                 description="ID do cliente vinculado ao portal", nullable=True
             ),
+            "notif_email_vencimentos": fields.Boolean(
+                description="Opt-in de e-mail pros avisos de vencimento (N3)",
+                attribute=lambda u: (
+                    u.notif_email_vencimentos
+                    if getattr(u, "notif_email_vencimentos", None) is not None
+                    else True
+                ),
+            ),
         },
     )
 
