@@ -19,13 +19,15 @@ import CasoTimeline from '../components/CasoTimeline'
 import ProximasAtividadesCard from '../components/ProximasAtividadesCard.jsx'
 import PrioridadeBadge from '../components/ui/PrioridadeBadge.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
+import ItemAgendaForm from '../components/ItemAgendaForm.jsx'
 import { useConfirm } from '../hooks/useConfirm.jsx'
 import {
   CheckCircleIcon,
-  EyeIcon,
   TrashIcon,
   NewspaperIcon,
   SparklesIcon,
+  PencilSquareIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline'
 
 // Componente auxiliar para exibir mensagens de status (loading, error, success)
@@ -64,6 +66,9 @@ function CasoDetalhePage() {
   const [caso, setCaso] = useState(null)
   const [publicacoesDjen, setPublicacoesDjen] = useState([])
   const [prazos, setPrazos] = useState([])
+  // Form de prazo no contexto do caso (sem ir pro Kanban global).
+  // null = fechado; { item } = editando; {} = criando novo.
+  const [prazoForm, setPrazoForm] = useState(null)
 
   const [isLoadingCaso, setIsLoadingCaso] = useState(true)
   const [isLoadingMovimentacoes, setIsLoadingMovimentacoes] = useState(false)
@@ -515,9 +520,20 @@ function CasoDetalhePage() {
               <h5 className="card-title mb-0 text-primary">
                 Prazos e Tarefas Vinculados ({prazos.length})
               </h5>
-              <Link to="/prazos" className="btn btn-sm btn-outline-primary">
-                Abrir Kanban
-              </Link>
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary d-inline-flex align-items-center"
+                  onClick={() => setPrazoForm({})}
+                  data-testid="btn-novo-prazo-caso"
+                >
+                  <PlusIcon style={{ width: 16, height: 16 }} className="me-1" />
+                  Novo Prazo
+                </button>
+                <Link to="/prazos" className="btn btn-sm btn-outline-secondary">
+                  Abrir Kanban
+                </Link>
+              </div>
             </div>
             <div className="card-body p-3">
               {prazos.length > 0 ? (
@@ -544,8 +560,8 @@ function CasoDetalhePage() {
                           <tr
                             key={t.id}
                             style={{ cursor: 'pointer' }}
-                            onClick={() => navigate(`/prazos?tarefa=${t.id}`)}
-                            title="Abrir no Kanban de Prazos"
+                            onClick={() => setPrazoForm({ item: t })}
+                            title="Editar este prazo"
                           >
                             <td className="fw-medium text-dark">{t.titulo}</td>
                             <td>
@@ -612,11 +628,11 @@ function CasoDetalhePage() {
                               <button
                                 type="button"
                                 className="btn btn-sm btn-outline-primary p-1 lh-1 me-1"
-                                title="Abrir no Kanban"
-                                onClick={() => navigate(`/prazos?tarefa=${t.id}`)}
+                                title="Editar prazo"
+                                onClick={() => setPrazoForm({ item: t })}
                                 style={{ width: 28, height: 28 }}
                               >
-                                <EyeIcon style={{ width: 14, height: 14 }} />
+                                <PencilSquareIcon style={{ width: 14, height: 14 }} />
                               </button>
                               <button
                                 type="button"
@@ -722,6 +738,24 @@ function CasoDetalhePage() {
         </button>
       </div>
       {ConfirmDialog}
+
+      {/* Form de prazo no contexto do caso — caso travado, sem ir ao Kanban */}
+      {prazoForm && (
+        <ItemAgendaForm
+          itemParaEditar={prazoForm.item || null}
+          defaultTipo="tarefa"
+          casoFixo={{
+            id: parseInt(casoId, 10),
+            label: caso?.titulo || caso?.numero_processo || `Caso #${casoId}`,
+          }}
+          onCancel={() => setPrazoForm(null)}
+          onSalvo={() => {
+            setPrazoForm(null)
+            recarregarPrazos()
+            setTimelineRefreshNonce((n) => n + 1)
+          }}
+        />
+      )}
     </div>
   )
 }
