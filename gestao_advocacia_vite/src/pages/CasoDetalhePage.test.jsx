@@ -27,6 +27,21 @@ vi.mock('../components/ApensarMenuCaso.jsx', () => ({
 vi.mock('../components/CasoTimeline', () => ({
   default: () => <div data-testid="timeline">timeline</div>,
 }))
+// Stub do ItemAgendaForm: expoe o casoFixo recebido pra validar que o prazo
+// nasce travado no caso, sem depender da implementacao interna do form.
+vi.mock('../components/ItemAgendaForm.jsx', () => ({
+  default: ({ casoFixo, itemParaEditar }) => (
+    <div data-testid="item-agenda-form">
+      <span data-testid="form-caso-label">{casoFixo?.label}</span>
+      <span data-testid="form-modo">{itemParaEditar ? 'editar' : 'novo'}</span>
+    </div>
+  ),
+}))
+vi.mock('../api/itensAgenda.js', () => ({
+  listItensAgenda: vi.fn().mockResolvedValue([]),
+  concluirItemAgenda: vi.fn(),
+  deleteItemAgenda: vi.fn(),
+}))
 
 const CASO_MOCK = {
   id: 1,
@@ -119,5 +134,24 @@ describe('CasoDetalhePage tabs (Epic #6 / #180)', () => {
     fireEvent.click(screen.getByTestId('tab-historico'))
     expect(screen.getByTestId('tab-historico')).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('tab-resumo')).toHaveAttribute('aria-selected', 'false')
+  })
+
+  // Prazo dentro do caso (sem ir ao Kanban global)
+  it('"Novo Prazo" na aba Atividades abre o form com o caso travado', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByTestId('caso-tabs')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId('tab-atividades'))
+    expect(screen.getByTestId('painel-atividades')).toBeInTheDocument()
+    // form fechado inicialmente
+    expect(screen.queryByTestId('item-agenda-form')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('btn-novo-prazo-caso'))
+
+    // form abre, em modo "novo", com o caso pre-fixado (label = numero do processo)
+    const form = await screen.findByTestId('item-agenda-form')
+    expect(form).toBeInTheDocument()
+    expect(screen.getByTestId('form-modo')).toHaveTextContent('novo')
+    expect(screen.getByTestId('form-caso-label')).toHaveTextContent('0001234-56.2026.8.16.0075')
   })
 })

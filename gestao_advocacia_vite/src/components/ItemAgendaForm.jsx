@@ -61,26 +61,45 @@ const initialState = {
   descricao: '',
 }
 
-function ItemAgendaForm({ itemParaEditar, onSalvo, onCancel, defaultTipo = 'tarefa' }) {
-  const [formData, setFormData] = useState({ ...initialState, tipo: defaultTipo })
+// casoFixo: { id, label } — quando passado (ex: criar prazo DENTRO de um caso),
+// o item ja nasce vinculado aquele caso e o seletor de caso fica travado.
+// Evita o usuario ter que reescolher o caso e impede vincular ao caso errado.
+function ItemAgendaForm({
+  itemParaEditar,
+  onSalvo,
+  onCancel,
+  defaultTipo = 'tarefa',
+  casoFixo = null,
+}) {
+  const [formData, setFormData] = useState({
+    ...initialState,
+    tipo: defaultTipo,
+    caso_id: casoFixo?.id ? String(casoFixo.id) : '',
+  })
   const [salvando, setSalvando] = useState(false)
   const [casos, setCasos] = useState([])
 
   const editando = Boolean(itemParaEditar?.id)
 
-  // Carrega casos pra select (single fetch — pequena lista)
+  // Carrega casos pra select (single fetch — pequena lista). Pula quando o
+  // caso ja vem travado (casoFixo) — nao precisa da lista.
   useEffect(() => {
+    if (casoFixo?.id) return
     listCasos()
       .then((data) => setCasos(Array.isArray(data) ? data : []))
       .catch((err) => {
         console.warn('ItemAgendaForm: erro ao carregar casos', err)
       })
-  }, [])
+  }, [casoFixo])
 
   // Hidrata form com dados do item ao editar
   useEffect(() => {
     if (!itemParaEditar) {
-      setFormData({ ...initialState, tipo: defaultTipo })
+      setFormData({
+        ...initialState,
+        tipo: defaultTipo,
+        caso_id: casoFixo?.id ? String(casoFixo.id) : '',
+      })
       return
     }
     setFormData({
@@ -92,10 +111,14 @@ function ItemAgendaForm({ itemParaEditar, onSalvo, onCancel, defaultTipo = 'tare
       data_inicio: toDateTimeLocal(itemParaEditar.data_inicio),
       data_fim: toDateTimeLocal(itemParaEditar.data_fim),
       data_vencimento: toDateOnly(itemParaEditar.data_vencimento),
-      caso_id: itemParaEditar.caso_id ? String(itemParaEditar.caso_id) : '',
+      caso_id: itemParaEditar.caso_id
+        ? String(itemParaEditar.caso_id)
+        : casoFixo?.id
+          ? String(casoFixo.id)
+          : '',
       descricao: itemParaEditar.descricao || '',
     })
-  }, [itemParaEditar, defaultTipo])
+  }, [itemParaEditar, defaultTipo, casoFixo])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -317,19 +340,30 @@ function ItemAgendaForm({ itemParaEditar, onSalvo, onCancel, defaultTipo = 'tare
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Caso vinculado</label>
-                  <select
-                    className="form-select"
-                    name="caso_id"
-                    value={formData.caso_id}
-                    onChange={handleChange}
-                  >
-                    <option value="">— Sem caso —</option>
-                    {casos.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.titulo || c.numero_processo || `Caso #${c.id}`}
-                      </option>
-                    ))}
-                  </select>
+                  {casoFixo?.id ? (
+                    // Caso travado: criando/editando prazo DENTRO de um caso.
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={casoFixo.label || `Caso #${casoFixo.id}`}
+                      disabled
+                      title="Vinculado a este caso"
+                    />
+                  ) : (
+                    <select
+                      className="form-select"
+                      name="caso_id"
+                      value={formData.caso_id}
+                      onChange={handleChange}
+                    >
+                      <option value="">— Sem caso —</option>
+                      {casos.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.titulo || c.numero_processo || `Caso #${c.id}`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
 
