@@ -71,7 +71,6 @@ import {
   ScaleIcon,
   Cog6ToothIcon,
   PuzzlePieceIcon,
-  ClipboardDocumentListIcon,
   NewspaperIcon,
   UserCircleIcon,
   BuildingOffice2Icon,
@@ -468,23 +467,13 @@ const MainLayout = () => {
             <SidebarLink to="/casos" icon={BriefcaseIcon}>
               Casos
             </SidebarLink>
-            {/* PR D3.5 — Sidebar consolidada.
-                /agenda = visao unificada (calendar + lista) — entrada
-                principal pra "o que vence essa semana".
-                /prazos = mesma data, visualizacao Kanban dedicada — pra
-                quem prefere o fluxo de drag-drop. Ambos consomem
-                item_agenda no backend (dual-write D2 garante sync).
-                Badge fica no Kanban porque a metrica 'tarefasAlerta'
-                (IA pendentes + vencidos) eh natural do fluxo kanban. */}
-            <SidebarLink to="/agenda" icon={CalendarDaysIcon}>
-              Agenda
-            </SidebarLink>
-            <SidebarLink
-              to="/prazos"
-              icon={ClipboardDocumentListIcon}
-              badge={sidebarCounts.tarefasAlerta}
-            >
-              Prazos · Kanban
+            {/* Agenda unificada: UMA entrada na sidebar. /agenda abre a tela
+                com o seletor de 3 visoes (Calendario | Kanban | Lista). O
+                Kanban vive em /prazos mas eh alcancado pelo toggle — o
+                usuario percebe uma experiencia unica. Badge de prazos
+                vencidos/IA pendentes (tarefasAlerta) fica aqui. */}
+            <SidebarLink to="/agenda" icon={CalendarDaysIcon} badge={sidebarCounts.tarefasAlerta}>
+              Agenda · Prazos
             </SidebarLink>
 
             {/* === FINANCEIRO === (oculto pra assistente) */}

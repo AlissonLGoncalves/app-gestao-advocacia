@@ -9,7 +9,6 @@ import {
   listItensAgenda,
   createItemAgenda,
   updateItemAgenda,
-  deleteItemAgenda,
   reorderItensAgenda,
   validarPrazoItemAgenda,
   concluirItemAgenda,
@@ -39,6 +38,7 @@ import {
 import PrioridadeBadge from '../components/ui/PrioridadeBadge.jsx'
 import SlaBar from '../components/ui/SlaBar.jsx'
 import TratarPrazoModal from '../components/TratarPrazoModal.jsx'
+import AgendaViewToggle from '../components/AgendaViewToggle.jsx'
 import {
   PlusIcon,
   ClockIcon,
@@ -47,8 +47,6 @@ import {
   BriefcaseIcon,
   PencilSquareIcon,
   ExclamationTriangleIcon,
-  ListBulletIcon,
-  ViewColumnsIcon,
   UserIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline'
@@ -171,7 +169,9 @@ export default function PrazosPage() {
   const [tarefas, setTarefas] = useState([])
   const [loading, setLoading] = useState(true)
   const [casos, setCasos] = useState([])
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem('prazos_view') || 'kanban')
+  // /prazos eh dedicado ao Kanban. Calendario e Lista vivem em /agenda,
+  // acessiveis pelo AgendaViewToggle compartilhado (unificacao Agenda+Kanban).
+  const viewMode = 'kanban'
 
   const [showModal, setShowModal] = useState(false)
   const [editandoId, setEditandoId] = useState(null)
@@ -215,11 +215,6 @@ export default function PrazosPage() {
     carregarTarefas()
     carregarCasos()
   }, [carregarTarefas, carregarCasos])
-
-  const handleViewChange = (mode) => {
-    setViewMode(mode)
-    localStorage.setItem('prazos_view', mode)
-  }
 
   const handleFecharModal = () => {
     setShowModal(false)
@@ -472,40 +467,9 @@ export default function PrazosPage() {
           </p>
         </div>
         <div className="d-flex gap-2">
-          <div className="btn-group shadow-sm" role="group">
-            <button
-              type="button"
-              className={`btn btn-sm ${viewMode === 'kanban' ? 'btn-primary' : 'btn-outline-secondary'}`}
-              onClick={() => handleViewChange('kanban')}
-            >
-              <ViewColumnsIcon
-                style={{
-                  width: 15,
-                  height: 15,
-                  display: 'inline',
-                  marginRight: 4,
-                  marginBottom: 2,
-                }}
-              />
-              Kanban
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${viewMode === 'lista' ? 'btn-primary' : 'btn-outline-secondary'}`}
-              onClick={() => handleViewChange('lista')}
-            >
-              <ListBulletIcon
-                style={{
-                  width: 15,
-                  height: 15,
-                  display: 'inline',
-                  marginRight: 4,
-                  marginBottom: 2,
-                }}
-              />
-              Lista
-            </button>
-          </div>
+          {/* Toggle unificado: Kanban e local; Calendario/Lista navegam pra /agenda.
+              O toggle interno Kanban|Lista foi consolidado no seletor unico. */}
+          <AgendaViewToggle current="kanban" />
           <button
             className="btn btn-primary shadow-sm rounded-pill px-4"
             onClick={() => setShowModal(true)}
