@@ -22,7 +22,6 @@ import ContratosPage from './pages/ContratosPage.jsx'
 import DespesasPage from './pages/DespesasPage.jsx'
 import AgendaPage from './pages/AgendaPage.jsx'
 import AgendaUnificadaPage from './pages/AgendaUnificadaPage.jsx'
-import PrazosPage from './pages/PrazosPage.jsx'
 import DocumentosPage from './pages/DocumentosPage.jsx'
 import RelatoriosPage from './pages/RelatoriosPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
@@ -468,10 +467,9 @@ const MainLayout = () => {
               Casos
             </SidebarLink>
             {/* Agenda unificada: UMA entrada na sidebar. /agenda abre a tela
-                com o seletor de 3 visoes (Calendario | Kanban | Lista). O
-                Kanban vive em /prazos mas eh alcancado pelo toggle — o
-                usuario percebe uma experiencia unica. Badge de prazos
-                vencidos/IA pendentes (tarefasAlerta) fica aqui. */}
+                com o seletor de 3 visoes (Calendario | Kanban | Lista), todas
+                na mesma rota. /prazos redireciona pra ?view=kanban. Badge de
+                prazos vencidos/IA pendentes (tarefasAlerta) fica aqui. */}
             <SidebarLink to="/agenda" icon={CalendarDaysIcon} badge={sidebarCounts.tarefasAlerta}>
               Agenda · Prazos
             </SidebarLink>
@@ -670,7 +668,9 @@ function App() {
           <Route path="casos/editar/:casoId" element={<CasosPage />} />
           <Route path="casos/detalhe/:casoId" element={<CasoDetalhePage />} />
 
-          <Route path="prazos" element={<PrazosPage />} />
+          {/* Kanban unificado: /prazos agora é a aba Kanban da Agenda.
+              Mantém todos os links existentes (Dashboard, onboarding, caso). */}
+          <Route path="prazos" element={<Navigate to="/agenda?view=kanban" replace />} />
 
           <Route path="recebimentos" element={<RecebimentosPage />} />
           <Route path="recebimentos/historico" element={<RecebimentosHistoricoPage />} />

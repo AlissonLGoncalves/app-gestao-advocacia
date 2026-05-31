@@ -165,12 +165,15 @@ const TAREFA_VAZIA = {
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
-export default function PrazosPage() {
+// `embedded`: quando renderizado DENTRO da AgendaUnificadaPage (view=kanban),
+// a página unificada já fornece o container, o título e o toggle de visão.
+// Nesse modo o Kanban renderiza só o board + botão "Novo Prazo" + modais,
+// sem duplicar a moldura. Standalone (`embedded=false`) mantém a moldura
+// completa como fallback.
+export default function PrazosPage({ embedded = false }) {
   const [tarefas, setTarefas] = useState([])
   const [loading, setLoading] = useState(true)
   const [casos, setCasos] = useState([])
-  // /prazos eh dedicado ao Kanban. Calendario e Lista vivem em /agenda,
-  // acessiveis pelo AgendaViewToggle compartilhado (unificacao Agenda+Kanban).
   const viewMode = 'kanban'
 
   const [showModal, setShowModal] = useState(false)
@@ -452,33 +455,48 @@ export default function PrazosPage() {
 
   return (
     <div
-      className="container-fluid py-4"
-      style={{ backgroundColor: 'var(--bg-main)', minHeight: '100%' }}
+      className={embedded ? '' : 'container-fluid py-4'}
+      style={embedded ? undefined : { backgroundColor: 'var(--bg-main)', minHeight: '100%' }}
     >
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h4 className="mb-0 fw-bold mx-2" style={{ fontFamily: 'var(--font-heading)' }}>
-            {viewMode === 'kanban' ? 'Kanban de Prazos' : 'Prazos por Data'}
-          </h4>
-          <p className="text-muted small mb-0 mx-2">
-            {viewMode === 'kanban'
-              ? 'Arraste cards entre colunas ou reordene dentro da mesma coluna.'
-              : 'Visualize prazos agrupados por urgência.'}
-          </p>
-        </div>
-        <div className="d-flex gap-2">
-          {/* Toggle unificado: Kanban e local; Calendario/Lista navegam pra /agenda.
-              O toggle interno Kanban|Lista foi consolidado no seletor unico. */}
-          <AgendaViewToggle current="kanban" />
+      {embedded ? (
+        // Dentro da AgendaUnificadaPage: título e toggle já vêm da página.
+        // Só o botão de ação fica aqui (refresca o estado próprio do Kanban).
+        <div className="d-flex justify-content-end mb-3">
           <button
-            className="btn btn-primary shadow-sm rounded-pill px-4"
+            className="btn btn-primary btn-sm shadow-sm rounded-pill px-3"
             onClick={() => setShowModal(true)}
           >
-            <PlusIcon style={{ width: 18, marginRight: 5 }} className="mb-1" />
+            <PlusIcon
+              style={{ width: 15, height: 15 }}
+              className="me-1 d-inline align-text-bottom"
+            />
             Novo Prazo
           </button>
         </div>
-      </div>
+      ) : (
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 className="mb-0 fw-bold mx-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              {viewMode === 'kanban' ? 'Kanban de Prazos' : 'Prazos por Data'}
+            </h4>
+            <p className="text-muted small mb-0 mx-2">
+              {viewMode === 'kanban'
+                ? 'Arraste cards entre colunas ou reordene dentro da mesma coluna.'
+                : 'Visualize prazos agrupados por urgência.'}
+            </p>
+          </div>
+          <div className="d-flex gap-2">
+            <AgendaViewToggle current="kanban" />
+            <button
+              className="btn btn-primary shadow-sm rounded-pill px-4"
+              onClick={() => setShowModal(true)}
+            >
+              <PlusIcon style={{ width: 18, marginRight: 5 }} className="mb-1" />
+              Novo Prazo
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-5">
