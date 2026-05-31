@@ -1,15 +1,13 @@
 // src/components/AgendaViewToggle.jsx
 //
-// Seletor de visao UNIFICADO da Agenda/Prazos. Antes /agenda e /prazos
-// eram telas separadas e confusas; agora sao 3 visoes da MESMA coisa
-// (itens-agenda), acessadas por este toggle coeso:
+// Seletor de visao UNIFICADO da Agenda. As 3 visoes vivem TODAS em /agenda
+// como abas da MESMA fonte (itens-agenda), acessadas por este toggle coeso:
 //
 //   Calendario → /agenda?view=calendario   (eventos + tarefas datadas)
-//   Kanban     → /prazos                    (workflow drag-drop de tarefas)
+//   Kanban     → /agenda?view=kanban        (workflow drag-drop de tarefas)
 //   Lista      → /agenda?view=lista         (tabela unificada)
 //
-// Reusado em AgendaUnificadaPage e PrazosPage pra dar a sensacao de uma
-// experiencia unica, sem reescrever o Kanban (1100 linhas).
+// O antigo /prazos agora redireciona pra /agenda?view=kanban (mantem links).
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDaysIcon, ViewColumnsIcon, ListBulletIcon } from '@heroicons/react/24/outline'
@@ -21,24 +19,19 @@ const VIEWS = [
     icon: CalendarDaysIcon,
     rota: '/agenda?view=calendario',
   },
-  { key: 'kanban', label: 'Kanban', icon: ViewColumnsIcon, rota: '/prazos' },
+  { key: 'kanban', label: 'Kanban', icon: ViewColumnsIcon, rota: '/agenda?view=kanban' },
   { key: 'lista', label: 'Lista', icon: ListBulletIcon, rota: '/agenda?view=lista' },
 ]
 
 // current: 'calendario' | 'kanban' | 'lista'
-// onLocalChange: opcional — quando a visao alvo vive na MESMA pagina, o pai
-//   pode tratar localmente (evita reload). Se nao passado, sempre navega.
+// onLocalChange: opcional — como as 3 visoes vivem na MESMA pagina (/agenda),
+//   o pai troca localmente (sem reload). Se nao passado, navega pela rota.
 function AgendaViewToggle({ current, onLocalChange }) {
   const navigate = useNavigate()
 
   const handleClick = (view) => {
     if (view.key === current) return
-    // calendario e lista vivem em /agenda; kanban em /prazos.
-    // Se o pai sabe tratar localmente (mesma rota), usa o callback.
-    const mesmaRota =
-      (current === 'calendario' || current === 'lista') &&
-      (view.key === 'calendario' || view.key === 'lista')
-    if (mesmaRota && onLocalChange) {
+    if (onLocalChange) {
       onLocalChange(view.key)
     } else {
       navigate(view.rota)

@@ -24,6 +24,7 @@ import { toast } from 'react-toastify'
 import { PlusIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
 import ItemAgendaForm from '../components/ItemAgendaForm.jsx'
 import AgendaViewToggle from '../components/AgendaViewToggle.jsx'
+import PrazosPage from './PrazosPage.jsx'
 import { listItensAgenda, deleteItemAgenda } from '../api/itensAgenda.js'
 
 // Cores visuais por tipo+status. Centralizadas pra UI consistente entre
@@ -73,9 +74,10 @@ function AgendaUnificadaPage() {
   // preferencia salva, depois 'calendario'.
   const viewParam = searchParams.get('view')
   const viewMode =
-    viewParam === 'lista' || viewParam === 'calendario'
+    viewParam === 'lista' || viewParam === 'calendario' || viewParam === 'kanban'
       ? viewParam
       : localStorage.getItem('agenda_unificada_view') || 'calendario'
+  const isKanban = viewMode === 'kanban'
   const [filtroTipo, setFiltroTipo] = useState('todos') // todos | tarefa | evento
   const [filtroStatus, setFiltroStatus] = useState('ativos') // ativos | todos | pendentes | concluidos
   const [modalAberto, setModalAberto] = useState(false)
@@ -105,8 +107,13 @@ function AgendaUnificadaPage() {
   }, [filtroTipo, filtroStatus])
 
   useEffect(() => {
+    // No Kanban o board carrega seus próprios dados; evita fetch redundante.
+    if (isKanban) {
+      setLoading(false)
+      return
+    }
     carregar()
-  }, [carregar, refreshKey])
+  }, [carregar, refreshKey, isKanban])
 
   const handleViewChange = (mode) => {
     localStorage.setItem('agenda_unificada_view', mode)
@@ -183,43 +190,61 @@ function AgendaUnificadaPage() {
         <div className="d-flex flex-wrap align-items-center gap-2">
           <AgendaViewToggle current={viewMode} onLocalChange={handleViewChange} />
 
-          <select
-            className="form-select form-select-sm"
-            style={{ width: 'auto' }}
-            value={filtroTipo}
-            onChange={(e) => setFiltroTipo(e.target.value)}
-            aria-label="Filtrar por tipo"
-          >
-            <option value="todos">Todos os tipos</option>
-            <option value="tarefa">Só tarefas</option>
-            <option value="evento">Só eventos</option>
-          </select>
+          {/* Filtros tipo/status só fazem sentido no Calendário/Lista. O Kanban
+              tem suas próprias colunas (A Fazer/Em Andamento/Concluído). */}
+          {!isKanban && (
+            <>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 'auto' }}
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
+                aria-label="Filtrar por tipo"
+              >
+                <option value="todos">Todos os tipos</option>
+                <option value="tarefa">Só tarefas</option>
+                <option value="evento">Só eventos</option>
+              </select>
 
-          <select
-            className="form-select form-select-sm"
-            style={{ width: 'auto' }}
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value)}
-            aria-label="Filtrar por status"
-          >
-            <option value="ativos">Ativos (default)</option>
-            <option value="pendentes">Só pendentes</option>
-            <option value="concluidos">Só concluídos</option>
-            <option value="todos">Todos</option>
-          </select>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 'auto' }}
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                aria-label="Filtrar por status"
+              >
+                <option value="ativos">Ativos (default)</option>
+                <option value="pendentes">Só pendentes</option>
+                <option value="concluidos">Só concluídos</option>
+                <option value="todos">Todos</option>
+              </select>
+            </>
+          )}
         </div>
 
-        <button
-          type="button"
-          className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm"
-          onClick={handleAdicionarClick}
-        >
-          <PlusIcon style={{ width: 15, height: 15 }} className="me-1 d-inline align-text-bottom" />
-          Novo item
-        </button>
+        {/* No Kanban, a criação fica no botão "Novo Prazo" próprio (que refresca
+            o estado do board). Aqui o "Novo item" cobre Calendário/Lista. */}
+        {!isKanban && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm"
+            onClick={handleAdicionarClick}
+          >
+            <PlusIcon
+              style={{ width: 15, height: 15 }}
+              className="me-1 d-inline align-text-bottom"
+            />
+            Novo item
+          </button>
+        )}
       </div>
 
-      {loading ? (
+      {isKanban ? (
+        // Kanban embutido — board drag-drop com estado próprio (não usa o
+        // fetch/loading desta página). Mesma experiência do antigo /prazos,
+        // agora como 3ª aba da Agenda.
+        <PrazosPage embedded />
+      ) : loading ? (
         <div className="d-flex justify-content-center align-items-center p-5">
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Carregando agenda...</span>
