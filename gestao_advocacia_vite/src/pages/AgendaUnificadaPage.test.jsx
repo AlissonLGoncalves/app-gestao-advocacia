@@ -48,7 +48,7 @@ describe('AgendaUnificadaPage — Kanban unificado', () => {
       },
     ])
     // PrazosPage embutido busca /casos via fetch direto.
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
   })
 
   it('?view=kanban renderiza o board (colunas) e o botão "Novo Prazo"', async () => {
