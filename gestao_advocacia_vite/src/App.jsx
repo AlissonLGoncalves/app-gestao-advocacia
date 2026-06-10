@@ -7,44 +7,49 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 import { useNavigate } from 'react-router-dom'
 import { api } from './api/client.js'
 
-// Importação dos componentes de página
-import DashboardPage from './pages/DashboardPage.jsx'
-import ClientesPage from './pages/ClientesPage.jsx'
-import CasosPage from './pages/CasosPage.jsx'
-import CasoDetalhePage from './pages/CasoDetalhePage.jsx'
-import ImportarCnjsPage from './pages/ImportarCnjsPage.jsx'
-import BuscarProcessoCnjPage from './pages/BuscarProcessoCnjPage.jsx'
-import RecebimentosPage from './pages/RecebimentosPage.jsx'
-import RecebimentosHistoricoPage from './pages/RecebimentosHistoricoPage.jsx'
-import NotasFiscaisPage from './pages/NotasFiscaisPage.jsx'
-import ClienteDetalhePage from './pages/ClienteDetalhePage.jsx'
-import ContratosPage from './pages/ContratosPage.jsx'
-import DespesasPage from './pages/DespesasPage.jsx'
-import AgendaUnificadaPage from './pages/AgendaUnificadaPage.jsx'
-import DocumentosPage from './pages/DocumentosPage.jsx'
-import RelatoriosPage from './pages/RelatoriosPage.jsx'
-import NotFoundPage from './pages/NotFoundPage.jsx'
-import LoginPage from './pages/auth/LoginPage.jsx'
-import RegisterPage from './pages/auth/RegisterPage.jsx'
-import TermsPage from './pages/auth/TermsPage.jsx'
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx'
-import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
-import SolicitarAcessoPage from './pages/SolicitarAcessoPage.jsx'
-import SettingsPage from './pages/SettingsPage.jsx'
-import IntegracoesPage from './pages/IntegracoesPage.jsx'
-import ModelosDocumentoPage from './pages/ModelosDocumentoPage.jsx'
-import DjenPage from './pages/DjenPage.jsx'
-import TriagemAssistidaPage from './pages/TriagemAssistidaPage.jsx'
-import PerfilPage from './pages/PerfilPage.jsx'
-import OnboardingPage from './pages/auth/OnboardingPage.jsx'
+// Issue #298 — code-splitting: páginas viram React.lazy (cada rota gera
+// um chunk próprio; FullCalendar, dnd-kit, DjenPage etc. saem do bundle
+// inicial — antes 2.6 MB num arquivo só). Mantidas estáticas só as de
+// primeiro paint (Landing, Login) e a NotFound (minúscula).
 import LandingPage from './pages/LandingPage.jsx'
-import NovoClientePorProcuracao from './pages/clientes/NovoClientePorProcuracao.jsx'
-import PortalPage from './pages/portal/PortalPage.jsx'
-import PortalRegisterPage from './pages/portal/PortalRegisterPage.jsx'
+import LoginPage from './pages/auth/LoginPage.jsx'
+import NotFoundPage from './pages/NotFoundPage.jsx'
+
+const { lazy, Suspense } = React
+const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'))
+const ClientesPage = lazy(() => import('./pages/ClientesPage.jsx'))
+const CasosPage = lazy(() => import('./pages/CasosPage.jsx'))
+const CasoDetalhePage = lazy(() => import('./pages/CasoDetalhePage.jsx'))
+const ImportarCnjsPage = lazy(() => import('./pages/ImportarCnjsPage.jsx'))
+const BuscarProcessoCnjPage = lazy(() => import('./pages/BuscarProcessoCnjPage.jsx'))
+const RecebimentosPage = lazy(() => import('./pages/RecebimentosPage.jsx'))
+const RecebimentosHistoricoPage = lazy(() => import('./pages/RecebimentosHistoricoPage.jsx'))
+const NotasFiscaisPage = lazy(() => import('./pages/NotasFiscaisPage.jsx'))
+const ClienteDetalhePage = lazy(() => import('./pages/ClienteDetalhePage.jsx'))
+const ContratosPage = lazy(() => import('./pages/ContratosPage.jsx'))
+const DespesasPage = lazy(() => import('./pages/DespesasPage.jsx'))
+const AgendaUnificadaPage = lazy(() => import('./pages/AgendaUnificadaPage.jsx'))
+const DocumentosPage = lazy(() => import('./pages/DocumentosPage.jsx'))
+const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage.jsx'))
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage.jsx'))
+const TermsPage = lazy(() => import('./pages/auth/TermsPage.jsx'))
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage.jsx'))
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage.jsx'))
+const SolicitarAcessoPage = lazy(() => import('./pages/SolicitarAcessoPage.jsx'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'))
+const IntegracoesPage = lazy(() => import('./pages/IntegracoesPage.jsx'))
+const ModelosDocumentoPage = lazy(() => import('./pages/ModelosDocumentoPage.jsx'))
+const DjenPage = lazy(() => import('./pages/DjenPage.jsx'))
+const TriagemAssistidaPage = lazy(() => import('./pages/TriagemAssistidaPage.jsx'))
+const PerfilPage = lazy(() => import('./pages/PerfilPage.jsx'))
+const OnboardingPage = lazy(() => import('./pages/auth/OnboardingPage.jsx'))
+const NovoClientePorProcuracao = lazy(() => import('./pages/clientes/NovoClientePorProcuracao.jsx'))
+const PortalPage = lazy(() => import('./pages/portal/PortalPage.jsx'))
+const PortalRegisterPage = lazy(() => import('./pages/portal/PortalRegisterPage.jsx'))
 // admin-fase0: paginas do backoffice super-admin
-import AdminTenantsPage from './pages/admin/AdminTenantsPage.jsx'
-import AdminTenantDetailPage from './pages/admin/AdminTenantDetailPage.jsx'
-import AdminAccessRequestsPage from './pages/admin/AdminAccessRequestsPage.jsx'
+const AdminTenantsPage = lazy(() => import('./pages/admin/AdminTenantsPage.jsx'))
+const AdminTenantDetailPage = lazy(() => import('./pages/admin/AdminTenantDetailPage.jsx'))
+const AdminAccessRequestsPage = lazy(() => import('./pages/admin/AdminAccessRequestsPage.jsx'))
 import { adminApi } from './api/admin.js'
 import { APP_VERSION } from './version.js'
 import GlobalSearch from './components/GlobalSearch.jsx'
@@ -615,127 +620,140 @@ function App() {
         pauseOnHover
         theme="colored"
       />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/solicitar-acesso" element={<SolicitarAcessoPage />} />
-        <Route path="/termos" element={<TermsPage />} />
-        <Route path="/portal/registro" element={<PortalRegisterPage />} />
-        <Route
-          path="/portal"
-          element={
-            <PortalRoute>
-              <PortalPage />
-            </PortalRoute>
-          }
-        />
-        <Route
-          path="/onboarding"
-          element={
-            <ProtectedRoute>
-              <OnboardingPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/" element={<HomeRoute />} />
-        <Route
-          element={
-            <ProtectedRoute>
-              <OnboardingGate>
-                <MainLayout />
-              </OnboardingGate>
-            </ProtectedRoute>
-          }
-        >
-          <Route path="dashboard" element={<DashboardPage />} />
+      {/* Issue #298 — Suspense cobre os chunks lazy das rotas. O fallback
+          é o mesmo spinner padrão das páginas. */}
+      <Suspense
+        fallback={
+          <div
+            className="d-flex justify-content-center align-items-center"
+            style={{ minHeight: '60vh' }}
+          >
+            <span className="spinner-border text-primary" role="status" aria-label="Carregando" />
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/solicitar-acesso" element={<SolicitarAcessoPage />} />
+          <Route path="/termos" element={<TermsPage />} />
+          <Route path="/portal/registro" element={<PortalRegisterPage />} />
+          <Route
+            path="/portal"
+            element={
+              <PortalRoute>
+                <PortalPage />
+              </PortalRoute>
+            }
+          />
+          <Route
+            path="/onboarding"
+            element={
+              <ProtectedRoute>
+                <OnboardingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/" element={<HomeRoute />} />
+          <Route
+            element={
+              <ProtectedRoute>
+                <OnboardingGate>
+                  <MainLayout />
+                </OnboardingGate>
+              </ProtectedRoute>
+            }
+          >
+            <Route path="dashboard" element={<DashboardPage />} />
 
-          <Route path="clientes" element={<ClientesPage />} />
-          <Route path="clientes/novo" element={<ClientesPage />} />
-          <Route path="clientes/novo/procuracao" element={<NovoClientePorProcuracao />} />
-          <Route path="clientes/editar/:clienteId" element={<ClientesPage />} />
-          {/* PR #249: drill-down do cliente. /clientes/:id agora abre pagina
+            <Route path="clientes" element={<ClientesPage />} />
+            <Route path="clientes/novo" element={<ClientesPage />} />
+            <Route path="clientes/novo/procuracao" element={<NovoClientePorProcuracao />} />
+            <Route path="clientes/editar/:clienteId" element={<ClientesPage />} />
+            {/* PR #249: drill-down do cliente. /clientes/:id agora abre pagina
               de detalhe com abas (Dados, Casos, Contratos, Documentos,
               Hist Financeiro) em vez do form de edicao read-only antigo. */}
-          <Route path="clientes/:clienteId" element={<ClienteDetalhePage />} />
+            <Route path="clientes/:clienteId" element={<ClienteDetalhePage />} />
 
-          <Route path="casos" element={<CasosPage />} />
-          <Route path="casos/novo" element={<CasosPage />} />
-          <Route path="casos/importar" element={<ImportarCnjsPage />} />
-          <Route path="casos/buscar" element={<BuscarProcessoCnjPage />} />
-          <Route path="casos/editar/:casoId" element={<CasosPage />} />
-          <Route path="casos/detalhe/:casoId" element={<CasoDetalhePage />} />
+            <Route path="casos" element={<CasosPage />} />
+            <Route path="casos/novo" element={<CasosPage />} />
+            <Route path="casos/importar" element={<ImportarCnjsPage />} />
+            <Route path="casos/buscar" element={<BuscarProcessoCnjPage />} />
+            <Route path="casos/editar/:casoId" element={<CasosPage />} />
+            <Route path="casos/detalhe/:casoId" element={<CasoDetalhePage />} />
 
-          {/* Kanban unificado: /prazos agora é a aba Kanban da Agenda.
+            {/* Kanban unificado: /prazos agora é a aba Kanban da Agenda.
               Mantém todos os links existentes (Dashboard, onboarding, caso). */}
-          <Route path="prazos" element={<Navigate to="/agenda?view=kanban" replace />} />
+            <Route path="prazos" element={<Navigate to="/agenda?view=kanban" replace />} />
 
-          <Route path="recebimentos" element={<RecebimentosPage />} />
-          <Route path="recebimentos/historico" element={<RecebimentosHistoricoPage />} />
-          <Route path="recebimentos/novo" element={<RecebimentosPage />} />
-          <Route path="recebimentos/editar/:recebimentoId" element={<RecebimentosPage />} />
+            <Route path="recebimentos" element={<RecebimentosPage />} />
+            <Route path="recebimentos/historico" element={<RecebimentosHistoricoPage />} />
+            <Route path="recebimentos/novo" element={<RecebimentosPage />} />
+            <Route path="recebimentos/editar/:recebimentoId" element={<RecebimentosPage />} />
 
-          <Route path="contratos" element={<ContratosPage />} />
+            <Route path="contratos" element={<ContratosPage />} />
 
-          <Route path="despesas" element={<DespesasPage />} />
-          <Route path="despesas/novo" element={<DespesasPage />} />
-          <Route path="despesas/editar/:despesaId" element={<DespesasPage />} />
+            <Route path="despesas" element={<DespesasPage />} />
+            <Route path="despesas/novo" element={<DespesasPage />} />
+            <Route path="despesas/editar/:despesaId" element={<DespesasPage />} />
 
-          <Route path="nfse" element={<NotasFiscaisPage />} />
+            <Route path="nfse" element={<NotasFiscaisPage />} />
 
-          {/* Issue #301: AgendaPage legada removida. A unificada cobre as
+            {/* Issue #301: AgendaPage legada removida. A unificada cobre as
               3 visões; criação via ?novo=evento|tarefa (abre o modal).
               Redirects preservam links/favoritos antigos. */}
-          <Route path="agenda" element={<AgendaUnificadaPage />} />
-          <Route path="agenda/legado" element={<Navigate to="/agenda" replace />} />
-          <Route path="agenda/novo" element={<Navigate to="/agenda?novo=evento" replace />} />
-          <Route path="agenda/editar/:eventoId" element={<Navigate to="/agenda" replace />} />
+            <Route path="agenda" element={<AgendaUnificadaPage />} />
+            <Route path="agenda/legado" element={<Navigate to="/agenda" replace />} />
+            <Route path="agenda/novo" element={<Navigate to="/agenda?novo=evento" replace />} />
+            <Route path="agenda/editar/:eventoId" element={<Navigate to="/agenda" replace />} />
 
-          <Route path="documentos" element={<DocumentosPage />} />
-          <Route path="documentos/novo" element={<DocumentosPage />} />
-          <Route path="documentos/editar/:documentoId" element={<DocumentosPage />} />
+            <Route path="documentos" element={<DocumentosPage />} />
+            <Route path="documentos/novo" element={<DocumentosPage />} />
+            <Route path="documentos/editar/:documentoId" element={<DocumentosPage />} />
 
-          <Route path="djen" element={<DjenPage />} />
-          <Route path="djen/triagem-assistida" element={<TriagemAssistidaPage />} />
+            <Route path="djen" element={<DjenPage />} />
+            <Route path="djen/triagem-assistida" element={<TriagemAssistidaPage />} />
 
-          <Route path="relatorios" element={<RelatoriosPage />} />
+            <Route path="relatorios" element={<RelatoriosPage />} />
 
-          <Route path="configuracoes" element={<SettingsPage />} />
-          <Route path="integracoes" element={<IntegracoesPage />} />
-          <Route path="modelos" element={<ModelosDocumentoPage />} />
-          <Route path="perfil" element={<PerfilPage />} />
+            <Route path="configuracoes" element={<SettingsPage />} />
+            <Route path="integracoes" element={<IntegracoesPage />} />
+            <Route path="modelos" element={<ModelosDocumentoPage />} />
+            <Route path="perfil" element={<PerfilPage />} />
 
-          {/* admin-fase0: rotas do backoffice (gated por SuperAdminRoute) */}
-          <Route path="admin" element={<Navigate to="/admin/tenants" replace />} />
-          <Route
-            path="admin/tenants"
-            element={
-              <SuperAdminRoute>
-                <AdminTenantsPage />
-              </SuperAdminRoute>
-            }
-          />
-          <Route
-            path="admin/tenants/:id"
-            element={
-              <SuperAdminRoute>
-                <AdminTenantDetailPage />
-              </SuperAdminRoute>
-            }
-          />
-          <Route
-            path="admin/access-requests"
-            element={
-              <SuperAdminRoute>
-                <AdminAccessRequestsPage />
-              </SuperAdminRoute>
-            }
-          />
+            {/* admin-fase0: rotas do backoffice (gated por SuperAdminRoute) */}
+            <Route path="admin" element={<Navigate to="/admin/tenants" replace />} />
+            <Route
+              path="admin/tenants"
+              element={
+                <SuperAdminRoute>
+                  <AdminTenantsPage />
+                </SuperAdminRoute>
+              }
+            />
+            <Route
+              path="admin/tenants/:id"
+              element={
+                <SuperAdminRoute>
+                  <AdminTenantDetailPage />
+                </SuperAdminRoute>
+              }
+            />
+            <Route
+              path="admin/access-requests"
+              element={
+                <SuperAdminRoute>
+                  <AdminAccessRequestsPage />
+                </SuperAdminRoute>
+              }
+            />
 
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </>
   )
 }
