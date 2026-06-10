@@ -1,3 +1,4 @@
+import logging
 import re
 import unicodedata
 
@@ -856,7 +857,11 @@ STRING A SEPARAR:
             contents=prompt,
             config={"response_mime_type": "application/json"},
         )
-    except Exception:
+    except Exception as exc:
+        # logging padrao (nao current_app): funciona tambem fora de app
+        # context e nao mascara a falha da IA — antes era um return None
+        # mudo, impossivel de depurar em producao.
+        logging.getLogger(__name__).warning("djen_separar_partes_ia_falhou: %s", exc)
         return None
 
     raw = (getattr(response, "text", None) or "").strip()
@@ -1326,7 +1331,36 @@ def montar_grupos_pendentes(db, Cliente, Caso, PublicacaoDJEN, tenant_id):
     return grupos
 
 
-def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise):
+def carregar_cache_vinculos(Cliente, Caso, tenant_id):
+    """Pré-carrega casos e clientes do tenant pra sugestão de vínculos.
+
+    A triagem em lote chamava sugerir_vinculos() por publicação, e cada
+    chamada fazia até ~8 queries (1 exata + 1 approx de casos + 5 ilike de
+    nomes + 1 de clientes com doc). Com 20 publicações na tela isso virava
+    ~150 queries (N+1). Carregando os dois conjuntos UMA vez por request e
+    casando em Python, a listagem cai pra 2 queries fixas.
+    """
+    casos = (
+        Caso.query.filter(
+            Caso.tenant_id == tenant_id,
+            Caso.numero_processo.isnot(None),
+            Caso.numero_processo != "",
+        )
+        .limit(500)
+        .all()
+    )
+    clientes = Cliente.query.filter(Cliente.tenant_id == tenant_id).limit(1000).all()
+    return {"casos": casos, "clientes": clientes}
+
+
+def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise, cache=None):
+    # cache opcional (ver carregar_cache_vinculos): chamadas avulsas seguem
+    # funcionando sem ele — só pagam as 2 queries de carga aqui.
+    if cache is None:
+        cache = carregar_cache_vinculos(Cliente, Caso, tenant_id)
+    casos_cache = cache["casos"]
+    clientes_cache = cache["clientes"]
+
     numero_processo = (analise.get("numero_processo") or "").strip()
     nomes = _dedupe_preserving_order(
         (analise.get("partes_autoras") or []) + (analise.get("partes_reus") or [])
@@ -1337,31 +1371,22 @@ def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise):
     sugestoes_clientes = []
 
     if numero_processo:
-        exato = Caso.query.filter_by(tenant_id=tenant_id, numero_processo=numero_processo).all()
-        for caso in exato:
-            sugestoes_casos.append(
-                {
-                    "id": caso.id,
-                    "titulo": caso.titulo,
-                    "numero_processo": caso.numero_processo,
-                    "score": 0.99,
-                    "motivo": "Numero de processo exato",
-                }
-            )
+        for caso in casos_cache:
+            if caso.numero_processo == numero_processo:
+                sugestoes_casos.append(
+                    {
+                        "id": caso.id,
+                        "titulo": caso.titulo,
+                        "numero_processo": caso.numero_processo,
+                        "score": 0.99,
+                        "motivo": "Numero de processo exato",
+                    }
+                )
 
     if not sugestoes_casos and numero_processo:
         somente_digitos = re.sub(r"\D", "", numero_processo)
         if somente_digitos:
-            approx = (
-                Caso.query.filter(
-                    Caso.tenant_id == tenant_id,
-                    Caso.numero_processo.isnot(None),
-                    Caso.numero_processo != "",
-                )
-                .limit(100)
-                .all()
-            )
-            for caso in approx:
+            for caso in casos_cache:
                 num_caso = re.sub(r"\D", "", caso.numero_processo or "")
                 if num_caso and (somente_digitos in num_caso or num_caso in somente_digitos):
                     sugestoes_casos.append(
@@ -1377,14 +1402,11 @@ def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise):
     for nome in nomes[:5]:
         if len(nome) < 4:
             continue
-        candidatos = (
-            Cliente.query.filter(
-                Cliente.tenant_id == tenant_id,
-                Cliente.nome_razao_social.ilike(f"%{nome}%"),
-            )
-            .limit(5)
-            .all()
-        )
+        # Equivalente ao ilike("%nome%") de antes: substring case-insensitive.
+        nome_lower = nome.lower()
+        candidatos = [
+            c for c in clientes_cache if nome_lower in (c.nome_razao_social or "").lower()
+        ][:5]
         for cliente in candidatos:
             score = 0.7
             if normalizar_nome(cliente.nome_razao_social) == normalizar_nome(nome):
@@ -1400,16 +1422,7 @@ def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise):
             )
 
     if documentos:
-        clientes_doc = (
-            Cliente.query.filter(
-                Cliente.tenant_id == tenant_id,
-                Cliente.cpf_cnpj.isnot(None),
-                Cliente.cpf_cnpj != "",
-            )
-            .limit(300)
-            .all()
-        )
-        for cliente in clientes_doc:
+        for cliente in clientes_cache:
             cpf_cnpj = re.sub(r"\D", "", cliente.cpf_cnpj or "")
             if cpf_cnpj and cpf_cnpj in documentos:
                 sugestoes_clientes.append(

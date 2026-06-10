@@ -295,7 +295,7 @@ def _ctx_advogado(user, tenant):
 
 
 def _renderizar(modelo, cliente, caso, user, tenant):
-    """Renderiza o template HTML com Jinja2 + autoescape.
+    """Renderiza o template HTML com Jinja2 sandboxed + autoescape.
 
     Importante: usamos `autoescape=True` pra impedir injeção XSS via campos
     do cliente (o user pode ter colocado `<script>` no nome). Como o
@@ -303,12 +303,19 @@ def _renderizar(modelo, cliente, caso, user, tenant):
     template autor confia em si mesmo, mas as variáveis devem ser escapadas.
     Trade-off: se o user quiser HTML em uma variável (raro), terá que
     usar `{{ var | safe }}` explicitamente — opção desativada por padrão.
+
+    Sandbox: o `conteudo_html` é editável pelo tenant, então é um template
+    user-controlled. `SandboxedEnvironment` bloqueia acesso a atributos
+    internos (`__class__`, `__mro__`, etc.) e operações inseguras — fecha
+    SSTI sem mudar o comportamento dos templates legítimos (placeholders
+    simples + if/for continuam funcionando).
     """
     import locale  # noqa: PLC0415
 
-    from jinja2 import Environment, select_autoescape  # noqa: PLC0415
+    from jinja2 import select_autoescape  # noqa: PLC0415
+    from jinja2.sandbox import SandboxedEnvironment  # noqa: PLC0415
 
-    env = Environment(autoescape=select_autoescape(["html", "xml"]))
+    env = SandboxedEnvironment(autoescape=select_autoescape(["html", "xml"]))
     try:
         template = env.from_string(modelo.conteudo_html)
     except Exception as e:

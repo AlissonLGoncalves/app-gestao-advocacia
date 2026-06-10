@@ -599,10 +599,11 @@ def _criar_tarefa_de_publicacao(db, _ignored, pub, max_idade_dias=None):
     O 2o argumento (legado: TarefaPrazo class) eh ignorado e mantido por
     compat com callers — PR D4.4 deletou TarefaPrazo do models.
     """
-    from datetime import date, timedelta  # noqa: PLC0415
+    from datetime import timedelta  # noqa: PLC0415
 
     from djen_prazo_calculator import calcular_prazo  # noqa: PLC0415
     from models import ItemAgenda  # noqa: PLC0415
+    from utils.datas import hoje_brasil  # noqa: PLC0415
 
     if not pub or pub.importante is not True or pub.caso_id is None:
         return None
@@ -617,7 +618,7 @@ def _criar_tarefa_de_publicacao(db, _ignored, pub, max_idade_dias=None):
         except (RuntimeError, TypeError, ValueError):
             max_idade_dias = DJEN_AUTO_TAREFA_MAX_IDADE_DIAS_PADRAO
     if max_idade_dias and max_idade_dias > 0 and pub.data_disponibilizacao:
-        if pub.data_disponibilizacao < date.today() - timedelta(days=max_idade_dias):
+        if pub.data_disponibilizacao < hoje_brasil() - timedelta(days=max_idade_dias):
             return None
 
     # Idempotencia: pub ja deu origem a uma tarefa?
@@ -682,13 +683,14 @@ def limpar_prazos_vencidos_antigos(app, tenant_id=None, dias_minimos=60):
 
     Retorna o numero de tarefas movidas.
     """
-    from datetime import date, timedelta  # noqa: PLC0415
+    from datetime import timedelta  # noqa: PLC0415
 
     from extensions import db  # noqa: PLC0415
     from models import ItemAgenda  # noqa: PLC0415
+    from utils.datas import hoje_brasil  # noqa: PLC0415
 
     logger = logging.getLogger(__name__)
-    corte = date.today() - timedelta(days=dias_minimos)
+    corte = hoje_brasil() - timedelta(days=dias_minimos)
 
     # PR D4.4 — usa ItemAgenda(tipo='tarefa') no vocab novo
     # ("Concluido" sem acento, "Cancelado" tambem nao conta).

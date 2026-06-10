@@ -17,12 +17,13 @@ e o item ainda esta pendente. Formato:
   "<tipo>:<item_id>:<data_referencia>"
 """
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy.exc import IntegrityError
 
 from extensions import db
 from models import Despesa, Notificacao, Recebimento, User
+from utils.datas import hoje_brasil
 
 # App atual injetado pelo job_verificar_vencimentos pra logar/enviar email.
 # Modulo-level pra nao precisar passar app por toda cadeia de helpers.
@@ -209,7 +210,8 @@ def job_verificar_vencimentos(app):
     with app.app_context():
         _current_app = app
         try:
-            hoje = date.today()
+            # Dia civil no Brasil (não o do servidor UTC) — ver utils/datas.py
+            hoje = hoje_brasil()
             criados = []
             _processar_recebimentos(hoje, criados)
             _processar_despesas(hoje, criados)

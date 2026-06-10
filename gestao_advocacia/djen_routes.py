@@ -799,7 +799,11 @@ def registrar_rotas_djen(
             """Fila de triagem com análise de partes/representantes e sugestões de vínculo."""
             user_id = get_jwt_identity()
             from app import Cliente, User
-            from djen_triagem import analisar_publicacao, sugerir_vinculos
+            from djen_triagem import (
+                analisar_publicacao,
+                carregar_cache_vinculos,
+                sugerir_vinculos,
+            )
 
             user = User.query.get(int(user_id))
             if not user:
@@ -830,6 +834,12 @@ def registrar_rotas_djen(
             # extras por pub. Lite pula tudo isso.
             lite = request.args.get("lite", "false").lower() == "true"
 
+            # Fix N+1: carrega casos+clientes do tenant UMA vez e reusa o
+            # cache em todas as publicacoes da pagina (antes: ~8 queries/pub).
+            cache_vinculos = (
+                None if lite else carregar_cache_vinculos(Cliente, Caso, user.tenant_id)
+            )
+
             itens = []
             for pub in pubs:
                 if lite:
@@ -838,7 +848,9 @@ def registrar_rotas_djen(
                 # Apenas regex (rapido, gratis). Gemini fica reservado ao endpoint
                 # /triagem/<id>/analise-ia que o wizard chama por publicacao.
                 analise = analisar_publicacao(pub)
-                sugestoes = sugerir_vinculos(db, Cliente, Caso, user.tenant_id, analise)
+                sugestoes = sugerir_vinculos(
+                    db, Cliente, Caso, user.tenant_id, analise, cache=cache_vinculos
+                )
                 itens.append(
                     {
                         "publicacao": pub.to_dict(),
