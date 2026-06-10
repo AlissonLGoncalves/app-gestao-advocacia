@@ -665,6 +665,9 @@ def _criar_tarefa_de_publicacao(db, _ignored, pub, max_idade_dias=None):
         prazo_validado=False,
         prazo_calculado_por_ia=True,
         prazo_dias_origem=calc["dias"],
+        # Issue #304 — persiste a regra detectada (contestacao_15d, ...)
+        # pra UI mostrar a providência e sugerir o modelo de peça.
+        tipo_providencia=calc.get("regra"),
     )
     db.session.add(tarefa)
     return tarefa

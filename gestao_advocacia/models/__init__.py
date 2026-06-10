@@ -1167,6 +1167,11 @@ class ItemAgenda(db.Model):
     prazo_calculado_por_ia = db.Column(db.Boolean, nullable=False, default=False)
     prazo_dias_origem = db.Column(db.Integer, nullable=True)
     origem_id = db.Column(db.String(100), nullable=True)
+    # Issue #304 — tipo de providencia detectado pelo calculador de prazo
+    # (nome da regra: contestacao_15d, recurso_15d, manifestacao_15d, ...).
+    # Permite a UI mostrar O QUE a intimacao exige e sugerir o modelo de
+    # peca certo no "Gerar peca". Nullable: itens manuais nao tem.
+    tipo_providencia = db.Column(db.String(40), nullable=True)
 
     # Notificacoes (de EventoAgenda) — estado de envio {"7d": True, ...}.
     notificacoes_enviadas = db.Column(db.JSON, nullable=True, default=dict)
@@ -1223,6 +1228,7 @@ class ItemAgenda(db.Model):
             "prazo_validado": bool(self.prazo_validado),
             "prazo_calculado_por_ia": bool(self.prazo_calculado_por_ia),
             "prazo_dias_origem": self.prazo_dias_origem,
+            "tipo_providencia": self.tipo_providencia,
             "origem_id": self.origem_id,
             "notificacoes_enviadas": self.notificacoes_enviadas,
             "tratado_em": self.tratado_em.isoformat() if self.tratado_em else None,

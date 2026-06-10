@@ -482,6 +482,8 @@ def register_api_routes(app, api, finance_access_required):
             "prazo_validado": fields.Boolean,
             "prazo_calculado_por_ia": fields.Boolean,
             "prazo_dias_origem": fields.Integer,
+            # Issue #304 — regra de providencia detectada (contestacao_15d, ...)
+            "tipo_providencia": fields.String,
             "origem_id": fields.String,
             "notificacoes_enviadas": fields.Raw,
             # Tratamento (Onda 1) — registro de como o advogado tratou

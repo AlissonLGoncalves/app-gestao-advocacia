@@ -36,6 +36,7 @@ import {
   aplicarReorderEmTarefas,
 } from '../utils/kanbanReorder.js'
 import PrioridadeBadge from '../components/ui/PrioridadeBadge.jsx'
+import { getProvidencia } from '../utils/providencia.js'
 import SlaBar from '../components/ui/SlaBar.jsx'
 import TratarPrazoModal from '../components/TratarPrazoModal.jsx'
 import AgendaViewToggle from '../components/AgendaViewToggle.jsx'
@@ -801,6 +802,21 @@ function KanbanCardVisual({ tarefa, casos, onEditar, onConfirmarPrazo, onConclui
         <div className="d-flex justify-content-between align-items-start mb-2">
           <div className="d-flex flex-wrap gap-1">
             <PrioridadeBadge prioridade={tarefa.prioridade} mostrarNormal />
+
+            {/* Issue #304 — badge da providência detectada (contestação,
+                recurso, manifestação...) direto no card */}
+            {(() => {
+              const prov = getProvidencia(tarefa.tipo_providencia)
+              if (!prov) return null
+              return (
+                <span
+                  className={`badge bg-${prov.cor} ${prov.cor === 'warning' ? 'text-dark' : ''}`}
+                  title={prov.descricao}
+                >
+                  ⚖ {prov.label}
+                </span>
+              )
+            })()}
 
             {precisaConfirmarPrazo && (
               <span

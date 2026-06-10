@@ -25,6 +25,9 @@ import {
   DocumentArrowUpIcon,
 } from '@heroicons/react/24/outline'
 import { tratarItemAgenda, getHistoricoItemAgenda } from '../api/itensAgenda.js'
+import { listModelos } from '../api/modelos.js'
+import { getProvidencia, ordenarModelosPorProvidencia } from '../utils/providencia.js'
+import PreviewModeloModal from './PreviewModeloModal.jsx'
 import { API_URL } from '../config.js'
 
 // Calcula dias relativos: positivo=vencido ha N dias, negativo=falta N dias
@@ -97,6 +100,10 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
   const [historicoAberto, setHistoricoAberto] = useState(false)
   const [historico, setHistorico] = useState(null) // null=nao carregou, []=carregou-vazio, [...]=ok
   const [carregandoHist, setCarregandoHist] = useState(false)
+  // Issue #304 — responder com peça: modelos + preview
+  const [modelos, setModelos] = useState([])
+  const [modeloSelId, setModeloSelId] = useState('')
+  const [modeloPreview, setModeloPreview] = useState(null)
 
   // Pre-popula como_tratado com valor existente quando reabre o modal
   useEffect(() => {
@@ -125,6 +132,26 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
       })
   }, [item?.caso_id])
 
+  // Issue #304 — carrega modelos pro "Responder com peça" (só quando o
+  // item tem caso vinculado: sem caso não há cliente pra preencher).
+  // Ordena sugerindo primeiro os modelos que casam com a providência.
+  useEffect(() => {
+    if (!item?.caso_id) {
+      setModelos([])
+      return
+    }
+    listModelos()
+      .then((data) => {
+        const lista = Array.isArray(data) ? data : data?.items || []
+        const ordenados = ordenarModelosPorProvidencia(lista, item?.tipo_providencia)
+        setModelos(ordenados)
+        setModeloSelId(ordenados.length ? String(ordenados[0].id) : '')
+      })
+      .catch((err) => {
+        console.warn('TratarPrazoModal: erro ao listar modelos', err)
+      })
+  }, [item?.caso_id, item?.tipo_providencia])
+
   // Lazy-load do historico quando usuario expande
   const handleToggleHistorico = async () => {
     const novoEstado = !historicoAberto
@@ -149,6 +176,8 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
   const dias = diasRelativos(item.data_vencimento || item.data_inicio)
   const vencido = dias !== null && dias > 0 && item.status === 'Pendente'
   const jaTratado = Boolean(item.tratado_em)
+  // Issue #304 — providência detectada pelo calculador de prazo
+  const providencia = getProvidencia(item.tipo_providencia)
   const statusLabel = STATUS_LABEL[item.status] || {
     texto: item.status,
     cor: 'bg-secondary',
@@ -221,8 +250,17 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
                 />
                 Tratar prazo
               </h5>
-              <div className="d-flex align-items-center gap-2 mt-1">
+              <div className="d-flex align-items-center gap-2 mt-1 flex-wrap">
                 <span className={`badge ${statusLabel.cor}`}>{statusLabel.texto}</span>
+                {providencia && (
+                  <span
+                    className={`badge bg-${providencia.cor} ${providencia.cor === 'warning' ? 'text-dark' : ''}`}
+                    title={providencia.descricao}
+                    data-testid="badge-providencia"
+                  >
+                    ⚖ {providencia.label}
+                  </span>
+                )}
                 {vencido && (
                   <span className="badge bg-danger d-inline-flex align-items-center gap-1">
                     <ExclamationTriangleIcon style={{ width: 12, height: 12 }} />
@@ -296,6 +334,54 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
                 )}
               </div>
             </div>
+
+            {/* Issue #304 — Responder com peça: a intimação vira ação.
+                Só aparece com caso vinculado (precisa do cliente pro
+                preenchimento) e quando há modelos cadastrados. */}
+            {item.caso_id && modelos.length > 0 && (
+              <div className="mb-3 p-3 border rounded bg-primary bg-opacity-10">
+                <label className="form-label small fw-semibold mb-2">
+                  <DocumentArrowUpIcon
+                    style={{ width: 14, height: 14 }}
+                    className="me-1 align-text-bottom d-inline"
+                  />
+                  Responder com peça
+                  {providencia && (
+                    <span className="text-muted fw-normal"> — sugerido: {providencia.label}</span>
+                  )}
+                </label>
+                <div className="d-flex gap-2">
+                  <select
+                    className="form-select form-select-sm"
+                    value={modeloSelId}
+                    onChange={(e) => setModeloSelId(e.target.value)}
+                    disabled={salvando}
+                    aria-label="Modelo de peça"
+                  >
+                    {modelos.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.titulo}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary flex-shrink-0"
+                    data-testid="btn-gerar-peca"
+                    disabled={salvando || !modeloSelId}
+                    onClick={() => {
+                      const m = modelos.find((x) => String(x.id) === String(modeloSelId))
+                      if (m) setModeloPreview(m)
+                    }}
+                  >
+                    Gerar peça
+                  </button>
+                </div>
+                <small className="text-muted">
+                  Abre o modelo já preenchido com o cliente e o caso deste prazo.
+                </small>
+              </div>
+            )}
 
             {/* Anotação existente (se ja foi tratado antes) */}
             {jaTratado && item.como_tratado && (
@@ -499,6 +585,16 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
           </div>
         </div>
       </div>
+
+      {/* Issue #304 — preview da peça gerada (cliente+caso pré-selecionados
+          a partir do caso do prazo) */}
+      {modeloPreview && (
+        <PreviewModeloModal
+          modelo={modeloPreview}
+          casoPreSelecionadoId={item.caso_id}
+          onClose={() => setModeloPreview(null)}
+        />
+      )}
     </div>
   )
 }
