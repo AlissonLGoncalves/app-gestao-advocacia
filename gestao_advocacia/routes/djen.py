@@ -1,5 +1,5 @@
 # ==============================================================================
-# ARQUIVO: gestao_advocacia/djen_routes.py
+# ARQUIVO: gestao_advocacia/routes/djen.py (ex-djen_routes.py, movido na issue #300)
 # Rotas da API DJEN — Diário de Justiça Eletrônico Nacional.
 # Chamado via registrar_rotas_djen() de dentro de create_app() em app.py
 # para evitar importação circular.
