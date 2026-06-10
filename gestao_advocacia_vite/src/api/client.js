@@ -1,4 +1,5 @@
 import { TERMS_VERSION, LGPD_VERSION } from '../constants/legal'
+import { mensagemAmigavel, ERRO_REDE } from '../utils/errorMessages.js'
 
 const BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
@@ -48,26 +49,41 @@ async function throwIfError(res, path) {
       // Sessao expirada / token invalido em endpoint autenticado
       handleUnauthorized()
     }
-    throw Object.assign(new Error(payload.message || payload.erro || `HTTP ${res.status}`), {
+    const tecnica = payload.message || payload.erro || `HTTP ${res.status}`
+    // Issue #299 — err.message vira a versao amigavel PT-BR (os ~99
+    // toast.error(err.message) existentes ficam amigaveis sem mudanca).
+    // A original fica em err.technical/err.payload pra depuracao.
+    const err = Object.assign(new Error(mensagemAmigavel(res.status, tecnica)), {
       status: res.status,
       payload,
+      technical: tecnica,
     })
+    console.warn(`API ${res.status} em ${path}:`, tecnica)
+    throw err
   }
 }
 
 export async function request(path, { method = 'GET', body, headers, signal, auth = true } = {}) {
   const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
   const finalHeaders = buildHeaders({ headers, isFormData, auth })
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers: finalHeaders,
-    body: isFormData
-      ? body
-      : body !== undefined && body !== null
-        ? JSON.stringify(body)
-        : undefined,
-    signal,
-  })
+  let res
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method,
+      headers: finalHeaders,
+      body: isFormData
+        ? body
+        : body !== undefined && body !== null
+          ? JSON.stringify(body)
+          : undefined,
+      signal,
+    })
+  } catch (e) {
+    // Abort e fluxo normal (buscas canceladas) — repassa intacto.
+    if (e?.name === 'AbortError') throw e
+    // Falha de rede (fetch rejeita com TypeError): mensagem amigavel.
+    throw Object.assign(new Error(ERRO_REDE), { cause: e, technical: String(e) })
+  }
   await throwIfError(res, path)
   if (res.status === 204) return null
   return res.json()
