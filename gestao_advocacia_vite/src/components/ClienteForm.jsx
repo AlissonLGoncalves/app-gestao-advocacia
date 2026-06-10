@@ -1,14 +1,14 @@
 ﻿import React, { useState, useEffect } from 'react'
-import { useConfirm } from './hooks/useConfirm.jsx'
-import { API_URL } from './config.js'
+import { useConfirm } from '../hooks/useConfirm.jsx'
+import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
-import DocumentosClienteTab from './components/DocumentosClienteTab.jsx'
-import DadosPessoaisSection from './components/forms/cliente/DadosPessoaisSection.jsx'
-import EnderecoSection from './components/forms/cliente/EnderecoSection.jsx'
-import ContatoSection from './components/forms/cliente/ContatoSection.jsx'
-import useClienteForm from './hooks/useClienteForm.js'
-import { anonimizarCliente } from './api/clientes.js'
-import { api } from './api/client.js'
+import DocumentosClienteTab from './DocumentosClienteTab.jsx'
+import DadosPessoaisSection from './forms/cliente/DadosPessoaisSection.jsx'
+import EnderecoSection from './forms/cliente/EnderecoSection.jsx'
+import ContatoSection from './forms/cliente/ContatoSection.jsx'
+import useClienteForm from '../hooks/useClienteForm.js'
+import { anonimizarCliente } from '../api/clientes.js'
+import { api } from '../api/client.js'
 
 const initialStatePF = {
   nome_razao_social: '',

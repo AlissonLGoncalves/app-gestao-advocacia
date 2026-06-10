@@ -20,7 +20,6 @@ import NotasFiscaisPage from './pages/NotasFiscaisPage.jsx'
 import ClienteDetalhePage from './pages/ClienteDetalhePage.jsx'
 import ContratosPage from './pages/ContratosPage.jsx'
 import DespesasPage from './pages/DespesasPage.jsx'
-import AgendaPage from './pages/AgendaPage.jsx'
 import AgendaUnificadaPage from './pages/AgendaUnificadaPage.jsx'
 import DocumentosPage from './pages/DocumentosPage.jsx'
 import RelatoriosPage from './pages/RelatoriosPage.jsx'
@@ -685,13 +684,13 @@ function App() {
 
           <Route path="nfse" element={<NotasFiscaisPage />} />
 
-          {/* PR D3: /agenda passa a usar a pagina unificada (itens-agenda).
-              /agenda/legado mantem o form de evento antigo (criacao
-              direta em /eventos) como fallback durante a transicao. */}
+          {/* Issue #301: AgendaPage legada removida. A unificada cobre as
+              3 visões; criação via ?novo=evento|tarefa (abre o modal).
+              Redirects preservam links/favoritos antigos. */}
           <Route path="agenda" element={<AgendaUnificadaPage />} />
-          <Route path="agenda/legado" element={<AgendaPage />} />
-          <Route path="agenda/novo" element={<AgendaPage />} />
-          <Route path="agenda/editar/:eventoId" element={<AgendaPage />} />
+          <Route path="agenda/legado" element={<Navigate to="/agenda" replace />} />
+          <Route path="agenda/novo" element={<Navigate to="/agenda?novo=evento" replace />} />
+          <Route path="agenda/editar/:eventoId" element={<Navigate to="/agenda" replace />} />
 
           <Route path="documentos" element={<DocumentosPage />} />
           <Route path="documentos/novo" element={<DocumentosPage />} />

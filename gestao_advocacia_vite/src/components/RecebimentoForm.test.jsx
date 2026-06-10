@@ -15,21 +15,21 @@ vi.mock('react-toastify', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
-vi.mock('./api/client.js', () => ({
+vi.mock('../api/client.js', () => ({
   api: { get: vi.fn().mockResolvedValue([]) },
 }))
 
-vi.mock('./api/financeiro.js', () => ({
+vi.mock('../api/financeiro.js', () => ({
   createRecebimento: vi.fn(),
   updateRecebimento: vi.fn(),
   createRecebimentoSerie: vi.fn(),
 }))
 
-vi.mock('./api/clientes.js', () => ({
+vi.mock('../api/clientes.js', () => ({
   createCliente: vi.fn(),
 }))
 
-import { createRecebimento, updateRecebimento, createRecebimentoSerie } from './api/financeiro.js'
+import { createRecebimento, updateRecebimento, createRecebimentoSerie } from '../api/financeiro.js'
 import RecebimentoForm from './RecebimentoForm.jsx'
 
 describe('RecebimentoForm robusto (Fase 2)', () => {

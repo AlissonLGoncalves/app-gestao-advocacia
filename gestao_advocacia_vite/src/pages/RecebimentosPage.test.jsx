@@ -5,11 +5,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import RecebimentosPage from './RecebimentosPage.jsx'
 import { getRecebimento } from '../api/financeiro.js'
 
-vi.mock('../RecebimentoList.jsx', () => ({
+vi.mock('../components/RecebimentoList.jsx', () => ({
   default: () => <div data-testid="recebimento-list" />,
 }))
 
-vi.mock('../RecebimentoForm.jsx', () => ({
+vi.mock('../components/RecebimentoForm.jsx', () => ({
   default: ({ recebimentoParaEditar }) => (
     <div data-testid="recebimento-form">{recebimentoParaEditar?.descricao || 'sem-dados'}</div>
   ),

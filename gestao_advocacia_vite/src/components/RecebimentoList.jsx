@@ -15,14 +15,14 @@ import {
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
-import { exportarParaPDF } from './utils/pdfGenerator.js'
-import { api } from './api/client.js'
-import { deleteRecebimento, listRecebimentos, marcarRecebimentoPago } from './api/financeiro.js'
-import { listEmissoesNFSe } from './api/nfse.js'
-import { useConfirm } from './hooks/useConfirm.jsx'
-import useListData from './hooks/useListData.js'
-import EmptyState from './components/EmptyState.jsx'
-import EmitirNFSeButton from './components/EmitirNFSeButton.jsx'
+import { exportarParaPDF } from '../utils/pdfGenerator.js'
+import { api } from '../api/client.js'
+import { deleteRecebimento, listRecebimentos, marcarRecebimentoPago } from '../api/financeiro.js'
+import { listEmissoesNFSe } from '../api/nfse.js'
+import { useConfirm } from '../hooks/useConfirm.jsx'
+import useListData from '../hooks/useListData.js'
+import EmptyState from './EmptyState.jsx'
+import EmitirNFSeButton from './EmitirNFSeButton.jsx'
 
 function RecebimentoList({ onEditRecebimento, refreshKey }) {
   const { confirm, ConfirmDialog } = useConfirm()

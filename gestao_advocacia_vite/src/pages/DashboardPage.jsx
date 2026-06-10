@@ -1,5 +1,5 @@
 // src/pages/DashboardPage.jsx
-import Dashboard from '../Dashboard.jsx'
+import Dashboard from '../components/Dashboard.jsx'
 import DashboardCharts from '../components/DashboardCharts.jsx'
 import { useNavigate } from 'react-router-dom'
 

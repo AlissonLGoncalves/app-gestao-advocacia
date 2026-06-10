@@ -9,11 +9,11 @@ vi.mock('../api/casos.js', () => ({
   getCaso: vi.fn(),
 }))
 
-vi.mock('../CasoList.jsx', () => ({
+vi.mock('../components/CasoList.jsx', () => ({
   default: () => <div data-testid="caso-list">Lista de casos</div>,
 }))
 
-vi.mock('../CasoForm.jsx', () => ({
+vi.mock('../components/CasoForm.jsx', () => ({
   default: ({ casoParaEditar }) => (
     <div data-testid="caso-form">Form caso: {casoParaEditar?.titulo || 'novo'}</div>
   ),

@@ -1,7 +1,7 @@
 {
   "name": "gestao_advocacia_vite",
   "private": true,
-  "version": "2.4.1",
+  "version": "2.4.2",
   "type": "module",
   "scripts": {
     "dev": "npm --prefix gestao_advocacia_vite run dev",

@@ -1,8 +1,8 @@
 ﻿// src/pages/DespesasPage.jsx
 import React, { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import DespesaList from '../DespesaList.jsx' // Ajuste o caminho se DespesaList.jsx não estiver em src/
-import DespesaForm from '../DespesaForm.jsx' // Ajuste o caminho se DespesaForm.jsx não estiver em src/
+import DespesaList from '../components/DespesaList.jsx' // Ajuste o caminho se DespesaList.jsx não estiver em src/
+import DespesaForm from '../components/DespesaForm.jsx' // Ajuste o caminho se DespesaForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
 import { getDespesa } from '../api/financeiro.js'
 

@@ -5,11 +5,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import DespesasPage from './DespesasPage.jsx'
 import { getDespesa } from '../api/financeiro.js'
 
-vi.mock('../DespesaList.jsx', () => ({
+vi.mock('../components/DespesaList.jsx', () => ({
   default: () => <div data-testid="despesa-list" />,
 }))
 
-vi.mock('../DespesaForm.jsx', () => ({
+vi.mock('../components/DespesaForm.jsx', () => ({
   default: ({ despesaParaEditar }) => (
     <div data-testid="despesa-form">{despesaParaEditar?.descricao || 'sem-dados'}</div>
   ),

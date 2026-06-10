@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import CasoForm from './CasoForm.jsx'
-import { consultaPublicaCnj, createCaso } from './api/casos.js'
+import { consultaPublicaCnj, createCaso } from '../api/casos.js'
 
 const { toastMock } = vi.hoisted(() => ({
   toastMock: {
@@ -17,7 +17,7 @@ vi.mock('react-toastify', () => ({
   toast: toastMock,
 }))
 
-vi.mock('./api/casos.js', () => ({
+vi.mock('../api/casos.js', () => ({
   createCaso: vi.fn(),
   updateCaso: vi.fn(),
   consultaPublicaCnj: vi.fn(),

@@ -87,6 +87,21 @@ function AgendaUnificadaPage() {
   // Issue #304 — clique em TAREFA/PRAZO abre o tratamento (não o editor):
   // ver vencimento, providência, responder com peça, marcar cumprido.
   const [itemTratar, setItemTratar] = useState(null)
+  // Issue #301 — ?novo=evento|tarefa abre o modal de criação direto.
+  // Usado pelo QuickAdd do header (substitui a rota legada /agenda/novo).
+  const [novoTipoUrl, setNovoTipoUrl] = useState(null)
+  useEffect(() => {
+    const novo = searchParams.get('novo')
+    if (novo === 'evento' || novo === 'tarefa') {
+      setNovoTipoUrl(novo)
+      setItemEditar(null)
+      setModalAberto(true)
+      const params = new URLSearchParams(searchParams)
+      params.delete('novo') // remove da URL pra não reabrir em refresh
+      setSearchParams(params, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   // Fetch unificado
   const carregar = useCallback(async () => {
@@ -164,6 +179,7 @@ function AgendaUnificadaPage() {
   const handleFormSalvo = () => {
     setModalAberto(false)
     setItemEditar(null)
+    setNovoTipoUrl(null)
     setRefreshKey((k) => k + 1)
   }
 
@@ -319,8 +335,9 @@ function AgendaUnificadaPage() {
           onCancel={() => {
             setModalAberto(false)
             setItemEditar(null)
+            setNovoTipoUrl(null)
           }}
-          defaultTipo={filtroTipo === 'evento' ? 'evento' : 'tarefa'}
+          defaultTipo={novoTipoUrl || (filtroTipo === 'evento' ? 'evento' : 'tarefa')}
         />
       )}
 
