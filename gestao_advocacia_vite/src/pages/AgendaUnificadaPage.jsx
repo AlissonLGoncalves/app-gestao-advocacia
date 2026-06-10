@@ -374,68 +374,68 @@ function ListaItens({ itens, onAbrir, onEditar, onExcluir }) {
             {itens.map((item) => {
               const prov = item.tipo === 'tarefa' ? getProvidencia(item.tipo_providencia) : null
               return (
-              <tr key={item.id}>
-                <td className="fw-medium">
-                  {/* Issue #304 — título clicável: tarefa abre tratamento */}
-                  <button
-                    type="button"
-                    className="btn btn-link p-0 text-start fw-medium text-decoration-none"
-                    onClick={() => onAbrir(item)}
-                    title={item.tipo === 'tarefa' ? 'Tratar prazo' : 'Editar evento'}
-                  >
-                    {item.titulo}
-                  </button>
-                  {prov && (
-                    <span
-                      className={`badge ms-2 bg-${prov.cor} ${prov.cor === 'warning' ? 'text-dark' : ''}`}
-                      title={prov.descricao}
+                <tr key={item.id}>
+                  <td className="fw-medium">
+                    {/* Issue #304 — título clicável: tarefa abre tratamento */}
+                    <button
+                      type="button"
+                      className="btn btn-link p-0 text-start fw-medium text-decoration-none"
+                      onClick={() => onAbrir(item)}
+                      title={item.tipo === 'tarefa' ? 'Tratar prazo' : 'Editar evento'}
                     >
-                      ⚖ {prov.label}
+                      {item.titulo}
+                    </button>
+                    {prov && (
+                      <span
+                        className={`badge ms-2 bg-${prov.cor} ${prov.cor === 'warning' ? 'text-dark' : ''}`}
+                        title={prov.descricao}
+                      >
+                        ⚖ {prov.label}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <span
+                      className={`badge ${item.tipo === 'evento' ? 'bg-primary' : 'bg-warning text-dark'}`}
+                    >
+                      {item.tipo === 'evento' ? 'Evento' : 'Tarefa'}
                     </span>
-                  )}
-                </td>
-                <td>
-                  <span
-                    className={`badge ${item.tipo === 'evento' ? 'bg-primary' : 'bg-warning text-dark'}`}
-                  >
-                    {item.tipo === 'evento' ? 'Evento' : 'Tarefa'}
-                  </span>
-                </td>
-                <td>
-                  <small className="text-muted">{item.categoria || '—'}</small>
-                </td>
-                <td>
-                  <small>{formatDataBR(item.data_inicio || item.data_vencimento)}</small>
-                </td>
-                <td>
-                  <span className={`badge ${BADGE_STATUS[item.status] || 'bg-secondary'}`}>
-                    {item.status}
-                  </span>
-                </td>
-                <td>
-                  <small>{item.prioridade}</small>
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
-                    onClick={() => onEditar(item)}
-                    title="Editar"
-                    style={{ width: 28, height: 28 }}
-                  >
-                    <PencilSquareIcon style={{ width: 14, height: 14 }} />
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-danger p-1 lh-1"
-                    onClick={() => onExcluir(item)}
-                    title="Excluir"
-                    style={{ width: 28, height: 28 }}
-                  >
-                    <TrashIcon style={{ width: 14, height: 14 }} />
-                  </button>
-                </td>
-              </tr>
+                  </td>
+                  <td>
+                    <small className="text-muted">{item.categoria || '—'}</small>
+                  </td>
+                  <td>
+                    <small>{formatDataBR(item.data_inicio || item.data_vencimento)}</small>
+                  </td>
+                  <td>
+                    <span className={`badge ${BADGE_STATUS[item.status] || 'bg-secondary'}`}>
+                      {item.status}
+                    </span>
+                  </td>
+                  <td>
+                    <small>{item.prioridade}</small>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
+                      onClick={() => onEditar(item)}
+                      title="Editar"
+                      style={{ width: 28, height: 28 }}
+                    >
+                      <PencilSquareIcon style={{ width: 14, height: 14 }} />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-danger p-1 lh-1"
+                      onClick={() => onExcluir(item)}
+                      title="Excluir"
+                      style={{ width: 28, height: 28 }}
+                    >
+                      <TrashIcon style={{ width: 14, height: 14 }} />
+                    </button>
+                  </td>
+                </tr>
               )
             })}
           </tbody>

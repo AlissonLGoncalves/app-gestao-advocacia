@@ -74,11 +74,7 @@ describe('TratarPrazoModal — providência e gerar peça (#304)', () => {
 
   it('sem caso vinculado, seção de peça não aparece', async () => {
     render(
-      <TratarPrazoModal
-        item={{ ...ITEM, caso_id: null }}
-        onTratado={vi.fn()}
-        onClose={vi.fn()}
-      />
+      <TratarPrazoModal item={{ ...ITEM, caso_id: null }} onTratado={vi.fn()} onClose={vi.fn()} />
     )
     await screen.findByTestId('badge-providencia')
     expect(screen.queryByTestId('btn-gerar-peca')).not.toBeInTheDocument()
