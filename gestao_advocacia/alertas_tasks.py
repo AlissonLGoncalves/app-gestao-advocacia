@@ -1,8 +1,7 @@
-from datetime import datetime
-
 from extensions import db
 from mail_service import enviar_alerta_email
 from models import ItemAgenda, User
+from utils.datas import hoje_brasil
 
 
 def job_verificar_prazos(app):
@@ -16,7 +15,9 @@ def job_verificar_prazos(app):
     de notificacao.
     """
     with app.app_context():
-        hoje = datetime.utcnow().date()
+        # Dia civil no Brasil — evita off-by-one quando o servidor (UTC)
+        # já virou o dia mas Brasília ainda não. Ver utils/datas.py.
+        hoje = hoje_brasil()
 
         # Filtros equivalentes ao legado:
         #   - tipo_evento -> categoria (vocab novo, sem acento)

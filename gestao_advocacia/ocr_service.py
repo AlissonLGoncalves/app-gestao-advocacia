@@ -123,7 +123,13 @@ def _extract_with_gemini(text):
         return None
 
     try:
-        client = _genai.Client(api_key=api_key)
+        from google.genai import types as _genai_types  # noqa: PLC0415
+
+        # Timeout (ms): sem ele a request pendura o worker se a API cair.
+        client = _genai.Client(
+            api_key=api_key,
+            http_options=_genai_types.HttpOptions(timeout=60_000),
+        )
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=_GEMINI_PROMPT + text[:8000],
@@ -602,8 +608,9 @@ def _extract_case_data_with_gemini(text):
         from google import genai
         from google.genai import types
 
-        # O cliente coleta a API key automaticamente da var GEMINI_API_KEY
-        client = genai.Client()
+        # O cliente coleta a API key automaticamente da var GEMINI_API_KEY.
+        # Timeout (ms) evita pendurar o worker se a API do Gemini cair.
+        client = genai.Client(http_options=types.HttpOptions(timeout=60_000))
 
         prompt = """
 Você é um extrator de dados jurídicos brasileiro (Legaltech).

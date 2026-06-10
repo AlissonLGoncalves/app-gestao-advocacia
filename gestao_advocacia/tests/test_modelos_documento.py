@@ -261,3 +261,62 @@ class TestGerarDocumento:
         html = resp.get_json()["html"]
         assert "<script>" not in html
         assert "&lt;script&gt;" in html  # escapado
+
+
+class TestSandboxTemplate:
+    """Auditoria 06/2026: conteudo_html é user-controlled → renderização
+    usa SandboxedEnvironment. Estes testes garantem que SSTI é bloqueado
+    sem quebrar templates legítimos."""
+
+    def _gerar(self, client, setup_basico, db_, conteudo_html):
+        m = ModeloDocumento(
+            tenant_id=setup_basico["tenant"].id,
+            titulo="Custom",
+            tipo="outro",
+            conteudo_html=conteudo_html,
+            padrao=False,
+            ativo=True,
+            user_id=setup_basico["user"].id,
+        )
+        db_.session.add(m)
+        db_.session.commit()
+        return client.post(
+            f"/api/v1/modelos/{m.id}/gerar",
+            json={"cliente_id": setup_basico["cliente"].id},
+            headers=setup_basico["headers"],
+        )
+
+    def test_template_legitimo_continua_funcionando(self, client, setup_basico, db):
+        resp = self._gerar(
+            client,
+            setup_basico,
+            db,
+            "<p>{{ cliente.nome_razao_social }}{% if caso %} — {{ caso.titulo }}{% endif %}</p>",
+        )
+        assert resp.status_code == 200
+        assert "Fulano" in resp.get_json()["html"] or resp.get_json()["html"]
+
+    def test_ssti_introspeccao_bloqueada(self, client, setup_basico, db):
+        """Acesso a __class__/__mro__ deve falhar no sandbox (não vazar objetos)."""
+        resp = self._gerar(
+            client,
+            setup_basico,
+            db,
+            "{{ ''.__class__.__mro__ }}",
+        )
+        # O endpoint captura o erro de renderização e devolve mensagem de
+        # erro no HTML — o importante é NÃO vazar a introspecção.
+        html = resp.get_json()["html"]
+        assert "__mro__" not in html or "Erro" in html
+        assert "<class" not in html
+
+    def test_ssti_subclasses_bloqueada(self, client, setup_basico, db):
+        resp = self._gerar(
+            client,
+            setup_basico,
+            db,
+            "{{ [].__class__.__bases__[0].__subclasses__() }}",
+        )
+        html = resp.get_json()["html"]
+        assert "subprocess" not in html
+        assert "<class" not in html

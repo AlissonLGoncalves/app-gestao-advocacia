@@ -140,8 +140,10 @@ def _para_datetime(data_disp) -> datetime:
             )
         except ValueError:
             pass
-    # Sem data de partida — usa hoje meio-dia
-    return datetime.combine(date.today(), time(hour=12))
+    # Sem data de partida — usa hoje (dia civil no Brasil) meio-dia
+    from utils.datas import hoje_brasil  # noqa: PLC0415
+
+    return datetime.combine(hoje_brasil(), time(hour=12))
 
 
 def calcular_prazo(
