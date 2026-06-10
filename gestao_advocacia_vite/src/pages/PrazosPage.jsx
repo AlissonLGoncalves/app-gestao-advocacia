@@ -294,7 +294,7 @@ export default function PrazosPage({ embedded = false }) {
   const handleConcluirTarefa = async (tarefa) => {
     try {
       await concluirItemAgenda(tarefa.id)
-      toast.success('Tarefa marcada como cumprida.')
+      toast.success('Prazo marcado como cumprido.')
       carregarTarefas()
     } catch (err) {
       console.error('PrazosPage: erro ao concluir tarefa', err)
@@ -557,7 +557,7 @@ export default function PrazosPage({ embedded = false }) {
               <form onSubmit={handleSalvarTarefa}>
                 <div className="modal-header border-bottom-0 pb-0">
                   <h5 className="modal-title fw-bold">
-                    {editandoId ? 'Editar Prazo / Tarefa' : 'Nova Tarefa / Prazo'}
+                    {editandoId ? 'Editar Prazo' : 'Novo Prazo'}
                   </h5>
                   <button type="button" className="btn-close" onClick={handleFecharModal} />
                 </div>

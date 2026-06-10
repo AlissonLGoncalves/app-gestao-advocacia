@@ -287,6 +287,15 @@ function CasoDetalhePage() {
     <div className="container-fluid p-md-4 p-lg-5">
       {/* Epic #6 (#180): cabeçalho fixo com tabs (Resumo / Atividades / Histórico).
           Inspirado no padrão Astrea — tab persiste na URL pra share/refresh. */}
+      {/* Issue #303 — voltar contextual no topo (antes só nos estados de erro) */}
+      <nav aria-label="breadcrumb" className="mb-2">
+        <Link
+          to="/casos"
+          className="text-decoration-none small text-muted d-inline-flex align-items-center gap-1"
+        >
+          ← Casos
+        </Link>
+      </nav>
       <div className="card shadow-lg mb-3">
         <div className="card-header bg-light py-3">
           <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center">

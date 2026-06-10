@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import { useConfirm } from '../hooks/useConfirm.jsx'
 import {
   LinkIcon,
   ArrowsPointingOutIcon,
@@ -23,6 +24,7 @@ import {
 const INSTANCIAS_COMUNS = ['1ª Instância', '2ª Instância', 'Superior', 'Recurso']
 
 function ApensarMenuCaso({ caso, onCasoAtualizado }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const navigate = useNavigate()
   const [apensos, setApensos] = useState([])
   const [loadingApensos, setLoadingApensos] = useState(true)
@@ -105,7 +107,8 @@ function ApensarMenuCaso({ caso, onCasoAtualizado }) {
   }
 
   const handleDesapensar = async () => {
-    if (!window.confirm('Confirma desapensar este caso do principal?')) return
+    const ok = await confirm('Confirma desapensar este caso do principal?', 'Desapensar caso')
+    if (!ok) return
     setSalvando(true)
     try {
       const data = await desapensarCaso(caso.id)
@@ -359,6 +362,7 @@ function ApensarMenuCaso({ caso, onCasoAtualizado }) {
           </div>
         </div>
       )}
+      {ConfirmDialog}
     </>
   )
 }

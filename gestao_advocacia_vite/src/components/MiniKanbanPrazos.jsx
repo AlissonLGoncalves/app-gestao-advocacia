@@ -213,7 +213,10 @@ export default function MiniKanbanPrazos() {
                     className="text-muted small text-center py-3"
                     style={{ fontSize: '0.78rem' }}
                   >
-                    Nenhum prazo nesta faixa.
+                    Nenhum prazo nesta faixa.{' '}
+                    <Link to="/agenda?novo=tarefa" className="text-decoration-none">
+                      Criar prazo
+                    </Link>
                   </div>
                 )}
                 {items.slice(0, 3).map((t) => (

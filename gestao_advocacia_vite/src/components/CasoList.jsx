@@ -577,6 +577,13 @@ function CasoList({ onEditCaso, refreshKey }) {
         </div>
       )}
 
+      {/* Issue #303 — contador: o advogado sabe quantos registros está vendo */}
+      <div className="d-flex justify-content-end mb-1">
+        <small className="text-muted">
+          {casos.length} caso{casos.length === 1 ? '' : 's'} listado
+          {casos.length === 1 ? '' : 's'}
+        </small>
+      </div>
       <div className="table-responsive">
         <table className="table table-hover table-striped table-sm mb-0 align-middle">
           <thead className="table-light">
