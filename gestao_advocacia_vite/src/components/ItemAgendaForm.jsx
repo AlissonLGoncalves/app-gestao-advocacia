@@ -214,7 +214,7 @@ function ItemAgendaForm({
                       onChange={handleChange}
                     />
                     <label className="btn btn-outline-primary" htmlFor="tipo-tarefa">
-                      Tarefa / Prazo
+                      Prazo
                       <small className="d-block text-muted">Aparece no Kanban; data opcional</small>
                     </label>
                     <input

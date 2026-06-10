@@ -6,6 +6,7 @@
 // status atual (titular + validade) ou form de upload.
 import React, { useState } from 'react'
 import { toast } from 'react-toastify'
+import { useConfirm } from '../hooks/useConfirm.jsx'
 import { DocumentCheckIcon, ExclamationTriangleIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { uploadCertificadoA1, removerCertificadoA1 } from '../api/nfse.js'
 
@@ -23,6 +24,7 @@ const diasAteVencer = (iso) => {
 }
 
 function UploadCertificadoA1({ config, onConfigChange, tipoPessoa }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   // tipoPessoa: 'PF' | 'PJ' — usado pra mostrar hint sobre tipo de cert
   // correto. Vem do ConfigNFSeForm pai.
   const certEsperado = tipoPessoa === 'PF' ? 'e-CPF A1' : 'e-CNPJ A1'
@@ -79,7 +81,11 @@ function UploadCertificadoA1({ config, onConfigChange, tipoPessoa }) {
   }
 
   const handleRemover = async () => {
-    if (!window.confirm('Tem certeza que deseja remover o certificado A1?')) return
+    const ok = await confirm(
+      'Tem certeza que deseja remover o certificado A1?',
+      'Remover certificado'
+    )
+    if (!ok) return
     setRemovendo(true)
     try {
       await removerCertificadoA1()
@@ -205,6 +211,7 @@ function UploadCertificadoA1({ config, onConfigChange, tipoPessoa }) {
           </div>
         </form>
       </div>
+      {ConfirmDialog}
     </div>
   )
 }

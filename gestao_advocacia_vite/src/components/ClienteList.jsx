@@ -360,6 +360,13 @@ function ClienteList({ onEditCliente, refreshKey }) {
         </div>
       )}
 
+      {/* Issue #303 — contador: o advogado sabe quantos registros está vendo */}
+      <div className="d-flex justify-content-end mb-1">
+        <small className="text-muted">
+          {clientes.length} cliente{clientes.length === 1 ? '' : 's'} listado
+          {clientes.length === 1 ? '' : 's'}
+        </small>
+      </div>
       <div className="table-responsive">
         <table className="table table-hover table-striped table-sm mb-0 align-middle">
           <thead className="table-light">

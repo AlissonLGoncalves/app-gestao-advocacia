@@ -28,6 +28,7 @@ import TratarPrazoModal from '../components/TratarPrazoModal.jsx'
 import PrazosPage from './PrazosPage.jsx'
 import { listItensAgenda, deleteItemAgenda } from '../api/itensAgenda.js'
 import { getProvidencia } from '../utils/providencia.js'
+import { useConfirm } from '../hooks/useConfirm.jsx'
 
 // Cores visuais por tipo+status. Centralizadas pra UI consistente entre
 // calendar e list.
@@ -87,6 +88,7 @@ function AgendaUnificadaPage() {
   // Issue #304 — clique em TAREFA/PRAZO abre o tratamento (não o editor):
   // ver vencimento, providência, responder com peça, marcar cumprido.
   const [itemTratar, setItemTratar] = useState(null)
+  const { confirm, ConfirmDialog } = useConfirm()
   // Issue #301 — ?novo=evento|tarefa abre o modal de criação direto.
   // Usado pelo QuickAdd do header (substitui a rota legada /agenda/novo).
   const [novoTipoUrl, setNovoTipoUrl] = useState(null)
@@ -163,9 +165,11 @@ function AgendaUnificadaPage() {
   }
 
   const handleExcluir = async (item) => {
-    if (!window.confirm(`Excluir "${item.titulo}"? Esta ação não pode ser desfeita.`)) {
-      return
-    }
+    const ok = await confirm(
+      `Excluir "${item.titulo}"? Esta ação não pode ser desfeita.`,
+      'Excluir item'
+    )
+    if (!ok) return
     try {
       await deleteItemAgenda(item.id)
       toast.success('Item excluído.')
@@ -233,7 +237,7 @@ function AgendaUnificadaPage() {
                 aria-label="Filtrar por tipo"
               >
                 <option value="todos">Todos os tipos</option>
-                <option value="tarefa">Só tarefas</option>
+                <option value="tarefa">Só prazos</option>
                 <option value="evento">Só eventos</option>
               </select>
 
@@ -341,6 +345,8 @@ function AgendaUnificadaPage() {
         />
       )}
 
+      {ConfirmDialog}
+
       {/* Issue #304 — tratamento do prazo (cumprir, cancelar, gerar peça) */}
       {itemTratar && (
         <TratarPrazoModal
@@ -415,7 +421,7 @@ function ListaItens({ itens, onAbrir, onEditar, onExcluir }) {
                     <span
                       className={`badge ${item.tipo === 'evento' ? 'bg-primary' : 'bg-warning text-dark'}`}
                     >
-                      {item.tipo === 'evento' ? 'Evento' : 'Tarefa'}
+                      {item.tipo === 'evento' ? 'Evento' : 'Prazo'}
                     </span>
                   </td>
                   <td>
