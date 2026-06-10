@@ -44,25 +44,36 @@ beforeEach(() => {
   gerarMock.mockResolvedValue({ html: '<p>Documento gerado</p>' })
 })
 
+// Espera as <option> de cliente RENDERIZAREM (não só o mock ser chamado).
+// Causa-raiz do flaky: fireEvent.change num <select> controlado ANTES da
+// option existir vira value='' no jsdom — clienteId nunca setava e os
+// asserts de disabled estouravam o timeout de forma intermitente.
+const esperarClientesRenderizados = async () => {
+  await screen.findByRole('option', { name: 'João Silva' })
+}
+
+const selecionarCliente1 = async () => {
+  await esperarClientesRenderizados()
+  fireEvent.change(screen.getByTestId('preview-cliente-select'), { target: { value: '1' } })
+}
+
 describe('PreviewModeloModal', () => {
   it('carrega clientes ao abrir', async () => {
     render(<PreviewModeloModal modelo={MODELO} onClose={vi.fn()} />)
-    await waitFor(() => expect(listClientesMock).toHaveBeenCalled())
+    await esperarClientesRenderizados()
     expect(screen.getByTestId('preview-modelo-modal')).toBeInTheDocument()
   })
 
   it('Gerar prévia desabilitado sem cliente', async () => {
     render(<PreviewModeloModal modelo={MODELO} onClose={vi.fn()} />)
-    await waitFor(() => expect(listClientesMock).toHaveBeenCalled())
+    await esperarClientesRenderizados()
     expect(screen.getByTestId('btn-renderizar')).toBeDisabled()
     expect(screen.getByTestId('btn-imprimir')).toBeDisabled()
   })
 
   it('com cliente selecionado, Gerar prévia chama backend com cliente_id', async () => {
     render(<PreviewModeloModal modelo={MODELO} onClose={vi.fn()} />)
-    await waitFor(() => expect(listClientesMock).toHaveBeenCalled())
-
-    fireEvent.change(screen.getByTestId('preview-cliente-select'), { target: { value: '1' } })
+    await selecionarCliente1()
     fireEvent.click(screen.getByTestId('btn-renderizar'))
 
     await waitFor(() => expect(gerarMock).toHaveBeenCalled())
@@ -71,15 +82,8 @@ describe('PreviewModeloModal', () => {
 
   it('lista casos só do cliente selecionado', async () => {
     render(<PreviewModeloModal modelo={MODELO} onClose={vi.fn()} />)
-    await waitFor(() => expect(listClientesMock).toHaveBeenCalled())
+    await selecionarCliente1()
 
-    fireEvent.change(screen.getByTestId('preview-cliente-select'), { target: { value: '1' } })
-
-    // O select de casos so habilita quando (a) clienteId esta setado E (b) os
-    // casos terminaram de carregar (fetch async no mount). O waitFor(listClientes)
-    // acima nao garante que listCasos ja resolveu — por isso o assert sincrono
-    // anterior era flaky (casosDoCliente ainda []  => disabled=true). waitFor
-    // espera o re-render apos os casos carregarem.
     const casoSelect = screen.getByTestId('preview-caso-select')
     await waitFor(() => expect(casoSelect).not.toBeDisabled())
     // Cliente 1 só tem caso 10, não 11
@@ -91,16 +95,22 @@ describe('PreviewModeloModal', () => {
   it('clicar no backdrop fecha o modal', async () => {
     const onClose = vi.fn()
     render(<PreviewModeloModal modelo={MODELO} onClose={onClose} />)
-    await waitFor(() => expect(listClientesMock).toHaveBeenCalled())
+    await esperarClientesRenderizados()
     fireEvent.click(screen.getByTestId('preview-modelo-backdrop'))
     expect(onClose).toHaveBeenCalled()
   })
 
   it('botão Imprimir habilitado após renderizar', async () => {
     render(<PreviewModeloModal modelo={MODELO} onClose={vi.fn()} />)
-    await waitFor(() => expect(listClientesMock).toHaveBeenCalled())
-    fireEvent.change(screen.getByTestId('preview-cliente-select'), { target: { value: '1' } })
+    await selecionarCliente1()
     fireEvent.click(screen.getByTestId('btn-renderizar'))
     await waitFor(() => expect(screen.getByTestId('btn-imprimir')).not.toBeDisabled())
+  })
+
+  it('issue #304: casoPreSelecionadoId pré-seleciona caso e cliente dono', async () => {
+    render(<PreviewModeloModal modelo={MODELO} onClose={vi.fn()} casoPreSelecionadoId={11} />)
+    await esperarClientesRenderizados()
+    await waitFor(() => expect(screen.getByTestId('preview-cliente-select').value).toBe('2'))
+    expect(screen.getByTestId('preview-caso-select').value).toBe('11')
   })
 })
