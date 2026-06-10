@@ -1,12 +1,12 @@
 // src/Dashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { API_URL } from './config.js'
-import { listProximos } from './api/agenda.js'
-import { listItensAgenda } from './api/itensAgenda.js'
-import { syncDjen, listOabs } from './api/djen.js'
-import MovimentacoesRecentes from './components/MovimentacoesRecentes.jsx'
-import OnboardingChecklist from './components/OnboardingChecklist.jsx'
-import MiniKanbanPrazos from './components/MiniKanbanPrazos.jsx'
+import { API_URL } from '../config.js'
+import { listProximos } from '../api/agenda.js'
+import { listItensAgenda } from '../api/itensAgenda.js'
+import { syncDjen, listOabs } from '../api/djen.js'
+import MovimentacoesRecentes from './MovimentacoesRecentes.jsx'
+import OnboardingChecklist from './OnboardingChecklist.jsx'
+import MiniKanbanPrazos from './MiniKanbanPrazos.jsx'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -26,8 +26,8 @@ import {
   CalendarDaysIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
-import { formatCNJ } from './utils/cnj.js'
-import { getResumoFinanceiro } from './api/financeiro.js'
+import { formatCNJ } from '../utils/cnj.js'
+import { getResumoFinanceiro } from '../api/financeiro.js'
 
 const hojeLocal = () => {
   const d = new Date()

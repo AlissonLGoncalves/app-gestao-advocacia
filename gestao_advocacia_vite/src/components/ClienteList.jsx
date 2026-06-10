@@ -1,9 +1,9 @@
 // src/ClienteList.jsx
 import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { API_URL } from './config.js'
-import { deleteCliente, listClientes } from './api/clientes.js'
-import StatusBadge from './components/ui/StatusBadge.jsx'
+import { API_URL } from '../config.js'
+import { deleteCliente, listClientes } from '../api/clientes.js'
+import StatusBadge from './ui/StatusBadge.jsx'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -19,10 +19,10 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
-import EscolherModeloModal from './components/EscolherModeloModal.jsx'
-import { useConfirm } from './hooks/useConfirm.jsx'
-import useListData from './hooks/useListData.js'
-import EmptyState from './components/EmptyState.jsx'
+import EscolherModeloModal from './EscolherModeloModal.jsx'
+import { useConfirm } from '../hooks/useConfirm.jsx'
+import useListData from '../hooks/useListData.js'
+import EmptyState from './EmptyState.jsx'
 
 function ClienteList({ onEditCliente, refreshKey }) {
   const navigate = useNavigate()

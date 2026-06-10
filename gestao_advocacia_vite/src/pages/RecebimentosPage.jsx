@@ -1,8 +1,8 @@
 ﻿// src/pages/RecebimentosPage.jsx
 import React, { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import RecebimentoList from '../RecebimentoList.jsx' // Ajuste o caminho se RecebimentoList.jsx não estiver em src/
-import RecebimentoForm from '../RecebimentoForm.jsx' // Ajuste o caminho se RecebimentoForm.jsx não estiver em src/
+import RecebimentoList from '../components/RecebimentoList.jsx' // Ajuste o caminho se RecebimentoList.jsx não estiver em src/
+import RecebimentoForm from '../components/RecebimentoForm.jsx' // Ajuste o caminho se RecebimentoForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/
 import { getRecebimento } from '../api/financeiro.js'
 

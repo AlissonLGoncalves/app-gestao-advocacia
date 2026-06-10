@@ -1,8 +1,8 @@
 // src/DocumentoForm.jsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { toast } from 'react-toastify'
-import { api } from './api/client.js'
-import { updateDocumento, uploadDocumento } from './api/documentos.js'
+import { api } from '../api/client.js'
+import { updateDocumento, uploadDocumento } from '../api/documentos.js'
 
 const initialState = {
   descricao: '',

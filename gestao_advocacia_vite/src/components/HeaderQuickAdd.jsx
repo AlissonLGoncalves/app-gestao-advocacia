@@ -28,7 +28,7 @@ const ITENS = [
   { label: 'Caso', path: '/casos/novo', icon: BriefcaseIcon, shortcut: 'P' }, // P de Processo
   { label: 'Recebimento', path: '/recebimentos/novo', icon: BanknotesIcon, shortcut: 'R' },
   { label: 'Despesa', path: '/despesas/novo', icon: CreditCardIcon, shortcut: 'D' },
-  { label: 'Evento (Agenda)', path: '/agenda/novo', icon: CalendarDaysIcon, shortcut: 'E' },
+  { label: 'Evento (Agenda)', path: '/agenda?novo=evento', icon: CalendarDaysIcon, shortcut: 'E' },
 ]
 
 export default function HeaderQuickAdd() {

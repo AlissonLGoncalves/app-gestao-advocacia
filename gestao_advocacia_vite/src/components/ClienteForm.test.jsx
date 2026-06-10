@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import ClienteForm from './ClienteForm.jsx'
-import { createCliente, extrairDadosDocumentoCliente } from './api/clientes.js'
+import { createCliente, extrairDadosDocumentoCliente } from '../api/clientes.js'
 
 const { toastMock } = vi.hoisted(() => ({
   toastMock: {
@@ -17,11 +17,11 @@ vi.mock('react-toastify', () => ({
   toast: toastMock,
 }))
 
-vi.mock('./components/DocumentosClienteTab.jsx', () => ({
+vi.mock('./DocumentosClienteTab.jsx', () => ({
   default: () => <div data-testid="documentos-cliente-tab" />,
 }))
 
-vi.mock('./api/clientes.js', () => ({
+vi.mock('../api/clientes.js', () => ({
   createCliente: vi.fn(),
   updateCliente: vi.fn(),
   extrairDadosDocumentoCliente: vi.fn(),

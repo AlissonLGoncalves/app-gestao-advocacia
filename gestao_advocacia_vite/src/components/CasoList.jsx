@@ -1,8 +1,8 @@
 // src/CasoList.jsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { API_URL } from './config.js'
-import { deleteCaso, listCasos } from './api/casos.js'
+import { API_URL } from '../config.js'
+import { deleteCaso, listCasos } from '../api/casos.js'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -16,11 +16,11 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
-import { exportarParaPDF } from './utils/pdfGenerator.js'
-import { useConfirm } from './hooks/useConfirm.jsx'
-import useListData from './hooks/useListData.js'
-import EmptyState from './components/EmptyState.jsx'
-import CardMeta from './components/ui/CardMeta.jsx'
+import { exportarParaPDF } from '../utils/pdfGenerator.js'
+import { useConfirm } from '../hooks/useConfirm.jsx'
+import useListData from '../hooks/useListData.js'
+import EmptyState from './EmptyState.jsx'
+import CardMeta from './ui/CardMeta.jsx'
 
 function CasoList({ onEditCaso, refreshKey }) {
   const location = useLocation()

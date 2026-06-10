@@ -1,17 +1,23 @@
-// Arquivo: src/DespesaForm.jsx
+// Arquivo: src/RecebimentoForm.jsx
 //
-// Versao "Despesa Robusto" (Fase 2/3/4 consolidadas). Espelha o
-// RecebimentoForm pos-refactor. Diferencas pra Despesa:
-//   - Adiciona campo "fornecedor" (texto livre, opcional)
-//   - Cliente eh opcional (despesa pode ser avulsa ou reembolsavel)
-//   - Toggle Unico/Recorrente/Parcelado igual ao Recebimento
-//   - Checkbox "Sem vencimento" igual ao Recebimento
+// Formulario de Recebimento — versao "Recebimento Robusto" (Fase 2).
+//
+// Mudancas vs. versao anterior:
+//   1. Cliente OPCIONAL (lancamento avulso permitido).
+//   2. Botao "+ Novo" ao lado do select de Cliente abre modal de cadastro
+//      rapido, sem perder o form. Cliente criado eh auto-selecionado.
+//   3. Apos salvar SEM cliente, modal pergunta "Quer vincular cliente?"
+//      com 3 acoes: vincular existente / criar novo / depois.
+//   4. Toggle "Tipo": Unico | Recorrente | Parcelado. Quando nao for Unico,
+//      o submit chama POST /recebimentos/serie em vez de POST /recebimentos.
+//   5. Campos novos do backend Fase 1: status, data_vencimento, data_pagamento,
+//      categoria, forma_pagamento, notas.
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { toast } from 'react-toastify'
-import { api } from './api/client.js'
-import { createDespesa, createDespesaSerie, updateDespesa } from './api/financeiro.js'
-import CadastrarClienteRapidoModal from './components/CadastrarClienteRapidoModal.jsx'
+import { api } from '../api/client.js'
+import { createRecebimento, createRecebimentoSerie, updateRecebimento } from '../api/financeiro.js'
+import CadastrarClienteRapidoModal from './CadastrarClienteRapidoModal.jsx'
 
 const TIPO_UNICO = 'UNICO'
 const TIPO_RECORRENTE = 'RECORRENTE'
@@ -20,16 +26,13 @@ const TIPO_PARCELADO = 'PARCELADO'
 const STATUS_OPCOES = ['Pendente', 'Programado', 'Pago', 'Vencido', 'Cancelado', 'Em Negociacao']
 
 const CATEGORIAS = [
-  'Despesa Operacional',
-  'Aluguel',
-  'Custas Processuais',
-  'Honorarios Contratados',
-  'Software / SaaS',
-  'Energia / Agua / Internet',
-  'Material de Escritorio',
-  'Marketing',
-  'Viagens',
-  'Outros',
+  'Honorarios Advocaticios',
+  'Honorarios de Exito',
+  'Consultoria',
+  'Custas Processuais (Reembolso)',
+  'Despesas (Reembolso)',
+  'Acordo Judicial',
+  'Outros Recebimentos',
 ]
 
 const FORMAS_PAGAMENTO = [
@@ -37,7 +40,6 @@ const FORMAS_PAGAMENTO = [
   'Transferencia Bancaria',
   'Boleto',
   'Cartao de Credito',
-  'Debito Automatico',
   'Dinheiro',
   'Cheque',
   'Outro',
@@ -52,25 +54,43 @@ const FREQUENCIAS = [
 
 const hoje = () => new Date().toISOString().split('T')[0]
 
+// Tipos de recebimento (Etapa 6). Lista fechada espelhando o backend.
+// "Outros" e fallback para casos atipicos.
+const TIPOS_RECEBIMENTO = [
+  'Diretamente do cliente',
+  'Precatorio',
+  'RPV',
+  'Deposito judicial',
+  'Acordo extrajudicial',
+  'Outros',
+]
+
 const initialState = () => ({
   cliente_id: '',
   caso_id: '',
   descricao: '',
-  categoria: 'Despesa Operacional',
+  categoria: 'Honorarios Advocaticios',
   valor: '',
   data_vencimento: hoje(),
   data_pagamento: '',
   status: 'Pendente',
   forma_pagamento: '',
   notas: '',
-  fornecedor: '',
+  // Etapa 6: previsao de ano (precatorio/RPV) e tipo de recebimento.
+  // Ambos opcionais. ano_previsao independe de data_vencimento.
+  ano_previsao: '',
+  tipo_recebimento: '',
+  // Tipo de criacao (so usado em modo "novo"; edicao sempre eh UNICO).
   tipo: TIPO_UNICO,
+  // Campos da serie (so quando tipo != UNICO)
   frequencia: 'MENSAL',
   total_parcelas: 12,
+  // Fase 4: flag "Sem vencimento". Quando true, data_vencimento e
+  // enviado como null pro backend.
   semVencimento: false,
 })
 
-function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
+function RecebimentoForm({ recebimentoParaEditar, onRecebimentoChange, onCancel }) {
   const [formData, setFormData] = useState(initialState)
   const [clientes, setClientes] = useState([])
   const [casos, setCasos] = useState([])
@@ -78,7 +98,10 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
   const [loading, setLoading] = useState(false)
   const [validationErrors, setValidationErrors] = useState({})
 
+  // Modal de cadastro rapido de cliente
   const [modalClienteOpen, setModalClienteOpen] = useState(false)
+  // Modal pos-save de "Deseja cadastrar/vincular cliente?"
+  const [modalSugerirClienteData, setModalSugerirClienteData] = useState(null)
 
   const clearValidationErrors = useCallback(() => setValidationErrors({}), [])
 
@@ -104,27 +127,37 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
 
   useEffect(() => {
     fetchClientes()
-    if (despesaParaEditar && despesaParaEditar.cliente_id) {
-      fetchCasos(despesaParaEditar.cliente_id)
-    } else if (!despesaParaEditar) {
+    if (recebimentoParaEditar && recebimentoParaEditar.cliente_id) {
+      fetchCasos(recebimentoParaEditar.cliente_id)
+    } else if (!recebimentoParaEditar) {
       fetchCasos()
     }
-  }, [fetchClientes, fetchCasos, despesaParaEditar])
+  }, [fetchClientes, fetchCasos, recebimentoParaEditar])
 
   useEffect(() => {
     clearValidationErrors()
-    if (despesaParaEditar) {
-      const dados = { ...initialState(), ...despesaParaEditar }
+    if (recebimentoParaEditar) {
+      const dados = { ...initialState(), ...recebimentoParaEditar }
+      // Datas: backend pode devolver string ISO completa.
       ;['data_vencimento', 'data_pagamento'].forEach((key) => {
         if (dados[key] && typeof dados[key] === 'string') {
           dados[key] = dados[key].split('T')[0]
         }
       })
       dados.valor = dados.valor === null || dados.valor === undefined ? '' : String(dados.valor)
+      // Etapa 6: campos novos podem vir null do backend — normalizar pra
+      // string vazia pro select/input controlado nao quebrar.
+      dados.ano_previsao =
+        dados.ano_previsao === null || dados.ano_previsao === undefined
+          ? ''
+          : String(dados.ano_previsao)
+      dados.tipo_recebimento = dados.tipo_recebimento || ''
+      // Status default pra registros antigos sem status persistido.
       if (!dados.status) {
-        dados.status = despesaParaEditar.pago ? 'Pago' : 'Pendente'
+        dados.status = recebimentoParaEditar.recebido ? 'Pago' : 'Pendente'
       }
-      dados.tipo = TIPO_UNICO
+      dados.tipo = TIPO_UNICO // edicao nao suporta mudar pra serie
+      // Detectar registros sem vencimento (data_vencimento=null no backend).
       dados.semVencimento = !dados.data_vencimento
       setFormData(dados)
       setIsEditing(true)
@@ -132,7 +165,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
       setFormData(initialState())
       setIsEditing(false)
     }
-  }, [despesaParaEditar, clearValidationErrors])
+  }, [recebimentoParaEditar, clearValidationErrors])
 
   const validateForm = () => {
     const erros = {}
@@ -144,6 +177,9 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
     ) {
       erros.valor = 'Valor deve ser positivo.'
     }
+    // Data de vencimento eh OPCIONAL para tipo UNICO (Fase 4: "Sem vencimento").
+    // Para serie (RECORRENTE/PARCELADO) eh obrigatoria — precisa do ponto
+    // de partida pra calcular vencimentos das parcelas.
     if (formData.tipo !== TIPO_UNICO && !formData.data_vencimento) {
       erros.data_vencimento = 'Data inicial e obrigatoria para series.'
     }
@@ -168,6 +204,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
         fetchCasos(value)
         next.caso_id = ''
       }
+      // Status -> Pago e preenche data_pagamento se vazia
       if (name === 'status' && value === 'Pago' && !prev.data_pagamento) {
         next.data_pagamento = hoje()
       }
@@ -191,8 +228,13 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
     cliente_id: formData.cliente_id ? parseInt(formData.cliente_id, 10) : null,
     caso_id: formData.caso_id ? parseInt(formData.caso_id, 10) : null,
     categoria: formData.categoria || null,
-    fornecedor: formData.fornecedor ? formData.fornecedor.trim() : null,
     notas: formData.notas || null,
+    // Etapa 6: ano_previsao como int (ou null) e tipo_recebimento string.
+    ano_previsao:
+      formData.ano_previsao === '' || formData.ano_previsao == null
+        ? null
+        : parseInt(formData.ano_previsao, 10),
+    tipo_recebimento: formData.tipo_recebimento || null,
   })
 
   const handleSubmit = async (e) => {
@@ -213,17 +255,23 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
           forma_pagamento: formData.forma_pagamento || null,
         }
         if (isEditing) {
-          await updateDespesa(despesaParaEditar.id, body)
-          toast.success('Despesa atualizada.')
-          onDespesaChange?.()
+          await updateRecebimento(recebimentoParaEditar.id, body)
+          toast.success('Recebimento atualizado.')
+          onRecebimentoChange?.()
           onCancel?.()
         } else {
-          await createDespesa(body)
-          toast.success('Despesa adicionada.')
-          onDespesaChange?.()
-          setFormData(initialState())
+          const criado = await createRecebimento(body)
+          toast.success('Recebimento adicionado.')
+          if (!body.cliente_id) {
+            // Sugerir vincular cliente apos criar sem
+            setModalSugerirClienteData({ recebimento: criado, descricao: body.descricao })
+          } else {
+            onRecebimentoChange?.()
+            setFormData(initialState())
+          }
         }
       } else {
+        // Serie RECORRENTE ou PARCELADO
         const body = {
           ...buildBaseBody(),
           tipo: formData.tipo,
@@ -232,12 +280,20 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
           total_parcelas: parseInt(formData.total_parcelas, 10),
           data_inicio: formData.data_vencimento,
         }
-        const resultado = await createDespesaSerie(body)
+        const resultado = await createRecebimentoSerie(body)
         toast.success(
           `Serie ${formData.tipo.toLowerCase()} criada: ${resultado.total_geradas} parcelas.`
         )
-        onDespesaChange?.()
-        setFormData(initialState())
+        if (!body.cliente_id) {
+          setModalSugerirClienteData({
+            recebimentos: resultado.parcelas,
+            descricao: body.descricao,
+            serie: true,
+          })
+        } else {
+          onRecebimentoChange?.()
+          setFormData(initialState())
+        }
       }
     } catch (error) {
       toast.error(error?.message || 'Erro ao salvar.')
@@ -246,28 +302,120 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
     }
   }
 
+  // ===== Modal pos-save: sugerir vincular cliente =====
+  const handleSugestaoVincularExistente = () => {
+    setModalSugerirClienteData(null)
+    onRecebimentoChange?.()
+    setFormData((prev) => ({ ...initialState(), cliente_id: prev.cliente_id }))
+    toast.info('Selecione o cliente no proximo lancamento.')
+  }
+
+  const handleSugestaoCriarNovo = () => {
+    setModalSugerirClienteData(null)
+    setModalClienteOpen(true)
+  }
+
+  const handleSugestaoDepois = () => {
+    setModalSugerirClienteData(null)
+    onRecebimentoChange?.()
+    setFormData(initialState())
+  }
+
   return (
     <div className="card shadow-sm mb-4">
       <CadastrarClienteRapidoModal
         open={modalClienteOpen}
         onClose={() => setModalClienteOpen(false)}
-        onCreated={handleClienteCriado}
+        onCreated={(cliente) => {
+          handleClienteCriado(cliente)
+          // Se veio do modal pos-save, vincular ao recebimento ja criado
+          if (modalSugerirClienteData) {
+            const rec = modalSugerirClienteData.recebimento
+            if (rec?.id) {
+              updateRecebimento(rec.id, { cliente_id: cliente.id })
+                .then(() => toast.success('Cliente vinculado ao recebimento.'))
+                .catch((err) => toast.error(`Erro ao vincular: ${err.message}`))
+            }
+            onRecebimentoChange?.()
+            setFormData(initialState())
+          }
+        }}
       />
 
+      {modalSugerirClienteData && (
+        <>
+          <div className="modal show d-block" tabIndex="-1" role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-dialog-centered" role="document">
+              <div className="modal-content">
+                <div className="modal-header py-2">
+                  <h6 className="modal-title">
+                    <i className="bi bi-link-45deg me-2" />
+                    Vincular um cliente?
+                  </h6>
+                </div>
+                <div className="modal-body">
+                  <p className="mb-2">
+                    Voce criou{' '}
+                    {modalSugerirClienteData.serie ? (
+                      <strong>{modalSugerirClienteData.recebimentos.length} recebimentos</strong>
+                    ) : (
+                      <strong>1 recebimento</strong>
+                    )}{' '}
+                    sem cliente vinculado.
+                  </p>
+                  <p className="small text-muted mb-0">
+                    Vincular ajuda a localizar depois e mantem o financeiro organizado. Voce pode
+                    fazer isso depois — nao e obrigatorio.
+                  </p>
+                </div>
+                <div className="modal-footer py-2 d-flex flex-wrap gap-2 justify-content-between">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={handleSugestaoDepois}
+                  >
+                    Depois
+                  </button>
+                  <div className="d-flex gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={handleSugestaoVincularExistente}
+                    >
+                      <i className="bi bi-search me-1" />
+                      Vincular existente
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={handleSugestaoCriarNovo}
+                    >
+                      <i className="bi bi-person-plus me-1" />
+                      Cadastrar novo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop show" />
+        </>
+      )}
+
       <div className="card-header bg-light">
-        <h5 className="mb-0">{isEditing ? 'Editar Despesa' : 'Adicionar Nova Despesa'}</h5>
+        <h5 className="mb-0">{isEditing ? 'Editar Recebimento' : 'Adicionar Novo Recebimento'}</h5>
       </div>
       <div className="card-body p-4">
-        <form onSubmit={handleSubmit} noValidate>
-          {/* Toggle Tipo (so em criacao) */}
+        <form onSubmit={handleSubmit}>
+          {/* ===== Toggle Tipo (so em criacao) ===== */}
           {!isEditing && (
             <div className="mb-3">
-              <label className="form-label form-label-sm d-block mb-2">Tipo de despesa</label>
-              <div className="btn-group btn-group-sm" role="group">
+              <label className="form-label form-label-sm d-block mb-2">Tipo de recebimento</label>
+              <div className="btn-group btn-group-sm" role="group" aria-label="Tipo de recebimento">
                 {[
-                  { value: TIPO_UNICO, label: 'Unica', icon: 'bi-1-circle' },
+                  { value: TIPO_UNICO, label: 'Unico', icon: 'bi-1-circle' },
                   { value: TIPO_RECORRENTE, label: 'Recorrente', icon: 'bi-arrow-repeat' },
-                  { value: TIPO_PARCELADO, label: 'Parcelada', icon: 'bi-bar-chart-steps' },
+                  { value: TIPO_PARCELADO, label: 'Parcelado', icon: 'bi-bar-chart-steps' },
                 ].map((opt) => (
                   <button
                     key={opt.value}
@@ -282,45 +430,26 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
               </div>
               <small className="d-block text-muted mt-1">
                 {formData.tipo === TIPO_UNICO &&
-                  'Despesa unica. Ex: material de escritorio, custas pontuais.'}
+                  'Um unico recebimento. Use pra PIX, honorario pontual, etc.'}
                 {formData.tipo === TIPO_RECORRENTE &&
-                  'Gera N parcelas pra frente (aluguel, conta de luz, SaaS).'}
+                  'Gera N parcelas pra frente (honorario mensal). Pode ser renovado.'}
                 {formData.tipo === TIPO_PARCELADO &&
-                  'Divide um valor total em N parcelas iguais (compra parcelada).'}
+                  'Divide um valor total em N parcelas iguais (acordo, etc).'}
               </small>
             </div>
           )}
 
-          {/* Fornecedor */}
-          <div className="row">
-            <div className="col-md-12 mb-3">
-              <label htmlFor="fornecedor_desp" className="form-label form-label-sm">
-                Fornecedor / Quem recebeu{' '}
-                <span className="text-muted">(opcional, texto livre)</span>
-              </label>
-              <input
-                type="text"
-                name="fornecedor"
-                id="fornecedor_desp"
-                className="form-control form-control-sm"
-                value={formData.fornecedor || ''}
-                onChange={handleChange}
-                placeholder="Ex: Imobiliaria XYZ, Posto Shell, TJSP"
-              />
-            </div>
-          </div>
-
-          {/* Cliente + Caso (opcionais — pra reembolso) */}
+          {/* ===== Cliente + botao novo ===== */}
           <div className="row">
             <div className="col-md-6 mb-3">
-              <label htmlFor="cliente_id_desp" className="form-label form-label-sm">
-                Cliente <span className="text-muted">(opcional, p/ reembolso)</span>
+              <label htmlFor="cliente_id_rec" className="form-label form-label-sm">
+                Cliente Associado <span className="text-muted">(opcional)</span>
               </label>
               <div className="input-group input-group-sm">
                 <select
                   name="cliente_id"
-                  id="cliente_id_desp"
-                  className="form-select form-select-sm"
+                  id="cliente_id_rec"
+                  className={`form-select form-select-sm ${validationErrors.cliente_id ? 'is-invalid' : ''}`}
                   value={formData.cliente_id || ''}
                   onChange={handleChange}
                 >
@@ -342,12 +471,12 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
               </div>
             </div>
             <div className="col-md-6 mb-3">
-              <label htmlFor="caso_id_desp" className="form-label form-label-sm">
-                Caso <span className="text-muted">(opcional)</span>
+              <label htmlFor="caso_id_rec" className="form-label form-label-sm">
+                Caso Associado <span className="text-muted">(opcional)</span>
               </label>
               <select
                 name="caso_id"
-                id="caso_id_desp"
+                id="caso_id_rec"
                 className="form-select form-select-sm"
                 value={formData.caso_id || ''}
                 onChange={handleChange}
@@ -370,34 +499,34 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
             </div>
           </div>
 
-          {/* Descricao */}
+          {/* ===== Descricao ===== */}
           <div className="mb-3">
-            <label htmlFor="descricao_desp" className="form-label form-label-sm">
+            <label htmlFor="descricao_rec" className="form-label form-label-sm">
               Descricao *
             </label>
             <input
               type="text"
               name="descricao"
-              id="descricao_desp"
+              id="descricao_rec"
               className={`form-control form-control-sm ${validationErrors.descricao ? 'is-invalid' : ''}`}
               value={formData.descricao}
               onChange={handleChange}
-              placeholder="Ex: Aluguel sala comercial"
+              placeholder="Ex: Honorarios contratuais"
             />
             {validationErrors.descricao && (
               <div className="invalid-feedback d-block">{validationErrors.descricao}</div>
             )}
           </div>
 
-          {/* Categoria + Valor */}
+          {/* ===== Categoria + Valor ===== */}
           <div className="row">
             <div className="col-md-6 mb-3">
-              <label htmlFor="categoria_desp" className="form-label form-label-sm">
+              <label htmlFor="categoria_rec" className="form-label form-label-sm">
                 Categoria *
               </label>
               <select
                 name="categoria"
-                id="categoria_desp"
+                id="categoria_rec"
                 className={`form-select form-select-sm ${validationErrors.categoria ? 'is-invalid' : ''}`}
                 value={formData.categoria}
                 onChange={handleChange}
@@ -410,17 +539,18 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
               </select>
             </div>
             <div className="col-md-6 mb-3">
-              <label htmlFor="valor_desp" className="form-label form-label-sm">
+              <label htmlFor="valor_rec" className="form-label form-label-sm">
                 {formData.tipo === TIPO_UNICO ? 'Valor (R$) *' : 'Valor por parcela (R$) *'}
               </label>
               <input
                 type="number"
                 name="valor"
-                id="valor_desp"
+                id="valor_rec"
                 className={`form-control form-control-sm ${validationErrors.valor ? 'is-invalid' : ''}`}
                 value={formData.valor}
                 onChange={handleChange}
                 step="0.01"
+                placeholder="Ex: 1500.00"
               />
               {validationErrors.valor && (
                 <div className="invalid-feedback d-block">{validationErrors.valor}</div>
@@ -428,10 +558,10 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
             </div>
           </div>
 
-          {/* Datas */}
+          {/* ===== Datas ===== */}
           <div className="row">
             <div className="col-md-6 mb-3">
-              <label htmlFor="data_vencimento_desp" className="form-label form-label-sm">
+              <label htmlFor="data_vencimento_rec" className="form-label form-label-sm">
                 {formData.tipo === TIPO_UNICO ? 'Data de Vencimento' : 'Data da 1a parcela *'}
                 {formData.tipo === TIPO_UNICO && (
                   <span className="text-muted ms-1">(opcional)</span>
@@ -440,7 +570,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
               <input
                 type="date"
                 name="data_vencimento"
-                id="data_vencimento_desp"
+                id="data_vencimento_rec"
                 className={`form-control form-control-sm ${validationErrors.data_vencimento ? 'is-invalid' : ''}`}
                 value={formData.data_vencimento}
                 onChange={handleChange}
@@ -451,7 +581,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
                   <input
                     type="checkbox"
                     className="form-check-input"
-                    id="semVencimentoCheckDesp"
+                    id="semVencimentoCheck"
                     checked={!!formData.semVencimento}
                     onChange={(e) => {
                       const checked = e.target.checked
@@ -462,10 +592,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
                       }))
                     }}
                   />
-                  <label
-                    className="form-check-label small text-muted"
-                    htmlFor="semVencimentoCheckDesp"
-                  >
+                  <label className="form-check-label small text-muted" htmlFor="semVencimentoCheck">
                     Sem data de vencimento (lancamento sem prazo)
                   </label>
                 </div>
@@ -476,13 +603,13 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
             </div>
             {formData.tipo === TIPO_UNICO && (
               <div className="col-md-6 mb-3">
-                <label htmlFor="data_pagamento_desp" className="form-label form-label-sm">
-                  Data de Pagamento <span className="text-muted">(quando pago)</span>
+                <label htmlFor="data_pagamento_rec" className="form-label form-label-sm">
+                  Data de Pagamento <span className="text-muted">(quando recebido)</span>
                 </label>
                 <input
                   type="date"
                   name="data_pagamento"
-                  id="data_pagamento_desp"
+                  id="data_pagamento_rec"
                   className="form-control form-control-sm"
                   value={formData.data_pagamento || ''}
                   onChange={handleChange}
@@ -492,16 +619,16 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
             )}
           </div>
 
-          {/* Campos de serie */}
+          {/* ===== Campos de serie ===== */}
           {formData.tipo !== TIPO_UNICO && (
             <div className="row">
               <div className="col-md-6 mb-3">
-                <label htmlFor="frequencia_desp" className="form-label form-label-sm">
+                <label htmlFor="frequencia_rec" className="form-label form-label-sm">
                   Frequencia
                 </label>
                 <select
                   name="frequencia"
-                  id="frequencia_desp"
+                  id="frequencia_rec"
                   className="form-select form-select-sm"
                   value={formData.frequencia}
                   onChange={handleChange}
@@ -514,7 +641,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
                 </select>
               </div>
               <div className="col-md-6 mb-3">
-                <label htmlFor="total_parcelas_desp" className="form-label form-label-sm">
+                <label htmlFor="total_parcelas_rec" className="form-label form-label-sm">
                   {formData.tipo === TIPO_PARCELADO
                     ? 'Numero de parcelas *'
                     : 'Quantas pra frente *'}
@@ -522,7 +649,7 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
                 <input
                   type="number"
                   name="total_parcelas"
-                  id="total_parcelas_desp"
+                  id="total_parcelas_rec"
                   className={`form-control form-control-sm ${validationErrors.total_parcelas ? 'is-invalid' : ''}`}
                   value={formData.total_parcelas}
                   onChange={handleChange}
@@ -546,16 +673,16 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
             </div>
           )}
 
-          {/* Status + Forma (so UNICO) */}
+          {/* ===== Status + Forma (so UNICO) ===== */}
           {formData.tipo === TIPO_UNICO && (
             <div className="row">
               <div className="col-md-6 mb-3">
-                <label htmlFor="status_desp" className="form-label form-label-sm">
+                <label htmlFor="status_rec" className="form-label form-label-sm">
                   Status *
                 </label>
                 <select
                   name="status"
-                  id="status_desp"
+                  id="status_rec"
                   className={`form-select form-select-sm ${validationErrors.status ? 'is-invalid' : ''}`}
                   value={formData.status}
                   onChange={handleChange}
@@ -568,12 +695,12 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
                 </select>
               </div>
               <div className="col-md-6 mb-3">
-                <label htmlFor="forma_pagamento_desp" className="form-label form-label-sm">
+                <label htmlFor="forma_pagamento_rec" className="form-label form-label-sm">
                   Forma de Pagamento
                 </label>
                 <select
                   name="forma_pagamento"
-                  id="forma_pagamento_desp"
+                  id="forma_pagamento_rec"
                   className="form-select form-select-sm"
                   value={formData.forma_pagamento || ''}
                   onChange={handleChange}
@@ -589,14 +716,59 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
             </div>
           )}
 
-          {/* Notas */}
+          {/* ===== Etapa 6: Tipo de Recebimento + Ano de Previsao ===== */}
+          <div className="row">
+            <div className="col-md-8 mb-3">
+              <label htmlFor="tipo_recebimento_rec" className="form-label form-label-sm">
+                Tipo de Recebimento
+              </label>
+              <select
+                name="tipo_recebimento"
+                id="tipo_recebimento_rec"
+                className="form-select form-select-sm"
+                value={formData.tipo_recebimento || ''}
+                onChange={handleChange}
+              >
+                <option value="">Selecione...</option>
+                {TIPOS_RECEBIMENTO.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <small className="text-muted">
+                Útil para diferenciar precatório, RPV, depósito judicial etc.
+              </small>
+            </div>
+            <div className="col-md-4 mb-3">
+              <label htmlFor="ano_previsao_rec" className="form-label form-label-sm">
+                Ano de Previsão
+              </label>
+              <input
+                type="number"
+                name="ano_previsao"
+                id="ano_previsao_rec"
+                className="form-control form-control-sm"
+                value={formData.ano_previsao || ''}
+                onChange={handleChange}
+                min="1900"
+                max="2200"
+                placeholder="Ex: 2028"
+              />
+              <small className="text-muted">
+                Quando previsão é só do ano (precatório/RPV sem data exata).
+              </small>
+            </div>
+          </div>
+
+          {/* ===== Notas ===== */}
           <div className="mb-3">
-            <label htmlFor="notas_desp" className="form-label form-label-sm">
+            <label htmlFor="notas_rec" className="form-label form-label-sm">
               Notas
             </label>
             <textarea
               name="notas"
-              id="notas_desp"
+              id="notas_rec"
               className="form-control form-control-sm"
               value={formData.notas || ''}
               onChange={handleChange}
@@ -625,9 +797,9 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
                 />
               )}
               {isEditing
-                ? 'Atualizar Despesa'
+                ? 'Atualizar Recebimento'
                 : formData.tipo === TIPO_UNICO
-                  ? 'Adicionar Despesa'
+                  ? 'Adicionar Recebimento'
                   : `Gerar ${formData.total_parcelas} parcelas`}
             </button>
           </div>
@@ -637,4 +809,4 @@ function DespesaForm({ despesaParaEditar, onDespesaChange, onCancel }) {
   )
 }
 
-export default DespesaForm
+export default RecebimentoForm

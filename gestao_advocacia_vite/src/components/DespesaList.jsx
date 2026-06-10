@@ -15,12 +15,12 @@ import {
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
-import { exportarParaPDF } from './utils/pdfGenerator.js'
-import { api } from './api/client.js'
-import { deleteDespesa, listDespesas, marcarDespesaPaga } from './api/financeiro.js'
-import { useConfirm } from './hooks/useConfirm.jsx'
-import useListData from './hooks/useListData.js'
-import EmptyState from './components/EmptyState.jsx'
+import { exportarParaPDF } from '../utils/pdfGenerator.js'
+import { api } from '../api/client.js'
+import { deleteDespesa, listDespesas, marcarDespesaPaga } from '../api/financeiro.js'
+import { useConfirm } from '../hooks/useConfirm.jsx'
+import useListData from '../hooks/useListData.js'
+import EmptyState from './EmptyState.jsx'
 
 function DespesaList({ onEditDespesa, refreshKey }) {
   const { confirm, ConfirmDialog } = useConfirm()

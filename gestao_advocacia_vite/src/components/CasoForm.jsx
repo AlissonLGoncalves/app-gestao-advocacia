@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { API_URL } from './config.js'
+import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
-import { parseCNJ, formatCNJ } from './utils/cnj.js'
-import { consultaPublicaCnj } from './api/casos.js'
-import DadosProcessoSection from './components/forms/caso/DadosProcessoSection.jsx'
-import TramitacaoSection from './components/forms/caso/TramitacaoSection.jsx'
-import EventoAgendaSection from './components/forms/caso/EventoAgendaSection.jsx'
-import useCasoForm from './hooks/useCasoForm.js'
+import { parseCNJ, formatCNJ } from '../utils/cnj.js'
+import { consultaPublicaCnj } from '../api/casos.js'
+import DadosProcessoSection from './forms/caso/DadosProcessoSection.jsx'
+import TramitacaoSection from './forms/caso/TramitacaoSection.jsx'
+import EventoAgendaSection from './forms/caso/EventoAgendaSection.jsx'
+import useCasoForm from '../hooks/useCasoForm.js'
 
 const initialState = {
   cliente_id: '',
