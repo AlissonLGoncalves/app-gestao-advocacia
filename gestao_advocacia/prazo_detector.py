@@ -44,11 +44,14 @@ _RE_DIAS_PRAZO = re.compile(
 # Frases-gatilho que indicam que ha prazo (ajuda separar 'em 15 dias estara
 # pronto' de 'intime-se para X em 15 dias')
 _GATILHOS = [
-    r"\bintima(?:r|do|m|cao|ç[ãa]o|-se)",
-    r"\bnotifica(?:r|do|m|cao|ç[ãa]o|-se)",
-    r"\bcita(?:r|do|m|cao|ç[ãa]o|-se)",
-    r"\bdetermina(?:r|do|m|cao|ç[ãa]o)",
-    r"\bcumpra(?:-se)?",
+    # Inclui as formas imperativas "intime-se"/"cite-se"/"notifique-se" —
+    # como os tribunais de fato escrevem. Bug achado pelos testes (#302):
+    # "Cite-se para apresentar contestação em 15 dias" não disparava.
+    r"\bintim(?:a(?:r|do|m|cao|ç[ãa]o)?|e(?:m|-se)?)\b",
+    r"\bnotifi(?:ca(?:r|do|m|cao|ç[ãa]o)?|que(?:m|-se)?)\b",
+    r"\bcit(?:a(?:r|do|m|cao|ç[ãa]o)?|e(?:m|-se)?)\b",
+    r"\bdetermin(?:a(?:r|do|m|cao|ç[ãa]o)?|e(?:m|-se)?)\b",
+    r"\bcumpra(?:m|-se)?\b",
     r"\bprazo\s+(?:de|para)",
     r"\bno\s+prazo\s+de",
     r"\bdentro\s+de",
