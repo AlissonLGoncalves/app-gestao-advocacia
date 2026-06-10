@@ -506,7 +506,7 @@ def register_api_routes(app, api, finance_access_required):
     register_financeiro_api(app, api, finance_access_required)
 
     try:
-        from djen_routes import registrar_rotas_djen
+        from routes.djen import registrar_rotas_djen
 
         registrar_rotas_djen(
             djen_ns,

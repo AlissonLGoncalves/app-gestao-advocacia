@@ -8,7 +8,7 @@ notificações podiam ser calculados com off-by-one.
 
 Para app jurídico brasileiro a referência correta de "hoje" é o dia civil
 em America/Sao_Paulo (mesma timezone já usada pelo SCHEDULER_TIMEZONE em
-config.py e pelo guard de horário do DJEN em djen_routes.py).
+config.py e pelo guard de horário do DJEN em routes/djen.py).
 """
 
 from __future__ import annotations
