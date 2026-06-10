@@ -575,3 +575,69 @@ def test_historico_404_se_item_de_outro_tenant(auth_client, db):
     """Item de outro tenant retorna 404 (nao vaza existencia)."""
     res = auth_client.get("/api/v1/itens-agenda/99999/historico")
     assert res.status_code == 404
+
+
+# ---------- Issue #304: tipo_providencia ----------
+
+
+def test_tarefa_auto_djen_persiste_tipo_providencia(auth_client, db):
+    """_criar_tarefa_de_publicacao grava a regra do calculador no item."""
+    from djen_tasks import _criar_tarefa_de_publicacao
+    from models import Caso, Cliente, ItemAgenda, PublicacaoDJEN, User
+    from utils.datas import hoje_brasil
+
+    user = User.query.first()
+    cliente = Cliente(
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        nome_razao_social="Cliente Prov",
+        cpf_cnpj="11122233344",
+        tipo_pessoa="PF",
+    )
+    db.session.add(cliente)
+    db.session.flush()
+    caso = Caso(
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        cliente_id=cliente.id,
+        titulo="Caso Prov",
+        status="Ativo",
+        numero_processo="0001234-56.2026.8.16.0001",
+    )
+    db.session.add(caso)
+    db.session.flush()
+    pub = PublicacaoDJEN(
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        caso_id=caso.id,
+        numero_processo="00012345620268160001",
+        tipo_comunicacao="Intimação",
+        texto="Fica a parte ré intimada para apresentar contestação no prazo legal.",
+        data_disponibilizacao=hoje_brasil(),
+        importante=True,
+    )
+    db.session.add(pub)
+    db.session.commit()
+
+    tarefa = _criar_tarefa_de_publicacao(db, None, pub)
+    db.session.commit()
+
+    assert tarefa is not None
+    assert tarefa.tipo_providencia == "contestacao_15d"
+    # to_dict / DTO expõem o campo
+    assert tarefa.to_dict()["tipo_providencia"] == "contestacao_15d"
+    resp = auth_client.get(f"/api/v1/itens-agenda/{tarefa.id}")
+    assert resp.status_code == 200
+    assert json.loads(resp.data)["tipo_providencia"] == "contestacao_15d"
+    # limpa pra nao vazar pros outros testes
+    ItemAgenda.query.delete()
+    db.session.commit()
+
+
+def test_item_manual_tem_tipo_providencia_null(auth_client, db):
+    resp = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "Item manual", "tipo": "tarefa"},
+    )
+    assert resp.status_code == 201
+    assert json.loads(resp.data)["tipo_providencia"] is None

@@ -43,7 +43,12 @@ const PRINT_CSS = `
   }
 `
 
-export default function PreviewModeloModal({ modelo, onClose, clientePreSelecionadoId = null }) {
+export default function PreviewModeloModal({
+  modelo,
+  onClose,
+  clientePreSelecionadoId = null,
+  casoPreSelecionadoId = null,
+}) {
   const [clientes, setClientes] = useState([])
   const [casos, setCasos] = useState([])
   const [clienteId, setClienteId] = useState(
@@ -61,8 +66,18 @@ export default function PreviewModeloModal({ modelo, onClose, clientePreSelecion
     Promise.all([listClientes(), listCasos()])
       .then(([cls, css]) => {
         if (!ativo) return
+        const listaCasos = Array.isArray(css) ? css : css?.items || []
         setClientes(Array.isArray(cls) ? cls : cls?.items || [])
-        setCasos(Array.isArray(css) ? css : css?.items || [])
+        setCasos(listaCasos)
+        // Issue #304 — quando vem do "Gerar peça" do prazo, o caso já é
+        // conhecido: pré-seleciona caso E cliente (dono do caso).
+        if (casoPreSelecionadoId) {
+          const caso = listaCasos.find((c) => String(c.id) === String(casoPreSelecionadoId))
+          if (caso) {
+            setClienteId(String(caso.cliente_id))
+            setCasoId(String(caso.id))
+          }
+        }
       })
       .catch(() => {
         if (ativo) toast.error('Falha ao carregar clientes/casos.')
@@ -73,6 +88,7 @@ export default function PreviewModeloModal({ modelo, onClose, clientePreSelecion
     return () => {
       ativo = false
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Casos filtrados pelo cliente selecionado (UX: não mostra caso de outro cliente)

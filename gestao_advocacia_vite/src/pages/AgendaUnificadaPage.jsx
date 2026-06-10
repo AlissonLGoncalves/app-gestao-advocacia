@@ -24,8 +24,10 @@ import { toast } from 'react-toastify'
 import { PlusIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
 import ItemAgendaForm from '../components/ItemAgendaForm.jsx'
 import AgendaViewToggle from '../components/AgendaViewToggle.jsx'
+import TratarPrazoModal from '../components/TratarPrazoModal.jsx'
 import PrazosPage from './PrazosPage.jsx'
 import { listItensAgenda, deleteItemAgenda } from '../api/itensAgenda.js'
+import { getProvidencia } from '../utils/providencia.js'
 
 // Cores visuais por tipo+status. Centralizadas pra UI consistente entre
 // calendar e list.
@@ -82,6 +84,9 @@ function AgendaUnificadaPage() {
   const [filtroStatus, setFiltroStatus] = useState('ativos') // ativos | todos | pendentes | concluidos
   const [modalAberto, setModalAberto] = useState(false)
   const [itemEditar, setItemEditar] = useState(null)
+  // Issue #304 — clique em TAREFA/PRAZO abre o tratamento (não o editor):
+  // ver vencimento, providência, responder com peça, marcar cumprido.
+  const [itemTratar, setItemTratar] = useState(null)
 
   // Fetch unificado
   const carregar = useCallback(async () => {
@@ -132,6 +137,16 @@ function AgendaUnificadaPage() {
     setModalAberto(true)
   }
 
+  // Issue #304 — roteia o clique: tarefa (prazo) → modal de tratamento;
+  // evento (compromisso) → editor direto, como antes.
+  const handleItemClick = (item) => {
+    if (item.tipo === 'tarefa') {
+      setItemTratar(item)
+    } else {
+      handleEditarClick(item)
+    }
+  }
+
   const handleExcluir = async (item) => {
     if (!window.confirm(`Excluir "${item.titulo}"? Esta ação não pode ser desfeita.`)) {
       return
@@ -171,7 +186,7 @@ function AgendaUnificadaPage() {
 
   const handleCalendarEventClick = (clickInfo) => {
     const item = clickInfo.event.extendedProps?.item
-    if (item) handleEditarClick(item)
+    if (item) handleItemClick(item)
   }
 
   return (
@@ -289,7 +304,12 @@ function AgendaUnificadaPage() {
           />
         </div>
       ) : (
-        <ListaItens itens={itens} onEditar={handleEditarClick} onExcluir={handleExcluir} />
+        <ListaItens
+          itens={itens}
+          onAbrir={handleItemClick}
+          onEditar={handleEditarClick}
+          onExcluir={handleExcluir}
+        />
       )}
 
       {modalAberto && (
@@ -303,6 +323,22 @@ function AgendaUnificadaPage() {
           defaultTipo={filtroTipo === 'evento' ? 'evento' : 'tarefa'}
         />
       )}
+
+      {/* Issue #304 — tratamento do prazo (cumprir, cancelar, gerar peça) */}
+      {itemTratar && (
+        <TratarPrazoModal
+          item={itemTratar}
+          onTratado={() => {
+            setItemTratar(null)
+            setRefreshKey((k) => k + 1)
+          }}
+          onClose={() => setItemTratar(null)}
+          onEditarDados={(it) => {
+            setItemTratar(null)
+            handleEditarClick(it)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -310,7 +346,7 @@ function AgendaUnificadaPage() {
 // Tabela inline — separada pra reduzir tamanho do componente principal
 // e facilitar leitura. Nao virou arquivo separado porque so faz sentido
 // no contexto da AgendaUnificadaPage.
-function ListaItens({ itens, onEditar, onExcluir }) {
+function ListaItens({ itens, onAbrir, onEditar, onExcluir }) {
   if (itens.length === 0) {
     return (
       <div className="text-center text-muted py-5 bg-white rounded shadow-sm">
@@ -335,9 +371,29 @@ function ListaItens({ itens, onEditar, onExcluir }) {
             </tr>
           </thead>
           <tbody>
-            {itens.map((item) => (
+            {itens.map((item) => {
+              const prov = item.tipo === 'tarefa' ? getProvidencia(item.tipo_providencia) : null
+              return (
               <tr key={item.id}>
-                <td className="fw-medium">{item.titulo}</td>
+                <td className="fw-medium">
+                  {/* Issue #304 — título clicável: tarefa abre tratamento */}
+                  <button
+                    type="button"
+                    className="btn btn-link p-0 text-start fw-medium text-decoration-none"
+                    onClick={() => onAbrir(item)}
+                    title={item.tipo === 'tarefa' ? 'Tratar prazo' : 'Editar evento'}
+                  >
+                    {item.titulo}
+                  </button>
+                  {prov && (
+                    <span
+                      className={`badge ms-2 bg-${prov.cor} ${prov.cor === 'warning' ? 'text-dark' : ''}`}
+                      title={prov.descricao}
+                    >
+                      ⚖ {prov.label}
+                    </span>
+                  )}
+                </td>
                 <td>
                   <span
                     className={`badge ${item.tipo === 'evento' ? 'bg-primary' : 'bg-warning text-dark'}`}
@@ -380,7 +436,8 @@ function ListaItens({ itens, onEditar, onExcluir }) {
                   </button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
