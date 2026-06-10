@@ -17,26 +17,38 @@ export default function GlobalSearch() {
   const inputRef = useRef(null)
   const containerRef = useRef(null)
   const timerRef = useRef(null)
+  // Issue #297 — cancela a busca anterior ao digitar (AbortController) e
+  // garante que só a ÚLTIMA query aplica resultados. Sem isso, a resposta
+  // atrasada de "A" sobrescrevia os resultados corretos de "AB".
+  const abortRef = useRef(null)
+  const seqRef = useRef(0)
 
   const buscar = useCallback(async (q) => {
+    abortRef.current?.abort()
     if (q.trim().length < 2) {
       setResults({ clientes: [], casos: [] })
+      setLoading(false)
       return
     }
+    const controller = new AbortController()
+    abortRef.current = controller
+    const seq = ++seqRef.current
     setLoading(true)
     try {
       const [clientesRes, casosRes] = await Promise.all([
-        api.get(`/clientes/?search=${encodeURIComponent(q)}`),
-        api.get(`/casos/?search=${encodeURIComponent(q)}`),
+        api.get(`/clientes/?search=${encodeURIComponent(q)}`, { signal: controller.signal }),
+        api.get(`/casos/?search=${encodeURIComponent(q)}`, { signal: controller.signal }),
       ])
+      if (seq !== seqRef.current) return // chegou tarde — descarta
       setResults({
         clientes: Array.isArray(clientesRes) ? clientesRes.slice(0, 5) : [],
         casos: Array.isArray(casosRes) ? casosRes.slice(0, 5) : [],
       })
-    } catch {
+    } catch (err) {
+      if (err?.name === 'AbortError' || seq !== seqRef.current) return
       setResults({ clientes: [], casos: [] })
     } finally {
-      setLoading(false)
+      if (seq === seqRef.current) setLoading(false)
     }
   }, [])
 
@@ -57,7 +69,19 @@ export default function GlobalSearch() {
     setQuery('')
     setResults({ clientes: [], casos: [] })
     clearTimeout(timerRef.current)
+    abortRef.current?.abort()
+    seqRef.current += 1 // invalida respostas em voo
+    setLoading(false)
   }, [])
+
+  // Cleanup no unmount: cancela timer e request pendentes
+  useEffect(
+    () => () => {
+      clearTimeout(timerRef.current)
+      abortRef.current?.abort()
+    },
+    []
+  )
 
   const handleSelect = (path) => {
     navigate(path)
