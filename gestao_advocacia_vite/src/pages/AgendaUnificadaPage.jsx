@@ -81,6 +81,8 @@ function AgendaUnificadaPage() {
       ? viewParam
       : localStorage.getItem('agenda_unificada_view') || 'calendario'
   const isKanban = viewMode === 'kanban'
+  // Fase 3 (caso como hub): /agenda?caso=ID mostra só a agenda do caso.
+  const casoFiltro = searchParams.get('caso')
   const [filtroTipo, setFiltroTipo] = useState('todos') // todos | tarefa | evento
   const [filtroStatus, setFiltroStatus] = useState('ativos') // ativos | todos | pendentes | concluidos
   const [modalAberto, setModalAberto] = useState(false)
@@ -110,6 +112,7 @@ function AgendaUnificadaPage() {
     setLoading(true)
     try {
       const params = {}
+      if (casoFiltro) params.caso_id = casoFiltro
       if (filtroTipo !== 'todos') params.tipo = filtroTipo
       if (filtroStatus === 'pendentes') params.status = 'Pendente'
       if (filtroStatus === 'concluidos') params.status = 'Concluido'
@@ -126,7 +129,7 @@ function AgendaUnificadaPage() {
     } finally {
       setLoading(false)
     }
-  }, [filtroTipo, filtroStatus])
+  }, [filtroTipo, filtroStatus, casoFiltro])
 
   useEffect(() => {
     // No Kanban o board carrega seus próprios dados; evita fetch redundante.
@@ -224,6 +227,26 @@ function AgendaUnificadaPage() {
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div className="d-flex flex-wrap align-items-center gap-2">
           <AgendaViewToggle current={viewMode} onLocalChange={handleViewChange} />
+
+          {casoFiltro && (
+            <span
+              className="badge bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center gap-2 px-3 py-2"
+              data-testid="chip-filtro-caso"
+            >
+              Agenda do caso #{casoFiltro}
+              <button
+                type="button"
+                className="btn-close"
+                style={{ fontSize: '0.6rem' }}
+                aria-label="Limpar filtro de caso"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams)
+                  params.delete('caso')
+                  setSearchParams(params, { replace: true })
+                }}
+              />
+            </span>
+          )}
 
           {/* Filtros tipo/status só fazem sentido no Calendário/Lista. O Kanban
               tem suas próprias colunas (A Fazer/Em Andamento/Concluído). */}

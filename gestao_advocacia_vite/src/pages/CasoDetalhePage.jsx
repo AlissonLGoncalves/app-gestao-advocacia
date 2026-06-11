@@ -20,6 +20,8 @@ import ProximasAtividadesCard from '../components/ProximasAtividadesCard.jsx'
 import PrioridadeBadge from '../components/ui/PrioridadeBadge.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import ItemAgendaForm from '../components/ItemAgendaForm.jsx'
+import ContratoFormModal from '../components/ContratoFormModal.jsx'
+import RecebimentosCasoCard from '../components/RecebimentosCasoCard.jsx'
 import { useConfirm } from '../hooks/useConfirm.jsx'
 import {
   CheckCircleIcon,
@@ -43,7 +45,7 @@ const StatusDisplay = ({ isLoading, error, successMessage, className = '' }) => 
 
 // Epic #6 (#180): tabs do detalhe do caso. Persistido em ?tab=resumo|atividades|historico
 // pra preservar estado em refresh / share de URL. Default: 'resumo'.
-const TABS_VALIDAS = ['resumo', 'atividades', 'historico']
+const TABS_VALIDAS = ['resumo', 'atividades', 'historico', 'financeiro']
 const TAB_DEFAULT = 'resumo'
 
 function CasoDetalhePage() {
@@ -69,6 +71,9 @@ function CasoDetalhePage() {
   // Form de prazo no contexto do caso (sem ir pro Kanban global).
   // null = fechado; { item } = editando; {} = criando novo.
   const [prazoForm, setPrazoForm] = useState(null)
+  // Fase 3 — caso como hub: '+' cria contrato sem sair do caso
+  const [contratoNovo, setContratoNovo] = useState(false)
+  const [finNonce, setFinNonce] = useState(0)
 
   const [isLoadingCaso, setIsLoadingCaso] = useState(true)
   const [isLoadingMovimentacoes, setIsLoadingMovimentacoes] = useState(false)
@@ -302,9 +307,59 @@ function CasoDetalhePage() {
             <h5 className="card-title mb-2 mb-sm-0 text-primary">
               Detalhes do Caso: <span className="fw-bold">{caso.nome_caso}</span>
             </h5>
-            <Link to={`/casos/editar/${caso.id}`} className="btn btn-sm btn-outline-secondary">
-              Editar Caso
-            </Link>
+            <div className="d-flex gap-2 align-items-center">
+              {/* Fase 3 — caso como hub: tudo nasce aqui pelo '+' */}
+              <div className="dropdown">
+                <button
+                  className="btn btn-sm btn-primary dropdown-toggle"
+                  type="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  data-testid="btn-mais-caso"
+                >
+                  + Novo
+                </button>
+                <ul className="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => setPrazoForm({ tipo: 'tarefa' })}
+                      data-testid="mais-prazo"
+                    >
+                      Prazo / tarefa
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => setPrazoForm({ tipo: 'evento' })}
+                      data-testid="mais-audiencia"
+                    >
+                      Audiência / compromisso
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => setContratoNovo(true)}
+                      data-testid="mais-contrato"
+                    >
+                      Contrato de honorários
+                    </button>
+                  </li>
+                </ul>
+              </div>
+              <Link
+                to={`/agenda?caso=${caso.id}`}
+                className="btn btn-sm btn-outline-secondary"
+                title="Calendário e prazos só deste caso"
+              >
+                Agenda do caso
+              </Link>
+              <Link to={`/casos/editar/${caso.id}`} className="btn btn-sm btn-outline-secondary">
+                Editar Caso
+              </Link>
+            </div>
           </div>
         </div>
         <ul className="nav nav-tabs px-3" role="tablist" data-testid="caso-tabs">
@@ -349,6 +404,17 @@ function CasoDetalhePage() {
                   {publicacoesDjen.length}
                 </span>
               )}
+            </button>
+          </li>
+          <li className="nav-item" role="presentation">
+            <button
+              className={`nav-link ${tabAtiva === 'financeiro' ? 'active fw-semibold' : ''}`}
+              onClick={() => setTabAtiva('financeiro')}
+              role="tab"
+              aria-selected={tabAtiva === 'financeiro'}
+              data-testid="tab-financeiro"
+            >
+              Financeiro
             </button>
           </li>
         </ul>
@@ -491,7 +557,20 @@ function CasoDetalhePage() {
               </div>
               {/* /card "Detalhes do Caso" */}
               {/* HONORÁRIOS continua coluna principal (precisa de espaço) */}
-              <HonorariosCasoCard casoId={casoId} clienteId={caso.cliente_id} />
+              {/* Fase 3: honorários moraram aqui; agora têm aba própria */}
+              <div className="card shadow-sm border-0 mb-4">
+                <div className="card-body d-flex justify-content-between align-items-center py-3">
+                  <span className="text-muted small">
+                    Contratos, parcelas e recebimentos deste caso ficam na aba Financeiro.
+                  </span>
+                  <button
+                    className="btn btn-sm btn-outline-primary flex-shrink-0"
+                    onClick={() => setTabAtiva('financeiro')}
+                  >
+                    Abrir Financeiro
+                  </button>
+                </div>
+              </div>
               {/* DRIVE do processo (full-width principal) */}
               <div className="card shadow-lg mb-4">
                 <div className="card-body p-4 pt-2">
@@ -741,6 +820,14 @@ function CasoDetalhePage() {
         </div>
       )}
 
+      {/* ── Aba Financeiro (Fase 3 — caso como hub) ─────────────────────── */}
+      {tabAtiva === 'financeiro' && (
+        <div data-testid="conteudo-financeiro">
+          <HonorariosCasoCard key={`hon-${finNonce}`} casoId={casoId} clienteId={caso.cliente_id} />
+          <RecebimentosCasoCard key={`rec-${finNonce}`} casoId={casoId} />
+        </div>
+      )}
+
       <div className="mt-4 text-center">
         <button onClick={() => navigate('/casos')} className="btn btn-secondary">
           Voltar para Lista de Casos
@@ -748,11 +835,29 @@ function CasoDetalhePage() {
       </div>
       {ConfirmDialog}
 
+      {/* Fase 3 — contrato nasce dentro do caso (caso travado) */}
+      {contratoNovo && (
+        <ContratoFormModal
+          casoFixo={{
+            id: parseInt(casoId, 10),
+            cliente_id: caso?.cliente_id,
+            cliente_nome: caso?.cliente_nome,
+            label: caso?.titulo || caso?.numero_processo || `Caso #${casoId}`,
+          }}
+          onCancel={() => setContratoNovo(false)}
+          onSalvo={() => {
+            setContratoNovo(false)
+            setFinNonce((n) => n + 1)
+            setTabAtiva('financeiro')
+          }}
+        />
+      )}
+
       {/* Form de prazo no contexto do caso — caso travado, sem ir ao Kanban */}
       {prazoForm && (
         <ItemAgendaForm
           itemParaEditar={prazoForm.item || null}
-          defaultTipo="tarefa"
+          defaultTipo={prazoForm.tipo || 'tarefa'}
           casoFixo={{
             id: parseInt(casoId, 10),
             label: caso?.titulo || caso?.numero_processo || `Caso #${casoId}`,
