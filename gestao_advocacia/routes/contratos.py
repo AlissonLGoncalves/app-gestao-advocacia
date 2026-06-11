@@ -177,6 +177,11 @@ def register_contratos_routes(
                     data_recebimento=venc,
                     recebido=False,
                     caso_id=contrato.caso_id,
+                    # Fase 1 (auditoria UX): parcelas nasciam SEM tenant_id e
+                    # sem cliente_id — com RLS no Postgres elas sumiam das
+                    # listagens e não apareciam no financeiro do cliente.
+                    cliente_id=contrato.cliente_id,
+                    tenant_id=get_tenant_id(),
                     user_id=user_id,
                     contrato_id=id,
                 )
