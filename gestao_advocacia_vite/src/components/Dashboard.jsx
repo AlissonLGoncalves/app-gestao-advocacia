@@ -7,6 +7,7 @@ import { syncDjen, listOabs } from '../api/djen.js'
 import MovimentacoesRecentes from './MovimentacoesRecentes.jsx'
 import OnboardingChecklist from './OnboardingChecklist.jsx'
 import MiniKanbanPrazos from './MiniKanbanPrazos.jsx'
+import MeuDiaCard from './MeuDiaCard.jsx'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -417,6 +418,10 @@ function Dashboard({ mudarSecao }) {
       >
         Pra você agora
       </h5>
+
+      {/* Fase 4 — Meu dia: prazos de hoje, agenda de hoje e intimações não
+          tratadas, tudo clicável. A primeira resposta do app ao advogado. */}
+      <MeuDiaCard />
 
       {/* ── Briefing do Dia ─────────────────────────────────────────────────── */}
       {temBriefing && (
