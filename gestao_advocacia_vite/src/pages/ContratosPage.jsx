@@ -6,7 +6,15 @@ import {
   DocumentCurrencyDollarIcon,
   MagnifyingGlassIcon,
   LinkIcon,
+  PlusIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  CalculatorIcon,
 } from '@heroicons/react/24/outline'
+import ContratoFormModal from '../components/ContratoFormModal.jsx'
+import GerarParcelasModal from '../components/GerarParcelasModal.jsx'
+import { deleteContrato } from '../api/contratos.js'
+import { useConfirm } from '../hooks/useConfirm.jsx'
 
 const STATUS_OPTIONS = [
   'Todos',
@@ -60,6 +68,12 @@ export default function ContratosPage() {
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('Todos')
   const [filtroTipo, setFiltroTipo] = useState('Todos')
+  // Fase 1 (auditoria UX): a página era read-only — agora cria/edita/exclui
+  // contrato e gera parcelas direto daqui.
+  const [formAberto, setFormAberto] = useState(false)
+  const [contratoEditar, setContratoEditar] = useState(null)
+  const [contratoParcelas, setContratoParcelas] = useState(null)
+  const { confirm, ConfirmDialog } = useConfirm()
 
   const fetchTudo = useCallback(async () => {
     const token = localStorage.getItem('token')
@@ -125,9 +139,23 @@ export default function ContratosPage() {
 
   return (
     <div className="container-fluid p-3 p-md-4">
-      <div className="d-flex align-items-center mb-3">
-        <DocumentCurrencyDollarIcon className="text-primary me-2" style={ICON_TITLE} />
-        <h1 className="h3 mb-0 text-dark">Contratos de Honorários</h1>
+      <div className="d-flex align-items-center justify-content-between mb-3">
+        <div className="d-flex align-items-center">
+          <DocumentCurrencyDollarIcon className="text-primary me-2" style={ICON_TITLE} />
+          <h1 className="h3 mb-0 text-dark">Contratos de Honorários</h1>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary shadow-sm rounded-pill px-3"
+          onClick={() => {
+            setContratoEditar(null)
+            setFormAberto(true)
+          }}
+          data-testid="btn-novo-contrato"
+        >
+          <PlusIcon style={{ width: 16, height: 16 }} className="me-1 d-inline align-text-bottom" />
+          Novo contrato
+        </button>
       </div>
 
       {/* Resumo */}
@@ -212,6 +240,7 @@ export default function ContratosPage() {
                   <th>Assinatura</th>
                   <th>Status</th>
                   <th>Caso</th>
+                  <th style={{ width: 120 }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -274,6 +303,49 @@ export default function ContratosPage() {
                           </span>
                         )}
                       </td>
+                      <td className="text-nowrap">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-success p-1 lh-1 me-1"
+                          title="Gerar parcelas nos Recebimentos"
+                          disabled={!c.valor_total}
+                          onClick={() => setContratoParcelas(c)}
+                        >
+                          <CalculatorIcon style={{ width: 14, height: 14 }} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary p-1 lh-1 me-1"
+                          title="Editar contrato"
+                          onClick={() => {
+                            setContratoEditar(c)
+                            setFormAberto(true)
+                          }}
+                        >
+                          <PencilSquareIcon style={{ width: 14, height: 14 }} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-danger p-1 lh-1"
+                          title="Excluir contrato"
+                          onClick={async () => {
+                            const ok = await confirm(
+                              `Excluir o contrato #${c.id}? Parcelas já geradas nos Recebimentos permanecem.`,
+                              'Excluir contrato'
+                            )
+                            if (!ok) return
+                            try {
+                              await deleteContrato(c.id)
+                              toast.success('Contrato excluído.')
+                              fetchTudo()
+                            } catch (err) {
+                              toast.error(err?.message || 'Falha ao excluir.')
+                            }
+                          }}
+                        >
+                          <TrashIcon style={{ width: 14, height: 14 }} />
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -281,6 +353,37 @@ export default function ContratosPage() {
             </table>
           </div>
         </div>
+      )}
+      {ConfirmDialog}
+
+      {formAberto && (
+        <ContratoFormModal
+          contratoParaEditar={contratoEditar}
+          onCancel={() => {
+            setFormAberto(false)
+            setContratoEditar(null)
+          }}
+          onSalvo={(contrato) => {
+            setFormAberto(false)
+            setContratoEditar(null)
+            fetchTudo()
+            // Emenda o próximo passo do fluxo: contrato com valor → parcelas
+            if (!contratoEditar && contrato?.valor_total) {
+              setContratoParcelas(contrato)
+            }
+          }}
+        />
+      )}
+
+      {contratoParcelas && (
+        <GerarParcelasModal
+          contrato={contratoParcelas}
+          onCancel={() => setContratoParcelas(null)}
+          onGerado={() => {
+            setContratoParcelas(null)
+            fetchTudo()
+          }}
+        />
       )}
     </div>
   )
