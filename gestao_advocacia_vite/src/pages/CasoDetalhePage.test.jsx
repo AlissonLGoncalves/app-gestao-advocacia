@@ -30,12 +30,19 @@ vi.mock('../components/CasoTimeline', () => ({
 // Stub do ItemAgendaForm: expoe o casoFixo recebido pra validar que o prazo
 // nasce travado no caso, sem depender da implementacao interna do form.
 vi.mock('../components/ItemAgendaForm.jsx', () => ({
-  default: ({ casoFixo, itemParaEditar }) => (
+  default: ({ casoFixo, itemParaEditar, defaultTipo }) => (
     <div data-testid="item-agenda-form">
       <span data-testid="form-caso-label">{casoFixo?.label}</span>
       <span data-testid="form-modo">{itemParaEditar ? 'editar' : 'novo'}</span>
+      <span data-testid="form-tipo">{defaultTipo}</span>
     </div>
   ),
+}))
+vi.mock('../components/RecebimentosCasoCard.jsx', () => ({
+  default: () => <div data-testid="recebimentos-caso-card" />,
+}))
+vi.mock('../components/ContratoFormModal.jsx', () => ({
+  default: () => <div data-testid="contrato-form-modal" />,
 }))
 vi.mock('../api/itensAgenda.js', () => ({
   listItensAgenda: vi.fn().mockResolvedValue([]),
@@ -85,11 +92,34 @@ describe('CasoDetalhePage tabs (Epic #6 / #180)', () => {
     expect(screen.getByTestId('tab-atividades')).toBeInTheDocument()
     expect(screen.getByTestId('tab-historico')).toBeInTheDocument()
 
-    // Default = resumo: mostra honorários e docs vinculados, NÃO mostra timeline
+    // Fase 3: honorários saíram do Resumo (têm aba Financeiro própria)
     expect(screen.getByTestId('painel-resumo')).toBeInTheDocument()
-    expect(screen.getByTestId('honorarios-card')).toBeInTheDocument()
+    expect(screen.queryByTestId('honorarios-card')).not.toBeInTheDocument()
+    expect(screen.getByTestId('tab-financeiro')).toBeInTheDocument()
     expect(screen.queryByTestId('painel-historico')).not.toBeInTheDocument()
     expect(screen.queryByTestId('timeline')).not.toBeInTheDocument()
+  })
+
+  it('Fase 3: aba Financeiro mostra honorários + recebimentos do caso', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByTestId('caso-tabs')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('tab-financeiro'))
+    expect(await screen.findByTestId('conteudo-financeiro')).toBeInTheDocument()
+    expect(screen.getByTestId('honorarios-card')).toBeInTheDocument()
+    expect(screen.getByTestId('recebimentos-caso-card')).toBeInTheDocument()
+  })
+
+  it('Fase 3: "+ Novo" abre prazo/audiência com caso travado e link Agenda do caso', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByTestId('btn-mais-caso')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('mais-audiencia'))
+    // ItemAgendaForm (stub) abre com defaultTipo evento
+    expect(await screen.findByTestId('item-agenda-form')).toHaveTextContent('evento')
+    // link da agenda filtrada
+    expect(screen.getByRole('link', { name: /Agenda do caso/i })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/agenda?caso=')
+    )
   })
 
   it('clicar em "Histórico" troca para o painel correspondente', async () => {

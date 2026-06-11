@@ -14,13 +14,19 @@ import { createContrato, updateContrato } from '../api/contratos.js'
 const TIPOS = ['Fixo', 'Êxito', 'Misto', 'Mensal', 'Horas']
 const STATUS = ['Ativo', 'Pendente Assinatura', 'Minuta', 'Finalizado', 'Cancelado']
 
-function ContratoFormModal({ contratoParaEditar = null, onSalvo, onCancel }) {
+// casoFixo {id, cliente_id, label}: quando o contrato nasce DENTRO do caso
+// (Fase 3 — caso como hub), o select de caso vem travado nele.
+function ContratoFormModal({ contratoParaEditar = null, casoFixo = null, onSalvo, onCancel }) {
   const editando = Boolean(contratoParaEditar?.id)
   const [casos, setCasos] = useState([])
   const [carregandoCasos, setCarregandoCasos] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [form, setForm] = useState({
-    caso_id: contratoParaEditar?.caso_id ? String(contratoParaEditar.caso_id) : '',
+    caso_id: contratoParaEditar?.caso_id
+      ? String(contratoParaEditar.caso_id)
+      : casoFixo?.id
+        ? String(casoFixo.id)
+        : '',
     tipo_honorario: contratoParaEditar?.tipo_honorario || 'Fixo',
     valor_total: contratoParaEditar?.valor_total ?? '',
     percentual_exito: contratoParaEditar?.percentual_exito ?? '',
@@ -32,11 +38,24 @@ function ContratoFormModal({ contratoParaEditar = null, onSalvo, onCancel }) {
   })
 
   useEffect(() => {
+    if (casoFixo?.id) {
+      // Caso travado: não precisa da lista inteira
+      setCasos([
+        {
+          id: casoFixo.id,
+          titulo: casoFixo.label,
+          cliente_id: casoFixo.cliente_id,
+          cliente_nome: casoFixo.cliente_nome,
+        },
+      ])
+      setCarregandoCasos(false)
+      return
+    }
     listCasos()
       .then((data) => setCasos(Array.isArray(data) ? data : data?.items || []))
       .catch(() => toast.error('Falha ao carregar a lista de casos.'))
       .finally(() => setCarregandoCasos(false))
-  }, [])
+  }, [casoFixo])
 
   const casoSelecionado = useMemo(
     () => casos.find((c) => String(c.id) === String(form.caso_id)),
@@ -102,7 +121,7 @@ function ContratoFormModal({ contratoParaEditar = null, onSalvo, onCancel }) {
                   className="form-select"
                   value={form.caso_id}
                   onChange={(e) => setForm({ ...form, caso_id: e.target.value })}
-                  disabled={salvando || editando || carregandoCasos}
+                  disabled={salvando || editando || carregandoCasos || Boolean(casoFixo)}
                   required
                   data-testid="contrato-caso-select"
                 >
