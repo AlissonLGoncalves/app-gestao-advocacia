@@ -641,3 +641,121 @@ def test_item_manual_tem_tipo_providencia_null(auth_client, db):
     )
     assert resp.status_code == 201
     assert json.loads(resp.data)["tipo_providencia"] is None
+
+
+# ---------- Issue #316: gerar minuta da peça via IA ----------
+
+
+def _montar_prazo_com_caso(db, com_pub=True):
+    from models import Caso, Cliente, ItemAgenda, PublicacaoDJEN, User
+
+    user = User.query.first()
+    cliente = Cliente(
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        nome_razao_social="Cliente Minuta",
+        cpf_cnpj="39053344705",
+        tipo_pessoa="PF",
+    )
+    db.session.add(cliente)
+    db.session.flush()
+    caso = Caso(
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        cliente_id=cliente.id,
+        titulo="Caso Minuta",
+        status="Ativo",
+        numero_processo="0007734-76.2025.8.16.0075",
+        parte_contraria="Banco Reu S/A",
+    )
+    db.session.add(caso)
+    db.session.flush()
+    pub_id = None
+    if com_pub:
+        from utils.datas import hoje_brasil
+
+        pub = PublicacaoDJEN(
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            caso_id=caso.id,
+            numero_processo="00077347620258160075",
+            tipo_comunicacao="Intimação",
+            texto="Intime-se a parte ré para apresentar contestação no prazo de 15 dias.",
+            data_disponibilizacao=hoje_brasil(),
+            importante=True,
+        )
+        db.session.add(pub)
+        db.session.flush()
+        pub_id = pub.id
+    item = ItemAgenda(
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        caso_id=caso.id,
+        publicacao_djen_id=pub_id,
+        tipo="tarefa",
+        categoria="Prazo",
+        titulo="Intimação: 0007734-76.2025.8.16.0075",
+        status="Pendente",
+        tipo_providencia="contestacao_15d",
+    )
+    db.session.add(item)
+    db.session.commit()
+    return item
+
+
+class _FakeModels:
+    def __init__(self, texto):
+        self.texto = texto
+        self.calls = []
+
+    def generate_content(self, model, contents, **kw):
+        self.calls.append({"model": model, "contents": contents})
+
+        class R:
+            text = self.texto
+
+        return R()
+
+
+class _FakeClient:
+    def __init__(self, texto):
+        self.models = _FakeModels(texto)
+
+
+def test_gerar_minuta_usa_providencia_e_intimacao(auth_client, db):
+    from unittest.mock import patch
+
+    item = _montar_prazo_com_caso(db)
+    fake = _FakeClient("## CONTESTAÇÃO\n\nExcelentíssimo Senhor Doutor Juiz...")
+    with patch("gemini_service.get_gemini_client", return_value=fake):
+        resp = auth_client.post(f"/api/v1/itens-agenda/{item.id}/gerar-minuta")
+    assert resp.status_code == 200, resp.data
+    data = json.loads(resp.data)
+    assert data["tipo_peca"] == "CONTESTAÇÃO"
+    assert "CONTESTAÇÃO" in data["minuta"]
+    assert data["numero_processo"] == "0007734-76.2025.8.16.0075"
+    prompt = fake.models.calls[0]["contents"]
+    # prompt carrega intimação, partes e regras anti-alucinação
+    assert "apresentar contestação no prazo de 15 dias" in prompt
+    assert "Cliente Minuta" in prompt
+    assert "Banco Reu S/A" in prompt
+    assert "NUNCA invente fatos" in prompt
+
+
+def test_gerar_minuta_sem_caso_retorna_400(auth_client, db):
+    resp = auth_client.post(
+        "/api/v1/itens-agenda",
+        json={"titulo": "Prazo solto", "tipo": "tarefa"},
+    )
+    item_id = json.loads(resp.data)["id"]
+    resp = auth_client.post(f"/api/v1/itens-agenda/{item_id}/gerar-minuta")
+    assert resp.status_code == 400
+
+
+def test_gerar_minuta_sem_gemini_retorna_503(auth_client, db):
+    from unittest.mock import patch
+
+    item = _montar_prazo_com_caso(db, com_pub=False)
+    with patch("gemini_service.get_gemini_client", return_value=None):
+        resp = auth_client.post(f"/api/v1/itens-agenda/{item.id}/gerar-minuta")
+    assert resp.status_code == 503

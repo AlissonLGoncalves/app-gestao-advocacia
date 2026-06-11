@@ -24,7 +24,12 @@ import {
   ClockIcon,
   DocumentArrowUpIcon,
 } from '@heroicons/react/24/outline'
-import { tratarItemAgenda, getHistoricoItemAgenda } from '../api/itensAgenda.js'
+import {
+  tratarItemAgenda,
+  getHistoricoItemAgenda,
+  gerarMinutaItemAgenda,
+} from '../api/itensAgenda.js'
+import MinutaEditorModal from './MinutaEditorModal.jsx'
 import { listModelos } from '../api/modelos.js'
 import { getProvidencia, ordenarModelosPorProvidencia } from '../utils/providencia.js'
 import PreviewModeloModal from './PreviewModeloModal.jsx'
@@ -104,6 +109,9 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
   const [modelos, setModelos] = useState([])
   const [modeloSelId, setModeloSelId] = useState('')
   const [modeloPreview, setModeloPreview] = useState(null)
+  // Issue #316 — minuta redigida pela IA
+  const [gerandoMinuta, setGerandoMinuta] = useState(false)
+  const [minuta, setMinuta] = useState(null) // {minuta, tipo_peca, numero_processo}
 
   // Pre-popula como_tratado com valor existente quando reabre o modal
   useEffect(() => {
@@ -338,7 +346,7 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
             {/* Issue #304 — Responder com peça: a intimação vira ação.
                 Só aparece com caso vinculado (precisa do cliente pro
                 preenchimento) e quando há modelos cadastrados. */}
-            {item.caso_id && modelos.length > 0 && (
+            {item.caso_id && (
               <div className="mb-3 p-3 border rounded bg-primary bg-opacity-10">
                 <label className="form-label small fw-semibold mb-2">
                   <DocumentArrowUpIcon
@@ -350,36 +358,77 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
                     <span className="text-muted fw-normal"> — sugerido: {providencia.label}</span>
                   )}
                 </label>
-                <div className="d-flex gap-2">
-                  <select
-                    className="form-select form-select-sm"
-                    value={modeloSelId}
-                    onChange={(e) => setModeloSelId(e.target.value)}
-                    disabled={salvando}
-                    aria-label="Modelo de peça"
-                  >
-                    {modelos.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.titulo}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary flex-shrink-0"
-                    data-testid="btn-gerar-peca"
-                    disabled={salvando || !modeloSelId}
-                    onClick={() => {
-                      const m = modelos.find((x) => String(x.id) === String(modeloSelId))
-                      if (m) setModeloPreview(m)
-                    }}
-                  >
-                    Gerar peça
-                  </button>
-                </div>
-                <small className="text-muted">
-                  Abre o modelo já preenchido com o cliente e o caso deste prazo.
+
+                {/* Issue #316 — FAZER a peça: IA redige a minuta usando o
+                    texto da intimação + dados do caso/cliente. */}
+                <button
+                  type="button"
+                  className="btn btn-primary w-100 mb-1"
+                  data-testid="btn-redigir-minuta"
+                  disabled={salvando || gerandoMinuta}
+                  onClick={async () => {
+                    setGerandoMinuta(true)
+                    try {
+                      const resp = await gerarMinutaItemAgenda(item.id)
+                      setMinuta(resp)
+                    } catch (err) {
+                      toast.error(err?.message || 'Falha ao gerar a minuta.')
+                    } finally {
+                      setGerandoMinuta(false)
+                    }
+                  }}
+                >
+                  {gerandoMinuta ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" />
+                      Redigindo minuta... (pode levar ~20s)
+                    </>
+                  ) : (
+                    <>
+                      ✍️ Redigir minuta com IA
+                      {providencia ? ` — ${providencia.label}` : ''}
+                    </>
+                  )}
+                </button>
+                <small className="text-muted d-block mb-2">
+                  A IA redige um rascunho com base na intimação e nos dados do caso — você revisa,
+                  edita, imprime ou salva nos Documentos.
                 </small>
+
+                {modelos.length > 0 && (
+                  <>
+                    <div className="d-flex gap-2">
+                      <select
+                        className="form-select form-select-sm"
+                        value={modeloSelId}
+                        onChange={(e) => setModeloSelId(e.target.value)}
+                        disabled={salvando}
+                        aria-label="Modelo de peça"
+                      >
+                        {modelos.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.titulo}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary flex-shrink-0"
+                        data-testid="btn-gerar-peca"
+                        disabled={salvando || !modeloSelId}
+                        onClick={() => {
+                          const m = modelos.find((x) => String(x.id) === String(modeloSelId))
+                          if (m) setModeloPreview(m)
+                        }}
+                      >
+                        Usar modelo
+                      </button>
+                    </div>
+                    <small className="text-muted">
+                      Ou abra um modelo seu já preenchido com o cliente e o caso deste prazo.
+                    </small>
+                  </>
+                )}
               </div>
             )}
 
@@ -585,6 +634,18 @@ function TratarPrazoModal({ item, onTratado, onClose, onEditarDados }) {
           </div>
         </div>
       </div>
+
+      {/* Issue #316 — editor da minuta redigida pela IA */}
+      {minuta && (
+        <MinutaEditorModal
+          minutaInicial={minuta.minuta}
+          tipoPeca={minuta.tipo_peca}
+          casoId={item.caso_id}
+          numeroProcesso={minuta.numero_processo}
+          onClose={() => setMinuta(null)}
+          onSalvo={() => setMinuta(null)}
+        />
+      )}
 
       {/* Issue #304 — preview da peça gerada (cliente+caso pré-selecionados
           a partir do caso do prazo) */}

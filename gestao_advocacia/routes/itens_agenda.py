@@ -481,3 +481,114 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
                 }
                 for log in logs
             ], 200
+
+    @ns.route("/<int:item_id>/gerar-minuta")
+    class ItemAgendaGerarMinutaAPI(Resource):
+        @jwt_required()
+        @tenant_scoped
+        @ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Issue #316 — redige a MINUTA da peça que responde a este "
+                "prazo/intimação via IA (Gemini). Usa o texto da publicação "
+                "DJEN de origem + dados do caso/cliente/advogado e o tipo de "
+                "providência detectado (contestacao_15d, ...). Retorna "
+                "markdown editável — o advogado SEMPRE revisa antes de usar."
+            ),
+        )
+        def post(self, item_id):
+            from flask import current_app  # noqa: PLC0415
+
+            from gemini_service import get_gemini_client  # noqa: PLC0415
+            from models import Caso, Cliente, Tenant, User  # noqa: PLC0415
+
+            item = get_item_or_404(ItemAgenda, item_id)
+            if not item.caso_id:
+                ns.abort(400, "Vincule este prazo a um caso antes de gerar a minuta.")
+
+            client = get_gemini_client()
+            if client is None:
+                ns.abort(
+                    503,
+                    "IA não configurada neste ambiente (GEMINI_API_KEY ausente).",
+                )
+
+            caso = db.session.get(Caso, item.caso_id)
+            cliente = db.session.get(Cliente, caso.cliente_id) if caso else None
+            pub = (
+                db.session.get(PublicacaoDJEN, item.publicacao_djen_id)
+                if item.publicacao_djen_id
+                else None
+            )
+            user = db.session.get(User, int(get_jwt_identity()))
+            tenant = db.session.get(Tenant, get_tenant_id())
+
+            # Tipo de peça pela providência detectada (fallback genérico)
+            pecas = {
+                "contestacao_15d": "CONTESTAÇÃO",
+                "recurso_15d": "RECURSO DE APELAÇÃO",
+                "cumprimento_sentenca_15d": "IMPUGNAÇÃO AO CUMPRIMENTO DE SENTENÇA",
+                "manifestacao_15d": "MANIFESTAÇÃO",
+                "embargos_declaracao_5d": "EMBARGOS DE DECLARAÇÃO",
+                "sentenca_revisao_15d": "RECURSO DE APELAÇÃO",
+                "decisao_despacho_5d": "PETIÇÃO DE CUMPRIMENTO DE DESPACHO",
+                "audiencia_7d": "PETIÇÃO (preparação para audiência)",
+            }
+            tipo_peca = pecas.get(item.tipo_providencia or "", "PETIÇÃO ADEQUADA AO CASO")
+
+            adv_nome = (user.nome_completo or user.username) if user else "[ADVOGADO]"
+            adv_oab = (
+                (user.numero_oab if user else None)
+                or (tenant.numero_oab_escritorio if tenant else None)
+                or "[OAB]"
+            )
+            texto_intimacao = (pub.texto or "")[:6000] if pub else ""
+            contexto_intimacao = (
+                f"TEXTO DA INTIMAÇÃO/PUBLICAÇÃO:\n{texto_intimacao}"
+                if texto_intimacao
+                else f"DESCRIÇÃO DO PRAZO: {item.descricao or item.titulo}"
+            )
+
+            prompt = f"""Você é um advogado brasileiro experiente. Redija a MINUTA de uma {tipo_peca}
+em resposta à intimação abaixo. Trabalhe em português jurídico formal (norma do CPC/CLT conforme o caso).
+
+DADOS:
+- Processo: {caso.numero_processo or '[número do processo]'}
+- Vara/Juízo: {caso.vara_juizo or '[vara]'}
+- Cliente (parte representada): {cliente.nome_razao_social if cliente else '[cliente]'}
+- Parte contrária: {caso.parte_contraria or '[parte contrária]'}
+- Advogado subscritor: {adv_nome}, OAB {adv_oab}
+
+{contexto_intimacao}
+
+REGRAS DA MINUTA:
+1. Estrutura completa: endereçamento ao juízo, qualificação resumida, número do processo, corpo com tópicos (I, II, III...), pedidos e fecho com local/data/assinatura.
+2. Onde faltar informação de fato, use placeholders claros entre colchetes (ex.: [descrever a prova], [data do contrato]) — NUNCA invente fatos.
+3. Fundamente com dispositivos legais pertinentes ao tipo de peça, citando artigos.
+4. Seja objetivo: minuta de trabalho para o advogado revisar e completar, não peça final.
+5. Responda APENAS com a minuta em markdown (títulos com ##, parágrafos normais). Sem comentários antes ou depois."""
+
+            try:
+                modelo_ia = current_app.config.get("GEMINI_MINUTA_MODEL", "gemini-2.5-pro")
+                resp = client.models.generate_content(model=modelo_ia, contents=prompt)
+                minuta = (getattr(resp, "text", None) or "").strip()
+            except Exception as exc:
+                current_app.logger.warning("gerar_minuta_ia_falhou item=%s: %s", item_id, exc)
+                ns.abort(502, "A IA não respondeu. Tente novamente em instantes.")
+            if not minuta:
+                ns.abort(502, "A IA devolveu resposta vazia. Tente novamente.")
+
+            log_audit(
+                acao="item_agenda_gerar_minuta",
+                tabela_afetada="item_agenda",
+                registro_id=item.id,
+                detalhes=f"tipo_peca={tipo_peca}",
+            )
+            db.session.commit()
+
+            return {
+                "minuta": minuta,
+                "tipo_peca": tipo_peca,
+                "caso_id": item.caso_id,
+                "numero_processo": caso.numero_processo,
+            }, 200

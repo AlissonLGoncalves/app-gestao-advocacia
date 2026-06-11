@@ -116,3 +116,8 @@ export function tratarItemAgenda(id, opts) {
 export function getHistoricoItemAgenda(id) {
   return api.get(`/itens-agenda/${id}/historico`)
 }
+
+// Issue #316 — IA redige a minuta da peça que responde ao prazo.
+export function gerarMinutaItemAgenda(id) {
+  return api.post(`/itens-agenda/${id}/gerar-minuta`)
+}
