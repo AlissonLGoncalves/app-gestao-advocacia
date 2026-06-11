@@ -83,15 +83,50 @@ function CasosPage() {
 
   if (mostrarFormulario) {
     return (
-      <CasoForm
-        casoParaEditar={casoParaEditar}
-        clienteIdInicial={clienteIdInicial}
-        onCasoChange={handleFormularioFechado}
-        onCancel={() => {
-          setCasoParaEditar(null)
-          navigate('/casos')
-        }}
-      />
+      <>
+        {/* Fase 4 — entrada unificada: o form manual mostra os caminhos
+            assistidos ANTES do usuário digitar tudo à mão. */}
+        {modoFormulario === 'novo' && (
+          <div
+            className="alert alert-light border d-flex flex-wrap align-items-center gap-2 mx-3 mt-3 mb-0 py-2"
+            data-testid="modos-criacao-caso"
+          >
+            <span className="small text-muted me-1">
+              Tem o nº do processo ou a procuração? Deixe o app preencher:
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => navigate('/casos/buscar')}
+            >
+              Buscar pelo nº CNJ
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => navigate('/clientes/novo/procuracao')}
+            >
+              A partir da procuração
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => navigate('/casos/importar')}
+            >
+              Vários CNJs em lote
+            </button>
+          </div>
+        )}
+        <CasoForm
+          casoParaEditar={casoParaEditar}
+          clienteIdInicial={clienteIdInicial}
+          onCasoChange={handleFormularioFechado}
+          onCancel={() => {
+            setCasoParaEditar(null)
+            navigate('/casos')
+          }}
+        />
+      </>
     )
   }
   return (
