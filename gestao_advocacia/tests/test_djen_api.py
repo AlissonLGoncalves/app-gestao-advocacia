@@ -965,3 +965,99 @@ class TestDjenTriagemAcoesExtras:
     def test_qualidade_sem_autenticacao(self, client, db):
         resp = client.get("/api/v1/djen/qualidade")
         assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Fase 2 — Inbox de Intimações (tratada_em, contadores, sugestão, filtro)
+# ---------------------------------------------------------------------------
+
+
+class TestInboxIntimacoes:
+    def _user(self, db):
+        from app import User
+
+        return User.query.filter_by(username="testuser").first()
+
+    def test_tratar_marca_tratada_e_lida(self, auth_client, db):
+        u = self._user(db)
+        pub = _criar_publicacao(db, u.tenant_id, u.id, djen_id=801)
+        resp = auth_client.patch(
+            f"/api/v1/djen/publicacoes/{pub.id}/tratar", json={"acao": "registro"}
+        )
+        assert resp.status_code == 200, resp.data
+        data = json.loads(resp.data)
+        assert data["tratada_em"] is not None
+        assert data["lida"] is True
+
+    def test_criar_item_agenda_da_pub_marca_tratada(self, auth_client, db):
+        u = self._user(db)
+        caso_id = _criar_caso(auth_client, db)
+        pub = _criar_publicacao(db, u.tenant_id, u.id, caso_id=caso_id, djen_id=802)
+        resp = auth_client.post(
+            "/api/v1/itens-agenda",
+            json={
+                "titulo": "Prazo da intimação",
+                "tipo": "tarefa",
+                "categoria": "Prazo",
+                "publicacao_djen_id": pub.id,
+            },
+        )
+        assert resp.status_code == 201, resp.data
+        db.session.refresh(pub)
+        assert pub.tratada_em is not None
+
+    def test_contadores_inbox(self, auth_client, db):
+        u = self._user(db)
+        _criar_publicacao(db, u.tenant_id, u.id, djen_id=811)  # não tratada
+        p2 = _criar_publicacao(db, u.tenant_id, u.id, djen_id=812)
+        auth_client.patch(f"/api/v1/djen/publicacoes/{p2.id}/tratar", json={})
+        p3 = _criar_publicacao(db, u.tenant_id, u.id, djen_id=813)
+        p3.triagem_ignorada = True
+        db.session.commit()
+
+        resp = auth_client.get("/api/v1/djen/publicacoes/contadores")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["nao_tratadas"] == 1
+        assert data["tratadas"] == 1
+        assert data["descartadas"] == 1
+        assert data["recebidas_hoje"] == 3  # todas criadas hoje
+
+    def test_filtro_inbox_na_listagem(self, auth_client, db):
+        u = self._user(db)
+        _criar_publicacao(db, u.tenant_id, u.id, djen_id=821)
+        p2 = _criar_publicacao(db, u.tenant_id, u.id, djen_id=822)
+        auth_client.patch(f"/api/v1/djen/publicacoes/{p2.id}/tratar", json={})
+
+        resp = auth_client.get("/api/v1/djen/publicacoes?inbox=nao_tratadas")
+        itens = json.loads(resp.data)["items"]
+        assert [i["djen_id"] for i in itens] == [821]
+        resp = auth_client.get("/api/v1/djen/publicacoes?inbox=tratadas")
+        itens = json.loads(resp.data)["items"]
+        assert [i["djen_id"] for i in itens] == [822]
+
+    def test_sugestao_tratamento_contestacao(self, auth_client, db):
+        u = self._user(db)
+        pub = _criar_publicacao(db, u.tenant_id, u.id, djen_id=831)
+        pub.tipo_comunicacao = "intimacao"  # explicita: helper antigo tem mojibake
+        pub.texto = "Fica o réu intimado para apresentar contestação no prazo de 15 dias."
+        db.session.commit()
+        resp = auth_client.get(f"/api/v1/djen/publicacoes/{pub.id}/sugestao-tratamento")
+        assert resp.status_code == 200, resp.data
+        data = json.loads(resp.data)
+        assert data["tipo_sugerido"] == "prazo"
+        assert data["categoria"] == "Prazo"
+        assert data["regra"] == "contestacao_15d"
+        assert data["dias"] == 15
+        assert data["data_vencimento"]
+
+    def test_sugestao_tratamento_audiencia(self, auth_client, db):
+        u = self._user(db)
+        pub = _criar_publicacao(db, u.tenant_id, u.id, djen_id=832)
+        pub.tipo_comunicacao = "intimacao"
+        pub.texto = "Designada audiência de conciliação. Intimem-se as partes."
+        db.session.commit()
+        resp = auth_client.get(f"/api/v1/djen/publicacoes/{pub.id}/sugestao-tratamento")
+        data = json.loads(resp.data)
+        assert data["tipo_sugerido"] == "audiencia"
+        assert data["categoria"] == "Audiência"

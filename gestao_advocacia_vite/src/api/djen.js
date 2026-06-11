@@ -74,3 +74,9 @@ export const baixarCertidao = (pubId) => api.getBlob(`/djen/publicacoes/${pubId}
 export const getMonitoramentoStatus = () => api.get('/djen/monitoramento/status')
 export const triggerBackfill = (oabId) =>
   api.post(oabId ? `/djen/oabs/${oabId}/backfill` : '/djen/backfill', {})
+
+// Fase 2 — inbox de Intimações (inbox-zero, padrão Astrea)
+export const tratarPublicacao = (id, acao = 'registro') =>
+  api.patch(`/djen/publicacoes/${id}/tratar`, { acao })
+export const getSugestaoTratamento = (id) => api.get(`/djen/publicacoes/${id}/sugestao-tratamento`)
+export const getContadoresInbox = () => api.get('/djen/publicacoes/contadores')

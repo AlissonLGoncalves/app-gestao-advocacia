@@ -16,13 +16,16 @@
 
 import React from 'react'
 
+// Fase 2 (inbox-zero, padrão Astrea): a fila de trabalho é por ESTADO DE
+// TRATAMENTO, não por leitura. "Não tratadas" é a caixa de entrada (default);
+// "Sem processo" são as que precisam de cadastro antes de tratar; intimação
+// só sai da fila tratando ou descartando — nunca some sem rastro.
 const CATEGORIAS = [
+  { key: 'nao_tratadas', label: 'Não tratadas', cor: 'warning' },
+  { key: 'sem_processo', label: 'Sem processo', cor: 'danger' },
+  { key: 'tratadas', label: 'Tratadas', cor: 'success' },
+  { key: 'descartadas', label: 'Descartadas', cor: 'secondary' },
   { key: 'todas', label: 'Todas', cor: 'secondary' },
-  { key: 'nao_lidas', label: 'Não lidas', cor: 'primary' },
-  { key: 'pendentes', label: 'Pendentes', cor: 'warning' },
-  { key: 'vinculadas', label: 'Vinculadas', cor: 'success' },
-  // Epic #2 (#176): classificacao IA. Habilitado quando ha pubs classificadas
-  // como importantes. Marca visual: danger (vermelho) pra chamar atencao.
   { key: 'importantes', label: 'Importantes', cor: 'danger' },
 ]
 
