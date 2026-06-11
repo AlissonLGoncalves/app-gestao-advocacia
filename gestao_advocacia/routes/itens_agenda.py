@@ -145,9 +145,13 @@ def register_itens_agenda_routes(app, ns, input_dto, output_dto):
                 notificacoes_enviadas=data.get("notificacoes_enviadas") or {},
             )
             db.session.add(item)
-            # Marca pub como tratada (lida=true) — idempotente.
-            if pub_djen and not pub_djen.lida:
+            # Marca pub como tratada (inbox-zero Fase 2) — idempotente.
+            # Criar prazo/tarefa/audiencia A PARTIR da intimacao e a forma
+            # canonica de trata-la: sai da fila de nao tratadas.
+            if pub_djen:
                 pub_djen.lida = True
+                if pub_djen.tratada_em is None:
+                    pub_djen.tratada_em = datetime.utcnow()
             db.session.commit()
             app.logger.info(
                 f"ItemAgenda criado (id={item.id}, tipo={item.tipo}, "

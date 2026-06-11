@@ -519,7 +519,7 @@ const MainLayout = () => {
               badge={sidebarCounts.djenPendentes}
               badgeCor="warning"
             >
-              DJEN — Publicações
+              Intimações
             </SidebarLink>
 
             {/* === ANÁLISE === */}

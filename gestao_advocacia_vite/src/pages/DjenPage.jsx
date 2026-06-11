@@ -10,6 +10,7 @@ import {
   extrairTextoPlano,
 } from '../utils/htmlTribunal.js'
 import ModalCriarClienteCaso from '../components/djen/ModalCriarClienteCaso.jsx'
+import TratarIntimacaoModal from '../components/djen/TratarIntimacaoModal.jsx'
 import CategoriasPublicacoes from '../components/djen/CategoriasPublicacoes.jsx'
 import ModalNovaTarefaInline from '../components/djen/ModalNovaTarefaInline.jsx'
 import RiscoBadge from '../components/ui/RiscoBadge.jsx'
@@ -44,7 +45,9 @@ export default function DjenPage() {
   // Astrea (Importantes / Andamentos / Tarefas / etc). Por enquanto:
   // todas | nao_lidas | pendentes | vinculadas. "Importantes" fica visivel
   // como placeholder (em breve) ate a Epic #2 (#176) classificar via IA.
-  const [categoria, setCategoria] = useState('todas')
+  // Fase 2 (inbox-zero): a caixa de entrada abre nas NÃO TRATADAS.
+  const [categoria, setCategoria] = useState('nao_tratadas')
+  const [pubTratar, setPubTratar] = useState(null)
   const [contagens, setContagens] = useState({
     todas: 0,
     nao_lidas: 0,
@@ -52,7 +55,7 @@ export default function DjenPage() {
     vinculadas: 0,
     importantes: 0,
   })
-  const categoriaRef = useRef('todas')
+  const categoriaRef = useRef('nao_tratadas')
   useEffect(() => {
     categoriaRef.current = categoria
   }, [categoria])
@@ -124,8 +127,21 @@ export default function DjenPage() {
         // senao, deriva de "categoria" (ex: aba "Nao lidas" => lida=false).
         const lidaFromCat = cat === 'nao_lidas' ? 'false' : ''
         const lidaFiltro = f.lida !== '' ? f.lida : lidaFromCat
+        // Fase 2 (inbox-zero): categorias por estado de tratamento.
+        const inbox =
+          cat === 'nao_tratadas' || cat === 'sem_processo'
+            ? 'nao_tratadas'
+            : cat === 'tratadas'
+              ? 'tratadas'
+              : cat === 'descartadas'
+                ? 'descartadas'
+                : undefined
         const vinculacao =
-          cat === 'pendentes' ? 'sem_caso' : cat === 'vinculadas' ? 'com_caso' : undefined
+          cat === 'sem_processo' || cat === 'pendentes'
+            ? 'sem_caso'
+            : cat === 'vinculadas'
+              ? 'com_caso'
+              : undefined
         // Epic #2: categoria "Importantes" filtra por classificacao IA
         const importante = cat === 'importantes' ? 'true' : undefined
 
@@ -143,6 +159,7 @@ export default function DjenPage() {
           ordenar: f.ordenar || 'data_desc',
           vinculacao,
           importante,
+          inbox,
         })
 
         setPublicacoes(data.items || [])
@@ -990,6 +1007,14 @@ export default function DjenPage() {
                           <div className="flex-grow-1 me-2" style={{ minWidth: 0 }}>
                             <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                               {!pub.lida && <span className="badge bg-primary">Nova</span>}
+                              {/* Fase 2 — estado do inbox sempre visível */}
+                              {pub.triagem_ignorada ? (
+                                <span className="badge bg-secondary">Descartada</span>
+                              ) : pub.tratada_em ? (
+                                <span className="badge bg-success">Tratada</span>
+                              ) : (
+                                <span className="badge bg-warning text-dark">Não tratada</span>
+                              )}
                               {/* Risk tag: deriva de importante + tipo_comunicacao
                                   para 3 niveis (Alto/Atencao/Rotina). Tooltip
                                   mostra o motivo da classificacao da IA. */}
@@ -1036,6 +1061,20 @@ export default function DjenPage() {
                             )}
                           </div>
                           <div className="d-flex gap-1">
+                            {/* Fase 2 — o verbo central: Tratar */}
+                            {!pub.tratada_em && !pub.triagem_ignorada && (
+                              <button
+                                className="btn btn-sm btn-primary"
+                                title="Tratar intimação (prazo, audiência, tarefa...)"
+                                data-testid={`btn-tratar-${pub.id}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setPubTratar(pub)
+                                }}
+                              >
+                                Tratar
+                              </button>
+                            )}
                             {pub.hash_comunicacao && (
                               <button
                                 className="btn btn-sm btn-outline-secondary"
@@ -1773,6 +1812,22 @@ export default function DjenPage() {
               </div>
             )
           })()}
+
+        {/* Fase 2 — Tratar intimação (inbox-zero) */}
+        {pubTratar && (
+          <TratarIntimacaoModal
+            pub={pubTratar}
+            onClose={() => setPubTratar(null)}
+            onTratado={() => {
+              setPubTratar(null)
+              carregarPublicacoes(offset)
+            }}
+            onCadastrarProcesso={(p) => {
+              setPubTratar(null)
+              setItemModalCriar(p)
+            }}
+          />
+        )}
 
         {itemModalCriar && (
           <ModalCriarClienteCaso

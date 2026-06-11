@@ -3,40 +3,38 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import CategoriasPublicacoes from './CategoriasPublicacoes.jsx'
 
+// Fase 2 (inbox-zero): categorias por ESTADO DE TRATAMENTO.
 const CONTAGENS = {
   todas: 256,
-  nao_lidas: 18,
-  pendentes: 92,
-  vinculadas: 164,
+  nao_tratadas: 18,
+  sem_processo: 9,
+  tratadas: 164,
+  descartadas: 65,
   importantes: 0,
 }
 
-describe('CategoriasPublicacoes', () => {
-  it('renderiza as 5 categorias com contagens', () => {
-    render(<CategoriasPublicacoes ativa="todas" contagens={CONTAGENS} onChange={vi.fn()} />)
-    expect(screen.getByTestId('djen-cat-todas')).toBeInTheDocument()
-    expect(screen.getByTestId('djen-cat-nao_lidas')).toBeInTheDocument()
-    expect(screen.getByTestId('djen-cat-pendentes')).toBeInTheDocument()
-    expect(screen.getByTestId('djen-cat-vinculadas')).toBeInTheDocument()
-    expect(screen.getByTestId('djen-cat-importantes')).toBeInTheDocument()
-
+describe('CategoriasPublicacoes (inbox-zero)', () => {
+  it('renderiza as 6 categorias do inbox com contagens', () => {
+    render(<CategoriasPublicacoes ativa="nao_tratadas" contagens={CONTAGENS} onChange={vi.fn()} />)
+    expect(screen.getByTestId('djen-cat-nao_tratadas')).toHaveTextContent('18')
+    expect(screen.getByTestId('djen-cat-sem_processo')).toHaveTextContent('9')
+    expect(screen.getByTestId('djen-cat-tratadas')).toHaveTextContent('164')
+    expect(screen.getByTestId('djen-cat-descartadas')).toHaveTextContent('65')
     expect(screen.getByTestId('djen-cat-todas')).toHaveTextContent('256')
-    expect(screen.getByTestId('djen-cat-nao_lidas')).toHaveTextContent('18')
-    expect(screen.getByTestId('djen-cat-pendentes')).toHaveTextContent('92')
-    expect(screen.getByTestId('djen-cat-vinculadas')).toHaveTextContent('164')
+    expect(screen.getByTestId('djen-cat-importantes')).toBeInTheDocument()
   })
 
   it('marca a categoria ativa com aria-selected=true', () => {
-    render(<CategoriasPublicacoes ativa="pendentes" contagens={CONTAGENS} onChange={vi.fn()} />)
-    expect(screen.getByTestId('djen-cat-pendentes')).toHaveAttribute('aria-selected', 'true')
+    render(<CategoriasPublicacoes ativa="sem_processo" contagens={CONTAGENS} onChange={vi.fn()} />)
+    expect(screen.getByTestId('djen-cat-sem_processo')).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('djen-cat-todas')).toHaveAttribute('aria-selected', 'false')
   })
 
-  it('chama onChange ao clicar numa categoria habilitada', () => {
+  it('chama onChange ao clicar numa categoria', () => {
     const onChange = vi.fn()
-    render(<CategoriasPublicacoes ativa="todas" contagens={CONTAGENS} onChange={onChange} />)
-    fireEvent.click(screen.getByTestId('djen-cat-pendentes'))
-    expect(onChange).toHaveBeenCalledWith('pendentes')
+    render(<CategoriasPublicacoes ativa="nao_tratadas" contagens={CONTAGENS} onChange={onChange} />)
+    fireEvent.click(screen.getByTestId('djen-cat-tratadas'))
+    expect(onChange).toHaveBeenCalledWith('tratadas')
   })
 
   it('Importantes esta habilitado e dispara onChange (Epic #2 / #176)', () => {
@@ -47,12 +45,7 @@ describe('CategoriasPublicacoes', () => {
     expect(btn).not.toBeDisabled()
     fireEvent.click(btn)
     expect(onChange).toHaveBeenCalledWith('importantes')
-  })
-
-  it('Importantes mostra contagem real do tenant', () => {
-    const contagens = { ...CONTAGENS, importantes: 5 }
-    render(<CategoriasPublicacoes ativa="todas" contagens={contagens} onChange={vi.fn()} />)
-    expect(screen.getByTestId('djen-cat-importantes')).toHaveTextContent('5')
+    expect(btn).toHaveTextContent('5')
   })
 
   it('aceita contagens=undefined sem quebrar (mostra 0)', () => {

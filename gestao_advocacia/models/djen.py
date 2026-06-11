@@ -83,6 +83,11 @@ class PublicacaoDJEN(db.Model):
     )  # pendente, criado_automaticamente, revisado_manual, ignorado
     lida = db.Column(db.Boolean, default=False, index=True)
     triagem_ignorada = db.Column(db.Boolean, default=False, index=True)
+    # Fase 2 (inbox-zero, padrao Astrea): intimacao so sai da fila quando
+    # TRATADA (gerou prazo/tarefa/audiencia ou foi conscientemente
+    # registrada) ou DESCARTADA (triagem_ignorada). 'lida' sozinha nao
+    # resolve — sumia da fila sem rastro de acao.
+    tratada_em = db.Column(db.DateTime, nullable=True, index=True)
     notas = db.Column(db.Text, nullable=True)
     polo_ativo = db.Column(db.Text, nullable=True)
     polo_passivo = db.Column(db.Text, nullable=True)
@@ -133,6 +138,7 @@ class PublicacaoDJEN(db.Model):
             "origem_busca": self.origem_busca,
             "status_origem": self.status_origem,
             "triagem_ignorada": self.triagem_ignorada,
+            "tratada_em": self.tratada_em.isoformat() if self.tratada_em else None,
             "lida": self.lida,
             "notas": self.notas,
             "polo_ativo": self.polo_ativo,

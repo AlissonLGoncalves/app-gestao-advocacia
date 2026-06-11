@@ -637,6 +637,19 @@ def registrar_rotas_djen(
             if lida_param is not None:
                 q = q.filter_by(lida=(lida_param.lower() == "true"))
 
+            # Fase 2 — inbox-zero: nao_tratadas | tratadas | descartadas.
+            # 'Nao tratada' = sem acao registrada e nao descartada.
+            inbox = request.args.get("inbox")
+            if inbox == "nao_tratadas":
+                q = q.filter(
+                    PublicacaoDJEN.tratada_em.is_(None),
+                    PublicacaoDJEN.triagem_ignorada.is_(False),
+                )
+            elif inbox == "tratadas":
+                q = q.filter(PublicacaoDJEN.tratada_em.isnot(None))
+            elif inbox == "descartadas":
+                q = q.filter(PublicacaoDJEN.triagem_ignorada.is_(True))
+
             sigla = request.args.get("sigla_tribunal")
             if sigla:
                 q = q.filter(PublicacaoDJEN.sigla_tribunal.ilike(sigla))
@@ -768,6 +781,15 @@ def registrar_rotas_djen(
             # entra — sao publicacoes ainda nao classificadas).
             importantes = base_q.filter(PublicacaoDJEN.importante.is_(True)).count()
             total_geral = base_q.count()
+            # Fase 2 — inbox-zero (padrao Astrea)
+            nao_tratadas_q = base_q.filter(
+                PublicacaoDJEN.tratada_em.is_(None),
+                PublicacaoDJEN.triagem_ignorada.is_(False),
+            )
+            nao_tratadas = nao_tratadas_q.count()
+            sem_processo = nao_tratadas_q.filter(PublicacaoDJEN.caso_id.is_(None)).count()
+            tratadas = base_q.filter(PublicacaoDJEN.tratada_em.isnot(None)).count()
+            descartadas = base_q.filter(PublicacaoDJEN.triagem_ignorada.is_(True)).count()
 
             return {
                 "total": total,
@@ -781,6 +803,10 @@ def registrar_rotas_djen(
                     "pendentes": pendentes,
                     "vinculadas": vinculadas,
                     "importantes": importantes,
+                    "nao_tratadas": nao_tratadas,
+                    "sem_processo": sem_processo,
+                    "tratadas": tratadas,
+                    "descartadas": descartadas,
                 },
             }
 
@@ -1866,6 +1892,105 @@ def registrar_rotas_djen(
                 pub.notas = data["notas"]
             db.session.commit()
             return pub.to_dict()
+
+    @djen_ns.route("/publicacoes/<int:pub_id>/tratar")
+    class PublicacaoTratarAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Fase 2 (inbox-zero) — marca a intimação como TRATADA "
+                "(saiu da fila com ação consciente). Body opcional: "
+                "{acao: 'prazo'|'audiencia'|'tarefa'|'registro'}."
+            ),
+        )
+        @jwt_required()
+        def patch(self, pub_id):
+            user = _get_user_or_401()
+            pub = _get_scoped_or_404(
+                PublicacaoDJEN, user, pub_id, "PublicacaoDJEN", "Publicação não encontrada."
+            )
+            from datetime import datetime  # noqa: PLC0415
+
+            from models import log_audit  # noqa: PLC0415
+
+            data = request.json or {}
+            pub.tratada_em = datetime.utcnow()
+            pub.lida = True
+            log_audit(
+                acao="publicacao_tratar",
+                tabela_afetada="publicacao_djen",
+                registro_id=pub.id,
+                detalhes=f"acao={data.get('acao') or 'registro'}",
+            )
+            db.session.commit()
+            return pub.to_dict()
+
+    @djen_ns.route("/publicacoes/<int:pub_id>/sugestao-tratamento")
+    class PublicacaoSugestaoTratamentoAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Fase 2 — sugestão determinística de tratamento da intimação "
+                "(mesmo motor das auto-tarefas): tipo (prazo/audiencia/tarefa), "
+                "título, vencimento calculado e prioridade."
+            ),
+        )
+        @jwt_required()
+        def get(self, pub_id):
+            from djen_prazo_calculator import calcular_prazo  # noqa: PLC0415
+
+            user = _get_user_or_401()
+            pub = _get_scoped_or_404(
+                PublicacaoDJEN, user, pub_id, "PublicacaoDJEN", "Publicação não encontrada."
+            )
+            calc = calcular_prazo(pub.tipo_comunicacao, pub.texto, pub.data_disponibilizacao)
+            regra = calc.get("regra") or ""
+            if regra.startswith("audiencia"):
+                tipo_sugerido, categoria = "audiencia", "Audiência"
+            elif regra.startswith("fallback"):
+                tipo_sugerido, categoria = "tarefa", "Outros"
+            else:
+                tipo_sugerido, categoria = "prazo", "Prazo"
+            proc = pub.numero_processo_mascara or pub.numero_processo or ""
+            titulo = f"{(pub.tipo_comunicacao or 'Intimação').capitalize()}: {proc}".strip(": ")
+            return {
+                "tipo_sugerido": tipo_sugerido,
+                "categoria": categoria,
+                "titulo": titulo[:240],
+                "data_vencimento": calc["data_vencimento"].date().isoformat(),
+                "dias": calc["dias"],
+                "regra": regra,
+                "prioridade": calc["prioridade"],
+                "caso_id": pub.caso_id,
+            }
+
+    @djen_ns.route("/publicacoes/contadores")
+    class PublicacaoContadoresAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description="Fase 2 — contadores do inbox de intimações do tenant.",
+        )
+        @jwt_required()
+        def get(self):
+            from utils.datas import hoje_brasil  # noqa: PLC0415
+
+            user = _get_user_or_401()
+            base = PublicacaoDJEN.query.filter_by(tenant_id=user.tenant_id)
+            nao_tratadas = base.filter(
+                PublicacaoDJEN.tratada_em.is_(None),
+                PublicacaoDJEN.triagem_ignorada.is_(False),
+            ).count()
+            tratadas = base.filter(PublicacaoDJEN.tratada_em.isnot(None)).count()
+            descartadas = base.filter(PublicacaoDJEN.triagem_ignorada.is_(True)).count()
+            recebidas_hoje = base.filter(
+                PublicacaoDJEN.data_disponibilizacao == hoje_brasil()
+            ).count()
+            return {
+                "recebidas_hoje": recebidas_hoje,
+                "nao_tratadas": nao_tratadas,
+                "tratadas": tratadas,
+                "descartadas": descartadas,
+            }
 
     @djen_ns.route("/publicacoes/<int:pub_id>/reclassificar")
     class PublicacaoReclassificarAPI(Resource):
