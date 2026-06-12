@@ -433,6 +433,20 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
                         polo_ativo_list.append(nome_parte)
     polo_ativo_str = " | ".join(polo_ativo_list) or None
     polo_passivo_str = " | ".join(polo_passivo_list) or None
+    # Feedback 12/06: quando a API nao manda partes estruturadas, extrai
+    # do texto (mesmo regex da triagem) — "quem contra quem" sempre que
+    # o texto permitir.
+    if not polo_ativo_str and not polo_passivo_str and texto:
+        try:
+            from types import SimpleNamespace  # noqa: PLC0415
+
+            from djen_triagem import extrair_polos_do_texto  # noqa: PLC0415
+
+            polo_ativo_str, polo_passivo_str = extrair_polos_do_texto(
+                SimpleNamespace(texto=texto, raw_json=item, numero_processo=numero_proc)
+            )
+        except Exception:
+            pass
     nome_juiz = str(_item_get(item, "nomeJuiz", "juiz", "magistrado") or "")[:200] or None
 
     # enriquecimento-cnj: hot-path — preencher mascara com canonico extraido

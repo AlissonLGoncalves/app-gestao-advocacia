@@ -1992,6 +1992,47 @@ def registrar_rotas_djen(
                 "descartadas": descartadas,
             }
 
+    @djen_ns.route("/publicacoes/backfill-partes")
+    class PublicacaoBackfillPartesAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Feedback 12/06 — preenche polo_ativo/polo_passivo das "
+                "publicações antigas a partir do TEXTO (regex da triagem). "
+                "Processa até `limit` por chamada (default 300)."
+            ),
+        )
+        @jwt_required()
+        def post(self):
+            from djen_triagem import extrair_polos_do_texto  # noqa: PLC0415
+
+            user = _get_user_or_401()
+            data = request.json or {}
+            limit = min(int(data.get("limit", 300)), 1000)
+            pendentes_q = PublicacaoDJEN.query.filter(
+                PublicacaoDJEN.tenant_id == user.tenant_id,
+                PublicacaoDJEN.polo_ativo.is_(None),
+                PublicacaoDJEN.polo_passivo.is_(None),
+                PublicacaoDJEN.texto.isnot(None),
+            )
+            lote = pendentes_q.limit(limit).all()
+            atualizadas = 0
+            for pub in lote:
+                try:
+                    ativo, passivo = extrair_polos_do_texto(pub)
+                except Exception:
+                    continue
+                if ativo or passivo:
+                    pub.polo_ativo = ativo
+                    pub.polo_passivo = passivo
+                    atualizadas += 1
+                else:
+                    # marca como tentado pra nao reprocessar eternamente
+                    pub.polo_ativo = ""
+            db.session.commit()
+            restantes = pendentes_q.count()
+            return {"processadas": len(lote), "atualizadas": atualizadas, "restantes": restantes}
+
     @djen_ns.route("/publicacoes/<int:pub_id>/reclassificar")
     class PublicacaoReclassificarAPI(Resource):
         @djen_ns.doc(
