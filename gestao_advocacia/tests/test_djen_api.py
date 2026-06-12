@@ -3,10 +3,11 @@
 # Cobre: OABs monitoradas, publicaÃ§Ãµes, PATCH de publicaÃ§Ã£o, nÃ£o-lidas e sync manual.
 
 import json
-from datetime import date
+from datetime import date  # noqa: F401
 from unittest.mock import patch
 
 from app import Caso, Cliente, PublicacaoDJEN
+from utils.datas import hoje_brasil
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,7 +64,7 @@ def _criar_publicacao(
         sigla_tribunal="TJPR",
         nome_orgao="1Âª Vara CÃ­vel",
         tipo_comunicacao="IntimaÃ§Ã£o",
-        data_disponibilizacao=date.today(),
+        data_disponibilizacao=hoje_brasil(),
         texto="Texto de intimaÃ§Ã£o de teste.",
         lida=lida,
         origem_busca="oab",
@@ -627,7 +628,7 @@ class TestDjenTriagem:
                 numero_processo="0001234-12.2024.8.16.0001",
                 sigla_tribunal="TJPR",
                 tipo_comunicacao="Intimacao",
-                data_disponibilizacao=date.today(),
+                data_disponibilizacao=hoje_brasil(),
                 texto=(
                     "AUTOR: Joao da Silva; REU: Empresa XPTO LTDA; "
                     "ADVOGADO: Maria Rocha OAB/PR 12345"
@@ -674,7 +675,7 @@ class TestDjenTriagem:
                 numero_processo="0007777-12.2025.8.16.0001",
                 sigla_tribunal="TJPR",
                 tipo_comunicacao="Intimacao",
-                data_disponibilizacao=date.today(),
+                data_disponibilizacao=hoje_brasil(),
                 texto="AUTOR: Carla Souza; REU: Empresa Alfa LTDA; ADVOGADO: Dr. Pedro Lopes",
                 origem_busca="oab",
                 lida=False,
@@ -719,7 +720,7 @@ class TestDjenTriagem:
                     numero_processo=f"00088{idx}7-12.2025.8.16.0001",
                     sigla_tribunal="TJPR",
                     tipo_comunicacao="Intimacao",
-                    data_disponibilizacao=date.today(),
+                    data_disponibilizacao=hoje_brasil(),
                     texto=f"AUTOR: Pessoa {idx}; REU: Empresa {idx}; ADVOGADO: Dr. Triagem {idx}",
                     origem_busca="oab",
                     lida=False,
@@ -883,7 +884,7 @@ class TestDjenTriagemAcoesExtras:
                 numero_processo=f"0009{djen_id}-12.2025.8.16.0001",
                 sigla_tribunal="TJPR",
                 tipo_comunicacao="Intimacao",
-                data_disponibilizacao=date.today(),
+                data_disponibilizacao=hoje_brasil(),
                 texto=f"AUTOR: Parte Extra {djen_id}; REU: Empresa X",
                 origem_busca="oab",
             )

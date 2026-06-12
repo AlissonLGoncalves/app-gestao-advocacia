@@ -1,12 +1,13 @@
 """Testes do modulo de Notificacoes (model + endpoints + cron job + e-mail N3)."""
 
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta  # noqa: F401
 from unittest.mock import patch
 
 from extensions import db
 from models import Notificacao
 from notificacoes_tasks import job_verificar_vencimentos
+from utils.datas import hoje_brasil
 
 # ===== Endpoints CRUD =====
 
@@ -133,7 +134,7 @@ def _criar_recebimento_via_api(auth_client, data_vencimento, status="Pendente"):
 
 
 def test_cron_cria_notif_recebimento_vencendo_em_3_dias(auth_client, db, app):
-    em_3 = (date.today() + timedelta(days=3)).isoformat()
+    em_3 = (hoje_brasil() + timedelta(days=3)).isoformat()
     _criar_recebimento_via_api(auth_client, em_3)
 
     job_verificar_vencimentos(app)
@@ -144,7 +145,7 @@ def test_cron_cria_notif_recebimento_vencendo_em_3_dias(auth_client, db, app):
 
 
 def test_cron_cria_notif_recebimento_atrasado(auth_client, db, app):
-    atrasado = (date.today() - timedelta(days=5)).isoformat()
+    atrasado = (hoje_brasil() - timedelta(days=5)).isoformat()
     _criar_recebimento_via_api(auth_client, atrasado)
 
     job_verificar_vencimentos(app)
@@ -157,7 +158,7 @@ def test_cron_cria_notif_recebimento_atrasado(auth_client, db, app):
 
 def test_cron_idempotente_nao_duplica(auth_client, db, app):
     """Rodar 2x no mesmo dia nao cria notif duplicada."""
-    em_3 = (date.today() + timedelta(days=3)).isoformat()
+    em_3 = (hoje_brasil() + timedelta(days=3)).isoformat()
     _criar_recebimento_via_api(auth_client, em_3)
 
     job_verificar_vencimentos(app)
@@ -168,7 +169,7 @@ def test_cron_idempotente_nao_duplica(auth_client, db, app):
 
 
 def test_cron_nao_cria_para_pago(auth_client, db, app):
-    em_3 = (date.today() + timedelta(days=3)).isoformat()
+    em_3 = (hoje_brasil() + timedelta(days=3)).isoformat()
     _criar_recebimento_via_api(auth_client, em_3, status="Pago")
 
     job_verificar_vencimentos(app)
@@ -177,7 +178,7 @@ def test_cron_nao_cria_para_pago(auth_client, db, app):
 
 
 def test_cron_cria_para_despesa_atrasada(auth_client, db, app):
-    atrasada = (date.today() - timedelta(days=2)).isoformat()
+    atrasada = (hoje_brasil() - timedelta(days=2)).isoformat()
     auth_client.post(
         "/api/v1/despesas",
         json={
@@ -215,7 +216,7 @@ def test_put_me_atualiza_preferencia_email(auth_client, db):
 
 def test_cron_envia_email_quando_optin_ativo(auth_client, db, app):
     """Por padrao (opt-in True), cron dispara e-mail pra notif nova."""
-    em_3 = (date.today() + timedelta(days=3)).isoformat()
+    em_3 = (hoje_brasil() + timedelta(days=3)).isoformat()
     _criar_recebimento_via_api(auth_client, em_3)
 
     # enviar_email eh importado dentro de _enviar_email_se_optin
@@ -235,7 +236,7 @@ def test_cron_nao_envia_email_quando_optout(auth_client, db, app):
     json.loads(res_me.data)["id"]
     auth_client.put("/api/v1/auth/me", json={"notif_email_vencimentos": False})
 
-    em_3 = (date.today() + timedelta(days=3)).isoformat()
+    em_3 = (hoje_brasil() + timedelta(days=3)).isoformat()
     _criar_recebimento_via_api(auth_client, em_3)
 
     with patch("mail_service.enviar_email") as mock_email:
@@ -249,7 +250,7 @@ def test_cron_nao_envia_email_quando_optout(auth_client, db, app):
 
 def test_cron_idempotente_nao_reenvia_email(auth_client, db, app):
     """Rodar 2x: e-mail so na 1a (2a cai no dedupe e nao reenvia)."""
-    em_3 = (date.today() + timedelta(days=3)).isoformat()
+    em_3 = (hoje_brasil() + timedelta(days=3)).isoformat()
     _criar_recebimento_via_api(auth_client, em_3)
 
     with patch("mail_service.enviar_email") as mock_email:
