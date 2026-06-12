@@ -337,13 +337,6 @@ function Dashboard({ mudarSecao }) {
     (ev) => ev.data_inicio && ev.data_inicio.startsWith(hoje)
   )
 
-  const temBriefing =
-    stats.djenPendentesTriagem > 0 ||
-    tarefasAlerta.vencidas > 0 ||
-    tarefasAlerta.vencendoHoje > 0 ||
-    eventosHoje.length > 0 ||
-    syncing
-
   // Busca local primeiro (Caso/Publicacao). DataJud so vira opcional como fallback.
   const handleConsultaRapida = async () => {
     const inputTrimmed = consultaCnjInput.trim()
@@ -424,90 +417,13 @@ function Dashboard({ mudarSecao }) {
       <MeuDiaCard />
 
       {/* ── Briefing do Dia ─────────────────────────────────────────────────── */}
-      {temBriefing && (
-        <div className="row mb-4 g-0">
-          <div className="col-12">
-            <div
-              className="card border-0 shadow-sm"
-              style={{ borderRadius: 'var(--radius-lg)', borderLeft: '4px solid #f59e0b' }}
-            >
-              <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
-                <h6 className="mb-0 fw-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Atenção — Hoje
-                </h6>
-                {syncing && (
-                  <span
-                    className="text-muted small d-flex align-items-center gap-2"
-                    style={{ fontSize: '0.8rem' }}
-                  >
-                    <ArrowPathIcon style={{ width: 14, height: 14 }} className="text-primary" />
-                    Verificando novas publicações no DJEN...
-                  </span>
-                )}
-              </div>
-              <div className="card-body pt-0 pb-3 px-3">
-                <div className="d-flex flex-wrap gap-2">
-                  {stats.djenPendentesTriagem > 0 && (
-                    <button
-                      className="btn btn-sm btn-warning d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm"
-                      onClick={() => navigate('/djen')}
-                    >
-                      <NewspaperIcon style={{ width: 16, height: 16 }} />
-                      <span>
-                        <strong>{stats.djenPendentesTriagem}</strong> publicaç
-                        {stats.djenPendentesTriagem === 1 ? 'ão' : 'ões'} aguardando triagem
-                      </span>
-                      <ChevronRightIcon style={{ width: 14, height: 14 }} />
-                    </button>
-                  )}
-
-                  {tarefasAlerta.vencidas > 0 && (
-                    <button
-                      className="btn btn-sm btn-danger d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm"
-                      onClick={() => navigate('/prazos')}
-                    >
-                      <ExclamationTriangleIcon style={{ width: 16, height: 16 }} />
-                      <span>
-                        <strong>{tarefasAlerta.vencidas}</strong> prazo
-                        {tarefasAlerta.vencidas !== 1 ? 's' : ''} vencido
-                        {tarefasAlerta.vencidas !== 1 ? 's' : ''}
-                      </span>
-                      <ChevronRightIcon style={{ width: 14, height: 14 }} />
-                    </button>
-                  )}
-
-                  {tarefasAlerta.vencendoHoje > 0 && (
-                    <button
-                      className="btn btn-sm btn-outline-danger d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm"
-                      onClick={() => navigate('/prazos')}
-                    >
-                      <PrazoIconSolid style={{ width: 16, height: 16 }} />
-                      <span>
-                        <strong>{tarefasAlerta.vencendoHoje}</strong> prazo
-                        {tarefasAlerta.vencendoHoje !== 1 ? 's' : ''} vence
-                        {tarefasAlerta.vencendoHoje !== 1 ? 'm' : ''} hoje
-                      </span>
-                      <ChevronRightIcon style={{ width: 14, height: 14 }} />
-                    </button>
-                  )}
-
-                  {eventosHoje.length > 0 && (
-                    <button
-                      className="btn btn-sm btn-primary d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm"
-                      onClick={() => navigate('/agenda')}
-                    >
-                      <CalendarDaysIcon style={{ width: 16, height: 16 }} />
-                      <span>
-                        <strong>{eventosHoje.length}</strong> evento
-                        {eventosHoje.length !== 1 ? 's' : ''} hoje
-                      </span>
-                      <ChevronRightIcon style={{ width: 14, height: 14 }} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Feedback 12/06: o bloco "Atenção — Hoje" duplicava o Meu dia
+          (mesmos números em 3 lugares). Removido; sobrou só o indicador
+          de sincronização, que era a única informação exclusiva dele. */}
+      {syncing && (
+        <div className="text-muted small d-flex align-items-center gap-2 mb-3">
+          <ArrowPathIcon style={{ width: 14, height: 14 }} className="text-primary" />
+          Verificando novas publicações no DJEN...
         </div>
       )}
 

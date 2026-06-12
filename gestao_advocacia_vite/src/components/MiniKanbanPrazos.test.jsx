@@ -98,3 +98,37 @@ describe('MiniKanbanPrazos render', () => {
     expect(screen.getByText('Hoje task')).toBeInTheDocument()
   })
 })
+
+describe('baixa em massa de vencidos (feedback 12/06)', () => {
+  const originalFetch = globalThis.fetch
+  beforeEach(() => localStorage.setItem('token', 'fake'))
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    localStorage.clear()
+  })
+
+  it('botão "Já tratei no tribunal" baixa todos os vencidos via /tratar', async () => {
+    const { fireEvent } = await import('@testing-library/react')
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { id: 11, titulo: 'Vencido A', data_vencimento: '2020-01-01', status: 'A Fazer' },
+        { id: 12, titulo: 'Vencido B', data_vencimento: '2020-01-02', status: 'A Fazer' },
+      ],
+    })
+    render(
+      <MemoryRouter>
+        <MiniKanbanPrazos />
+      </MemoryRouter>
+    )
+    const btn = await screen.findByTestId('btn-baixar-vencidos')
+    fireEvent.click(btn)
+    // modal do useConfirm
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }))
+    await waitFor(() => {
+      const urls = globalThis.fetch.mock.calls.map(([u]) => String(u))
+      expect(urls.some((u) => u.includes('/itens-agenda/11/tratar'))).toBe(true)
+      expect(urls.some((u) => u.includes('/itens-agenda/12/tratar'))).toBe(true)
+    })
+  })
+})
