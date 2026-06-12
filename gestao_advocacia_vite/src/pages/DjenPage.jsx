@@ -31,6 +31,7 @@ import {
   updatePublicacao,
   reclassificarPublicacao,
   vincularDecisao,
+  backfillPartes,
 } from '../api/djen.js'
 import { listCasos } from '../api/casos.js'
 
@@ -178,6 +179,31 @@ export default function DjenPage() {
     },
     [itensPorPagina]
   )
+
+  // Feedback 12/06 — auto-backfill das partes do acervo antigo: roda UMA
+  // vez por sessão, em lotes, sob a sessão do próprio usuário. Novas
+  // publicações já chegam com partes pela ingestão.
+  useEffect(() => {
+    if (sessionStorage.getItem('djen_backfill_partes_ok')) return
+    let ativo = true
+    ;(async () => {
+      try {
+        for (let i = 0; i < 5; i++) {
+          const r = await backfillPartes(500)
+          if (!ativo) return
+          if (!r || r.restantes === 0) break
+        }
+        sessionStorage.setItem('djen_backfill_partes_ok', '1')
+        carregarPublicacoes(0)
+      } catch {
+        /* silencioso — tenta de novo na próxima sessão */
+      }
+    })()
+    return () => {
+      ativo = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Carregar OABs ───────────────────────────────────────────────────────────
   const carregarOabs = useCallback(async () => {
