@@ -80,3 +80,7 @@ export const tratarPublicacao = (id, acao = 'registro') =>
   api.patch(`/djen/publicacoes/${id}/tratar`, { acao })
 export const getSugestaoTratamento = (id) => api.get(`/djen/publicacoes/${id}/sugestao-tratamento`)
 export const getContadoresInbox = () => api.get('/djen/publicacoes/contadores')
+
+// Feedback 12/06 — backfill de partes do acervo antigo (lotes de até 1000)
+export const backfillPartes = (limit = 500) =>
+  api.post('/djen/publicacoes/backfill-partes', { limit })
