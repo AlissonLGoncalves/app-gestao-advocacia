@@ -1062,3 +1062,67 @@ class TestInboxIntimacoes:
         data = json.loads(resp.data)
         assert data["tipo_sugerido"] == "audiencia"
         assert data["categoria"] == "Audiência"
+
+
+# ---------------------------------------------------------------------------
+# Feedback 12/06 — partes ("quem contra quem") nas intimações
+# ---------------------------------------------------------------------------
+
+
+class TestPartesNasIntimacoes:
+    def _user(self, db):
+        from app import User
+
+        return User.query.filter_by(username="testuser").first()
+
+    def test_extrair_polos_do_texto(self, db):
+        from types import SimpleNamespace
+
+        from djen_triagem import extrair_polos_do_texto
+
+        pub = SimpleNamespace(
+            texto="AUTOR: VALDIR ESTORBE ADVOGADO(A): ALISSON LUIZ RÉU: BANCO XPTO S/A",
+            raw_json={},
+            numero_processo=None,
+        )
+        ativo, passivo = extrair_polos_do_texto(pub)
+        assert "VALDIR ESTORBE" in (ativo or "")
+        assert "BANCO XPTO" in (passivo or "")
+
+    def test_backfill_preenche_polos_das_antigas(self, auth_client, db):
+        u = self._user(db)
+        pub = _criar_publicacao(db, u.tenant_id, u.id, djen_id=901)
+        pub.texto = "REQUERENTE: MARIA DA SILVA REQUERIDO: ESTADO DO PARANA Intimem-se."
+        pub.polo_ativo = None
+        pub.polo_passivo = None
+        db.session.commit()
+
+        resp = auth_client.post("/api/v1/djen/publicacoes/backfill-partes", json={"limit": 50})
+        assert resp.status_code == 200, resp.data
+        data = json.loads(resp.data)
+        assert data["atualizadas"] >= 1
+        db.session.refresh(pub)
+        assert "MARIA DA SILVA" in (pub.polo_ativo or "")
+        assert "ESTADO DO PARANA" in (pub.polo_passivo or "")
+
+    def test_ingestao_usa_fallback_do_texto(self, auth_client, db):
+        """_salvar_publicacao sem 'partes' estruturadas extrai do texto."""
+        from djen_tasks import _salvar_publicacao
+        from models import PublicacaoDJEN
+
+        u = self._user(db)
+        item = {
+            "id": 99887,
+            "siglaTribunal": "TJPR",
+            "tipoComunicacao": "Intimação",
+            "texto": "AUTOR: JOAO TESTE RÉU: EMPRESA ABC LTDA Prazo de 15 dias.",
+            "dataDisponibilizacao": "2026-06-10",
+            "numeroProcesso": "00099887700268160001",
+            "hash": "hash-fallback-1",
+        }
+        ok = _salvar_publicacao(db, PublicacaoDJEN, u.id, u.tenant_id, None, item, "oab")
+        assert ok
+        db.session.commit()
+        pub = PublicacaoDJEN.query.filter_by(djen_id=99887).first()
+        assert "JOAO TESTE" in (pub.polo_ativo or "")
+        assert "EMPRESA ABC" in (pub.polo_passivo or "")

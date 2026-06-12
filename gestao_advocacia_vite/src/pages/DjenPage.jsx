@@ -49,6 +49,9 @@ export default function DjenPage() {
   // Fase 2 (inbox-zero): a caixa de entrada abre nas NÃO TRATADAS.
   const [categoria, setCategoria] = useState('nao_tratadas')
   const [pubTratar, setPubTratar] = useState(null)
+  // Feedback 12/06: "quem contra quem" em toda intimação da lista.
+  // Caso vinculado é a fonte preferida (cliente × parte contrária);
+  // senão usa os polos extraídos da publicação (API ou regex do texto).
   const [contagens, setContagens] = useState({
     todas: 0,
     nao_lidas: 0,
@@ -1038,6 +1041,31 @@ export default function DjenPage() {
                                 pub.numero_processo ||
                                 'Sem nº processo'}
                             </div>
+                            {(() => {
+                              const casoVinc = pub.caso_id
+                                ? casos.find((c) => c.id === pub.caso_id)
+                                : null
+                              const ativo = casoVinc?.cliente_nome || pub.polo_ativo || ''
+                              const passivo = casoVinc?.parte_contraria || pub.polo_passivo || ''
+                              if (!ativo && !passivo) return null
+                              return (
+                                <div
+                                  className="text-truncate"
+                                  style={{ fontSize: '0.8rem' }}
+                                  title={`${ativo || '?'} × ${passivo || '?'}`}
+                                  data-testid={`partes-pub-${pub.id}`}
+                                >
+                                  <span className="fw-semibold text-dark">{ativo || '?'}</span>
+                                  <span className="text-muted mx-1">×</span>
+                                  <span className="text-dark">{passivo || '?'}</span>
+                                  {casoVinc && (
+                                    <span className="badge bg-success-subtle text-success-emphasis ms-2">
+                                      cliente
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            })()}
                             <div className="text-muted" style={{ fontSize: '0.78rem' }}>
                               {pub.nome_orgao} · {fmtData(pub.data_disponibilizacao)}
                             </div>

@@ -1353,6 +1353,20 @@ def carregar_cache_vinculos(Cliente, Caso, tenant_id):
     return {"casos": casos, "clientes": clientes}
 
 
+def extrair_polos_do_texto(publicacao):
+    """(polo_ativo_str, polo_passivo_str) extraídos do TEXTO da publicação.
+
+    Fallback pra quando a ComunicaAPI não manda as partes estruturadas
+    (campo "partes" vazio) — usa o mesmo regex de rótulos da triagem
+    (AUTOR:/REQUERENTE:/RÉU:/RECLAMADO: ...). Feedback 12/06: intimação
+    sem "quem contra quem" não diz nada ao advogado.
+    """
+    analise = analisar_publicacao(publicacao)
+    ativo = " | ".join(analise.get("partes_autoras") or [])[:1000] or None
+    passivo = " | ".join(analise.get("partes_reus") or [])[:1000] or None
+    return ativo, passivo
+
+
 def sugerir_vinculos(db, Cliente, Caso, tenant_id, analise, cache=None):
     # cache opcional (ver carregar_cache_vinculos): chamadas avulsas seguem
     # funcionando sem ele — só pagam as 2 queries de carga aqui.
