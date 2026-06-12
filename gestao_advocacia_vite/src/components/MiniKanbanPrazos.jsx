@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { listItensAgenda } from '../api/itensAgenda.js'
+import { listItensAgenda, tratarItemAgenda } from '../api/itensAgenda.js'
+import { toast } from 'react-toastify'
+import { useConfirm } from '../hooks/useConfirm.jsx'
 import {
   ExclamationCircleIcon,
   ClockIcon,
@@ -132,23 +134,56 @@ function TarefaCard({ tarefa, hoje }) {
 export default function MiniKanbanPrazos() {
   const [tarefas, setTarefas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [baixando, setBaixando] = useState(false)
+  const { confirm, ConfirmDialog } = useConfirm()
   const hoje = HOJE_YMD()
 
+  const carregar = async () => {
+    try {
+      // PR D4.2 — usa /v1/itens-agenda. Filtra tipo=tarefa pra preservar
+      // semantica do MiniKanban (so prazos, nao eventos).
+      const itens = await listItensAgenda({ tipo: 'tarefa' })
+      setTarefas(Array.isArray(itens) ? itens : [])
+    } catch {
+      // widget secundario — silencia falhas
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    const carregar = async () => {
+    carregar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Feedback de uso real (12/06): prazos auto-criados das intimações
+  // acumulam como "vencidos" quando o advogado já resolveu DIRETO no
+  // sistema do tribunal. Baixa em massa: marca todos como cumpridos com
+  // anotação explícita — sem fingir que nunca existiram (fica no histórico).
+  const baixarVencidosTratadosFora = async (vencidos) => {
+    const ok = await confirm(
+      `Marcar os ${vencidos.length} prazos vencidos como CUMPRIDOS (tratados diretamente no sistema do tribunal)? Eles saem do painel e ficam registrados no histórico de cada um.`,
+      'Já tratei no tribunal'
+    )
+    if (!ok) return
+    setBaixando(true)
+    let okCount = 0
+    for (const t of vencidos) {
       try {
-        // PR D4.2 — usa /v1/itens-agenda. Filtra tipo=tarefa pra preservar
-        // semantica do MiniKanban (so prazos, nao eventos).
-        const itens = await listItensAgenda({ tipo: 'tarefa' })
-        setTarefas(Array.isArray(itens) ? itens : [])
+        await tratarItemAgenda(t.id, {
+          acao: 'cumpri',
+          como_tratado:
+            'Tratado diretamente no sistema do tribunal (baixa em massa pelo Dashboard).',
+        })
+        okCount += 1
       } catch {
-        // widget secundario — silencia falhas
-      } finally {
-        setLoading(false)
+        /* segue o lote; o que falhar permanece no painel */
       }
     }
+    setBaixando(false)
+    toast.success(`${okCount} prazo(s) baixados como cumpridos.`)
     carregar()
-  }, [])
+  }
 
   const buckets = { vencido: [], hoje: [], proximos7: [] }
   for (const t of tarefas) {
@@ -171,6 +206,7 @@ export default function MiniKanbanPrazos() {
 
   return (
     <div className="row g-3 mb-4">
+      {ConfirmDialog}
       {COLUNAS.map((col) => {
         const items = buckets[col.id]
         const Icon = col.icon
@@ -197,14 +233,29 @@ export default function MiniKanbanPrazos() {
                     {items.length}
                   </span>
                 </div>
-                <Link
-                  to={col.rota}
-                  className={`small text-${col.cor}-emphasis text-decoration-none`}
-                  style={{ fontSize: '0.72rem' }}
-                  title={`Ver todos os prazos em ${col.titulo.toLowerCase()}`}
-                >
-                  Ver todos <ChevronRightIcon style={{ width: 12, height: 12 }} />
-                </Link>
+                <div className="d-flex align-items-center gap-2">
+                  {col.id === 'vencido' && items.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-danger py-0 px-2"
+                      style={{ fontSize: '0.7rem' }}
+                      disabled={baixando}
+                      onClick={() => baixarVencidosTratadosFora(items)}
+                      title="Já resolvi estes prazos direto no sistema do tribunal — baixar todos como cumpridos"
+                      data-testid="btn-baixar-vencidos"
+                    >
+                      {baixando ? 'Baixando...' : '✓ Já tratei no tribunal'}
+                    </button>
+                  )}
+                  <Link
+                    to={col.rota}
+                    className={`small text-${col.cor}-emphasis text-decoration-none`}
+                    style={{ fontSize: '0.72rem' }}
+                    title={`Ver todos os prazos em ${col.titulo.toLowerCase()}`}
+                  >
+                    Ver todos <ChevronRightIcon style={{ width: 12, height: 12 }} />
+                  </Link>
+                </div>
               </div>
               <div className="card-body p-2" style={{ minHeight: 80 }}>
                 {loading && <div className="text-muted small text-center py-2">Carregando...</div>}
