@@ -44,11 +44,16 @@ const MOTIVO_LEGIVEL = {
   dv_invalido: 'Dígito verificador inválido.',
 }
 
+import CriarCasosLoteModal from '../components/CriarCasosLoteModal.jsx'
+
 function ImportarCnjsPage() {
   const navigate = useNavigate()
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState(null)
+  // Issue #320 — criação em lote (runner client-side, 1 CNJ por vez)
+  const [loteAberto, setLoteAberto] = useState(false)
+  const [situacaoLote, setSituacaoLote] = useState({}) // cnj -> {situacao, caso_id, msg}
 
   const cnjsExtraidos = texto
     .split(/[\n,;]+/)
@@ -99,7 +104,17 @@ function ImportarCnjsPage() {
               <h6 className="mb-1">Resultado da triagem</h6>
               <small className="text-muted">{resultado.total} processo(s) analisado(s)</small>
             </div>
-            <div className="d-flex gap-3">
+            <div className="d-flex gap-3 align-items-center">
+              {resultado.stats.valido > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => setLoteAberto(true)}
+                  data-testid="btn-criar-todos"
+                >
+                  Criar todos os válidos ({resultado.stats.valido})
+                </button>
+              )}
               <span className="badge bg-success-subtle text-success-emphasis">
                 {resultado.stats.valido} válidos
               </span>
@@ -162,12 +177,30 @@ function ImportarCnjsPage() {
                           Ver caso
                         </button>
                       ) : r.status === 'valido' ? (
-                        <span
-                          className="text-muted small"
-                          title="Busca automática no tribunal será implementada no Epic #12"
-                        >
-                          —
-                        </span>
+                        (() => {
+                          const sit = situacaoLote[r.cnj_normalizado || r.cnj_input]
+                          if (sit?.situacao === 'criado' || sit?.situacao === 'pulado') {
+                            return (
+                              <button
+                                className={`btn btn-sm ${sit.situacao === 'criado' ? 'btn-success' : 'btn-outline-secondary'}`}
+                                onClick={() => navigate(`/casos/detalhe/${sit.caso_id}`)}
+                              >
+                                {sit.situacao === 'criado' ? 'Criado — ver' : 'Já existia — ver'}
+                              </button>
+                            )
+                          }
+                          if (sit?.situacao === 'erro') {
+                            return (
+                              <span
+                                className="badge bg-danger-subtle text-danger-emphasis"
+                                title={sit.msg}
+                              >
+                                erro
+                              </span>
+                            )
+                          }
+                          return <span className="text-muted small">aguardando lote</span>
+                        })()
                       ) : null}
                     </td>
                   </tr>
@@ -256,6 +289,19 @@ function ImportarCnjsPage() {
       </form>
 
       {renderResultado()}
+
+      {/* Issue #320 — lote: busca no tribunal e cria caso a caso */}
+      {loteAberto && resultado && (
+        <CriarCasosLoteModal
+          cnjs={resultado.resultados
+            .filter((r) => r.status === 'valido')
+            .map((r) => r.cnj_normalizado || r.cnj_input)
+            .filter((c) => !situacaoLote[c] || situacaoLote[c].situacao === 'erro')}
+          onItemConcluido={(cnj, sit) => setSituacaoLote((prev) => ({ ...prev, [cnj]: sit }))}
+          onFinalizado={() => {}}
+          onClose={() => setLoteAberto(false)}
+        />
+      )}
     </div>
   )
 }

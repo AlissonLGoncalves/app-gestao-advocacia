@@ -13,18 +13,10 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline'
 import { buscarProcessoOnDemand, createCaso } from '../api/casos.js'
+import { parseValorCausa } from '../utils/valores.js'
 import { createCliente, listClientes } from '../api/clientes.js'
 
 // Converte valor da causa textual ("R$ 1.500,00" ou "1500.00") em número.
-function parseValorCausa(valor) {
-  if (valor === null || valor === undefined || valor === '') return null
-  if (typeof valor === 'number') return valor
-  const txt = String(valor).replace('R$', '').trim()
-  if (!txt) return null
-  const normalizado = txt.includes(',') ? txt.replace(/\./g, '').replace(',', '.') : txt
-  const num = Number(normalizado)
-  return Number.isFinite(num) ? num : null
-}
 
 const ERRO_LEGIVEL = {
   cnj_invalido: 'Número CNJ inválido. Verifique e tente novamente.',
