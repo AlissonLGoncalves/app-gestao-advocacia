@@ -31,6 +31,11 @@ const DespesasPage = lazy(() => import('./pages/DespesasPage.jsx'))
 const AgendaUnificadaPage = lazy(() => import('./pages/AgendaUnificadaPage.jsx'))
 const DocumentosPage = lazy(() => import('./pages/DocumentosPage.jsx'))
 const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage.jsx'))
+// Hubs do "menu enxuto": uma entrada de sidebar -> tela com abas que reembrulha
+// páginas já existentes (Financeiro, Documentos+Modelos, Configurações).
+const FinanceiroPage = lazy(() => import('./pages/FinanceiroPage.jsx'))
+const DocumentosHubPage = lazy(() => import('./pages/DocumentosHubPage.jsx'))
+const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage.jsx'))
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage.jsx'))
 const TermsPage = lazy(() => import('./pages/auth/TermsPage.jsx'))
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage.jsx'))
@@ -63,17 +68,13 @@ import {
   UsersIcon,
   BriefcaseIcon,
   DocumentTextIcon,
-  ReceiptPercentIcon,
   CurrencyDollarIcon,
   CalendarDaysIcon,
-  ChartBarIcon,
-  CreditCardIcon,
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
   ScaleIcon,
   Cog6ToothIcon,
-  PuzzlePieceIcon,
   NewspaperIcon,
   UserCircleIcon,
   BuildingOffice2Icon,
@@ -371,6 +372,8 @@ const MainLayout = () => {
       case 'despesas':
         baseTitle = 'Despesa'
         break
+      case 'financeiro':
+        return 'Financeiro'
       case 'prazos':
         baseTitle = 'Prazos/Tarefas'
         break
@@ -419,13 +422,14 @@ const MainLayout = () => {
       recebimentos: 'Lançamentos a receber e histórico de pagamentos',
       contratos: 'Contratos de honorários',
       despesas: 'Lançamentos a pagar e pagas',
+      financeiro: 'Recebimentos, contratos, despesas e notas fiscais',
       nfse: 'Emissão e gerenciamento de Notas Fiscais de Serviço',
       agenda: 'Compromissos, audiências e prazos com data',
       documentos: 'Anexos e arquivos do escritório',
       modelos: 'Modelos editáveis de peças jurídicas',
       djen: 'Publicações capturadas do Diário de Justiça Eletrônico',
       relatorios: 'Relatórios gerenciais e financeiros',
-      configuracoes: 'Configurações do escritório, equipe e plano',
+      configuracoes: 'Escritório, integrações e seu perfil',
       integracoes: 'Integrações com sistemas externos',
       perfil: 'Suas informações pessoais e segurança',
       admin: 'Backoffice — gerencia tenants e solicitações',
@@ -458,60 +462,15 @@ const MainLayout = () => {
           </div>
 
           <nav className="sidebar-nav">
-            {/* === OPERACIONAL === */}
+            {/* === MENU ENXUTO (15 itens planos -> 7 por frequência de uso) ===
+                Diário: o que o advogado abre toda manhã. Semanal: um nível
+                abaixo. O resto (Relatórios, Integrações, Perfil, Modelos)
+                saiu do caminho diário: virou aba de hub ou Ctrl+K. */}
+
+            {/* === DIÁRIO === */}
+            <SidebarSection>Diário</SidebarSection>
             <SidebarLink to="/dashboard" icon={HomeIcon}>
-              Dashboard
-            </SidebarLink>
-
-            <SidebarSection>Operacional</SidebarSection>
-            <SidebarLink to="/clientes" icon={UsersIcon}>
-              Clientes
-            </SidebarLink>
-            <SidebarLink to="/casos" icon={BriefcaseIcon}>
-              Casos
-            </SidebarLink>
-            {/* Agenda unificada: UMA entrada na sidebar. /agenda abre a tela
-                com o seletor de 3 visoes (Calendario | Kanban | Lista), todas
-                na mesma rota. /prazos redireciona pra ?view=kanban. Badge de
-                prazos vencidos/IA pendentes (tarefasAlerta) fica aqui. */}
-            <SidebarLink to="/agenda" icon={CalendarDaysIcon} badge={sidebarCounts.tarefasAlerta}>
-              Agenda · Prazos
-            </SidebarLink>
-
-            {/* === FINANCEIRO === (oculto pra assistente) */}
-            {userRole !== 'assistente' && (
-              <>
-                <SidebarSection>Financeiro</SidebarSection>
-                <SidebarLink
-                  to="/recebimentos"
-                  icon={CurrencyDollarIcon}
-                  badge={sidebarCounts.recebimentosVencidos}
-                >
-                  Recebimentos
-                </SidebarLink>
-                <SidebarLink to="/contratos" icon={CurrencyDollarIcon}>
-                  Contratos
-                </SidebarLink>
-                <SidebarLink
-                  to="/despesas"
-                  icon={CreditCardIcon}
-                  badge={sidebarCounts.despesasVencidas}
-                >
-                  Despesas
-                </SidebarLink>
-                <SidebarLink to="/nfse" icon={ReceiptPercentIcon}>
-                  Notas Fiscais
-                </SidebarLink>
-              </>
-            )}
-
-            {/* === DOCUMENTOS & PUBLICAÇÕES === */}
-            <SidebarSection>Documentos & Publicações</SidebarSection>
-            <SidebarLink to="/documentos" icon={DocumentTextIcon}>
-              Documentos
-            </SidebarLink>
-            <SidebarLink to="/modelos" icon={DocumentTextIcon}>
-              Modelos de Documento
+              Início
             </SidebarLink>
             <SidebarLink
               to="/djen"
@@ -521,23 +480,42 @@ const MainLayout = () => {
             >
               Intimações
             </SidebarLink>
-
-            {/* === ANÁLISE === */}
-            <SidebarSection>Análise</SidebarSection>
-            <SidebarLink to="/relatorios" icon={ChartBarIcon}>
-              Relatórios
+            <SidebarLink to="/casos" icon={BriefcaseIcon}>
+              Casos
+            </SidebarLink>
+            {/* Agenda unificada: UMA entrada. /agenda abre a tela com o seletor
+                de 3 visoes (Calendario | Kanban | Lista). Badge de prazos
+                vencidos/IA pendentes (tarefasAlerta) fica aqui. */}
+            <SidebarLink to="/agenda" icon={CalendarDaysIcon} badge={sidebarCounts.tarefasAlerta}>
+              Agenda
             </SidebarLink>
 
-            {/* === SISTEMA === */}
+            {/* === SEMANAL === */}
+            <SidebarSection>Semanal</SidebarSection>
+            <SidebarLink to="/clientes" icon={UsersIcon}>
+              Clientes
+            </SidebarLink>
+            {/* Financeiro consolidado: Recebimentos + Contratos + Despesas +
+                Notas Fiscais viram abas de /financeiro (era 4 itens). Oculto
+                pra assistente. Badge soma vencidos de recebimentos e despesas. */}
+            {userRole !== 'assistente' && (
+              <SidebarLink
+                to="/financeiro"
+                icon={CurrencyDollarIcon}
+                badge={sidebarCounts.recebimentosVencidos + sidebarCounts.despesasVencidas}
+              >
+                Financeiro
+              </SidebarLink>
+            )}
+            {/* Documentos + Modelos viram abas de /documentos. */}
+            <SidebarLink to="/documentos" icon={DocumentTextIcon}>
+              Documentos
+            </SidebarLink>
+
+            {/* === SISTEMA === Configurações + Integrações + Perfil num hub só */}
             <SidebarSection>Sistema</SidebarSection>
             <SidebarLink to="/configuracoes" icon={Cog6ToothIcon}>
-              Configurações SaaS
-            </SidebarLink>
-            <SidebarLink to="/integracoes" icon={PuzzlePieceIcon}>
-              Integrações
-            </SidebarLink>
-            <SidebarLink to="/perfil" icon={UserCircleIcon}>
-              Meu Perfil
+              Configurações
             </SidebarLink>
             {/* === ADMINISTRAÇÃO === so visivel pra superadmin */}
             {userRole === 'superadmin' && (
@@ -701,6 +679,11 @@ function App() {
 
             <Route path="nfse" element={<NotasFiscaisPage />} />
 
+            {/* Hub Financeiro: /financeiro?aba=recebimentos|contratos|despesas|notas.
+                As rotas acima (/recebimentos, /despesas...) seguem válidas pra
+                deep-links, formulários (novo/editar) e back-compat. */}
+            <Route path="financeiro" element={<FinanceiroPage />} />
+
             {/* Issue #301: AgendaPage legada removida. A unificada cobre as
               3 visões; criação via ?novo=evento|tarefa (abre o modal).
               Redirects preservam links/favoritos antigos. */}
@@ -709,7 +692,9 @@ function App() {
             <Route path="agenda/novo" element={<Navigate to="/agenda?novo=evento" replace />} />
             <Route path="agenda/editar/:eventoId" element={<Navigate to="/agenda" replace />} />
 
-            <Route path="documentos" element={<DocumentosPage />} />
+            {/* Hub Documentos: /documentos abre abas (Documentos | Modelos).
+                /documentos/novo|editar continuam na DocumentosPage standalone. */}
+            <Route path="documentos" element={<DocumentosHubPage />} />
             <Route path="documentos/novo" element={<DocumentosPage />} />
             <Route path="documentos/editar/:documentoId" element={<DocumentosPage />} />
 
@@ -718,7 +703,10 @@ function App() {
 
             <Route path="relatorios" element={<RelatoriosPage />} />
 
-            <Route path="configuracoes" element={<SettingsPage />} />
+            {/* Hub Configurações: /configuracoes abre abas (Escritório |
+                Integrações | Meu perfil). As rotas standalone abaixo seguem
+                válidas pra deep-links e back-compat. */}
+            <Route path="configuracoes" element={<ConfiguracoesPage />} />
             <Route path="integracoes" element={<IntegracoesPage />} />
             <Route path="modelos" element={<ModelosDocumentoPage />} />
             <Route path="perfil" element={<PerfilPage />} />
