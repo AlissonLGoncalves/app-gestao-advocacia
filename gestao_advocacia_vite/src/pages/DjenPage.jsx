@@ -10,6 +10,7 @@ import {
   extrairTextoPlano,
 } from '../utils/htmlTribunal.js'
 import ModalCriarClienteCaso from '../components/djen/ModalCriarClienteCaso.jsx'
+import { wrapPubParaModalCriar } from '../utils/djenModal.js'
 import TratarIntimacaoModal from '../components/djen/TratarIntimacaoModal.jsx'
 import AbaTriagem from '../components/djen/AbaTriagem.jsx'
 import CategoriasPublicacoes from '../components/djen/CategoriasPublicacoes.jsx'
@@ -1453,7 +1454,11 @@ export default function DjenPage() {
             }}
             onCadastrarProcesso={(p) => {
               setPubTratar(null)
-              setItemModalCriar(p)
+              // p é a publicação crua vinda do "Tratar". Prefere o item rico da
+              // triagem (se carregado); senão monta o wrapper a partir da própria
+              // publicação pra o auto-preenchimento não vir vazio.
+              const itemRico = triagemItems.find((i) => i.publicacao?.id === p.id)
+              setItemModalCriar(itemRico || wrapPubParaModalCriar(p))
             }}
           />
         )}
