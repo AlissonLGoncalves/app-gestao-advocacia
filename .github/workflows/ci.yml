@@ -26,7 +26,7 @@ jobs:
         working-directory: gestao_advocacia
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v6
@@ -52,7 +52,7 @@ jobs:
         working-directory: gestao_advocacia
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v6
@@ -120,7 +120,7 @@ jobs:
       DJEN_JOB_ENABLED: "false"
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v6
@@ -152,10 +152,10 @@ jobs:
         working-directory: gestao_advocacia_vite
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node 20
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: "npm"
