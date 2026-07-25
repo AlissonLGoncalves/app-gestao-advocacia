@@ -1,6 +1,6 @@
 // gestao_advocacia_vite/src/pages/CasoDetalhePage.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router'
 import { API_URL } from '../config.js' // Importa API_URL
 import { toast } from 'react-toastify' // Para notificações
 // PR D4.2 — Atividades do caso lê de /v1/itens-agenda em vez de /tarefas

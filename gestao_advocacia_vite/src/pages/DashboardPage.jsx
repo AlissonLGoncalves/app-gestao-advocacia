@@ -1,7 +1,7 @@
 // src/pages/DashboardPage.jsx
 import React, { lazy, Suspense } from 'react'
 import Dashboard from '../components/Dashboard.jsx'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 // App leve: os gráficos (recharts, ~300 KB) saem do caminho crítico do Início.
 // A parte acionável ("Meu dia", prazos, intimações) pinta imediatamente e a

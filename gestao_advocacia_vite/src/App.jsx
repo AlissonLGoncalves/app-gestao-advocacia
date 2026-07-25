@@ -1,10 +1,10 @@
 // src/App.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { Routes, Route, NavLink, Outlet, useLocation, Navigate } from 'react-router-dom'
+import { Routes, Route, NavLink, Outlet, useLocation, Navigate } from 'react-router'
 import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { api } from './api/client.js'
 
 // Issue #298 — code-splitting: páginas viram React.lazy (cada rota gera

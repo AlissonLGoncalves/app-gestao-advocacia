@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { listItensAgenda, tratarItemAgenda } from '../api/itensAgenda.js'
 import { toast } from 'react-toastify'
 import { useConfirm } from '../hooks/useConfirm.jsx'

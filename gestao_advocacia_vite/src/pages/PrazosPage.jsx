@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API_URL } from '../config.js'
 import { toast } from 'react-toastify'
 // PR D4.1 — kanban migrado de /tarefas pra /v1/itens-agenda.

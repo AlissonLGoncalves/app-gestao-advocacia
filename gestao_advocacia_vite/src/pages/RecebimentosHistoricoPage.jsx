@@ -1,6 +1,6 @@
 // src/pages/RecebimentosHistoricoPage.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,

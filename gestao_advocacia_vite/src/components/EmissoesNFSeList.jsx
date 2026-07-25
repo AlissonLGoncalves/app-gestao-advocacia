@@ -3,7 +3,7 @@
 // GET /api/v1/nfse/emissoes (ja existente) e mostra filtros por status
 // + acoes por linha (baixar PDF, copiar chave, cancelar).
 import React, { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { toast } from 'react-toastify'
 import {
   DocumentArrowDownIcon,

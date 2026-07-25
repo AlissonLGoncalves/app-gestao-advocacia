@@ -5,7 +5,7 @@ import HeaderQuickAdd from './HeaderQuickAdd.jsx'
 
 // Mock useNavigate — capturamos chamadas pra checar redirects.
 const navigateMock = vi.fn()
-vi.mock('react-router-dom', () => ({
+vi.mock('react-router', () => ({
   useNavigate: () => navigateMock,
 }))
 

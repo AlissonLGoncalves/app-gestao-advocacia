@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'react-toastify'
 import { LockClosedIcon } from '@heroicons/react/24/outline'
 import { APP_VERSION } from '../../version.js'

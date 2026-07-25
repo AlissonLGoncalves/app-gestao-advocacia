@@ -9,7 +9,7 @@
 //
 // O antigo /prazos agora redireciona pra /agenda?view=kanban (mantem links).
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { CalendarDaysIcon, ViewColumnsIcon, ListBulletIcon } from '@heroicons/react/24/outline'
 
 const VIEWS = [

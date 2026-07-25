@@ -12,7 +12,7 @@
 //     A unificacao backend (item_agenda) ja foi feita em D1/D2, entao
 //     o kanban antigo continua valido — so muda a fonte (D4).
 import React, { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'

@@ -5,7 +5,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 
 vi.mock('../api/itensAgenda.js', () => ({ listItensAgenda: vi.fn() }))
 vi.mock('../api/djen.js', () => ({ getContadoresInbox: vi.fn() }))

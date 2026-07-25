@@ -8,7 +8,7 @@ import MovimentacoesRecentes from './MovimentacoesRecentes.jsx'
 import OnboardingChecklist from './OnboardingChecklist.jsx'
 import MiniKanbanPrazos from './MiniKanbanPrazos.jsx'
 import MeuDiaCard from './MeuDiaCard.jsx'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 import {
   UsersIcon as UsersIconSolid,

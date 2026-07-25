@@ -10,7 +10,7 @@
  */
 
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { ClipboardDocumentListIcon } from '@heroicons/react/24/outline'
 import CasoSideCard from './CasoSideCard.jsx'
 

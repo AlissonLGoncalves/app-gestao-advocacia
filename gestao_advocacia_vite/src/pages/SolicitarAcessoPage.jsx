@@ -2,7 +2,7 @@
 // Substitui o mailto: das CTAs da landing page.
 
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API_URL } from '../config'
 
 export default function SolicitarAcessoPage() {

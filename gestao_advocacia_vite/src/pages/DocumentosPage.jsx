@@ -1,6 +1,6 @@
 // src/pages/DocumentosPage.jsx
 import React, { useState, useCallback, useEffect } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router'
 import DocumentoList from '../components/DocumentoList.jsx' // Ajuste o caminho se DocumentoList.jsx não estiver em src/
 import DocumentoForm from '../components/DocumentoForm.jsx' // Ajuste o caminho se DocumentoForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/

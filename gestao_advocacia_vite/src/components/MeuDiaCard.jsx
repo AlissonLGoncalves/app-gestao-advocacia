@@ -6,7 +6,7 @@
 //   2. Audiências e compromissos de hoje
 //   3. Intimações não tratadas (inbox da Fase 2)
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import {
   ClockIcon,
   CalendarDaysIcon,
