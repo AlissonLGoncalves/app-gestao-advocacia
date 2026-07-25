@@ -1,9 +1,9 @@
 // Arquivo: gestao_advocacia_vite/src/pages/auth/LoginPage.jsx
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom' // CORRIGIDO AQUI
+import { useNavigate } from 'react-router' // CORRIGIDO AQUI
 import { toast } from 'react-toastify'
 import { LockClosedIcon, UserIcon } from '@heroicons/react/24/outline'
-import { Link } from 'react-router-dom' // Adicionado para o link de registro, se desejar
+import { Link } from 'react-router' // Adicionado para o link de registro, se desejar
 import { APP_VERSION } from '../../version.js'
 import { login as loginRequest } from '../../api/auth'
 

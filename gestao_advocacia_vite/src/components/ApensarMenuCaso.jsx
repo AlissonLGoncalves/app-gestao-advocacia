@@ -4,7 +4,7 @@
 // minimizar conflito com Epic #6 (Tabs no detalhe).
 
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { toast } from 'react-toastify'
 import { useConfirm } from '../hooks/useConfirm.jsx'
 import {

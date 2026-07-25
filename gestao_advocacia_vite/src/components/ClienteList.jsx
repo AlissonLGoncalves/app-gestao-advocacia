@@ -1,6 +1,6 @@
 // src/ClienteList.jsx
 import React, { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { API_URL } from '../config.js'
 import { deleteCliente, listClientes } from '../api/clientes.js'
 import StatusBadge from './ui/StatusBadge.jsx'

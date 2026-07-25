@@ -4,7 +4,7 @@
 // baixa/cobrança continua no módulo Recebimentos. Aqui o advogado vê as
 // parcelas do caso (pagas/pendentes/vencidas) sem sair do processo.
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { toast } from 'react-toastify'
 import { API_URL } from '../config.js'
 

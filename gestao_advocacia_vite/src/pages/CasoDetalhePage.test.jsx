@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import CasoDetalhePage from './CasoDetalhePage.jsx'
 import { getCaso, listPublicacoesDjenCaso } from '../api/casos.js'

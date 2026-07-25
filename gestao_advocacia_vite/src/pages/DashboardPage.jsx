@@ -1,7 +1,12 @@
 // src/pages/DashboardPage.jsx
+import React, { lazy, Suspense } from 'react'
 import Dashboard from '../components/Dashboard.jsx'
-import DashboardCharts from '../components/DashboardCharts.jsx'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
+
+// App leve: os gráficos (recharts, ~300 KB) saem do caminho crítico do Início.
+// A parte acionável ("Meu dia", prazos, intimações) pinta imediatamente e a
+// visão analítica carrega logo depois, sem travar a primeira renderização.
+const DashboardCharts = lazy(() => import('../components/DashboardCharts.jsx'))
 
 const SECAO_ANTIGA_PARA_ROTA = {
   CLIENTES: '/clientes',
@@ -40,7 +45,11 @@ function DashboardPage() {
             Relatórios completos →
           </button>
         </div>
-        <DashboardCharts />
+        <Suspense
+          fallback={<div className="text-muted small px-2 py-4">Carregando visão analítica...</div>}
+        >
+          <DashboardCharts />
+        </Suspense>
       </div>
     </>
   )

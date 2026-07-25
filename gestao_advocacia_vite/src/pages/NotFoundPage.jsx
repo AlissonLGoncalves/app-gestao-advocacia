@@ -1,6 +1,6 @@
 ﻿// src/pages/NotFoundPage.jsx
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 function NotFoundPage() {
   return (
     <div className="container text-center mt-5">

@@ -8,7 +8,7 @@ import MovimentacoesRecentes from './MovimentacoesRecentes.jsx'
 import OnboardingChecklist from './OnboardingChecklist.jsx'
 import MiniKanbanPrazos from './MiniKanbanPrazos.jsx'
 import MeuDiaCard from './MeuDiaCard.jsx'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 import {
   UsersIcon as UsersIconSolid,
@@ -27,7 +27,6 @@ import {
   CalendarDaysIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
-import { formatCNJ } from '../utils/cnj.js'
 import { getResumoFinanceiro } from '../api/financeiro.js'
 
 const hojeLocal = () => {
@@ -175,15 +174,12 @@ function Dashboard({ mudarSecao }) {
     djenNaoLidas: 0,
   })
   const [proximosEventos, setProximosEventos] = useState([])
-  const [tarefasAlerta, setTarefasAlerta] = useState({ vencidas: 0, vencendoHoje: 0 })
   const [oabsMonitoradas, setOabsMonitoradas] = useState(null)
   const [syncing, setSyncing] = useState(false)
+  // App leve: detalhes financeiros começam recolhidos (progressive disclosure)
+  const [verDetalheFinanceiro, setVerDetalheFinanceiro] = useState(false)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
-
-  const [consultaCnjInput, setConsultaCnjInput] = useState('')
-  const [buscandoConsulta, setBuscandoConsulta] = useState(false)
-  const [resultadoConsulta, setResultadoConsulta] = useState(null)
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true)
@@ -240,34 +236,6 @@ function Dashboard({ mudarSecao }) {
     }
   }, [])
 
-  const fetchTarefasAlerta = useCallback(async () => {
-    try {
-      // PR D4.2 — usa /v1/itens-agenda filtrando tipo=tarefa.
-      // status no vocab novo: 'Concluido' (sem acento).
-      const itens = await listItensAgenda({ tipo: 'tarefa' })
-      const lista = Array.isArray(itens) ? itens : []
-      const hoje = hojeLocal()
-      // data_vencimento pode vir como 'YYYY-MM-DD' ou ISO; comparamos
-      // como prefixo de 10 chars pra cobrir ambos.
-      const ehVencida = (t) =>
-        t.data_vencimento &&
-        String(t.data_vencimento).slice(0, 10) < hoje &&
-        t.status !== 'Concluido' &&
-        t.status !== 'Cancelado'
-      const ehHoje = (t) =>
-        t.data_vencimento &&
-        String(t.data_vencimento).slice(0, 10) === hoje &&
-        t.status !== 'Concluido' &&
-        t.status !== 'Cancelado'
-      setTarefasAlerta({
-        vencidas: lista.filter(ehVencida).length,
-        vencendoHoje: lista.filter(ehHoje).length,
-      })
-    } catch (err) {
-      console.warn('Dashboard: erro ao buscar tarefas alerta', err)
-    }
-  }, [])
-
   const triggerDjenSync = useCallback(async () => {
     const hoje = hojeLocal()
     if (sessionStorage.getItem('djen_synced_date') === hoje) return
@@ -287,12 +255,11 @@ function Dashboard({ mudarSecao }) {
   useEffect(() => {
     fetchDashboardData()
     fetchProximosEventos()
-    fetchTarefasAlerta()
     triggerDjenSync()
     listOabs()
       .then((data) => setOabsMonitoradas(Array.isArray(data) ? data : []))
       .catch(() => setOabsMonitoradas([]))
-  }, [fetchDashboardData, fetchProximosEventos, fetchTarefasAlerta, triggerDjenSync])
+  }, [fetchDashboardData, fetchProximosEventos, triggerDjenSync])
 
   if (loading) {
     return (
@@ -329,76 +296,6 @@ function Dashboard({ mudarSecao }) {
   const handleCardClick = (secaoConstante) => {
     if (typeof mudarSecao === 'function') {
       mudarSecao(secaoConstante)
-    }
-  }
-
-  const hoje = hojeLocal()
-  const eventosHoje = proximosEventos.filter(
-    (ev) => ev.data_inicio && ev.data_inicio.startsWith(hoje)
-  )
-
-  // Busca local primeiro (Caso/Publicacao). DataJud so vira opcional como fallback.
-  const handleConsultaRapida = async () => {
-    const inputTrimmed = consultaCnjInput.trim()
-    if (!inputTrimmed) {
-      setResultadoConsulta({ erro: 'Digite o número do processo (com ou sem máscara).' })
-      return
-    }
-
-    setBuscandoConsulta(true)
-    setResultadoConsulta(null)
-    try {
-      const token = localStorage.getItem('token')
-      const resp = await fetch(
-        `${API_URL}/casos/buscar-processo-local?numero=${encodeURIComponent(inputTrimmed)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      const data = await resp.json()
-      if (!resp.ok) {
-        setResultadoConsulta({ erro: data?.message || 'Falha ao buscar.' })
-        return
-      }
-      setResultadoConsulta({ ...data, fonte: 'local' })
-    } catch {
-      setResultadoConsulta({ erro: 'Erro de conexão.' })
-    } finally {
-      setBuscandoConsulta(false)
-    }
-  }
-
-  // Fallback: tenta DataJud quando local nao retornou nada.
-  const handleConsultarDataJud = async () => {
-    const limpo = consultaCnjInput.replace(/\D/g, '')
-    if (limpo.length !== 20) {
-      setResultadoConsulta((prev) => ({
-        ...prev,
-        erroDataJud: 'CNJ inválido. O DataJud exige 20 dígitos.',
-      }))
-      return
-    }
-    setBuscandoConsulta(true)
-    try {
-      const token = localStorage.getItem('token')
-      const resp = await fetch(
-        `${API_URL}/casos/consulta-publica-cnj?numero=${encodeURIComponent(limpo)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      const data = await resp.json()
-      if (!resp.ok) {
-        setResultadoConsulta((prev) => ({
-          ...prev,
-          erroDataJud: data?.message || 'Não localizado no DataJud.',
-        }))
-        return
-      }
-      setResultadoConsulta({ ...data, fonte: 'datajud' })
-    } catch {
-      setResultadoConsulta((prev) => ({
-        ...prev,
-        erroDataJud: 'Erro de conexão com DataJud.',
-      }))
-    } finally {
-      setBuscandoConsulta(false)
     }
   }
 
@@ -518,75 +415,100 @@ function Dashboard({ mudarSecao }) {
           />
         </div>
       </div>
-      {/* ── Linha Recebimentos detalhados (A Receber + Atrasados) ─────────────── */}
-      <div className="row mt-3 g-3">
-        <div className="col-sm-6 col-lg-6">
-          <StatCard
-            title="A Receber (Programados)"
-            value={`${stats.recebimentosAReceberQtd} (R$ ${stats.recebimentosAReceberValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
-            icon={CreditCardIconSolid}
-            colorClass="text-info"
-            bgColorClass="bg-info-subtle"
-            onClick={() => handleCardClick('RECEBIMENTOS')}
-          />
-        </div>
-        <div className="col-sm-6 col-lg-6">
-          <StatCard
-            title="Atrasados"
-            value={`${stats.recebimentosAtrasadosQtd} (R$ ${stats.recebimentosAtrasadosValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
-            icon={CreditCardIconSolid}
-            colorClass="text-danger"
-            bgColorClass="bg-danger-subtle"
-            onClick={() => handleCardClick('RECEBIMENTOS')}
-          />
-        </div>
-      </div>
-      {/* ── Linha Pagamentos Recebidos (caixa do mes/ano) ─────────────────── */}
-      <div className="row mt-3 g-3">
-        <div className="col-sm-6 col-lg-6">
-          <StatCard
-            title="Recebido neste Mês"
-            value={`${stats.recebimentosPagosMesQtd} (R$ ${stats.recebimentosPagosMesValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
-            icon={TrendingUpIconSolid}
-            colorClass="text-success"
-            bgColorClass="bg-success-subtle"
-            onClick={() => handleCardClick('RECEBIMENTOS')}
-          />
-        </div>
-        <div className="col-sm-6 col-lg-6">
-          <StatCard
-            title="Recebido no Ano"
-            value={`${stats.recebimentosPagosAnoQtd} (R$ ${stats.recebimentosPagosAnoValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
-            icon={TrendingUpIconSolid}
-            colorClass="text-success"
-            bgColorClass="bg-success-subtle"
-            onClick={() => handleCardClick('RECEBIMENTOS')}
-          />
-        </div>
-      </div>
-      {/* ── Linha Despesas detalhadas (Programadas + Atrasadas) ──────────────── */}
-      <div className="row mt-3 g-3">
-        <div className="col-sm-6 col-lg-6">
-          <StatCard
-            title="Despesas Programadas"
-            value={`${stats.despesasProgramadasQtd} (R$ ${stats.despesasProgramadasValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
-            icon={TrendingDownIconSolid}
-            colorClass="text-info"
-            bgColorClass="bg-info-subtle"
-            onClick={() => handleCardClick('DESPESAS')}
-          />
-        </div>
-        <div className="col-sm-6 col-lg-6">
-          <StatCard
-            title="Despesas Atrasadas"
-            value={`${stats.despesasAtrasadasQtd} (R$ ${stats.despesasAtrasadasValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
-            icon={TrendingDownIconSolid}
-            colorClass="text-danger"
-            bgColorClass="bg-danger-subtle"
-            onClick={() => handleCardClick('DESPESAS')}
-          />
-        </div>
-      </div>
+      {/* App leve: os 6 cartões de detalhe financeiro ficavam TODOS abertos no
+          Início (10 cartões no total). Agora vêm recolhidos — quem quer o
+          detalhe abre; quem só quer saber "o que faço hoje" não vê o ruído. */}
+      <button
+        type="button"
+        className="btn btn-sm btn-link text-decoration-none px-1 mt-3"
+        onClick={() => setVerDetalheFinanceiro((v) => !v)}
+        aria-expanded={verDetalheFinanceiro}
+      >
+        {verDetalheFinanceiro ? 'Ocultar' : 'Ver'} detalhes financeiros
+        <ChevronRightIcon
+          style={{
+            width: 14,
+            height: 14,
+            transform: verDetalheFinanceiro ? 'rotate(90deg)' : 'none',
+            transition: 'transform 150ms',
+          }}
+          className="ms-1"
+        />
+      </button>
+
+      {verDetalheFinanceiro && (
+        <>
+          {/* ── Linha Recebimentos detalhados (A Receber + Atrasados) ─────────────── */}
+          <div className="row mt-3 g-3">
+            <div className="col-sm-6 col-lg-6">
+              <StatCard
+                title="A Receber (Programados)"
+                value={`${stats.recebimentosAReceberQtd} (R$ ${stats.recebimentosAReceberValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                icon={CreditCardIconSolid}
+                colorClass="text-info"
+                bgColorClass="bg-info-subtle"
+                onClick={() => handleCardClick('RECEBIMENTOS')}
+              />
+            </div>
+            <div className="col-sm-6 col-lg-6">
+              <StatCard
+                title="Atrasados"
+                value={`${stats.recebimentosAtrasadosQtd} (R$ ${stats.recebimentosAtrasadosValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                icon={CreditCardIconSolid}
+                colorClass="text-danger"
+                bgColorClass="bg-danger-subtle"
+                onClick={() => handleCardClick('RECEBIMENTOS')}
+              />
+            </div>
+          </div>
+          {/* ── Linha Pagamentos Recebidos (caixa do mes/ano) ─────────────────── */}
+          <div className="row mt-3 g-3">
+            <div className="col-sm-6 col-lg-6">
+              <StatCard
+                title="Recebido neste Mês"
+                value={`${stats.recebimentosPagosMesQtd} (R$ ${stats.recebimentosPagosMesValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                icon={TrendingUpIconSolid}
+                colorClass="text-success"
+                bgColorClass="bg-success-subtle"
+                onClick={() => handleCardClick('RECEBIMENTOS')}
+              />
+            </div>
+            <div className="col-sm-6 col-lg-6">
+              <StatCard
+                title="Recebido no Ano"
+                value={`${stats.recebimentosPagosAnoQtd} (R$ ${stats.recebimentosPagosAnoValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                icon={TrendingUpIconSolid}
+                colorClass="text-success"
+                bgColorClass="bg-success-subtle"
+                onClick={() => handleCardClick('RECEBIMENTOS')}
+              />
+            </div>
+          </div>
+          {/* ── Linha Despesas detalhadas (Programadas + Atrasadas) ──────────────── */}
+          <div className="row mt-3 g-3">
+            <div className="col-sm-6 col-lg-6">
+              <StatCard
+                title="Despesas Programadas"
+                value={`${stats.despesasProgramadasQtd} (R$ ${stats.despesasProgramadasValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                icon={TrendingDownIconSolid}
+                colorClass="text-info"
+                bgColorClass="bg-info-subtle"
+                onClick={() => handleCardClick('DESPESAS')}
+              />
+            </div>
+            <div className="col-sm-6 col-lg-6">
+              <StatCard
+                title="Despesas Atrasadas"
+                value={`${stats.despesasAtrasadasQtd} (R$ ${stats.despesasAtrasadasValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                icon={TrendingDownIconSolid}
+                colorClass="text-danger"
+                bgColorClass="bg-danger-subtle"
+                onClick={() => handleCardClick('DESPESAS')}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Eventos + Consulta CNJ ───────────────────────────────────────────── */}
       <div className="row mt-4 g-3">
@@ -619,165 +541,24 @@ function Dashboard({ mudarSecao }) {
         </div>
 
         <div className="col-lg-6">
-          <div className="card shadow-sm h-100 border-primary">
-            <div className="card-header bg-primary text-white d-flex align-items-center">
-              <MagnifyingGlassIcon style={{ width: '20px', height: '20px' }} className="me-2" />
-              <h2 className="h6 mb-0 text-white">Buscar processo</h2>
-            </div>
-            <div className="card-body">
-              <p className="small text-muted mb-3">
-                Busca primeiro nos seus Casos e publicações DJEN. Se não achar, oferece consulta ao
-                DataJud do CNJ (cobertura limitada em 2ª instância).
-              </p>
-              <div className="input-group mb-3">
-                <input
-                  type="text"
-                  className="form-control form-control-sm"
-                  placeholder="Número do processo (com ou sem máscara)"
-                  value={consultaCnjInput}
-                  onChange={(e) => setConsultaCnjInput(formatCNJ(e.target.value))}
-                  maxLength={25}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleConsultaRapida()
-                  }}
-                />
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={handleConsultaRapida}
-                  disabled={buscandoConsulta}
-                >
-                  {buscandoConsulta ? 'Buscando...' : 'Buscar'}
-                </button>
+          {/* App leve: o formulario completo de busca CNJ ocupava metade do
+              Inicio. Virou atalho — a busca continua em /casos/buscar e no
+              Ctrl+K ("Consultar processo (CNJ)"). */}
+          <div className="card h-100">
+            <div className="card-body d-flex flex-column justify-content-center align-items-start gap-2">
+              <div className="d-flex align-items-center gap-2">
+                <MagnifyingGlassIcon style={{ width: 18, height: 18 }} className="text-primary" />
+                <h2 className="h6 mb-0">Buscar processo</h2>
               </div>
-
-              {resultadoConsulta?.erro && (
-                <div className="alert alert-danger small py-2 mb-0">
-                  <strong>Erro:</strong> {resultadoConsulta.erro}
-                </div>
-              )}
-
-              {/* Resultado da busca local */}
-              {resultadoConsulta?.fonte === 'local' && (
-                <div
-                  className="border rounded p-2 bg-light"
-                  style={{ maxHeight: 320, overflowY: 'auto' }}
-                >
-                  {resultadoConsulta.total_local === 0 ? (
-                    <>
-                      <p className="small text-muted mb-2 mb-0">
-                        <i className="bi bi-info-circle me-1" />
-                        Nada encontrado nos seus Casos ou publicações DJEN para{' '}
-                        <strong>{resultadoConsulta.numero_consultado}</strong>.
-                      </p>
-                      <button
-                        className="btn btn-outline-primary btn-sm mt-2 w-100"
-                        onClick={handleConsultarDataJud}
-                        disabled={buscandoConsulta}
-                      >
-                        <i className="bi bi-globe me-1" />
-                        Tentar consultar DataJud (CNJ)
-                      </button>
-                      <p className="small text-muted mt-2 mb-0">
-                        Cobertura limitada em 2ª instância e Justiça Federal.
-                      </p>
-                      {resultadoConsulta.erroDataJud && (
-                        <div className="alert alert-warning small py-2 mt-2 mb-0">
-                          {resultadoConsulta.erroDataJud}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {resultadoConsulta.casos?.length > 0 && (
-                        <>
-                          <strong className="small d-block mb-2">
-                            <i className="bi bi-folder me-1 text-primary" />
-                            Casos ({resultadoConsulta.casos.length})
-                          </strong>
-                          {resultadoConsulta.casos.map((c) => (
-                            <button
-                              key={c.id}
-                              className="card border-0 shadow-sm w-100 text-start mb-2"
-                              onClick={() => navigate(`/casos/detalhe/${c.id}`)}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <div className="card-body py-2 px-2">
-                                <div className="d-flex align-items-center gap-2 flex-wrap">
-                                  <span className="badge bg-primary">{c.status || '—'}</span>
-                                  <span className="small font-monospace">{c.numero_processo}</span>
-                                </div>
-                                <div className="small fw-semibold mt-1">{c.titulo}</div>
-                                <div className="small text-muted">
-                                  {c.cliente_nome} · {c.vara_juizo || '—'}
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </>
-                      )}
-                      {resultadoConsulta.publicacoes?.length > 0 && (
-                        <>
-                          <strong className="small d-block mt-2 mb-2">
-                            <i className="bi bi-newspaper me-1 text-warning" />
-                            Publicações DJEN ({resultadoConsulta.publicacoes.length})
-                          </strong>
-                          {resultadoConsulta.publicacoes.slice(0, 5).map((p) => (
-                            <button
-                              key={p.id}
-                              className="card border-0 shadow-sm w-100 text-start mb-2"
-                              onClick={() => navigate(`/djen?publicacao=${p.id}`)}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <div className="card-body py-2 px-2">
-                                <div className="d-flex align-items-center gap-2 flex-wrap">
-                                  <span className="badge bg-secondary">
-                                    {p.sigla_tribunal || '—'}
-                                  </span>
-                                  <span className="badge bg-light text-dark border">
-                                    {p.tipo_comunicacao || 'Comunicação'}
-                                  </span>
-                                  {!p.lida && <span className="badge bg-danger">Não lida</span>}
-                                </div>
-                                <div className="small font-monospace mt-1">
-                                  {p.numero_processo_mascara || p.numero_processo}
-                                </div>
-                                <div className="small text-muted">
-                                  {p.nome_orgao} · {p.data_disponibilizacao}
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Resultado DataJud (fallback) */}
-              {resultadoConsulta?.fonte === 'datajud' && (
-                <div
-                  className="border rounded p-3 bg-light"
-                  style={{ maxHeight: 300, overflowY: 'auto' }}
-                >
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="badge bg-secondary">{resultadoConsulta.instancia}</span>
-                    <span className="small text-muted fw-bold">
-                      {resultadoConsulta.data_distribuicao?.split('-').reverse().join('/')}
-                    </span>
-                  </div>
-                  <p className="small fw-bold text-dark mb-1">{resultadoConsulta.vara_juizo}</p>
-                  <p className="small text-muted mb-2 border-bottom pb-2">
-                    Ação: {resultadoConsulta.classe_acao}
-                  </p>
-                  <pre
-                    className="small text-dark mb-0"
-                    style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}
-                  >
-                    {resultadoConsulta.resumo_andamentos || 'Sem andamentos recentes.'}
-                  </pre>
-                </div>
-              )}
+              <p className="small text-muted mb-2">
+                Procura nos seus casos e publicacoes; se nao achar, consulta o DataJud do CNJ.
+              </p>
+              <button
+                className="btn btn-sm btn-outline-primary"
+                onClick={() => navigate('/casos/buscar')}
+              >
+                Abrir busca de processo
+              </button>
             </div>
           </div>
         </div>

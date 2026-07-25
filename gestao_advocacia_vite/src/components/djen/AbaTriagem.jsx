@@ -3,7 +3,7 @@
 // continuam na página (compartilhados com a aba publicações) e entram
 // como props explícitas.
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import {
   decodeHtmlEntities,
   sanitizarHtmlTribunal,

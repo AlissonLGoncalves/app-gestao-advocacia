@@ -4,7 +4,7 @@
 // 2 abas: Emissoes (lista de notas emitidas) + Configuracao (CNPJ,
 // codigo de servico, cert A1, URLs etc).
 import React, { useState, useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router'
 import { DocumentTextIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 import EmissoesNFSeList from '../components/EmissoesNFSeList.jsx'
 import ConfigNFSeForm from '../components/ConfigNFSeForm.jsx'

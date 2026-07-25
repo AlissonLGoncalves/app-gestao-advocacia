@@ -6,7 +6,7 @@
 //
 // Acesso direto a /casos continua existindo no menu lateral.
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router'
 import { toast } from 'react-toastify'
 import {
   ArrowLeftIcon,

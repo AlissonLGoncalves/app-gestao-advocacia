@@ -6,7 +6,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router'
 
 vi.mock('../api/client.js', () => ({
   api: { get: vi.fn(() => Promise.resolve([])) },

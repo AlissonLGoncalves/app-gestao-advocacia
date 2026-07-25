@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate, Link, useSearchParams } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router'
 import { LGPD_VERSION, TERMS_VERSION } from '../../constants/legal'
 import ReactMarkdown from 'react-markdown'
 import termosV10Md from '../../legal/termos-v1.0.md?raw'

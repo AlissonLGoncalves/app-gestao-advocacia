@@ -1,6 +1,6 @@
 // admin-fase0: listagem de tenants no backoffice super-admin.
 import React, { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { toast } from 'react-toastify'
 import { adminApi } from '../../api/admin.js'
 

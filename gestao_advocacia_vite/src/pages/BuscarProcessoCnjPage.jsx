@@ -2,7 +2,7 @@
 // Inspirado no Astrea ('Busca de processo automatica > Pelo numero CNJ').
 
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { toast } from 'react-toastify'
 import {
   MagnifyingGlassIcon,

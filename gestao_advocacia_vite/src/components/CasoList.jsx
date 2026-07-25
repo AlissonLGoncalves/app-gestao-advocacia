@@ -1,6 +1,6 @@
 // src/CasoList.jsx
 import React, { useState, useEffect, useCallback } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router'
 import { API_URL } from '../config.js'
 import { deleteCaso, listCasos } from '../api/casos.js'
 import {

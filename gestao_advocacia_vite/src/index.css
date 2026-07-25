@@ -23,12 +23,14 @@
   --pink: #ff2d55;
   --yellow: #ffcc00;
   --sidebar-width: 286px;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
+  /* App leve: raios menores e sombras discretas. Antes: raio 22px e sombras
+     de 30-42px de blur, que davam aspecto "pesado/flutuante" em cada card. */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
   --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --shadow-sm: 0 10px 30px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 16px 42px rgba(15, 23, 42, 0.1);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
   --ease: 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --font-body:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
@@ -57,11 +59,9 @@ body {
   letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background:
-    radial-gradient(80% 50% at 10% 0%, rgba(10, 132, 255, 0.11) 0%, rgba(10, 132, 255, 0) 66%),
-    radial-gradient(70% 50% at 95% 5%, rgba(6, 182, 212, 0.1) 0%, rgba(6, 182, 212, 0) 66%),
-    linear-gradient(115deg, rgba(255, 255, 255, 0.38) 5%, rgba(255, 255, 255, 0) 35%),
-    linear-gradient(180deg, var(--canvas-top) 0%, var(--canvas-bottom) 100%);
+  /* App leve: fundo chapado. Antes eram 4 camadas de gradiente (2 radiais +
+     2 lineares) que pesavam visualmente e custavam repaint. */
+  background: var(--canvas-top);
 }
 
 .app-shell {
@@ -89,12 +89,8 @@ body {
   overflow-x: hidden;
   border-radius: var(--radius-lg);
   border: 1px solid var(--sidebar-line);
-  background:
-    radial-gradient(150% 90% at 10% 0%, rgba(10, 132, 255, 0.22) 0%, rgba(10, 132, 255, 0) 38%),
-    linear-gradient(180deg, var(--sidebar-bg) 0%, var(--sidebar-bg-soft) 100%);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  box-shadow: 0 20px 46px rgba(2, 6, 23, 0.28);
+  background: var(--sidebar-bg);
+  box-shadow: none;
   transition:
     transform var(--ease),
     box-shadow var(--ease);
@@ -259,10 +255,8 @@ body {
   justify-content: space-between;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.84));
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  box-shadow: var(--shadow-xs);
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .app-header h1 {
@@ -297,14 +291,23 @@ body {
   overflow-y: auto;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  background: linear-gradient(125deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.58));
-  backdrop-filter: blur(8px) saturate(180%);
-  -webkit-backdrop-filter: blur(8px) saturate(180%);
-  padding: 1.35rem;
+  background: #ffffff;
+  padding: 1.6rem 1.75rem;
 }
 
+/* App leve: fade curto e sem deslocamento. O fade-in-up de 380ms em TODO
+   filho do main fazia cada navegação parecer lenta. */
 .app-main > * {
-  animation: fade-in-up 380ms cubic-bezier(0.22, 0.8, 0.32, 1);
+  animation: fade-in 140ms ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Abas dos hubs do "menu enxuto" (Financeiro, Documentos, Configurações).
@@ -339,8 +342,8 @@ body {
 .card {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(249, 251, 255, 0.8));
-  box-shadow: var(--shadow-xs);
+  background: #ffffff;
+  box-shadow: none;
   overflow: hidden;
   transition:
     transform var(--ease),
@@ -356,7 +359,7 @@ body {
 .card-header,
 .card-header.bg-light {
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(255, 255, 255, 0.7) !important;
+  background: #ffffff !important;
   font-weight: 700;
   color: var(--text-1);
 }

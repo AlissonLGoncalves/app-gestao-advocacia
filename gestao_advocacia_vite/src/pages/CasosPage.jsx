@@ -1,6 +1,6 @@
 // src/pages/CasosPage.jsx
 import React, { useState, useCallback, useEffect } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router'
 import CasoList from '../components/CasoList.jsx' // Ajuste o caminho se CasoList.jsx não estiver em src/
 import CasoForm from '../components/CasoForm.jsx' // Ajuste o caminho se CasoForm.jsx não estiver em src/
 import BotaoAdicionar from '../components/BotaoAdicionar.jsx' // Ajuste o caminho se BotaoAdicionar.jsx não estiver em src/components/

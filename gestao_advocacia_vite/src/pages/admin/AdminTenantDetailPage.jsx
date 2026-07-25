@@ -1,7 +1,7 @@
 // admin-fase0: detalhe de tenant no backoffice. Tabs: Cadastro / Usuarios / Atividade / Anotacoes.
 // Confirmacao de suspender/reativar via modal proprio que pede digitar o nome do tenant.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router'
 import { toast } from 'react-toastify'
 import { adminApi } from '../../api/admin.js'
 

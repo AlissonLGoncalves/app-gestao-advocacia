@@ -1,7 +1,7 @@
 import { TRIBUNAIS } from '../constants/tribunais.js'
 import AbaOabs from '../components/djen/AbaOabs.jsx'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'react-toastify'
 import { useConfirm } from '../hooks/useConfirm.jsx'
 import {

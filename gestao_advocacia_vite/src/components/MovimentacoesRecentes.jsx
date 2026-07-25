@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { toast } from 'react-toastify'
 import { API_URL } from '../config.js'
 import { CalendarIcon, ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline'
