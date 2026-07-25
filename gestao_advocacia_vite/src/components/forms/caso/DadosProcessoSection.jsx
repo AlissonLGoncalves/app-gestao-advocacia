@@ -1,6 +1,10 @@
 import React from 'react'
 import FormInput from '../../FormInput.jsx'
 
+// App leve: `mostrarAvancado` controla os campos secundários (status,
+// prioridade, tipo de ação, área, valor, notas). Só o essencial — número do
+// processo, título e cliente — fica visível por padrão; o resto vai pra
+// "Mais detalhes". Todos continuam existindo e salvando igual.
 function DadosProcessoSection({
   formData,
   clientes,
@@ -9,6 +13,7 @@ function DadosProcessoSection({
   validationErrors,
   onChange,
   onNumeroProcessoChange,
+  mostrarAvancado = true,
 }) {
   return (
     <>
@@ -85,7 +90,7 @@ function DadosProcessoSection({
             <div className="invalid-feedback d-block">{validationErrors.cliente_id}</div>
           )}
         </div>
-        <div className="col-md-3 mb-3">
+        <div className={`col-md-3 mb-3 ${mostrarAvancado ? '' : 'd-none'}`}>
           <label htmlFor="status_caso" className="form-label form-label-sm">
             Status *
           </label>
@@ -102,7 +107,7 @@ function DadosProcessoSection({
             <option value="Arquivado">Arquivado</option>
           </select>
         </div>
-        <div className="col-md-3 mb-3">
+        <div className={`col-md-3 mb-3 ${mostrarAvancado ? '' : 'd-none'}`}>
           <label htmlFor="prioridade_caso" className="form-label form-label-sm">
             Prioridade
           </label>
@@ -121,7 +126,7 @@ function DadosProcessoSection({
         </div>
       </div>
 
-      <div className="row">
+      <div className={`row ${mostrarAvancado ? '' : 'd-none'}`}>
         <FormInput
           label="Tipo de Ação"
           name="tipo_acao"
@@ -171,6 +176,7 @@ function DadosProcessoSection({
         error={validationErrors.valor_causa}
         step="0.01"
         placeholder="Ex: 1500.50"
+        containerClassName={mostrarAvancado ? 'mb-3' : 'd-none'}
       />
 
       <FormInput
@@ -181,6 +187,7 @@ function DadosProcessoSection({
         value={formData.notas_caso || ''}
         onChange={onChange}
         rows="3"
+        containerClassName={mostrarAvancado ? 'mb-3' : 'd-none'}
       />
     </>
   )

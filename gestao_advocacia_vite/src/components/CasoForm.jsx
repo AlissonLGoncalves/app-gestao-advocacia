@@ -38,6 +38,9 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
   const [isDragOver, setIsDragOver] = useState(false)
   const [magicUploadProgress, setMagicUploadProgress] = useState(0)
   const magicFileRef = useRef(null)
+  // App leve: campos secundários começam recolhidos ao CRIAR. Ao editar um
+  // caso existente, abre tudo (quem edita quer ver o que já está preenchido).
+  const [mostrarDetalhes, setMostrarDetalhes] = useState(false)
   const [criarEvento, setCriarEvento] = useState(false)
   const [eventoData, setEventoData] = useState({
     titulo: '',
@@ -125,12 +128,15 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
       dadosEdit.cliente_id = dadosEdit.cliente_id ? String(dadosEdit.cliente_id) : ''
       setFormData(dadosEdit)
       setIsEditing(true)
+      // Editando: mostra tudo que já está preenchido.
+      setMostrarDetalhes(true)
       if (dadosEdit.numero_processo) setCnjInfo(parseCNJ(dadosEdit.numero_processo))
     } else {
       const estado = { ...initialState }
       if (clienteIdInicial) estado.cliente_id = String(clienteIdInicial)
       setFormData(estado)
       setIsEditing(false)
+      setMostrarDetalhes(false)
     }
   }, [casoParaEditar, clienteIdInicial, clearValidationErrors])
 
@@ -251,6 +257,8 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
               setNomeArquivoOrigem(jsonRes.nome_arquivo_original || file.name)
             }
             toast.success(`Leitura Concluida via ${jsonRes.dados.fonte || 'IA'}!`)
+            // A IA preencheu campos avançados — abre pra você conferir.
+            setMostrarDetalhes(true)
             if (jsonRes.dados.numero_processo && jsonRes.dados.numero_processo.length === 25)
               buscarDadosDataJud(jsonRes.dados.numero_processo)
           } else {
@@ -353,6 +361,10 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
         </div>
 
         <form onSubmit={handleSubmit}>
+          {/* App leve: por padrão só o essencial (número do processo, título e
+              cliente). Os outros ~15 campos continuam existindo, mas atrás de
+              "Mais detalhes" — cadastrar um caso deixa de parecer um
+              formulário de imposto de renda. Ao editar, abre tudo. */}
           <DadosProcessoSection
             formData={formData}
             clientes={clientes}
@@ -361,20 +373,39 @@ function CasoForm({ casoParaEditar, onCasoChange, onCancel, clienteIdInicial }) 
             validationErrors={validationErrors}
             onChange={handleChange}
             onNumeroProcessoChange={handleNumeroProcessoChange}
+            mostrarAvancado={mostrarDetalhes}
           />
 
-          <TramitacaoSection formData={formData} onChange={handleChange} />
+          <button
+            type="button"
+            className="btn btn-sm btn-link text-decoration-none px-0 mb-2"
+            onClick={() => setMostrarDetalhes((v) => !v)}
+            aria-expanded={mostrarDetalhes}
+          >
+            {mostrarDetalhes ? '− Menos detalhes' : '+ Mais detalhes'}
+            <span className="text-muted ms-2 small">
+              {mostrarDetalhes
+                ? ''
+                : 'status, prioridade, valor, vara, comarca, parte contrária...'}
+            </span>
+          </button>
 
-          <EventoAgendaSection
-            isEditing={isEditing}
-            criarEvento={criarEvento}
-            setCriarEvento={setCriarEvento}
-            eventoData={eventoData}
-            setEventoData={setEventoData}
-            formData={formData}
-            eventosIA={eventosIA}
-            setEventosIA={setEventosIA}
-          />
+          {mostrarDetalhes && (
+            <>
+              <TramitacaoSection formData={formData} onChange={handleChange} />
+
+              <EventoAgendaSection
+                isEditing={isEditing}
+                criarEvento={criarEvento}
+                setCriarEvento={setCriarEvento}
+                eventoData={eventoData}
+                setEventoData={setEventoData}
+                formData={formData}
+                eventosIA={eventosIA}
+                setEventosIA={setEventosIA}
+              />
+            </>
+          )}
 
           <hr className="my-4" />
           <div className="d-flex justify-content-end">
