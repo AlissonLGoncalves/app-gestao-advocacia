@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
 import { criarClienteCasoTriagem, vincularDecisao } from '../../api/djen.js'
+import { buscarProcessoOnDemand } from '../../api/casos.js'
 import { API_URL } from '../../config.js'
 import useArrastavel from '../../hooks/useArrastavel.js'
 
@@ -64,7 +65,10 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
       ? `Processo ${analise.numero_processo}`
       : `Caso DJEN #${pub.id || ''}`,
     numero_processo: analise.numero_processo || pub.numero_processo || '',
-    tipo_acao: analise.classe_processual || '',
+    // pub.nome_classe vem da própria ComunicaAPI e já aparecia no painel de
+    // Detalhe ("Classe: PROCEDIMENTO COMUM CÍVEL") — só não estava ligado aqui,
+    // por isso "Tipo da ação" vinha vazio mesmo com o dado em mãos.
+    tipo_acao: analise.classe_processual || pub.nome_classe || '',
     vara_juizo: pub.nome_orgao || analise.vara || '',
     comarca: analise.comarca || '',
     valor_causa: parseValorCausa(analise.valor_causa),
@@ -89,6 +93,48 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
     storageKey: 'djen-painel-criar-pos',
     bounds: { margin: 80 },
   })
+
+  // Enriquecimento pelo CNJ (DataJud).
+  //
+  // A intimação do DJEN é um AVISO, não a capa do processo: ela costuma trazer
+  // só número, classe, órgão e quem foi intimado. Valor da causa e a parte
+  // contrária (o réu) muitas vezes NÃO estão no texto — nenhum regex extrai o
+  // que não existe. Esses dados vêm do DataJud/CNJ, que o app já consulta em
+  // /casos/buscar-cnj. Aqui a busca dispara sozinha ao abrir o painel e só
+  // preenche campo que está VAZIO (nunca sobrescreve o que você digitou).
+  const [buscandoCnj, setBuscandoCnj] = useState(false)
+  const [cnjTentado, setCnjTentado] = useState(false)
+
+  const enriquecerPeloCnj = useCallback(
+    async (numero) => {
+      const limpo = String(numero || '').replace(/\D/g, '')
+      if (limpo.length !== 20) return
+      setBuscandoCnj(true)
+      try {
+        const dados = await buscarProcessoOnDemand(limpo)
+        setFormCaso((prev) => ({
+          ...prev,
+          tipo_acao: prev.tipo_acao || dados?.classe_acao || '',
+          vara_juizo: prev.vara_juizo || dados?.vara_juizo || '',
+          valor_causa: prev.valor_causa ?? parseValorCausa(dados?.valor_causa),
+          parte_contraria: prev.parte_contraria || dados?.parte_contraria || '',
+        }))
+      } catch {
+        // CNJ fora do ar / processo em segredo / tribunal sem cobertura:
+        // silencioso de propósito — os campos seguem editáveis à mão.
+      } finally {
+        setBuscandoCnj(false)
+        setCnjTentado(true)
+      }
+    },
+    [setFormCaso]
+  )
+
+  useEffect(() => {
+    const numero = formCaso.numero_processo
+    if (!cnjTentado && numero) enriquecerPeloCnj(numero)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Carrega TODOS os clientes do tenant para permitir vincular a qualquer um
   // (nao so as sugestoes do auto-match). Resolve: 'aparece so 3 clientes,
