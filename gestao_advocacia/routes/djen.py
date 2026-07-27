@@ -1992,6 +1992,56 @@ def registrar_rotas_djen(
                 "descartadas": descartadas,
             }
 
+    @djen_ns.route("/publicacoes/tratar-lote")
+    class PublicacaoTratarLoteAPI(Resource):
+        @djen_ns.doc(
+            security="jsonWebToken",
+            description=(
+                "Entrega 1 (destravar) — mutirao: trata ou descarta VARIAS "
+                "intimacoes de uma vez. Sem isso, zerar um acervo de 300+ "
+                "exigia 300 cliques e o advogado nunca comecava. "
+                "Body: {ids: [1,2,3], acao: 'registro'|'descartar'}. "
+                "'descartar' marca triagem_ignorada (sai da caixa como nao "
+                "relevante); qualquer outra acao marca tratada_em."
+            ),
+        )
+        @jwt_required()
+        def post(self):
+            from datetime import datetime  # noqa: PLC0415
+
+            from models import log_audit  # noqa: PLC0415
+
+            user = _get_user_or_401()
+            data = request.json or {}
+            ids = data.get("ids") or []
+            acao = (data.get("acao") or "registro").strip().lower()
+            if not isinstance(ids, list) or not ids:
+                return {"message": "Informe 'ids' (lista nao vazia)."}, 400
+            # Teto por chamada: o front pagina em lotes e mostra progresso.
+            ids = [int(i) for i in ids[:1000]]
+
+            # Escopo por tenant no proprio filtro — id de outro tenant e' ignorado.
+            pubs = PublicacaoDJEN.query.filter(
+                PublicacaoDJEN.tenant_id == user.tenant_id,
+                PublicacaoDJEN.id.in_(ids),
+            ).all()
+
+            agora = datetime.utcnow()
+            for pub in pubs:
+                if acao == "descartar":
+                    pub.triagem_ignorada = True
+                else:
+                    pub.tratada_em = agora
+                pub.lida = True
+            log_audit(
+                acao="publicacao_tratar_lote",
+                tabela_afetada="publicacao_djen",
+                registro_id=None,
+                detalhes=f"acao={acao} qtd={len(pubs)}",
+            )
+            db.session.commit()
+            return {"processadas": len(pubs), "acao": acao}
+
     @djen_ns.route("/publicacoes/backfill-partes")
     class PublicacaoBackfillPartesAPI(Resource):
         @djen_ns.doc(
