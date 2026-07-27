@@ -46,9 +46,9 @@ TEXTO_REAL = (
 
 def test_texto_real_numero_processo():
     resultado = analisar_publicacao(MockPub(TEXTO_REAL))
-    assert resultado["numero_processo"] == "0000472-75.2025.8.16.0075", (
-        f"Esperado '0000472-75.2025.8.16.0075', obtido {resultado['numero_processo']!r}"
-    )
+    assert (
+        resultado["numero_processo"] == "0000472-75.2025.8.16.0075"
+    ), f"Esperado '0000472-75.2025.8.16.0075', obtido {resultado['numero_processo']!r}"
 
 
 def test_texto_real_tribunal():
@@ -59,17 +59,17 @@ def test_texto_real_tribunal():
 def test_texto_real_partes_autoras():
     resultado = analisar_publicacao(MockPub(TEXTO_REAL))
     autoras_norm = [normalizar_nome(p) for p in resultado["partes_autoras"]]
-    assert any("dirce de oliveira pedotti" in a for a in autoras_norm), (
-        f"'DIRCE DE OLIVEIRA PEDOTTI' não encontrado em partes_autoras: {resultado['partes_autoras']}"
-    )
+    assert any(
+        "dirce de oliveira pedotti" in a for a in autoras_norm
+    ), f"'DIRCE DE OLIVEIRA PEDOTTI' não encontrado em partes_autoras: {resultado['partes_autoras']}"
 
 
 def test_texto_real_partes_reus():
     resultado = analisar_publicacao(MockPub(TEXTO_REAL))
     reus_norm = [normalizar_nome(r) for r in resultado["partes_reus"]]
-    assert any("banco do brasil" in r for r in reus_norm), (
-        f"'Banco do Brasil S/A' não encontrado em partes_reus: {resultado['partes_reus']}"
-    )
+    assert any(
+        "banco do brasil" in r for r in reus_norm
+    ), f"'Banco do Brasil S/A' não encontrado em partes_reus: {resultado['partes_reus']}"
 
 
 def test_texto_real_confianca_minima():
@@ -112,22 +112,22 @@ def test_extrai_reu_acentuado():
     """'RÉU:' (acentuado) deve popular partes_reus — antes vinha vazio."""
     resultado = analisar_publicacao(MockPub(TEXTO_TRABALHISTA))
     reus_norm = [normalizar_nome(r) for r in resultado["partes_reus"]]
-    assert any("jose moacir ferracini" in r for r in reus_norm), (
-        f"réu acentuado não extraído: {resultado['partes_reus']}"
-    )
+    assert any(
+        "jose moacir ferracini" in r for r in reus_norm
+    ), f"réu acentuado não extraído: {resultado['partes_reus']}"
 
 
 def test_extrai_autor_e_separa_do_reu_acentuado():
     """Autor não deve 'vazar' pro nome do réu (stop label cobre RÉU acentuado)."""
     resultado = analisar_publicacao(MockPub(TEXTO_TRABALHISTA))
     autoras_norm = [normalizar_nome(a) for a in resultado["partes_autoras"]]
-    assert any("maria angela victor marcelino" in a for a in autoras_norm), (
-        f"autor não extraído: {resultado['partes_autoras']}"
-    )
+    assert any(
+        "maria angela victor marcelino" in a for a in autoras_norm
+    ), f"autor não extraído: {resultado['partes_autoras']}"
     # autor não pode conter "RÉU"/"JOSE" colado
-    assert all("jose" not in a for a in autoras_norm), (
-        f"autor vazou pro réu: {resultado['partes_autoras']}"
-    )
+    assert all(
+        "jose" not in a for a in autoras_norm
+    ), f"autor vazou pro réu: {resultado['partes_autoras']}"
 
 
 def test_extrai_reclamante_reclamado_trabalhista():
@@ -164,9 +164,9 @@ def test_sem_numero_processo_confianca_baixa():
     texto = "Publicacao sem numero de processo. Apenas texto generico sem partes."
     resultado = analisar_publicacao(MockPub(texto))
     assert resultado["numero_processo"] is None
-    assert resultado["confianca"] < 0.5, (
-        f"Sem CNJ, confiança deveria ser < 0.5, obtida {resultado['confianca']}"
-    )
+    assert (
+        resultado["confianca"] < 0.5
+    ), f"Sem CNJ, confiança deveria ser < 0.5, obtida {resultado['confianca']}"
 
 
 def test_multiplos_autores():
@@ -179,9 +179,9 @@ def test_multiplos_autores():
     resultado = analisar_publicacao(MockPub(texto))
     assert resultado["partes_autoras"], "partes_autoras não deveria estar vazia"
     autoras_concat = " ".join(resultado["partes_autoras"]).lower()
-    assert "joao silva" in autoras_concat or "maria souza" in autoras_concat, (
-        f"Nenhum dos autores encontrado em: {resultado['partes_autoras']}"
-    )
+    assert (
+        "joao silva" in autoras_concat or "maria souza" in autoras_concat
+    ), f"Nenhum dos autores encontrado em: {resultado['partes_autoras']}"
     assert resultado["partes_reus"], "partes_reus não deveria estar vazia"
 
 
@@ -189,9 +189,9 @@ def test_normalizar_nome_caixa_mista():
     """normalizar_nome deve igualar 'Dirce De Oliveira Pedotti' e 'DIRCE DE OLIVEIRA PEDOTTI'."""
     nome_db = "DIRCE DE OLIVEIRA PEDOTTI"
     nome_extrato = "Dirce De Oliveira Pedotti"
-    assert normalizar_nome(nome_db) == normalizar_nome(nome_extrato), (
-        f"{normalizar_nome(nome_db)!r} != {normalizar_nome(nome_extrato)!r}"
-    )
+    assert normalizar_nome(nome_db) == normalizar_nome(
+        nome_extrato
+    ), f"{normalizar_nome(nome_db)!r} != {normalizar_nome(nome_extrato)!r}"
 
 
 def test_normalizar_nome_remove_acentos():
