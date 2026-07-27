@@ -1,3 +1,4 @@
+import html
 import logging
 import re
 import unicodedata
@@ -100,6 +101,26 @@ _STOP_LABELS_RE = (
 )
 
 
+def limpar_html(text):
+    """Decodifica entidades e remove tags ANTES de qualquer regex de extracao.
+
+    O texto do DJEN vem em HTML. Rodando os regex no texto cru:
+      - "AUTOR:&nbsp;DRYELLE BERTOLDO COSTA" extraia "&nbsp" e PERDIA o nome;
+      - "...COSTA<br>ADVOGADO" extraia "DRYELLE BERTOLDO COSTA<br>";
+      - a comarca saia como "Blumenau, para ci&ecirc;ncia das partes.".
+    A tela ja mostrava decodificado (utils/htmlTribunal.js no front), entao o
+    advogado via um texto limpo e campos vazios/sujos — sem entender o porque.
+    """
+    if not text:
+        return ""
+    # <br>, </p>, <td> etc viram espaco pra nao colar palavras vizinhas.
+    limpo = re.sub(r"<[^>]+>", " ", str(text))
+    limpo = html.unescape(limpo)
+    # &nbsp; vira \xa0 (espaco nao-quebravel) — normaliza pra espaco comum.
+    limpo = limpo.replace("\xa0", " ")
+    return limpo
+
+
 def _extract_labeled_entities(text, labels):
     found = []
     for label in labels:
@@ -149,12 +170,22 @@ def _extract_valor_causa(text):
 
 
 def _extract_comarca(text):
-    match = re.search(r"comarca\s+de\s+([^\n\r\-]+)", text, re.IGNORECASE)
+    # Para no primeiro delimitador de frase. Antes ia ate a quebra de linha e
+    # engolia o resto: "Comarca de Blumenau, para ciencia das partes." virava
+    # a comarca inteira. Nome de comarca nao tem virgula/ponto/barra.
+    match = re.search(r"comarca\s+de\s+([^\n\r\-,.;:/()]+)", text, re.IGNORECASE)
     if not match:
         return None
     comarca = (match.group(1) or "").strip()
     comarca = re.sub(r"\s+", " ", comarca)
-    return comarca or None
+    # Corta conectivos que indicam que a frase seguiu ("...Blumenau para ciencia")
+    comarca = re.split(
+        r"\s+(?:para|em|no|na|nos|nas|ao|aos|conforme|nos\s+autos)\b",
+        comarca,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0].strip()
+    return comarca[:100] or None
 
 
 def _extract_nome_juiz(text):
@@ -187,6 +218,8 @@ def analisar_publicacao(publicacao):
                 raw_text_chunks.append(str(value))
 
     texto_total = " ".join([texto] + raw_text_chunks).strip()
+    # Limpa HTML ANTES dos regex (entidades/tags quebravam a extracao).
+    texto_total = limpar_html(texto_total)
     # Normaliza múltiplos espaços/tabs consecutivos como separadores de campo (→ \n)
     texto_total = re.sub(r"[ \t]{2,}", "\n", texto_total)
 
@@ -1255,8 +1288,7 @@ def montar_grupos_pendentes(db, Cliente, Caso, PublicacaoDJEN, tenant_id):
                 "tipo": "cliente_existente",
                 "titulo": cliente.nome_razao_social,
                 "descricao": (
-                    f"{len(lista)} publicação(ões) de cliente já cadastrado — "
-                    "vincular tudo direto"
+                    f"{len(lista)} publicação(ões) de cliente já cadastrado — vincular tudo direto"
                 ),
                 "pub_ids": [i["pub"].id for i in lista],
                 "cliente_existente_id": cliente_id,
