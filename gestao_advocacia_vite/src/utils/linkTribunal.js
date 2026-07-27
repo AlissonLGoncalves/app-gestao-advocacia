@@ -18,6 +18,8 @@
 const PORTAIS = {
   TJPR: { nome: 'Projudi/TJPR', url: 'https://projudi.tjpr.jus.br/projudi/' },
   TJSC: { nome: 'eproc/TJSC', url: 'https://eproc1g.tjsc.jus.br/eproc/' },
+  TJSP: { nome: 'e-SAJ/TJSP', url: 'https://esaj.tjsp.jus.br/cpopg/open.do' },
+  TJMG: { nome: 'PJe/TJMG', url: 'https://pje-consulta-publica.tjmg.jus.br/' },
   TRF4: { nome: 'eproc/TRF4', url: 'https://eproc.trf4.jus.br/eproc2trf4/' },
   TRT9: { nome: 'PJe/TRT9', url: 'https://pje.trt9.jus.br/consultaprocessual/' },
   TST: { nome: 'TST', url: 'https://consultaprocessual.tst.jus.br/' },
