@@ -133,9 +133,7 @@ def test_extrai_autor_e_separa_do_reu_acentuado():
 def test_extrai_reclamante_reclamado_trabalhista():
     """Termos trabalhistas RECLAMANTE/RECLAMADO também são reconhecidos."""
     texto = (
-        "Processo: 0000772-27.2025.5.09.0093 "
-        "RECLAMANTE: JOAO DA SILVA "
-        "RECLAMADO: EMPRESA ACME LTDA"
+        "Processo: 0000772-27.2025.5.09.0093 RECLAMANTE: JOAO DA SILVA RECLAMADO: EMPRESA ACME LTDA"
     )
     resultado = analisar_publicacao(MockPub(texto))
     autoras = [normalizar_nome(a) for a in resultado["partes_autoras"]]
@@ -201,3 +199,45 @@ def test_normalizar_nome_remove_acentos():
     assert normalizar_nome("João da Silva") == normalizar_nome("Joao da Silva")
     assert normalizar_nome("Fernão") == normalizar_nome("Fernao")
     assert normalizar_nome("AÇÃO") == normalizar_nome("ACAO")
+
+
+# ---------------------------------------------------------------------------
+# Regressao (26/07/2026 — uso real): o texto do DJEN vem em HTML e os regex
+# rodavam nele cru. "AUTOR:&nbsp;DRYELLE..." extraia "&nbsp" e o modal
+# "Criar cliente e caso" abria com o nome VAZIO; a comarca vinha como
+# "Blumenau, para ci&ecirc;ncia das partes.".
+# ---------------------------------------------------------------------------
+TEXTO_HTML_NBSP = (
+    "Procedimento Comum C&iacute;vel N&ordm; 5028118-23.2026.8.24.0008/SC "
+    "AUTOR:&nbsp;DRYELLE BERTOLDO COSTAADVOGADO(A): ALISSON LUIZ GON&Ccedil;ALVES "
+    "(OAB PR094297) R&Eacute;U: BANCO EXEMPLO S/A "
+    "DESPACHO/DECIS&Atilde;O 5&ordf; Vara C&iacute;vel da Comarca de Blumenau, "
+    "para ci&ecirc;ncia das partes."
+)
+
+
+def test_extrai_autor_mesmo_com_entidade_html_nbsp():
+    """&nbsp; depois do label nao pode engolir o nome da parte."""
+    analise = analisar_publicacao(MockPub(TEXTO_HTML_NBSP))
+    assert "DRYELLE BERTOLDO COSTA" in (analise.get("partes_autoras") or [])
+    # nao pode sobrar lixo de entidade
+    assert not any("&nbsp" in p for p in (analise.get("partes_autoras") or []))
+
+
+def test_extrai_parte_sem_tag_html_colada():
+    """<br> entre a parte e o advogado nao pode entrar no nome."""
+    texto = "AUTOR: DRYELLE BERTOLDO COSTA<br>ADVOGADO(A): ALISSON"
+    analise = analisar_publicacao(MockPub(texto))
+    assert "DRYELLE BERTOLDO COSTA" in (analise.get("partes_autoras") or [])
+    assert not any("<" in p for p in (analise.get("partes_autoras") or []))
+
+
+def test_comarca_para_no_fim_do_nome():
+    """Comarca nao pode engolir o resto da frase nem manter entidade HTML."""
+    analise = analisar_publicacao(MockPub(TEXTO_HTML_NBSP))
+    assert analise.get("comarca") == "Blumenau"
+
+
+def test_comarca_com_nome_composto():
+    texto = "Vara Unica da Comarca de Sao Jose dos Pinhais - PR"
+    assert analisar_publicacao(MockPub(texto)).get("comarca") == "Sao Jose dos Pinhais"
