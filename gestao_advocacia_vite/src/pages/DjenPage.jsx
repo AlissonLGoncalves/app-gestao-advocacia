@@ -33,8 +33,10 @@ import {
   reclassificarPublicacao,
   vincularDecisao,
   backfillPartes,
+  tratarPublicacoesEmLote,
 } from '../api/djen.js'
 import { listCasos } from '../api/casos.js'
+import { destinoNoTribunal } from '../utils/linkTribunal.js'
 
 export default function DjenPage() {
   const { confirm, ConfirmDialog } = useConfirm()
@@ -111,6 +113,10 @@ export default function DjenPage() {
   const [triagemBusca, setTriagemBusca] = useState('')
   const [triagemExpandido, setTriagemExpandido] = useState({})
   const [itemModalCriar, setItemModalCriar] = useState(null)
+
+  // Entrega 1 (destravar) — mutirão na caixa de intimações.
+  const [selecionadas, setSelecionadas] = useState([])
+  const [tratandoLote, setTratandoLote] = useState(false)
 
   // Detalhe
   const [pubSelecionada, setPubSelecionada] = useState(null)
@@ -612,6 +618,31 @@ export default function DjenPage() {
     }
   }
 
+  // Entrega 1 — mutirão: trata/descarta as selecionadas de uma vez.
+  const tratarSelecionadasEmLote = async (acao) => {
+    if (selecionadas.length === 0) return
+    const verbo = acao === 'descartar' ? 'DESCARTAR' : 'marcar como TRATADAS'
+    const ok = await confirm(
+      `${verbo} ${selecionadas.length} intimação(ões)? ` +
+        (acao === 'descartar'
+          ? 'Elas saem da caixa como não relevantes.'
+          : 'Elas saem da caixa e ficam registradas como tratadas.'),
+      'Confirmar mutirão'
+    )
+    if (!ok) return
+    setTratandoLote(true)
+    try {
+      const r = await tratarPublicacoesEmLote(selecionadas, acao)
+      toast.success(`${r?.processadas ?? selecionadas.length} intimação(ões) processada(s).`)
+      setSelecionadas([])
+      await carregarPublicacoes(0)
+    } catch {
+      toast.error('Erro ao processar o lote.')
+    } finally {
+      setTratandoLote(false)
+    }
+  }
+
   const processarLoteTriagem = async () => {
     if (triagemSelecionadas.length === 0) {
       toast.info('Selecione ao menos uma publicação na triagem.')
@@ -1026,6 +1057,56 @@ export default function DjenPage() {
                       </select>
                     </div>
                   </div>
+
+                  {/* Entrega 1 (destravar) — mutirão. Antes só dava pra tratar
+                      UMA por vez: zerar um acervo de 300+ exigia 300 cliques,
+                      então ninguém começava. Agora seleciona e resolve em lote. */}
+                  <div className="d-flex align-items-center gap-2 flex-wrap mb-2 py-2 border-bottom">
+                    <div className="form-check mb-0">
+                      <input
+                        id="sel-todas-pubs"
+                        type="checkbox"
+                        className="form-check-input"
+                        checked={
+                          publicacoes.length > 0 && selecionadas.length === publicacoes.length
+                        }
+                        onChange={(e) =>
+                          setSelecionadas(e.target.checked ? publicacoes.map((p) => p.id) : [])
+                        }
+                      />
+                      <label className="form-check-label small" htmlFor="sel-todas-pubs">
+                        Selecionar esta página
+                      </label>
+                    </div>
+                    {selecionadas.length > 0 && (
+                      <>
+                        <span className="badge bg-primary">
+                          {selecionadas.length} selecionada(s)
+                        </span>
+                        <button
+                          className="btn btn-sm btn-success"
+                          disabled={tratandoLote}
+                          onClick={() => tratarSelecionadasEmLote('registro')}
+                        >
+                          {tratandoLote ? 'Processando...' : 'Marcar como tratadas'}
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          disabled={tratandoLote}
+                          onClick={() => tratarSelecionadasEmLote('descartar')}
+                        >
+                          Descartar
+                        </button>
+                        <button
+                          className="btn btn-sm btn-link text-decoration-none"
+                          onClick={() => setSelecionadas([])}
+                        >
+                          Limpar
+                        </button>
+                      </>
+                    )}
+                  </div>
+
                   {publicacoes.map((pub) => (
                     <div
                       key={pub.id}
@@ -1035,6 +1116,21 @@ export default function DjenPage() {
                     >
                       <div className="card-body py-2 px-3">
                         <div className="d-flex justify-content-between align-items-start">
+                          <div className="form-check me-2" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              aria-label={`Selecionar publicação ${pub.numero_processo || pub.id}`}
+                              checked={selecionadas.includes(pub.id)}
+                              onChange={(e) =>
+                                setSelecionadas((prev) =>
+                                  e.target.checked
+                                    ? [...prev, pub.id]
+                                    : prev.filter((id) => id !== pub.id)
+                                )
+                              }
+                            />
+                          </div>
                           <div className="flex-grow-1 me-2" style={{ minWidth: 0 }}>
                             <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                               {!pub.lida && <span className="badge bg-primary">Nova</span>}
@@ -1196,6 +1292,41 @@ export default function DjenPage() {
                   <div className="card-header bg-white d-flex justify-content-between align-items-center">
                     <strong className="small">Detalhe da Publicação</strong>
                     <div className="d-flex align-items-center gap-2">
+                      {/* Entrega 1 — o app não substitui o tribunal: leva até ele. */}
+                      {(() => {
+                        const destino = destinoNoTribunal(pubSelecionada)
+                        if (!destino) return null
+                        return (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-primary py-0 px-2"
+                            style={{ fontSize: '0.75rem' }}
+                            title={
+                              destino.precisaColar
+                                ? `Abre a consulta do ${destino.nome} e copia o nº do processo`
+                                : `Abre esta publicação no ${destino.nome}`
+                            }
+                            data-testid="btn-abrir-tribunal"
+                            onClick={async () => {
+                              const numero =
+                                pubSelecionada.numero_processo_mascara ||
+                                pubSelecionada.numero_processo ||
+                                ''
+                              if (destino.precisaColar && numero) {
+                                try {
+                                  await navigator.clipboard.writeText(numero)
+                                  toast.info(`Nº ${numero} copiado — cole na busca do tribunal.`)
+                                } catch {
+                                  /* clipboard bloqueado: segue abrindo mesmo assim */
+                                }
+                              }
+                              window.open(destino.url, '_blank', 'noopener,noreferrer')
+                            }}
+                          >
+                            <i className="bi bi-box-arrow-up-right me-1" /> Abrir no tribunal
+                          </button>
+                        )
+                      })()}
                       {/* Epic #3 (#177): atalho pra criar tarefa vinculada a esta pub */}
                       <button
                         type="button"

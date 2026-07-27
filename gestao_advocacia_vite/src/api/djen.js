@@ -78,6 +78,11 @@ export const triggerBackfill = (oabId) =>
 // Fase 2 — inbox de Intimações (inbox-zero, padrão Astrea)
 export const tratarPublicacao = (id, acao = 'registro') =>
   api.patch(`/djen/publicacoes/${id}/tratar`, { acao })
+// Entrega 1 (destravar) — mutirão: trata/descarta várias de uma vez.
+// Sem isso, zerar 300+ intimações exigia 300 cliques e ninguém começava.
+export const tratarPublicacoesEmLote = (ids, acao = 'registro') =>
+  api.post('/djen/publicacoes/tratar-lote', { ids, acao })
+
 export const getSugestaoTratamento = (id) => api.get(`/djen/publicacoes/${id}/sugestao-tratamento`)
 export const getContadoresInbox = () => api.get('/djen/publicacoes/contadores')
 

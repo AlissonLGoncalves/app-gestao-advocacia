@@ -990,6 +990,39 @@ class TestInboxIntimacoes:
         assert data["tratada_em"] is not None
         assert data["lida"] is True
 
+    def test_tratar_lote_marca_varias_de_uma_vez(self, auth_client, db):
+        """Entrega 1 (mutirao): zerar acervo de 300+ nao pode exigir 300 cliques."""
+        u = self._user(db)
+        p1 = _criar_publicacao(db, u.tenant_id, u.id, djen_id=8101)
+        p2 = _criar_publicacao(db, u.tenant_id, u.id, djen_id=8102)
+        resp = auth_client.post(
+            "/api/v1/djen/publicacoes/tratar-lote",
+            json={"ids": [p1.id, p2.id], "acao": "registro"},
+        )
+        assert resp.status_code == 200, resp.data
+        assert json.loads(resp.data)["processadas"] == 2
+        for pid in (p1.id, p2.id):
+            det = json.loads(auth_client.get(f"/api/v1/djen/publicacoes/{pid}").data)
+            assert det["tratada_em"] is not None
+            assert det["lida"] is True
+
+    def test_tratar_lote_descartar_marca_ignorada(self, auth_client, db):
+        u = self._user(db)
+        p1 = _criar_publicacao(db, u.tenant_id, u.id, djen_id=8103)
+        resp = auth_client.post(
+            "/api/v1/djen/publicacoes/tratar-lote",
+            json={"ids": [p1.id], "acao": "descartar"},
+        )
+        assert resp.status_code == 200, resp.data
+        det = json.loads(auth_client.get(f"/api/v1/djen/publicacoes/{p1.id}").data)
+        assert det["triagem_ignorada"] is True
+        # descartar NAO marca como tratada (saiu por irrelevancia, nao por acao)
+        assert det["tratada_em"] is None
+
+    def test_tratar_lote_exige_ids(self, auth_client, db):
+        resp = auth_client.post("/api/v1/djen/publicacoes/tratar-lote", json={"ids": []})
+        assert resp.status_code == 400
+
     def test_criar_item_agenda_da_pub_marca_tratada(self, auth_client, db):
         u = self._user(db)
         caso_id = _criar_caso(auth_client, db)
