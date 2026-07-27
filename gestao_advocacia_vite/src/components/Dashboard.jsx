@@ -1,13 +1,10 @@
 // src/Dashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { API_URL } from '../config.js'
-import { listProximos } from '../api/agenda.js'
-import { listItensAgenda } from '../api/itensAgenda.js'
 import { syncDjen, listOabs } from '../api/djen.js'
 import MovimentacoesRecentes from './MovimentacoesRecentes.jsx'
 import OnboardingChecklist from './OnboardingChecklist.jsx'
-import MiniKanbanPrazos from './MiniKanbanPrazos.jsx'
-import MeuDiaCard from './MeuDiaCard.jsx'
+import FilaDeTrabalho from './FilaDeTrabalho.jsx'
 import { useNavigate } from 'react-router'
 
 import {
@@ -89,66 +86,6 @@ const StatCard = ({
   )
 }
 
-const EventListItem = ({ evento, onClick }) => {
-  if (!evento || typeof evento !== 'object' || !evento.id || !evento.data_inicio) {
-    return null
-  }
-
-  let dataFormatada = 'Data inválida'
-  let horaFormatada = ''
-  try {
-    const dataObj = new Date(evento.data_inicio)
-    if (!isNaN(dataObj.getTime())) {
-      dataFormatada = dataObj.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: 'short',
-      })
-      horaFormatada = dataObj.toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      })
-    }
-  } catch (e) {
-    console.error('EventListItem: Erro ao formatar data_inicio:', evento.data_inicio, e)
-  }
-
-  const IconeEvento = evento.tipo_evento === 'Prazo' ? PrazoIconSolid : EventoIconSolid
-  const corIconeEvento = evento.tipo_evento === 'Prazo' ? 'text-danger' : 'text-primary'
-
-  return (
-    <li
-      className="list-group-item list-group-item-action py-3 px-2 d-flex justify-content-between align-items-center"
-      onClick={onClick}
-      style={{ cursor: 'pointer' }}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onClick()
-      }}
-    >
-      <div className="d-flex align-items-center">
-        <div className={`flex-shrink-0 me-2 ${corIconeEvento}`}>
-          <IconeEvento style={{ width: '20px', height: '20px' }} />
-        </div>
-        <div className="flex-grow-1 min-w-0">
-          <p
-            className="mb-0 fw-medium text-dark text-truncate"
-            style={{ fontSize: '0.9rem' }}
-            title={evento.titulo || 'Evento sem título'}
-          >
-            {evento.titulo || 'Evento sem título'}
-          </p>
-          <p className="small text-muted text-truncate mb-0" style={{ fontSize: '0.75rem' }}>
-            {dataFormatada} {horaFormatada && `às ${horaFormatada}`}
-          </p>
-        </div>
-      </div>
-      <ChevronRightIcon className="text-muted" style={{ width: '16px', height: '16px' }} />
-    </li>
-  )
-}
-
 function Dashboard({ mudarSecao }) {
   const navigate = useNavigate()
   const [stats, setStats] = useState({
@@ -173,7 +110,6 @@ function Dashboard({ mudarSecao }) {
     djenPendentesTriagem: 0,
     djenNaoLidas: 0,
   })
-  const [proximosEventos, setProximosEventos] = useState([])
   const [oabsMonitoradas, setOabsMonitoradas] = useState(null)
   const [syncing, setSyncing] = useState(false)
   // App leve: detalhes financeiros começam recolhidos (progressive disclosure)
@@ -227,15 +163,6 @@ function Dashboard({ mudarSecao }) {
     }
   }, [])
 
-  const fetchProximosEventos = useCallback(async () => {
-    try {
-      const eventos = await listProximos(7)
-      setProximosEventos(eventos)
-    } catch (error) {
-      console.error('Dashboard: Erro ao carregar próximos eventos:', error)
-    }
-  }, [])
-
   const triggerDjenSync = useCallback(async () => {
     const hoje = hojeLocal()
     if (sessionStorage.getItem('djen_synced_date') === hoje) return
@@ -254,12 +181,11 @@ function Dashboard({ mudarSecao }) {
 
   useEffect(() => {
     fetchDashboardData()
-    fetchProximosEventos()
     triggerDjenSync()
     listOabs()
       .then((data) => setOabsMonitoradas(Array.isArray(data) ? data : []))
       .catch(() => setOabsMonitoradas([]))
-  }, [fetchDashboardData, fetchProximosEventos, triggerDjenSync])
+  }, [fetchDashboardData, triggerDjenSync])
 
   if (loading) {
     return (
@@ -301,31 +227,18 @@ function Dashboard({ mudarSecao }) {
 
   return (
     <div className="container-fluid p-0">
-      {/* ── Zona 1: Pra voce agora ─────────────────────────────────────────── */}
-      <h5
-        className="fw-bold mb-3 mx-1"
-        style={{ fontFamily: 'var(--font-heading)', color: 'var(--text-1)' }}
-      >
-        Pra você agora
-      </h5>
+      {/* Feedback 26/07 ("app confuso; o que eu tenho que fazer?"): o topo do
+          Início mostrava os MESMOS prazos em 3 blocos — "Meu dia", mini-kanban
+          e "Próximos Prazos e Eventos" — com 3 chamadas iguais à API. Tudo isso
+          virou UMA fila: cada linha é uma ação com um botão. */}
+      <FilaDeTrabalho />
 
-      {/* Fase 4 — Meu dia: prazos de hoje, agenda de hoje e intimações não
-          tratadas, tudo clicável. A primeira resposta do app ao advogado. */}
-      <MeuDiaCard />
-
-      {/* ── Briefing do Dia ─────────────────────────────────────────────────── */}
-      {/* Feedback 12/06: o bloco "Atenção — Hoje" duplicava o Meu dia
-          (mesmos números em 3 lugares). Removido; sobrou só o indicador
-          de sincronização, que era a única informação exclusiva dele. */}
       {syncing && (
         <div className="text-muted small d-flex align-items-center gap-2 mb-3">
           <ArrowPathIcon style={{ width: 14, height: 14 }} className="text-primary" />
           Verificando novas publicações no DJEN...
         </div>
       )}
-
-      {/* ── Mini-Kanban de Prazos ──────────────────────────────────────────── */}
-      <MiniKanbanPrazos />
 
       {/* ── Banner onboarding DJEN ──────────────────────────────────────────── */}
       {oabsMonitoradas !== null && oabsMonitoradas.length === 0 && (
@@ -510,36 +423,8 @@ function Dashboard({ mudarSecao }) {
         </>
       )}
 
-      {/* ── Eventos + Consulta CNJ ───────────────────────────────────────────── */}
+      {/* ── Busca de processo ──────────────────────────────────────────────── */}
       <div className="row mt-4 g-3">
-        <div className="col-lg-6">
-          <div className="card shadow-sm h-100">
-            <div className="card-header bg-light">
-              <h2 className="h6 mb-0 text-dark">Próximos Prazos e Eventos</h2>
-            </div>
-            {proximosEventos && proximosEventos.length > 0 ? (
-              <ul className="list-group list-group-flush">
-                {proximosEventos.map((evento) => (
-                  <EventListItem
-                    key={evento.id}
-                    evento={evento}
-                    onClick={() => handleCardClick('AGENDA')}
-                  />
-                ))}
-              </ul>
-            ) : (
-              <div
-                className="card-body text-center d-flex align-items-center justify-content-center"
-                style={{ minHeight: '150px' }}
-              >
-                <p className="text-muted small mb-0">
-                  Nenhum prazo ou evento pendente nos próximos dias.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
         <div className="col-lg-6">
           {/* App leve: o formulario completo de busca CNJ ocupava metade do
               Inicio. Virou atalho — a busca continua em /casos/buscar e no

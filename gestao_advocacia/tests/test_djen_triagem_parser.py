@@ -46,9 +46,9 @@ TEXTO_REAL = (
 
 def test_texto_real_numero_processo():
     resultado = analisar_publicacao(MockPub(TEXTO_REAL))
-    assert (
-        resultado["numero_processo"] == "0000472-75.2025.8.16.0075"
-    ), f"Esperado '0000472-75.2025.8.16.0075', obtido {resultado['numero_processo']!r}"
+    assert resultado["numero_processo"] == "0000472-75.2025.8.16.0075", (
+        f"Esperado '0000472-75.2025.8.16.0075', obtido {resultado['numero_processo']!r}"
+    )
 
 
 def test_texto_real_tribunal():
@@ -59,17 +59,17 @@ def test_texto_real_tribunal():
 def test_texto_real_partes_autoras():
     resultado = analisar_publicacao(MockPub(TEXTO_REAL))
     autoras_norm = [normalizar_nome(p) for p in resultado["partes_autoras"]]
-    assert any(
-        "dirce de oliveira pedotti" in a for a in autoras_norm
-    ), f"'DIRCE DE OLIVEIRA PEDOTTI' não encontrado em partes_autoras: {resultado['partes_autoras']}"
+    assert any("dirce de oliveira pedotti" in a for a in autoras_norm), (
+        f"'DIRCE DE OLIVEIRA PEDOTTI' não encontrado em partes_autoras: {resultado['partes_autoras']}"
+    )
 
 
 def test_texto_real_partes_reus():
     resultado = analisar_publicacao(MockPub(TEXTO_REAL))
     reus_norm = [normalizar_nome(r) for r in resultado["partes_reus"]]
-    assert any(
-        "banco do brasil" in r for r in reus_norm
-    ), f"'Banco do Brasil S/A' não encontrado em partes_reus: {resultado['partes_reus']}"
+    assert any("banco do brasil" in r for r in reus_norm), (
+        f"'Banco do Brasil S/A' não encontrado em partes_reus: {resultado['partes_reus']}"
+    )
 
 
 def test_texto_real_confianca_minima():
@@ -112,30 +112,28 @@ def test_extrai_reu_acentuado():
     """'RÉU:' (acentuado) deve popular partes_reus — antes vinha vazio."""
     resultado = analisar_publicacao(MockPub(TEXTO_TRABALHISTA))
     reus_norm = [normalizar_nome(r) for r in resultado["partes_reus"]]
-    assert any(
-        "jose moacir ferracini" in r for r in reus_norm
-    ), f"réu acentuado não extraído: {resultado['partes_reus']}"
+    assert any("jose moacir ferracini" in r for r in reus_norm), (
+        f"réu acentuado não extraído: {resultado['partes_reus']}"
+    )
 
 
 def test_extrai_autor_e_separa_do_reu_acentuado():
     """Autor não deve 'vazar' pro nome do réu (stop label cobre RÉU acentuado)."""
     resultado = analisar_publicacao(MockPub(TEXTO_TRABALHISTA))
     autoras_norm = [normalizar_nome(a) for a in resultado["partes_autoras"]]
-    assert any(
-        "maria angela victor marcelino" in a for a in autoras_norm
-    ), f"autor não extraído: {resultado['partes_autoras']}"
+    assert any("maria angela victor marcelino" in a for a in autoras_norm), (
+        f"autor não extraído: {resultado['partes_autoras']}"
+    )
     # autor não pode conter "RÉU"/"JOSE" colado
-    assert all(
-        "jose" not in a for a in autoras_norm
-    ), f"autor vazou pro réu: {resultado['partes_autoras']}"
+    assert all("jose" not in a for a in autoras_norm), (
+        f"autor vazou pro réu: {resultado['partes_autoras']}"
+    )
 
 
 def test_extrai_reclamante_reclamado_trabalhista():
     """Termos trabalhistas RECLAMANTE/RECLAMADO também são reconhecidos."""
     texto = (
-        "Processo: 0000772-27.2025.5.09.0093 "
-        "RECLAMANTE: JOAO DA SILVA "
-        "RECLAMADO: EMPRESA ACME LTDA"
+        "Processo: 0000772-27.2025.5.09.0093 RECLAMANTE: JOAO DA SILVA RECLAMADO: EMPRESA ACME LTDA"
     )
     resultado = analisar_publicacao(MockPub(texto))
     autoras = [normalizar_nome(a) for a in resultado["partes_autoras"]]
@@ -166,9 +164,9 @@ def test_sem_numero_processo_confianca_baixa():
     texto = "Publicacao sem numero de processo. Apenas texto generico sem partes."
     resultado = analisar_publicacao(MockPub(texto))
     assert resultado["numero_processo"] is None
-    assert (
-        resultado["confianca"] < 0.5
-    ), f"Sem CNJ, confiança deveria ser < 0.5, obtida {resultado['confianca']}"
+    assert resultado["confianca"] < 0.5, (
+        f"Sem CNJ, confiança deveria ser < 0.5, obtida {resultado['confianca']}"
+    )
 
 
 def test_multiplos_autores():
@@ -181,9 +179,9 @@ def test_multiplos_autores():
     resultado = analisar_publicacao(MockPub(texto))
     assert resultado["partes_autoras"], "partes_autoras não deveria estar vazia"
     autoras_concat = " ".join(resultado["partes_autoras"]).lower()
-    assert (
-        "joao silva" in autoras_concat or "maria souza" in autoras_concat
-    ), f"Nenhum dos autores encontrado em: {resultado['partes_autoras']}"
+    assert "joao silva" in autoras_concat or "maria souza" in autoras_concat, (
+        f"Nenhum dos autores encontrado em: {resultado['partes_autoras']}"
+    )
     assert resultado["partes_reus"], "partes_reus não deveria estar vazia"
 
 
@@ -191,9 +189,9 @@ def test_normalizar_nome_caixa_mista():
     """normalizar_nome deve igualar 'Dirce De Oliveira Pedotti' e 'DIRCE DE OLIVEIRA PEDOTTI'."""
     nome_db = "DIRCE DE OLIVEIRA PEDOTTI"
     nome_extrato = "Dirce De Oliveira Pedotti"
-    assert normalizar_nome(nome_db) == normalizar_nome(
-        nome_extrato
-    ), f"{normalizar_nome(nome_db)!r} != {normalizar_nome(nome_extrato)!r}"
+    assert normalizar_nome(nome_db) == normalizar_nome(nome_extrato), (
+        f"{normalizar_nome(nome_db)!r} != {normalizar_nome(nome_extrato)!r}"
+    )
 
 
 def test_normalizar_nome_remove_acentos():
@@ -201,3 +199,45 @@ def test_normalizar_nome_remove_acentos():
     assert normalizar_nome("João da Silva") == normalizar_nome("Joao da Silva")
     assert normalizar_nome("Fernão") == normalizar_nome("Fernao")
     assert normalizar_nome("AÇÃO") == normalizar_nome("ACAO")
+
+
+# ---------------------------------------------------------------------------
+# Regressao (26/07/2026 — uso real): o texto do DJEN vem em HTML e os regex
+# rodavam nele cru. "AUTOR:&nbsp;DRYELLE..." extraia "&nbsp" e o modal
+# "Criar cliente e caso" abria com o nome VAZIO; a comarca vinha como
+# "Blumenau, para ci&ecirc;ncia das partes.".
+# ---------------------------------------------------------------------------
+TEXTO_HTML_NBSP = (
+    "Procedimento Comum C&iacute;vel N&ordm; 5028118-23.2026.8.24.0008/SC "
+    "AUTOR:&nbsp;DRYELLE BERTOLDO COSTAADVOGADO(A): ALISSON LUIZ GON&Ccedil;ALVES "
+    "(OAB PR094297) R&Eacute;U: BANCO EXEMPLO S/A "
+    "DESPACHO/DECIS&Atilde;O 5&ordf; Vara C&iacute;vel da Comarca de Blumenau, "
+    "para ci&ecirc;ncia das partes."
+)
+
+
+def test_extrai_autor_mesmo_com_entidade_html_nbsp():
+    """&nbsp; depois do label nao pode engolir o nome da parte."""
+    analise = analisar_publicacao(MockPub(TEXTO_HTML_NBSP))
+    assert "DRYELLE BERTOLDO COSTA" in (analise.get("partes_autoras") or [])
+    # nao pode sobrar lixo de entidade
+    assert not any("&nbsp" in p for p in (analise.get("partes_autoras") or []))
+
+
+def test_extrai_parte_sem_tag_html_colada():
+    """<br> entre a parte e o advogado nao pode entrar no nome."""
+    texto = "AUTOR: DRYELLE BERTOLDO COSTA<br>ADVOGADO(A): ALISSON"
+    analise = analisar_publicacao(MockPub(texto))
+    assert "DRYELLE BERTOLDO COSTA" in (analise.get("partes_autoras") or [])
+    assert not any("<" in p for p in (analise.get("partes_autoras") or []))
+
+
+def test_comarca_para_no_fim_do_nome():
+    """Comarca nao pode engolir o resto da frase nem manter entidade HTML."""
+    analise = analisar_publicacao(MockPub(TEXTO_HTML_NBSP))
+    assert analise.get("comarca") == "Blumenau"
+
+
+def test_comarca_com_nome_composto():
+    texto = "Vara Unica da Comarca de Sao Jose dos Pinhais - PR"
+    assert analisar_publicacao(MockPub(texto)).get("comarca") == "Sao Jose dos Pinhais"
