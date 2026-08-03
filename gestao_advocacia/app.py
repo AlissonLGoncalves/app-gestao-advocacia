@@ -38,9 +38,6 @@ from routes.api_registry import register_api_routes
 from utils.log_sanitizer import mask_user_id
 
 load_dotenv()
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads_documentos")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 def finance_access_required(fn):
@@ -123,7 +120,10 @@ from models import (  # noqa: E402, F401
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
-    app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+    # Respeita o caminho configurado por ambiente. Em producao, o volume
+    # persistente e montado em /data; sobrescrever esse valor aqui fazia os
+    # arquivos desaparecerem a cada deploy.
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     app.url_map.strict_slashes = False
 
     configure_json_logging(app)
@@ -320,6 +320,24 @@ def create_app(config_class=Config):
                 )
                 return
             user_tenant_id = _user.tenant_id
+            user_role = _user.role
+
+        # Cliente externo pertence ao mesmo tenant do escritorio, portanto
+        # RLS sozinho nao separa o Portal das APIs internas. A autorizacao
+        # precisa acontecer antes de qualquer endpoint consultar os dados.
+        if user_role == "cliente":
+            portal_allowed_paths = (
+                "/api/v1/portal",
+                "/api/v1/auth/me",
+            )
+            is_portal_path = any(
+                request.path == allowed or request.path.startswith(f"{allowed}/")
+                for allowed in portal_allowed_paths
+            )
+            if not is_portal_path:
+                return {
+                    "message": "Acesso restrito ao Portal do Cliente.",
+                }, 403
 
         if user_tenant_id is None:
             current_app.logger.warning(

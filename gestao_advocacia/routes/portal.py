@@ -14,6 +14,8 @@ def register_portal_routes(portal_ns):
         if not user or user.role != "cliente" or not user.portal_cliente_id:
             return None, None
         cliente = db.session.get(Cliente, user.portal_cliente_id)
+        if not cliente or cliente.tenant_id != user.tenant_id:
+            return None, None
         return user, cliente
 
     @portal_ns.route("/situacao")
@@ -29,7 +31,10 @@ def register_portal_routes(portal_ns):
             if not cliente:
                 return {"message": "Acesso restrito ao Portal do Cliente."}, 403
 
-            casos = Caso.query.filter_by(cliente_id=cliente.id).all()
+            casos = Caso.query.filter_by(
+                tenant_id=user.tenant_id,
+                cliente_id=cliente.id,
+            ).all()
             caso_ids = [c.id for c in casos]
 
             casos_data = [
@@ -56,6 +61,7 @@ def register_portal_routes(portal_ns):
                 ItemAgenda.query.filter(
                     ItemAgenda.tenant_id == user.tenant_id,
                     ItemAgenda.tipo == "evento",
+                    ItemAgenda.caso_id.in_(caso_ids),
                     ItemAgenda.data_inicio >= agora,
                 )
                 .order_by(ItemAgenda.data_inicio.asc())
@@ -75,7 +81,10 @@ def register_portal_routes(portal_ns):
             ]
 
             docs_raw = (
-                Documento.query.filter(Documento.caso_id.in_(caso_ids))
+                Documento.query.filter(
+                    Documento.tenant_id == user.tenant_id,
+                    Documento.caso_id.in_(caso_ids),
+                )
                 .order_by(Documento.data_upload.desc())
                 .limit(10)
                 .all()
@@ -91,8 +100,9 @@ def register_portal_routes(portal_ns):
             ]
 
             recebimentos_raw = Recebimento.query.filter(
+                Recebimento.tenant_id == user.tenant_id,
                 Recebimento.caso_id.in_(caso_ids),
-                Recebimento.recebido == False,  # noqa: E712
+                ~Recebimento.status.in_(["Pago", "Cancelado"]),
             ).all()
             pendencias = [
                 {
@@ -100,7 +110,7 @@ def register_portal_routes(portal_ns):
                     "descricao": r.descricao,
                     "valor": str(r.valor),
                     "data_vencimento": (
-                        r.data_recebimento.isoformat() if r.data_recebimento else None
+                        r.data_vencimento.isoformat() if r.data_vencimento else None
                     ),
                 }
                 for r in recebimentos_raw

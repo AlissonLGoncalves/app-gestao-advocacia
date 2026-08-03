@@ -13,6 +13,7 @@ from models import (
     Caso,
     Cliente,
     Despesa,
+    DjenOabMonitoramento,
     ItemAgenda,
     PublicacaoDJEN,
     Recebimento,
@@ -21,6 +22,199 @@ from models import (
 
 
 def register_dashboard_routes(app, dashboard_ns):
+    @dashboard_ns.route("/home")
+    class DashboardHomeAPI(Resource):
+        @jwt_required()
+        @dashboard_ns.doc(
+            security="jsonWebToken",
+            description="Retorna a visao operacional enxuta da tela inicial.",
+        )
+        def get(self):
+            user_id = get_jwt_identity()
+            tenant_id = get_tenant_id()
+            hoje = datetime.utcnow().date()
+            amanha = hoje + timedelta(days=1)
+            user = db.session.get(User, int(user_id))
+
+            status_inativos = ["Concluido", "Arquivado", "Encerrado"]
+            total_clientes = Cliente.query.filter_by(user_id=user_id).count()
+            casos_ativos = Caso.query.filter(
+                Caso.user_id == user_id,
+                ~Caso.status.in_(status_inativos),
+            ).count()
+
+            tarefas_ativas = ItemAgenda.query.filter(
+                ItemAgenda.user_id == user_id,
+                ItemAgenda.tipo == "tarefa",
+                ~ItemAgenda.status.in_(["Concluido", "Cancelado"]),
+            )
+            tarefas_vencidas = tarefas_ativas.filter(
+                ItemAgenda.data_vencimento.isnot(None),
+                func.date(ItemAgenda.data_vencimento) < hoje,
+            ).count()
+            tarefas_hoje = tarefas_ativas.filter(
+                ItemAgenda.data_vencimento.isnot(None),
+                func.date(ItemAgenda.data_vencimento) == hoje,
+            ).count()
+            tarefas_prioritarias = (
+                tarefas_ativas.filter(ItemAgenda.data_vencimento.isnot(None))
+                .order_by(ItemAgenda.data_vencimento.asc())
+                .limit(5)
+                .all()
+            )
+
+            caso_ids_tarefas = {item.caso_id for item in tarefas_prioritarias if item.caso_id}
+            casos_tarefas = {
+                caso.id: caso
+                for caso in Caso.query.filter(
+                    Caso.tenant_id == tenant_id,
+                    Caso.id.in_(caso_ids_tarefas),
+                ).all()
+            }
+
+            tarefas = []
+            for item in tarefas_prioritarias:
+                vencimento = item.data_vencimento.date() if item.data_vencimento else None
+                if vencimento and vencimento < hoje:
+                    urgencia = "vencido"
+                elif vencimento == hoje:
+                    urgencia = "hoje"
+                else:
+                    urgencia = "proximo"
+                caso = casos_tarefas.get(item.caso_id)
+                tarefas.append(
+                    {
+                        "id": item.id,
+                        "titulo": item.titulo,
+                        "categoria": item.categoria,
+                        "prioridade": item.prioridade,
+                        "status": item.status,
+                        "data_vencimento": (
+                            item.data_vencimento.isoformat() if item.data_vencimento else None
+                        ),
+                        "urgencia": urgencia,
+                        "caso_id": item.caso_id,
+                        "caso_titulo": caso.titulo if caso else None,
+                    }
+                )
+
+            eventos_hoje = ItemAgenda.query.filter(
+                ItemAgenda.user_id == user_id,
+                ItemAgenda.tipo == "evento",
+                ~ItemAgenda.status.in_(["Concluido", "Cancelado"]),
+                ItemAgenda.data_inicio >= datetime.combine(hoje, datetime.min.time()),
+                ItemAgenda.data_inicio < datetime.combine(amanha, datetime.min.time()),
+            ).count()
+
+            djen_pendentes = PublicacaoDJEN.query.filter(
+                PublicacaoDJEN.tenant_id == tenant_id,
+                PublicacaoDJEN.ativo.is_(True),
+                PublicacaoDJEN.triagem_ignorada.is_(False),
+                PublicacaoDJEN.caso_id.is_(None),
+            ).count()
+            djen_hoje = PublicacaoDJEN.query.filter(
+                PublicacaoDJEN.tenant_id == tenant_id,
+                PublicacaoDJEN.ativo.is_(True),
+                PublicacaoDJEN.data_disponibilizacao == hoje,
+            ).count()
+
+            financeiro = None
+            if not user or user.role != "assistente":
+                recebimentos_vencidos = Recebimento.query.filter(
+                    Recebimento.user_id == user_id,
+                    ~Recebimento.status.in_(["Pago", "Cancelado"]),
+                    Recebimento.data_vencimento.isnot(None),
+                    Recebimento.data_vencimento < hoje,
+                ).all()
+                despesas_vencidas = Despesa.query.filter(
+                    Despesa.user_id == user_id,
+                    ~Despesa.status.in_(["Pago", "Cancelado"]),
+                    Despesa.data_vencimento.isnot(None),
+                    Despesa.data_vencimento < hoje,
+                ).all()
+                financeiro = {
+                    "quantidade": len(recebimentos_vencidos) + len(despesas_vencidas),
+                    "valor_total": round(
+                        sum(float(item.valor or 0) for item in recebimentos_vencidos)
+                        + sum(float(item.valor or 0) for item in despesas_vencidas),
+                        2,
+                    ),
+                    "recebimentos_vencidos": len(recebimentos_vencidos),
+                    "despesas_vencidas": len(despesas_vencidas),
+                }
+
+            publicacoes = (
+                PublicacaoDJEN.query.filter(
+                    PublicacaoDJEN.tenant_id == tenant_id,
+                    PublicacaoDJEN.ativo.is_(True),
+                )
+                .order_by(
+                    PublicacaoDJEN.data_disponibilizacao.desc(),
+                    PublicacaoDJEN.id.desc(),
+                )
+                .limit(5)
+                .all()
+            )
+            caso_ids = {pub.caso_id for pub in publicacoes if pub.caso_id}
+            casos = {
+                caso.id: caso
+                for caso in Caso.query.filter(
+                    Caso.tenant_id == tenant_id,
+                    Caso.id.in_(caso_ids),
+                ).all()
+            }
+            cliente_ids = {caso.cliente_id for caso in casos.values() if caso.cliente_id}
+            clientes = {
+                cliente.id: cliente
+                for cliente in Cliente.query.filter(
+                    Cliente.tenant_id == tenant_id,
+                    Cliente.id.in_(cliente_ids),
+                ).all()
+            }
+            publicacoes_recentes = []
+            for pub in publicacoes:
+                caso = casos.get(pub.caso_id)
+                cliente = clientes.get(caso.cliente_id) if caso else None
+                publicacoes_recentes.append(
+                    {
+                        "id": pub.id,
+                        "data": (
+                            pub.data_disponibilizacao.isoformat()
+                            if pub.data_disponibilizacao
+                            else None
+                        ),
+                        "tribunal": pub.sigla_tribunal or "DJEN",
+                        "numero_processo": pub.numero_processo or "",
+                        "resumo": " ".join((pub.texto or "").split())[:180],
+                        "lida": bool(pub.lida),
+                        "caso_id": pub.caso_id,
+                        "caso_titulo": caso.titulo if caso else None,
+                        "cliente_nome": cliente.nome_razao_social if cliente else None,
+                    }
+                )
+
+            oabs_monitoradas = DjenOabMonitoramento.query.filter_by(
+                tenant_id=tenant_id,
+            ).count()
+
+            return {
+                "resumo": {
+                    "clientes": total_clientes,
+                    "casos_ativos": casos_ativos,
+                    "intimacoes_pendentes": djen_pendentes,
+                    "prazos_urgentes": tarefas_vencidas + tarefas_hoje,
+                    "financeiro_vencido": financeiro,
+                },
+                "hoje": {
+                    "prazos": tarefas_hoje,
+                    "eventos": eventos_hoje,
+                    "publicacoes": djen_hoje,
+                },
+                "tarefas_prioritarias": tarefas,
+                "publicacoes_recentes": publicacoes_recentes,
+                "monitoramento_djen_configurado": oabs_monitoradas > 0,
+            }, 200
+
     @dashboard_ns.route("/stats")
     class DashboardStatsAPI(Resource):
         @jwt_required()
@@ -305,6 +499,12 @@ def register_dashboard_routes(app, dashboard_ns):
             except (ValueError, TypeError):
                 dias = 7
 
+            try:
+                limite = int(request.args.get("limite", 20))
+            except (ValueError, TypeError):
+                limite = 20
+            limite = max(1, min(limite, 50))
+
             # Data inicial (hoje - dias)
             hoje = datetime.utcnow().date()
             data_inicio = hoje - timedelta(days=dias - 1)
@@ -318,7 +518,23 @@ def register_dashboard_routes(app, dashboard_ns):
                 PublicacaoDJEN.ativo.is_(True),
             ).order_by(PublicacaoDJEN.data_disponibilizacao.desc())
 
-            publicacoes = query.all()
+            publicacoes = query.limit(limite).all()
+            caso_ids = {pub.caso_id for pub in publicacoes if pub.caso_id}
+            casos = {
+                caso.id: caso
+                for caso in Caso.query.filter(
+                    Caso.tenant_id == tenant_id,
+                    Caso.id.in_(caso_ids),
+                ).all()
+            }
+            cliente_ids = {caso.cliente_id for caso in casos.values() if caso.cliente_id}
+            clientes = {
+                cliente.id: cliente
+                for cliente in Cliente.query.filter(
+                    Cliente.tenant_id == tenant_id,
+                    Cliente.id.in_(cliente_ids),
+                ).all()
+            }
 
             # Agrupar por data
             grupos_dict = defaultdict(list)
@@ -327,13 +543,11 @@ def register_dashboard_routes(app, dashboard_ns):
                     data_str = pub.data_disponibilizacao.isoformat()
                     cliente_nome = "N/A"
                     cliente_id = None
-                    if pub.caso_id:
-                        caso = Caso.query.get(pub.caso_id)
-                        if caso and caso.cliente_id:
-                            cliente = Cliente.query.get(caso.cliente_id)
-                            if cliente:
-                                cliente_nome = cliente.nome_razao_social
-                                cliente_id = cliente.id
+                    caso = casos.get(pub.caso_id)
+                    cliente = clientes.get(caso.cliente_id) if caso else None
+                    if cliente:
+                        cliente_nome = cliente.nome_razao_social
+                        cliente_id = cliente.id
 
                     resumo = pub.texto[:200] if pub.texto else ""
 
@@ -389,6 +603,7 @@ def register_dashboard_routes(app, dashboard_ns):
 
             return {
                 "dias": dias,
+                "limite": limite,
                 "grupos": grupos_list,
             }, 200
 

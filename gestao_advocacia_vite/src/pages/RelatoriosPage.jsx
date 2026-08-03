@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { lazy, Suspense, useState, useEffect, useCallback } from 'react'
 import { toast } from 'react-toastify'
 import {
   getRelatorioContasAReceber,
@@ -6,6 +6,8 @@ import {
   getRelatorioFluxoCaixa,
   getRelatorioCasosStatus,
 } from '../api/financeiro.js'
+
+const DashboardCharts = lazy(() => import('../components/DashboardCharts.jsx'))
 
 const fmtBRL = (v) =>
   parseFloat(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -402,6 +404,12 @@ const RELATORIOS = [
   { id: 'contas_pagar', label: 'Contas a Pagar', icon: 'bi-arrow-up-circle-fill', cor: 'danger' },
   { id: 'fluxo_caixa', label: 'Fluxo de Caixa', icon: 'bi-bar-chart-fill', cor: 'primary' },
   { id: 'casos_status', label: 'Casos por Status', icon: 'bi-pie-chart-fill', cor: 'warning' },
+  {
+    id: 'panorama',
+    label: 'Visão Analítica',
+    icon: 'bi-graph-up-arrow',
+    cor: 'info',
+  },
 ]
 
 function RelatoriosPage() {
@@ -417,6 +425,12 @@ function RelatoriosPage() {
         return <FluxoCaixa />
       case 'casos_status':
         return <CasosStatus />
+      case 'panorama':
+        return (
+          <Suspense fallback={<div className="text-muted small py-4">Carregando gráficos...</div>}>
+            <DashboardCharts />
+          </Suspense>
+        )
       default:
         return (
           <div className="text-center py-5 text-muted">
@@ -441,7 +455,7 @@ function RelatoriosPage() {
         {/* Seletor de relatório */}
         <div className="row g-3 mb-4">
           {RELATORIOS.map((r) => (
-            <div key={r.id} className="col-6 col-md-3">
+            <div key={r.id} className="col-6 col-md">
               <button
                 className={`card border-2 w-100 text-start p-3 shadow-sm transition ${ativo === r.id ? `border-${r.cor} bg-${r.cor} bg-opacity-10` : 'border-light bg-white'}`}
                 style={{ cursor: 'pointer' }}

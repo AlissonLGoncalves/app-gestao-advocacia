@@ -80,10 +80,21 @@ import {
   BuildingOffice2Icon,
 } from '@heroicons/react/24/outline'
 
+const getStoredRole = () => {
+  try {
+    return JSON.parse(localStorage.getItem('user') || '{}').role || ''
+  } catch {
+    return ''
+  }
+}
+
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token')
   if (!token) {
     return <Navigate to="/login" replace />
+  }
+  if (getStoredRole() === 'cliente') {
+    return <Navigate to="/portal" replace />
   }
   return children
 }
@@ -93,7 +104,9 @@ const ProtectedRoute = ({ children }) => {
 // anterior. Caso contrario mostra a LandingPage publica para captacao.
 const HomeRoute = () => {
   const token = localStorage.getItem('token')
-  if (token) return <Navigate to="/dashboard" replace />
+  if (token) {
+    return <Navigate to={getStoredRole() === 'cliente' ? '/portal' : '/dashboard'} replace />
+  }
   return <LandingPage />
 }
 
