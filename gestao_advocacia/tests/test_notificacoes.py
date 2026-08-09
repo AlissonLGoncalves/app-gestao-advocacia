@@ -177,28 +177,6 @@ def test_cron_nao_cria_para_pago(auth_client, db, app):
     assert Notificacao.query.count() == 0
 
 
-def test_cron_cria_para_despesa_atrasada(auth_client, db, app):
-    atrasada = (hoje_brasil() - timedelta(days=2)).isoformat()
-    auth_client.post(
-        "/api/v1/despesas",
-        json={
-            "descricao": "Aluguel",
-            "valor": 3000,
-            "data_vencimento": atrasada,
-            "status": "Pendente",
-        },
-    )
-
-    job_verificar_vencimentos(app)
-
-    notifs = Notificacao.query.filter_by(tipo="despesa_atrasada").all()
-    assert len(notifs) == 1
-    assert notifs[0].link.startswith("/despesas/editar/")
-
-
-# ===== N3: e-mail de vencimento (opt-in) =====
-
-
 def test_me_expoe_preferencia_email_default_true(auth_client, db):
     res = auth_client.get("/api/v1/auth/me")
     assert res.status_code == 200

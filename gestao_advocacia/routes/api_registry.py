@@ -16,9 +16,6 @@ from .itens_agenda import register_itens_agenda_routes
 from .nfse import register_nfse_routes
 from .notificacoes import register_notificacoes_routes
 from .portal import register_portal_routes
-from .procuracoes import register_procuracoes_routes
-from .projudi import register_projudi_routes
-from .relatorios import register_relatorios_routes
 from .tenant import register_tenant_routes
 
 
@@ -38,12 +35,8 @@ def register_api_routes(app, api, finance_access_required):
     dashboard_ns = Namespace("dashboard", description="Dados agregados para o Dashboard")
     audit_ns = Namespace("auditoria", description="Trilhas de Auditoria e Logs (LGPD)")
     djen_ns = Namespace("djen", description="Publicacoes DJEN")
-    procuracoes_ns = Namespace("procuracoes", description="Analise de procuracoes via Gemini")
     tenant_ns = Namespace("tenant", description="Dados do Escritorio (Tenant)")
-    relatorios_ns = Namespace("relatorios", description="Relatorios Gerenciais")
     portal_ns = Namespace("portal", description="Portal do Cliente (acesso simplificado)")
-    projudi_ns = Namespace("projudi", description="Integracao com projudi-agent (scraper local)")
-    modelos_ns = Namespace("modelos", description="Modelos editaveis de documentos juridicos")
     notificacoes_ns = Namespace("notificacoes", description="Notificacoes in-app do usuario")
     nfse_ns = Namespace("nfse", description="Emissao de Notas Fiscais de Servico eletronicas")
     itens_agenda_ns = Namespace(
@@ -58,12 +51,8 @@ def register_api_routes(app, api, finance_access_required):
     api.add_namespace(dashboard_ns)
     api.add_namespace(audit_ns)
     api.add_namespace(djen_ns)
-    api.add_namespace(procuracoes_ns)
     api.add_namespace(tenant_ns)
-    api.add_namespace(relatorios_ns)
     api.add_namespace(portal_ns)
-    api.add_namespace(projudi_ns)
-    api.add_namespace(modelos_ns)
     api.add_namespace(notificacoes_ns)
     api.add_namespace(nfse_ns)
     api.add_namespace(itens_agenda_ns)
@@ -394,20 +383,6 @@ def register_api_routes(app, api, finance_access_required):
         },
     )
 
-    procuracao_model_dto = procuracoes_ns.model(
-        "ProcuracaoAnaliseOutput",
-        {
-            "id": fields.Integer(readonly=True),
-            "status": fields.String(description="pending|processing|done|failed"),
-            "dados_extraidos": fields.Raw(description="JSON estruturado extraído via Gemini"),
-            "avisos_validacao": fields.List(fields.String, description="Avisos de validação"),
-            "erro": fields.String(description="Mensagem de erro quando status=failed"),
-            "arquivo_hash": fields.String(description="SHA256 do arquivo"),
-            "criado_em": fields.DateTime(dt_format="iso8601"),
-            "processado_em": fields.DateTime(dt_format="iso8601", nullable=True),
-        },
-    )
-
     # DTOs do modelo unificado ItemAgenda (PR D1). Schema rico que
     # absorve tanto o vocabulario de TarefaPrazo quanto de EventoAgenda.
     item_agenda_input_dto = itens_agenda_ns.model(
@@ -502,7 +477,6 @@ def register_api_routes(app, api, finance_access_required):
         app, itens_agenda_ns, item_agenda_input_dto, item_agenda_output_dto
     )
     register_documentos_routes(app, documentos_ns, documento_model_dto)
-    register_procuracoes_routes(app, procuracoes_ns, procuracao_model_dto)
     register_financeiro_api(app, api, finance_access_required)
 
     try:
@@ -523,9 +497,4 @@ def register_api_routes(app, api, finance_access_required):
 
     register_auditoria_routes(audit_ns, audit_log_model_dto)
     register_tenant_routes(tenant_ns)
-    register_relatorios_routes(relatorios_ns, finance_access_required)
     register_portal_routes(portal_ns)
-    register_projudi_routes(app, projudi_ns)
-    from .modelos_documento import register_modelos_routes  # noqa: PLC0415
-
-    register_modelos_routes(modelos_ns)

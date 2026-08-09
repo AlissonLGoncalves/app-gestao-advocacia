@@ -1,111 +1,17 @@
 from flask_restx import Namespace, fields
 
 from .contratos import register_contratos_routes
-from .despesas import register_despesas_routes
 from .recebimentos import register_recebimentos_routes
 
 
 def register_financeiro_api(app, api, finance_access_required):
-    despesas_ns = Namespace("despesas", description="Operacoes de Despesas")
     recebimentos_ns = Namespace("recebimentos", description="Operacoes de Recebimentos")
     contratos_ns = Namespace(
         "contratos", description="Operacoes relacionadas aos Contratos de Honorarios"
     )
 
-    api.add_namespace(despesas_ns)
     api.add_namespace(recebimentos_ns)
     api.add_namespace(contratos_ns)
-
-    despesa_input_model_dto = despesas_ns.model(
-        "DespesaInput",
-        {
-            "descricao": fields.String(required=True, description="Descricao da despesa"),
-            "valor": fields.Float(required=True, description="Valor (ex: 150.75)", min=0.01),
-            "data_vencimento": fields.Date(description="Data de vencimento (opcional)"),
-            "data_pagamento": fields.Date(description="Data efetiva do pagamento"),
-            "status": fields.String(
-                description='"Pendente"|"Pago"|"Vencido"|"Cancelado"|"Em Negociacao"',
-                enum=["Pendente", "Pago", "Vencido", "Cancelado", "Em Negociacao"],
-            ),
-            "categoria": fields.String(),
-            "forma_pagamento": fields.String(),
-            "notas": fields.String(),
-            "fornecedor": fields.String(description="Loja/prestador (texto livre, opcional)"),
-            "cliente_id": fields.Integer(description="Cliente vinculado (para reembolso)"),
-            "caso_id": fields.Integer(),
-            # Aliases legados retidos por compat com clients antigos
-            "data_despesa": fields.Date(description="[DEPRECATED] use data_vencimento"),
-            "pago": fields.Boolean(description='[DEPRECATED] use status=="Pago"'),
-        },
-    )
-
-    despesa_model_dto = despesas_ns.model(
-        "DespesaOutput",
-        {
-            "id": fields.Integer(readonly=True),
-            "descricao": fields.String,
-            "valor": fields.String(attribute=lambda x: str(x.valor)),
-            "status": fields.String,
-            "data_vencimento": fields.Date(dt_format="iso8601"),
-            "data_pagamento": fields.Date(dt_format="iso8601"),
-            "categoria": fields.String,
-            "forma_pagamento": fields.String,
-            "notas": fields.String,
-            "fornecedor": fields.String,
-            "cliente_id": fields.Integer(nullable=True),
-            "caso_id": fields.Integer(nullable=True),
-            # Nome do cliente e titulo do caso resolvidos via relationship
-            # (viewonly). Evita N+1 com lazy="select" padrao? Nao: cada acesso
-            # gera 1 query por linha. Como a lista financeira eh tipicamente
-            # pequena (<200 itens), aceitavel. Se virar gargalo, trocar por
-            # joinedload no get_list_query.
-            "cliente_nome": fields.String(
-                attribute=lambda d: getattr(getattr(d, "cliente", None), "nome_razao_social", None)
-            ),
-            "caso_titulo": fields.String(
-                attribute=lambda d: getattr(getattr(d, "caso", None), "titulo", None)
-            ),
-            "user_id": fields.Integer,
-            "recorrencia_id": fields.Integer(nullable=True),
-            "numero_parcela": fields.Integer(nullable=True),
-            # Compat retroativa
-            "data_despesa": fields.Date(dt_format="iso8601"),
-            "pago": fields.Boolean,
-        },
-    )
-
-    despesa_serie_input_dto = despesas_ns.model(
-        "DespesaSerieInput",
-        {
-            "tipo": fields.String(
-                required=True,
-                enum=["RECORRENTE", "PARCELADO"],
-                description="RECORRENTE (aluguel mensal) ou PARCELADO (compra em N x).",
-            ),
-            "frequencia": fields.String(enum=["MENSAL", "SEMANAL", "QUINZENAL", "ANUAL"]),
-            "valor_parcela": fields.Float(required=True, min=0.01),
-            "total_parcelas": fields.Integer(
-                description="Obrigatorio se PARCELADO; default 12 se RECORRENTE."
-            ),
-            "data_inicio": fields.Date(required=True),
-            "descricao": fields.String(required=True),
-            "categoria": fields.String(),
-            "fornecedor": fields.String(),
-            "cliente_id": fields.Integer(),
-            "caso_id": fields.Integer(),
-            "notas": fields.String(),
-        },
-    )
-
-    despesa_serie_output_dto = despesas_ns.model(
-        "DespesaSerieOutput",
-        {
-            "recorrencia_id": fields.Integer,
-            "tipo": fields.String,
-            "total_geradas": fields.Integer,
-            "parcelas": fields.List(fields.Nested(despesa_model_dto)),
-        },
-    )
 
     recebimento_input_model_dto = recebimentos_ns.model(
         "RecebimentoInput",
@@ -292,16 +198,6 @@ def register_financeiro_api(app, api, finance_access_required):
             "cliente_id": fields.Integer,
             "user_id": fields.Integer,
         },
-    )
-
-    register_despesas_routes(
-        app,
-        despesas_ns,
-        despesa_input_model_dto,
-        despesa_model_dto,
-        despesa_serie_input_dto,
-        despesa_serie_output_dto,
-        finance_access_required,
     )
 
     register_recebimentos_routes(

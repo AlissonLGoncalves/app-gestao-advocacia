@@ -28,9 +28,6 @@
     "@fullcalendar/timegrid": "^6.1.17",
     "@heroicons/react": "^2.2.0",
     "@popperjs/core": "^2.11.8",
-    "@tiptap/pm": "^3.23.6",
-    "@tiptap/react": "^3.23.6",
-    "@tiptap/starter-kit": "^3.23.6",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
     "jspdf": "^4.2.1",
@@ -41,7 +38,6 @@
     "react-markdown": "^10.1.0",
     "react-router": "^8.3.0",
     "react-toastify": "^11.1.0",
-    "recharts": "3.8.1",
     "web-vitals": "^5.3.0"
   },
   "devDependencies": {
