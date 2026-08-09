@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 
-from app import Caso, Cliente, ProcuracaoAnalise, User, db
+from app import Caso, Cliente, User, db
 from models import ContratoHonorario
 
 
@@ -171,34 +171,6 @@ def test_baixar_arquivo_contrato_200_quando_pdf_existe(client):
 def test_baixar_arquivo_contrato_sem_token_401(client):
     res = client.get("/api/v1/contratos/1/arquivo")
     assert res.status_code == 401
-
-
-def test_baixar_arquivo_procuracao_403_cross_tenant(client):
-    token_a, user_a = _register_and_login(client, "tenanta")
-    token_b, user_b = _register_and_login(client, "tenantb")
-
-    pdf_path = _criar_pdf_temporario()
-    try:
-        with client.application.app_context():
-            proc = ProcuracaoAnalise(
-                tenant_id=user_a["tenant_id"],
-                user_id=user_a["id"],
-                arquivo_path=pdf_path,
-                arquivo_hash="abc123",
-                status="done",
-            )
-            db.session.add(proc)
-            db.session.commit()
-            proc_id = proc.id
-
-        # Tenant B tenta baixar procuracao do Tenant A
-        res = client.get(f"/api/v1/procuracoes/{proc_id}/arquivo", headers=_headers(token_b))
-        assert res.status_code == 403
-    finally:
-        try:
-            os.unlink(pdf_path)
-        except (OSError, PermissionError):
-            pass
 
 
 def test_listar_documentos_caso_de_outro_tenant_404(client):

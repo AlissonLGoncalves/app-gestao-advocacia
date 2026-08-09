@@ -9,3 +9,7 @@ backups/
 # Per-machine local settings — nao deve ser versionado.
 .claude/settings.local.json
 gestao_advocacia/out/
+
+# artefatos gerados pelos testes do backend
+gestao_advocacia/uploads_test/
+gestao_advocacia/app_test.db

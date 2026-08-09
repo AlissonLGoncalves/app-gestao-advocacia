@@ -4,7 +4,6 @@ from .casos import register_casos_routes as register_casos_routes
 from .clientes import register_clientes_routes as register_clientes_routes
 from .contratos import register_contratos_routes as register_contratos_routes
 from .dashboard import register_dashboard_routes as register_dashboard_routes
-from .despesas import register_despesas_routes as register_despesas_routes
 from .documentos import register_documentos_routes as register_documentos_routes
 from .health import register_health_route as register_health_route
 from .itens_agenda import register_itens_agenda_routes as register_itens_agenda_routes

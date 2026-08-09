@@ -27,14 +27,11 @@ const RecebimentosHistoricoPage = lazy(() => import('./pages/RecebimentosHistori
 const NotasFiscaisPage = lazy(() => import('./pages/NotasFiscaisPage.jsx'))
 const ClienteDetalhePage = lazy(() => import('./pages/ClienteDetalhePage.jsx'))
 const ContratosPage = lazy(() => import('./pages/ContratosPage.jsx'))
-const DespesasPage = lazy(() => import('./pages/DespesasPage.jsx'))
 const AgendaUnificadaPage = lazy(() => import('./pages/AgendaUnificadaPage.jsx'))
 const DocumentosPage = lazy(() => import('./pages/DocumentosPage.jsx'))
-const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage.jsx'))
 // Hubs do "menu enxuto": uma entrada de sidebar -> tela com abas que reembrulha
 // páginas já existentes (Financeiro, Documentos+Modelos, Configurações).
 const FinanceiroPage = lazy(() => import('./pages/FinanceiroPage.jsx'))
-const DocumentosHubPage = lazy(() => import('./pages/DocumentosHubPage.jsx'))
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage.jsx'))
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage.jsx'))
 const TermsPage = lazy(() => import('./pages/auth/TermsPage.jsx'))
@@ -43,12 +40,9 @@ const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage.jsx'
 const SolicitarAcessoPage = lazy(() => import('./pages/SolicitarAcessoPage.jsx'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'))
 const IntegracoesPage = lazy(() => import('./pages/IntegracoesPage.jsx'))
-const ModelosDocumentoPage = lazy(() => import('./pages/ModelosDocumentoPage.jsx'))
 const DjenPage = lazy(() => import('./pages/DjenPage.jsx'))
-const TriagemAssistidaPage = lazy(() => import('./pages/TriagemAssistidaPage.jsx'))
 const PerfilPage = lazy(() => import('./pages/PerfilPage.jsx'))
 const OnboardingPage = lazy(() => import('./pages/auth/OnboardingPage.jsx'))
-const NovoClientePorProcuracao = lazy(() => import('./pages/clientes/NovoClientePorProcuracao.jsx'))
 const PortalPage = lazy(() => import('./pages/portal/PortalPage.jsx'))
 const PortalRegisterPage = lazy(() => import('./pages/portal/PortalRegisterPage.jsx'))
 // admin-fase0: paginas do backoffice super-admin
@@ -661,7 +655,6 @@ function App() {
 
             <Route path="clientes" element={<ClientesPage />} />
             <Route path="clientes/novo" element={<ClientesPage />} />
-            <Route path="clientes/novo/procuracao" element={<NovoClientePorProcuracao />} />
             <Route path="clientes/editar/:clienteId" element={<ClientesPage />} />
             {/* PR #249: drill-down do cliente. /clientes/:id agora abre pagina
               de detalhe com abas (Dados, Casos, Contratos, Documentos,
@@ -686,10 +679,6 @@ function App() {
 
             <Route path="contratos" element={<ContratosPage />} />
 
-            <Route path="despesas" element={<DespesasPage />} />
-            <Route path="despesas/novo" element={<DespesasPage />} />
-            <Route path="despesas/editar/:despesaId" element={<DespesasPage />} />
-
             <Route path="nfse" element={<NotasFiscaisPage />} />
 
             {/* Hub Financeiro: /financeiro?aba=recebimentos|contratos|despesas|notas.
@@ -707,21 +696,16 @@ function App() {
 
             {/* Hub Documentos: /documentos abre abas (Documentos | Modelos).
                 /documentos/novo|editar continuam na DocumentosPage standalone. */}
-            <Route path="documentos" element={<DocumentosHubPage />} />
             <Route path="documentos/novo" element={<DocumentosPage />} />
             <Route path="documentos/editar/:documentoId" element={<DocumentosPage />} />
 
             <Route path="djen" element={<DjenPage />} />
-            <Route path="djen/triagem-assistida" element={<TriagemAssistidaPage />} />
-
-            <Route path="relatorios" element={<RelatoriosPage />} />
 
             {/* Hub Configurações: /configuracoes abre abas (Escritório |
                 Integrações | Meu perfil). As rotas standalone abaixo seguem
                 válidas pra deep-links e back-compat. */}
             <Route path="configuracoes" element={<ConfiguracoesPage />} />
             <Route path="integracoes" element={<IntegracoesPage />} />
-            <Route path="modelos" element={<ModelosDocumentoPage />} />
             <Route path="perfil" element={<PerfilPage />} />
 
             {/* admin-fase0: rotas do backoffice (gated por SuperAdminRoute) */}

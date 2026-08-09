@@ -124,24 +124,6 @@ def _make_documento(client, token, cliente_id, caso_id, tag):
     return json.loads(resp.data)["id"]
 
 
-def _make_despesa(client, token, caso_id, tag):
-    resp = _auth_json(
-        client,
-        "post",
-        "/api/v1/despesas",
-        token,
-        {
-            "descricao": f"Despesa {tag}",
-            "valor": 100.5,
-            "data_despesa": date.today().isoformat(),
-            "caso_id": caso_id,
-            "pago": False,
-        },
-    )
-    assert resp.status_code == 201, resp.data
-    return json.loads(resp.data)["id"]
-
-
 def _make_recebimento(client, token, caso_id, tag):
     resp = _auth_json(
         client,
@@ -261,9 +243,6 @@ def tenants_setup(client, app, db):
     documento_a = _make_documento(client, token_a, cliente_a, caso_a, 1)
     documento_b = _make_documento(client, token_b, cliente_b, caso_b, 2)
 
-    despesa_a = _make_despesa(client, token_a, caso_a, 1)
-    despesa_b = _make_despesa(client, token_b, caso_b, 2)
-
     recebimento_a = _make_recebimento(client, token_a, caso_a, 1)
     recebimento_b = _make_recebimento(client, token_b, caso_b, 2)
 
@@ -292,7 +271,6 @@ def tenants_setup(client, app, db):
             "caso": caso_a,
             "evento": evento_a,
             "documento": documento_a,
-            "despesa": despesa_a,
             "recebimento": recebimento_a,
             "contrato": contrato_a,
             "tarefa": tarefa_a,
@@ -304,7 +282,6 @@ def tenants_setup(client, app, db):
             "caso": caso_b,
             "evento": evento_b,
             "documento": documento_b,
-            "despesa": despesa_b,
             "recebimento": recebimento_b,
             "contrato": contrato_b,
             "tarefa": tarefa_b,
@@ -325,7 +302,6 @@ def tenants_setup(client, app, db):
         # /itens-agenda. Listamos pela nova rota.
         ("/api/v1/itens-agenda", None, "evento", "Evento 1", "Evento 2"),
         ("/api/v1/documentos", "documentos", "documento", "Documento 1", "Documento 2"),
-        ("/api/v1/despesas", "despesas", "despesa", "Despesa 1", "Despesa 2"),
         ("/api/v1/recebimentos", "recebimentos", "recebimento", "Recebimento 1", "Recebimento 2"),
         ("/api/v1/contratos", "contratos", "contrato", "Contrato 1", "Contrato 2"),
         ("/api/v1/djen/oabs", None, "oab", "90001", "90002"),
@@ -397,20 +373,6 @@ def test_listagens_nunca_vazam_outro_tenant(
             None,
             "/api/v1/documentos/{id}",
             None,
-        ),
-        (
-            "despesa",
-            "despesa",
-            "/api/v1/despesas/{id}",
-            "/api/v1/despesas/{id}",
-            "put",
-            "/api/v1/despesas/{id}",
-            {
-                "descricao": "Despesa atualizada",
-                "valor": 101.0,
-                "data_despesa": date.today().isoformat(),
-                "pago": True,
-            },
         ),
         (
             "recebimento",
