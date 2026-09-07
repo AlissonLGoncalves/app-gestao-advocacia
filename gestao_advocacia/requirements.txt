@@ -22,7 +22,7 @@ psycopg2-binary==2.9.12
 PyJWT==2.13.0
 # pypdf 6.13.3: fecha CVE-2026-48155/48156/48735/49460/49461/54530/54531 e
 # GHSA-jm82-fx9c-mx94 (DoS/parse) reportados pelo pip-audit do CI.
-pypdf==6.14.2
+pypdf==6.16.1
 pypdfium2==5.8.0
 pytesseract==0.3.13
 python-json-logger==4.1.0
@@ -45,7 +45,7 @@ SQLAlchemy==2.0.50
 urllib3>=2.7.0
 # cryptography>=48.0.1: fecha GHSA-537c-gmf6-5ccf reportado pelo pip-audit.
 # Vem como transitiva (signxml, etc.); pin direto pra forcar a versao corrigida.
-cryptography>=48.0.1
+cryptography>=50.0.0
 # Pins de seguranca (pip-audit): transitivas com CVE.
 click>=8.3.3
 httplib2>=0.32.0
