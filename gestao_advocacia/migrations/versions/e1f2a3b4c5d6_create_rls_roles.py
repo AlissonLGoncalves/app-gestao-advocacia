@@ -84,8 +84,28 @@ def upgrade():
 
     # Garante que app_admin tem BYPASSRLS mesmo se o role ja existia
     # sem essa flag (rerun de migration em ambiente legado).
-    op.execute("ALTER ROLE app_admin WITH BYPASSRLS;")
-    op.execute("ALTER ROLE app_user WITH NOBYPASSRLS;")
+    #
+    # Cloud SQL (set/2026): nao existe SUPERUSER, e (ALTER|CREATE) ROLE com
+    # BYPASSRLS exige superuser -> insufficient_privilege. Nesse caso
+    # app_admin continua enxergando tudo porque e OWNER das tabelas (owner
+    # ignora RLS enquanto nenhuma tabela usar FORCE ROW LEVEL SECURITY, que
+    # nao usamos). Ver docs/ops/gcp-deploy.md.
+    op.execute("""
+        DO $$
+        BEGIN
+            BEGIN
+                ALTER ROLE app_admin WITH BYPASSRLS;
+            EXCEPTION WHEN insufficient_privilege THEN
+                RAISE NOTICE 'sem superuser: app_admin fica sem BYPASSRLS (owner das tabelas ja ignora RLS)';
+            END;
+            BEGIN
+                ALTER ROLE app_user WITH NOBYPASSRLS;
+            EXCEPTION WHEN insufficient_privilege THEN
+                RAISE NOTICE 'sem superuser: ALTER ROLE app_user NOBYPASSRLS ignorado';
+            END;
+        END
+        $$;
+    """)
 
     # GRANTs de schema.
     op.execute("GRANT USAGE ON SCHEMA public TO app_admin, app_user;")

@@ -1,0 +1,90 @@
+name: Deploy backend to Cloud Run
+
+# Substitui deploy-fly.yml (Fly.io abandonado em set/2026).
+# Dispara no merge de PR em main que toque o backend, ou manualmente.
+# Autentica no Google Cloud via Workload Identity Federation (sem chave JSON).
+# Runbook: docs/ops/gcp-deploy.md
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+    paths:
+      - 'gestao_advocacia/**'
+      - 'Dockerfile'
+      - '.github/workflows/deploy-cloudrun.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: cloudrun-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: patronus-app
+  REGION: southamerica-east1
+  SERVICE: patronus-api
+  IMAGE: southamerica-east1-docker.pkg.dev/patronus-app/patronus/api
+
+jobs:
+  deploy:
+    name: build + migrate + deploy + health
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Auth Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build image (Cloud Build)
+        run: |
+          gcloud builds submit \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --tag "$IMAGE:${GITHUB_SHA}" \
+            --quiet .
+
+      - name: Run migrations (Cloud Run Job patronus-migrate)
+        run: |
+          gcloud run jobs update patronus-migrate \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --image "$IMAGE:${GITHUB_SHA}" --quiet
+          gcloud run jobs execute patronus-migrate \
+            --project "$PROJECT_ID" --region "$REGION" --wait --quiet
+
+      - name: Deploy API
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --image "$IMAGE:${GITHUB_SHA}" --quiet
+
+      - name: Update scheduled jobs image
+        run: |
+          for j in cnj alertas notificacoes djen djen-worker; do
+            gcloud run jobs update "patronus-$j" \
+              --project "$PROJECT_ID" --region "$REGION" \
+              --image "$IMAGE:${GITHUB_SHA}" --quiet
+          done
+
+      - name: Health check
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" \
+                  --project "$PROJECT_ID" --region "$REGION" \
+                  --format 'value(status.url)')
+          curl --fail --silent --show-error \
+               --retry 5 --retry-delay 5 --retry-connrefused \
+               --max-time 30 "$URL/api/v1/health" \
+            | grep -q '"status":"ok"' \
+            || (echo "::error::Health check falhou apos deploy" && exit 1)

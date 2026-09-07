@@ -1,0 +1,10 @@
+node_modules
+.git
+gestao_advocacia_vite
+**/__pycache__
+**/*.pyc
+gestao_advocacia/venv
+gestao_advocacia/instance
+gestao_advocacia/uploads_documentos
+gestao_advocacia/out
+*.db

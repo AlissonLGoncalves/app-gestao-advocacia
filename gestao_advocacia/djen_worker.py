@@ -196,8 +196,43 @@ def _cleanup_stuck_jobs(session, logger):
         )
 
 
+def run_once(max_jobs=50):
+    """Drena a fila uma vez e retorna quantos jobs processou.
+
+    Usado pelo Cloud Run Job `patronus-djen-worker` (jobs_cli.py djen-worker),
+    disparado pelo Cloud Scheduler a cada 5 min. Mesma logica do loop de
+    main(), sem o sleep infinito: cleanup de travados, claim+process ate a
+    fila esvaziar (ou max_jobs, margem contra fila gigante travando o job).
+    """
+    logger = _setup_logger()
+    app = create_app()
+
+    with app.app_context():
+        try:
+            _cleanup_stuck_jobs(db.session, logger)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"startup_cleanup_error: {e}", exc_info=True)
+
+    processados = 0
+    while processados < max_jobs:
+        with app.app_context():
+            job = _claim_next_job(db.session, logger)
+        if job is None:
+            break
+        _process_job(app, job, logger)
+        processados += 1
+
+    logger.info(f"run_once done processed={processados}")
+    return processados
+
+
 def main():
     logger = _setup_logger()
+
+    if "--once" in sys.argv[1:]:
+        run_once()
+        return
+
     logger.info(
         f"starting djen_worker poll_interval={POLL_INTERVAL_SECONDS}s "
         f"max_running={MAX_RUNNING_MINUTES}min max_pending={MAX_PENDING_MINUTES}min"
