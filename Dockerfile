@@ -30,4 +30,8 @@ ENV UPLOAD_FOLDER=/data/uploads
 
 EXPOSE 8080
 
-CMD ["bash", "start.sh"]
+# Cloud Run: a API sobe direto no gunicorn (mesmo comando do antigo processo
+# `app` do Fly). Migrations NAO rodam no boot — rodam no Cloud Run Job
+# `patronus-migrate` (jobs_cli.py migrate) antes do deploy. start.sh continua
+# existindo para uso local/Render.
+CMD ["sh", "-c", "exec gunicorn -b 0.0.0.0:${PORT:-8080} --workers 2 --timeout 600 --access-logfile - --error-logfile - app:app"]

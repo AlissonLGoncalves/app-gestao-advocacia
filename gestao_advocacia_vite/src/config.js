@@ -29,7 +29,9 @@ function resolveApiUrl() {
     return 'http://127.0.0.1:5000/api/v1'
   }
 
-  return 'https://app-gestao-advocacia.fly.dev/api/v1'
+  // Cloud Run (projeto patronus-app, southamerica-east1). URL deterministica:
+  // https://<servico>-<numero-do-projeto>.<regiao>.run.app
+  return 'https://patronus-api-867244985680.southamerica-east1.run.app/api/v1'
 }
 
 export const API_URL = resolveApiUrl()
