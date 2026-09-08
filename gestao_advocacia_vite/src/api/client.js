@@ -1,7 +1,12 @@
 import { TERMS_VERSION, LGPD_VERSION } from '../constants/legal'
 import { mensagemAmigavel, ERRO_REDE } from '../utils/errorMessages.js'
+import { API_URL } from '../config.js'
 
-const BASE = import.meta.env.VITE_API_URL || '/api/v1'
+// Fonte unica da URL da API (config.js): respeita VITE_API_URL quando
+// definida e, sem ela, resolve localhost -> backend local e producao ->
+// Cloud Run. O fallback antigo '/api/v1' caia no proprio Vercel (405 em POST)
+// quando a env var nao existia — incidente de 07/09/2026.
+const BASE = API_URL
 
 function getToken() {
   return localStorage.getItem('access_token') || localStorage.getItem('token')

@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-toastify'
 import { getTenant, updateTenant } from '../api/tenant'
+import { API_URL } from '../config.js'
 
 function SettingsPage() {
   const [activeTab, setActiveTab] = useState('escritorio')
@@ -85,7 +86,8 @@ function SettingsPage() {
     if (userRole !== 'admin') return
     setLoadingLogs(true)
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      // API_URL ja termina em /api/v1; aqui o codigo concatena /api/v1 de novo.
+      const apiUrl = API_URL.replace(/\/api\/v1$/, '')
       const response = await fetch(`${apiUrl}/api/v1/auditoria/`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       })
@@ -112,7 +114,8 @@ function SettingsPage() {
 
     setIsInviting(true)
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      // API_URL ja termina em /api/v1; aqui o codigo concatena /api/v1 de novo.
+      const apiUrl = API_URL.replace(/\/api\/v1$/, '')
       const response = await fetch(`${apiUrl}/api/v1/auth/invite`, {
         method: 'POST',
         headers: {

@@ -3,8 +3,10 @@
 // Frontend gating e somente UX — backend valida role superadmin via JWT claim.
 
 import { TERMS_VERSION, LGPD_VERSION } from '../constants/legal'
+import { API_URL } from '../config.js'
 
-const RAW_API = import.meta.env.VITE_API_URL || '/api/v1'
+// Mesma fonte de verdade de client.js (ver comentario la).
+const RAW_API = API_URL
 // Deriva a base do backoffice a partir da base do app (mesmo host/origem).
 // Suporta:
 //   '/api/v1'                          -> '/admin/v1'
