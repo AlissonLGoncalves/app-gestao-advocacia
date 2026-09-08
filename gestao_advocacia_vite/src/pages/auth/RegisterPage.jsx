@@ -15,6 +15,7 @@ import {
   IdentificationIcon,
   CheckCircleIcon,
 } from '@heroicons/react/24/outline'
+import PasswordInput from '../../components/ui/PasswordInput.jsx'
 
 function stripFrontMatter(markdown) {
   if (!markdown?.startsWith('---\n')) return markdown || ''
@@ -140,8 +141,8 @@ function RegisterPage() {
       return
     }
 
-    if (password.length < 6) {
-      toast.error('A senha deve ter no mínimo 6 caracteres.')
+    if (password.length < 10) {
+      toast.error('A senha deve ter no mínimo 10 caracteres.')
       setLoading(false)
       return
     }
@@ -182,8 +183,8 @@ function RegisterPage() {
       return
     }
 
-    if (password.length < 6) {
-      toast.error('A senha deve ter no mínimo 6 caracteres.')
+    if (password.length < 10) {
+      toast.error('A senha deve ter no mínimo 10 caracteres.')
       setLoading(false)
       return
     }
@@ -404,14 +405,13 @@ function RegisterPage() {
                 <label className="form-label mb-1 text-secondary small fw-bold">
                   {inviteToken ? 'Escolha sua Senha de Acesso' : 'Senha Mestre'}
                 </label>
-                <input
-                  type="password"
-                  className="form-control"
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
-                  minLength="6"
+                  minLength="10"
+                  hint="Mínimo 10 caracteres, com letra maiúscula, minúscula, número e um caractere especial (!@#$%&*)."
                 />
               </div>
 

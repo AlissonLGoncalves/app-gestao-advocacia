@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router' // CORRIGIDO AQUI
 import { toast } from 'react-toastify'
 import { LockClosedIcon, UserIcon } from '@heroicons/react/24/outline'
+import PasswordInput from '../../components/ui/PasswordInput.jsx'
 import { Link } from 'react-router' // Adicionado para o link de registro, se desejar
 import { APP_VERSION } from '../../version.js'
 import { login as loginRequest } from '../../api/auth'
@@ -87,9 +88,7 @@ function LoginPage() {
                 Esqueceu a senha?
               </Link>
             </div>
-            <input
-              type="password"
-              className="form-control"
+            <PasswordInput
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
