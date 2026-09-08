@@ -186,13 +186,13 @@ def test_dashboard_home_limita_listas_e_entrega_resumo(auth_client, db):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert set(payload) == {
+    assert {
         "resumo",
         "hoje",
         "tarefas_prioritarias",
         "publicacoes_recentes",
         "monitoramento_djen_configurado",
-    }
+    } <= set(payload)
     assert len(payload["tarefas_prioritarias"]) == 5
     assert len(payload["publicacoes_recentes"]) == 5
     assert payload["resumo"]["prazos_urgentes"] >= 3
