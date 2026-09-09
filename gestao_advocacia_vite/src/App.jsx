@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 import { useNavigate } from 'react-router'
 import { api } from './api/client.js'
+import { lazyRetry } from './utils/lazyRetry.js'
 
 // Issue #298 — code-splitting: páginas viram React.lazy (cada rota gera
 // um chunk próprio; FullCalendar, dnd-kit, DjenPage etc. saem do bundle
@@ -15,46 +16,48 @@ import LandingPage from './pages/LandingPage.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
-const { lazy, Suspense } = React
-const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'))
-const ClientesPage = lazy(() => import('./pages/ClientesPage.jsx'))
-const CasosPage = lazy(() => import('./pages/CasosPage.jsx'))
-const CasoDetalhePage = lazy(() => import('./pages/CasoDetalhePage.jsx'))
-const ImportarCnjsPage = lazy(() => import('./pages/ImportarCnjsPage.jsx'))
-const BuscarProcessoCnjPage = lazy(() => import('./pages/BuscarProcessoCnjPage.jsx'))
-const RecebimentosPage = lazy(() => import('./pages/RecebimentosPage.jsx'))
-const RecebimentosHistoricoPage = lazy(() => import('./pages/RecebimentosHistoricoPage.jsx'))
-const NotasFiscaisPage = lazy(() => import('./pages/NotasFiscaisPage.jsx'))
-const ClienteDetalhePage = lazy(() => import('./pages/ClienteDetalhePage.jsx'))
-const ContratosPage = lazy(() => import('./pages/ContratosPage.jsx'))
-const DespesasPage = lazy(() => import('./pages/DespesasPage.jsx'))
-const AgendaUnificadaPage = lazy(() => import('./pages/AgendaUnificadaPage.jsx'))
-const DocumentosPage = lazy(() => import('./pages/DocumentosPage.jsx'))
-const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage.jsx'))
+const { Suspense } = React
+const DashboardPage = lazyRetry(() => import('./pages/DashboardPage.jsx'))
+const ClientesPage = lazyRetry(() => import('./pages/ClientesPage.jsx'))
+const CasosPage = lazyRetry(() => import('./pages/CasosPage.jsx'))
+const CasoDetalhePage = lazyRetry(() => import('./pages/CasoDetalhePage.jsx'))
+const ImportarCnjsPage = lazyRetry(() => import('./pages/ImportarCnjsPage.jsx'))
+const BuscarProcessoCnjPage = lazyRetry(() => import('./pages/BuscarProcessoCnjPage.jsx'))
+const RecebimentosPage = lazyRetry(() => import('./pages/RecebimentosPage.jsx'))
+const RecebimentosHistoricoPage = lazyRetry(() => import('./pages/RecebimentosHistoricoPage.jsx'))
+const NotasFiscaisPage = lazyRetry(() => import('./pages/NotasFiscaisPage.jsx'))
+const ClienteDetalhePage = lazyRetry(() => import('./pages/ClienteDetalhePage.jsx'))
+const ContratosPage = lazyRetry(() => import('./pages/ContratosPage.jsx'))
+const DespesasPage = lazyRetry(() => import('./pages/DespesasPage.jsx'))
+const AgendaUnificadaPage = lazyRetry(() => import('./pages/AgendaUnificadaPage.jsx'))
+const DocumentosPage = lazyRetry(() => import('./pages/DocumentosPage.jsx'))
+const RelatoriosPage = lazyRetry(() => import('./pages/RelatoriosPage.jsx'))
 // Hubs do "menu enxuto": uma entrada de sidebar -> tela com abas que reembrulha
 // páginas já existentes (Financeiro, Documentos+Modelos, Configurações).
-const FinanceiroPage = lazy(() => import('./pages/FinanceiroPage.jsx'))
-const DocumentosHubPage = lazy(() => import('./pages/DocumentosHubPage.jsx'))
-const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage.jsx'))
-const RegisterPage = lazy(() => import('./pages/auth/RegisterPage.jsx'))
-const TermsPage = lazy(() => import('./pages/auth/TermsPage.jsx'))
-const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage.jsx'))
-const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage.jsx'))
-const SolicitarAcessoPage = lazy(() => import('./pages/SolicitarAcessoPage.jsx'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'))
-const IntegracoesPage = lazy(() => import('./pages/IntegracoesPage.jsx'))
-const ModelosDocumentoPage = lazy(() => import('./pages/ModelosDocumentoPage.jsx'))
-const DjenPage = lazy(() => import('./pages/DjenPage.jsx'))
-const TriagemAssistidaPage = lazy(() => import('./pages/TriagemAssistidaPage.jsx'))
-const PerfilPage = lazy(() => import('./pages/PerfilPage.jsx'))
-const OnboardingPage = lazy(() => import('./pages/auth/OnboardingPage.jsx'))
-const NovoClientePorProcuracao = lazy(() => import('./pages/clientes/NovoClientePorProcuracao.jsx'))
-const PortalPage = lazy(() => import('./pages/portal/PortalPage.jsx'))
-const PortalRegisterPage = lazy(() => import('./pages/portal/PortalRegisterPage.jsx'))
+const FinanceiroPage = lazyRetry(() => import('./pages/FinanceiroPage.jsx'))
+const DocumentosHubPage = lazyRetry(() => import('./pages/DocumentosHubPage.jsx'))
+const ConfiguracoesPage = lazyRetry(() => import('./pages/ConfiguracoesPage.jsx'))
+const RegisterPage = lazyRetry(() => import('./pages/auth/RegisterPage.jsx'))
+const TermsPage = lazyRetry(() => import('./pages/auth/TermsPage.jsx'))
+const ForgotPasswordPage = lazyRetry(() => import('./pages/auth/ForgotPasswordPage.jsx'))
+const ResetPasswordPage = lazyRetry(() => import('./pages/auth/ResetPasswordPage.jsx'))
+const SolicitarAcessoPage = lazyRetry(() => import('./pages/SolicitarAcessoPage.jsx'))
+const SettingsPage = lazyRetry(() => import('./pages/SettingsPage.jsx'))
+const IntegracoesPage = lazyRetry(() => import('./pages/IntegracoesPage.jsx'))
+const ModelosDocumentoPage = lazyRetry(() => import('./pages/ModelosDocumentoPage.jsx'))
+const DjenPage = lazyRetry(() => import('./pages/DjenPage.jsx'))
+const TriagemAssistidaPage = lazyRetry(() => import('./pages/TriagemAssistidaPage.jsx'))
+const PerfilPage = lazyRetry(() => import('./pages/PerfilPage.jsx'))
+const OnboardingPage = lazyRetry(() => import('./pages/auth/OnboardingPage.jsx'))
+const NovoClientePorProcuracao = lazyRetry(
+  () => import('./pages/clientes/NovoClientePorProcuracao.jsx')
+)
+const PortalPage = lazyRetry(() => import('./pages/portal/PortalPage.jsx'))
+const PortalRegisterPage = lazyRetry(() => import('./pages/portal/PortalRegisterPage.jsx'))
 // admin-fase0: paginas do backoffice super-admin
-const AdminTenantsPage = lazy(() => import('./pages/admin/AdminTenantsPage.jsx'))
-const AdminTenantDetailPage = lazy(() => import('./pages/admin/AdminTenantDetailPage.jsx'))
-const AdminAccessRequestsPage = lazy(() => import('./pages/admin/AdminAccessRequestsPage.jsx'))
+const AdminTenantsPage = lazyRetry(() => import('./pages/admin/AdminTenantsPage.jsx'))
+const AdminTenantDetailPage = lazyRetry(() => import('./pages/admin/AdminTenantDetailPage.jsx'))
+const AdminAccessRequestsPage = lazyRetry(() => import('./pages/admin/AdminAccessRequestsPage.jsx'))
 import { adminApi } from './api/admin.js'
 import { APP_VERSION } from './version.js'
 import GlobalSearch from './components/GlobalSearch.jsx'
