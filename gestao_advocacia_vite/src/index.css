@@ -1,41 +1,78 @@
+/* ============================================================================
+   Patronus — estilos globais (redesign Stitch 2026-09)
+   Tokens em :root sao o contrato com as outras telas: use SEMPRE as variaveis
+   (cor, fonte, raio, sombra) em vez de valores soltos. Referencia visual:
+   docs/design/stitch-2026-09/prompt.md (bloco BASE).
+   ========================================================================== */
+
 :root {
+  /* Canvas: gradiente vertical claro com brilho azul sutil no topo-esquerdo */
   --canvas-top: #f7f8fa;
   --canvas-bottom: #eceff4;
+  --canvas-glow: rgba(10, 132, 255, 0.14);
+
+  /* Sidebar navy */
   --sidebar-bg: #13171f;
   --sidebar-bg-soft: #1a202b;
-  --sidebar-line: rgba(255, 255, 255, 0.11);
+  --sidebar-line: rgba(255, 255, 255, 0.09);
   --sidebar-text: #d4d9e4;
-  --sidebar-muted: #9ca7bb;
+  --sidebar-muted: #8b95a7;
+  --sidebar-width: 286px;
+
+  /* Superficies */
   --glass: rgba(255, 255, 255, 0.74);
   --glass-strong: rgba(255, 255, 255, 0.9);
+  --surface-soft: #f8fafc;
   --line: rgba(17, 24, 39, 0.09);
   --line-soft: rgba(17, 24, 39, 0.06);
+
+  /* Texto */
   --text-1: #101828;
   --text-2: #475467;
   --text-3: #667085;
-  --primary: #007aff;
-  --primary-strong: #0051d5;
-  --danger: #ff3b30;
-  --success: #34c759;
-  --warning: #ff9500;
-  --indigo: #5856d6;
-  --teal: #5ac8fa;
-  --pink: #ff2d55;
-  --yellow: #ffcc00;
-  --sidebar-width: 286px;
-  /* App leve: raios menores e sombras discretas. Antes: raio 22px e sombras
-     de 30-42px de blur, que davam aspecto "pesado/flutuante" em cada card. */
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+
+  /* Cor so com significado: urgencia, status, confianca, a UNICA acao primaria */
+  --primary: #0a84ff;
+  --primary-strong: #006fe3;
+  --primary-soft: rgba(10, 132, 255, 0.1);
+  --danger: #d92d20;
+  --danger-soft: rgba(217, 45, 32, 0.1);
+  --success: #079455;
+  --success-soft: rgba(7, 148, 85, 0.1);
+  --warning: #b54708;
+  --warning-soft: rgba(181, 71, 8, 0.1);
+
+  /* Geometria */
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.06);
   --ease: 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  --font-body:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --content-max: 1040px;
+
+  /* Tipografia: Plus Jakarta Sans (titulos) + Manrope (corpo), com fallback */
   --font-title:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
+    'Plus Jakarta Sans', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
+    sans-serif;
+  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+  /* Bootstrap: alinha as variaveis do framework aos tokens acima */
+  --bs-body-font-family: var(--font-body);
+  --bs-body-color: var(--text-1);
+  --bs-secondary-color: var(--text-3);
+  --bs-border-color: var(--line);
+  --bs-link-color: var(--primary);
+  --bs-link-hover-color: var(--primary-strong);
+  --bs-link-color-rgb: 10, 132, 255;
+  --bs-link-hover-color-rgb: 0, 111, 227;
+  --bs-primary: var(--primary);
+  --bs-primary-rgb: 10, 132, 255;
+  --bs-danger: var(--danger);
+  --bs-danger-rgb: 217, 45, 32;
+  --bs-success: var(--success);
+  --bs-success-rgb: 7, 148, 85;
 }
 
 *,
@@ -50,34 +87,116 @@ body,
   height: 100%;
 }
 
+html {
+  /* Mesma cor do fim do gradiente do body: quando o conteudo passa da
+     viewport nao aparece "corte" no fundo. */
+  background: var(--canvas-bottom);
+}
+
 body {
   margin: 0;
   overflow-x: hidden;
   color: var(--text-1);
   font-family: var(--font-body);
-  font-feature-settings: 'cv11', 'ss01', 'ss03';
-  letter-spacing: -0.011em;
+  font-size: 0.9375rem; /* 15px */
+  line-height: 1.5;
+  letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* App leve: fundo chapado. Antes eram 4 camadas de gradiente (2 radiais +
-     2 lineares) que pesavam visualmente e custavam repaint. */
-  background: var(--canvas-top);
+  background:
+    radial-gradient(70% 45% at 8% 0%, var(--canvas-glow) 0%, rgba(10, 132, 255, 0) 70%),
+    linear-gradient(180deg, var(--canvas-top) 0%, var(--canvas-bottom) 100%);
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.h1,
+.h2,
+.h3,
+.h4,
+.h5,
+.h6 {
+  font-family: var(--font-title);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-1);
+}
+
+/* Datas, numeros CNJ e valores: algarismos tabulares alinham em listas */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Marca — PatronusLogo (components/brand/PatronusLogo.jsx)
+   ------------------------------------------------------------------------- */
+.patronus-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.patronus-logo.is-compact {
+  gap: 0;
+}
+
+.patronus-logo-mark {
+  flex: none;
+  display: block;
+  filter: drop-shadow(0 6px 14px rgba(31, 120, 255, 0.32));
+}
+
+.patronus-logo-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.05;
+}
+
+.patronus-logo-name {
+  font-family: var(--font-title);
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.patronus-logo-tagline {
+  margin-top: 0.25rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.patronus-logo-light .patronus-logo-name {
+  color: #f8fbff;
+}
+
+.patronus-logo-light .patronus-logo-tagline {
+  color: var(--sidebar-muted);
+}
+
+.patronus-logo-dark .patronus-logo-name {
+  color: var(--text-1);
+}
+
+.patronus-logo-dark .patronus-logo-tagline {
+  color: var(--text-3);
+}
+
+/* ---------------------------------------------------------------------------
+   App shell: sidebar + quadro de conteudo, ambos "flutuando" com 16px de folga
+   ------------------------------------------------------------------------- */
 .app-shell {
   min-height: 100vh;
   display: flex;
   gap: 1rem;
   padding: 1rem;
-}
-
-.app-content {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
 }
 
 .app-sidebar {
@@ -87,10 +206,10 @@ body {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   border: 1px solid var(--sidebar-line);
-  background: var(--sidebar-bg);
-  box-shadow: none;
+  background: linear-gradient(180deg, var(--sidebar-bg) 0%, var(--sidebar-bg-soft) 100%);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.16);
   transition:
     transform var(--ease),
     box-shadow var(--ease);
@@ -99,69 +218,27 @@ body {
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  margin: 0.8rem;
-  padding: 0.95rem;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.06));
-}
-
-.sidebar-brand-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 13px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  background: linear-gradient(150deg, #0a84ff, #00a3ff);
-  box-shadow: 0 10px 24px rgba(10, 132, 255, 0.32);
-}
-
-.sidebar-brand-scale {
-  width: 24px;
-  height: 24px;
-}
-
-.sidebar-brand-text {
-  font-family: var(--font-title);
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-  color: #f8fafc;
-}
-
-.sidebar-brand-sub {
-  margin-top: 0.15rem;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--sidebar-muted);
+  padding: 1.6rem 1.5rem 1.1rem;
 }
 
 .sidebar-nav {
-  padding: 0.35rem 0.8rem 0.85rem;
   flex: 1;
+  padding: 0.25rem 1rem 1rem;
 }
 
-/* Header de secao da sidebar (Operacional, Financeiro, etc) — labelzinho
-   sutil pra agrupar links sem poluir visualmente. */
+/* Rotulo de grupo (Diario, Semanal, Sistema): pequeno, caixa alta, cinza */
 .sidebar-section-label {
-  font-size: 0.65rem;
+  margin: 0;
+  padding: 1.35rem 0.85rem 0.5rem;
+  font-size: 0.66rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--sidebar-muted);
-  padding: 0.85rem 0.8rem 0.4rem;
-  margin: 0;
-  opacity: 0.55;
 }
 
 .sidebar-section-label:first-child {
-  padding-top: 0.25rem;
+  padding-top: 0.5rem;
 }
 
 .sidebar-link {
@@ -169,44 +246,52 @@ body {
   border: 0;
   display: flex;
   align-items: center;
-  gap: 0.72rem;
-  padding: 0.7rem 0.8rem;
-  margin: 0 0 0.25rem;
-  border-radius: 11px;
+  gap: 0.8rem;
+  padding: 0.7rem 0.85rem;
+  margin: 0 0 0.2rem;
+  border-radius: var(--radius-sm);
   text-align: left;
   text-decoration: none;
   cursor: pointer;
   color: var(--sidebar-text);
   background: transparent;
-  font-size: 0.92rem;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
   font-weight: 600;
+  letter-spacing: -0.005em;
   transition:
     background var(--ease),
-    transform var(--ease),
     color var(--ease),
     box-shadow var(--ease);
 }
 
 .sidebar-link-icon {
-  width: 19px;
-  height: 19px;
-  opacity: 0.72;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  stroke-width: 1.5;
+  opacity: 0.8;
   transition: opacity var(--ease);
 }
 
 .sidebar-link:hover {
   color: #ffffff;
   text-decoration: none;
-  transform: translateX(2px);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
 }
 
+.sidebar-link:focus-visible {
+  outline: 2px solid rgba(86, 166, 255, 0.9);
+  outline-offset: 2px;
+}
+
+/* Item ativo: pilula azul com borda interna clara de 1px */
 .sidebar-link.active {
   color: #ffffff;
-  background: linear-gradient(135deg, rgba(10, 132, 255, 0.42), rgba(6, 182, 212, 0.34));
+  background: linear-gradient(135deg, #1f8fff 0%, var(--primary) 55%, #0072e5 100%);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.15),
-    0 8px 20px rgba(2, 132, 199, 0.25);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 6px 16px rgba(10, 132, 255, 0.28);
 }
 
 .sidebar-link.active .sidebar-link-icon,
@@ -216,88 +301,297 @@ body {
 
 .sidebar-footer {
   margin-top: auto;
-  padding: 0.8rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.75rem 1rem 1.1rem;
+  border-top: 1px solid var(--sidebar-line);
 }
 
-.sidebar-footer .sidebar-link {
-  color: #fecaca;
+/* "Sair": vermelho suave, nao grita */
+.sidebar-link-logout {
+  color: #f1a7a1;
 }
 
-.sidebar-footer .sidebar-link:hover {
-  background: rgba(239, 68, 68, 0.2);
+.sidebar-link-logout:hover {
+  color: #ffd3cf;
+  background: rgba(217, 45, 32, 0.16);
 }
 
 .sidebar-copyright {
-  margin-top: 0.85rem;
-  text-align: center;
-  font-size: 0.68rem;
-  color: rgba(212, 217, 228, 0.72);
-}
-
-.app-version {
-  display: inline-block;
-  margin-left: 0.35rem;
-  padding: 0.08rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #f8fbff;
-  background: linear-gradient(135deg, rgba(10, 132, 255, 0.72), rgba(6, 182, 212, 0.72));
-}
-
-.app-header {
-  margin-bottom: 0.85rem;
-  padding: 1.1rem 1.35rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  padding: 0 0.85rem;
+  font-size: 0.72rem;
+  color: var(--sidebar-muted);
+}
+
+.app-version {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--sidebar-muted);
+}
+
+/* Quadro de conteudo: um unico painel arredondado (26px) com header + main */
+.app-content {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  background: #ffffff;
-  box-shadow: none;
+  background: var(--glass);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 76px;
+  padding: 0.9rem 1.75rem;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+.app-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.app-header-heading {
+  min-width: 0;
 }
 
 .app-header h1 {
   margin: 0;
-  font-family: var(--font-title);
-  font-size: clamp(1.25rem, 2vw, 1.52rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .app-header-meta {
   display: block;
   margin-top: 0.15rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.app-header-date {
-  padding: 0.42rem 0.82rem;
-  border-radius: 999px;
-  border: 1px solid var(--line-soft);
-  background: rgba(255, 255, 255, 0.62);
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: none;
+}
+
+/* Campo de busca / command palette (Ctrl K) — fechado vira um "input" falso */
+.header-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: clamp(180px, 26vw, 360px);
+  height: 42px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-strong);
+  color: var(--text-3);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  text-align: left;
+  box-shadow: var(--shadow-xs);
+  cursor: text;
+  transition:
+    border-color var(--ease),
+    box-shadow var(--ease);
+}
+
+.header-search:hover,
+.header-search:focus-visible {
+  outline: none;
+  border-color: rgba(10, 132, 255, 0.45);
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.12);
+}
+
+.header-search-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
   color: var(--text-2);
-  font-size: 0.76rem;
+}
+
+.header-search-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.header-kbd {
+  flex: none;
+  padding: 0.22rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--text-3);
+  font-family: var(--font-body);
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.header-search-open {
+  position: relative;
+  z-index: 1050;
+  flex: 0 0 auto;
+  width: clamp(200px, 28vw, 380px);
+}
+
+.header-search-open .input-group {
+  height: 42px;
+  border: 1px solid rgba(10, 132, 255, 0.55);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.12);
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.header-search-open .input-group > .input-group-text,
+.header-search-open .input-group > .form-control,
+.header-search-open .input-group > .btn {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  height: 100%;
+}
+
+.header-search-open .input-group > .form-control {
+  font-size: 0.88rem;
+}
+
+.header-search-open .input-group > .btn {
+  color: var(--text-3);
+}
+
+.header-search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-md);
+}
+
+/* Botoes do header: sino e "+ Novo" — quadrados brancos discretos */
+.header-btn,
+.app-header-actions .btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  height: 42px;
+  min-width: 42px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-strong);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--shadow-xs);
+  transition:
+    border-color var(--ease),
+    background var(--ease),
+    box-shadow var(--ease);
+}
+
+.header-btn:hover,
+.app-header-actions .btn-link:hover {
+  color: var(--text-1);
+  border-color: rgba(10, 132, 255, 0.4);
+  background: #fff;
+}
+
+.header-btn:focus-visible,
+.app-header-actions .btn-link:focus-visible {
+  outline: none;
+  border-color: rgba(10, 132, 255, 0.55);
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.12);
+}
+
+.header-btn-novo {
+  padding: 0 1rem 0 0.8rem;
+}
+
+.header-btn-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/* Sino: o NotificacoesBell pinta o icone com .text-primary (!important do
+   Bootstrap); no header a cor e a do texto, so o ponto vermelho sinaliza. */
+.app-header-actions .btn-link svg {
+  width: 20px !important;
+  height: 20px !important;
+  color: var(--text-1) !important;
+}
+
+.app-header-actions .btn-link .badge {
+  font-size: 0.6rem;
+  transform: translate(-40%, -30%);
+}
+
+.header-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  z-index: 1050;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
 }
 
 .app-main {
   flex: 1;
   overflow-y: auto;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--line);
-  background: #ffffff;
-  padding: 1.6rem 1.75rem;
+  padding: 1.75rem 2rem 2.25rem;
 }
 
-/* App leve: fade curto e sem deslocamento. O fade-in-up de 380ms em TODO
-   filho do main fazia cada navegação parecer lenta. */
-.app-main > * {
+/* Conteudo limitado a 1040px e centralizado: a tela nunca vira uma "parede" */
+.app-main-inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+/* Fade curto na troca de rota (sem deslocamento) */
+.app-main-inner > * {
   animation: fade-in 140ms ease-out;
 }
 
@@ -310,8 +604,11 @@ body {
   }
 }
 
-/* Abas dos hubs do "menu enxuto" (Financeiro, Documentos, Configurações).
-   Visual mais leve que o nav-tabs padrão do Bootstrap. */
+/* ---------------------------------------------------------------------------
+   Componentes Bootstrap reestilizados com os tokens
+   ------------------------------------------------------------------------- */
+
+/* Abas dos hubs (Financeiro, Documentos, Configuracoes) */
 .tab-hub-nav {
   border-bottom: 1px solid var(--line);
   gap: 0.15rem;
@@ -321,7 +618,7 @@ body {
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  color: var(--text-muted, #64748b);
+  color: var(--text-2);
   font-size: 0.92rem;
   font-weight: 600;
   padding: 0.6rem 0.95rem;
@@ -329,37 +626,35 @@ body {
 }
 
 .tab-hub-nav .nav-link:hover {
-  color: #0a84ff;
+  color: var(--primary);
   border-bottom-color: rgba(10, 132, 255, 0.35);
 }
 
 .tab-hub-nav .nav-link.active {
-  color: #0a84ff;
+  color: var(--primary);
   background: transparent;
-  border-bottom-color: #0a84ff;
+  border-bottom-color: var(--primary);
 }
 
 .card {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: #ffffff;
-  box-shadow: none;
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   transition:
-    transform var(--ease),
     box-shadow var(--ease),
     border-color var(--ease);
 }
 
 .card:hover {
-  box-shadow: var(--shadow-sm);
-  border-color: rgba(0, 122, 255, 0.18);
+  box-shadow: var(--shadow-md);
 }
 
 .card-header,
 .card-header.bg-light {
   border-bottom: 1px solid var(--line-soft);
-  background: #ffffff !important;
+  background: transparent !important;
   font-weight: 700;
   color: var(--text-1);
 }
@@ -397,10 +692,10 @@ body {
 }
 
 .btn {
-  border-radius: 999px;
-  font-family: var(--font-title);
-  font-size: 0.86rem;
-  font-weight: 600;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 700;
   letter-spacing: -0.005em;
   transition:
     transform 120ms cubic-bezier(0.4, 0, 0.2, 1),
@@ -411,53 +706,78 @@ body {
 }
 
 .btn:active {
-  transform: scale(0.97);
-  opacity: 0.75;
+  transform: scale(0.98);
+  opacity: 0.85;
 }
 
+.btn:focus-visible {
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.2);
+}
+
+/* A unica acao primaria da tela: azul chapado, sem gradiente */
 .btn-primary {
-  border: 0;
-  background: linear-gradient(140deg, var(--primary), #4da3ff);
-  box-shadow: 0 8px 20px rgba(0, 122, 255, 0.32);
-  color: #fff;
+  --bs-btn-bg: var(--primary);
+  --bs-btn-border-color: var(--primary);
+  --bs-btn-hover-bg: var(--primary-strong);
+  --bs-btn-hover-border-color: var(--primary-strong);
+  --bs-btn-active-bg: var(--primary-strong);
+  --bs-btn-active-border-color: var(--primary-strong);
+  --bs-btn-disabled-bg: var(--primary);
+  --bs-btn-disabled-border-color: var(--primary);
+  box-shadow: 0 6px 16px rgba(10, 132, 255, 0.22);
 }
 
 .btn-primary:hover,
 .btn-primary:focus {
-  color: #fff;
-  background: linear-gradient(140deg, var(--primary-strong), #1a8aff);
-  box-shadow: 0 12px 26px rgba(0, 122, 255, 0.36);
+  box-shadow: 0 8px 20px rgba(10, 132, 255, 0.28);
 }
 
 .btn-outline-primary {
-  color: var(--primary);
-  border-color: rgba(0, 122, 255, 0.35);
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.btn-outline-primary:hover,
-.btn-outline-primary:focus {
-  color: #fff;
-  background: var(--primary);
-  border-color: var(--primary);
+  --bs-btn-color: var(--primary);
+  --bs-btn-border-color: rgba(10, 132, 255, 0.35);
+  --bs-btn-hover-bg: var(--primary);
+  --bs-btn-hover-border-color: var(--primary);
+  --bs-btn-active-bg: var(--primary-strong);
+  --bs-btn-active-border-color: var(--primary-strong);
+  background: var(--glass-strong);
 }
 
 .btn-outline-secondary {
-  border-color: rgba(15, 23, 42, 0.16);
-  color: var(--text-2);
+  --bs-btn-color: var(--text-2);
+  --bs-btn-border-color: rgba(17, 24, 39, 0.14);
+  --bs-btn-hover-color: var(--text-1);
+  --bs-btn-hover-bg: rgba(17, 24, 39, 0.05);
+  --bs-btn-hover-border-color: rgba(17, 24, 39, 0.2);
+  --bs-btn-active-color: var(--text-1);
+  --bs-btn-active-bg: rgba(17, 24, 39, 0.08);
+  --bs-btn-active-border-color: rgba(17, 24, 39, 0.2);
+  background: var(--glass-strong);
 }
 
-.btn-outline-secondary:hover {
-  background: rgba(15, 23, 42, 0.06);
-  color: var(--text-1);
+.btn-danger {
+  --bs-btn-bg: var(--danger);
+  --bs-btn-border-color: var(--danger);
+  --bs-btn-hover-bg: #b42318;
+  --bs-btn-hover-border-color: #b42318;
+  --bs-btn-active-bg: #b42318;
+  --bs-btn-active-border-color: #b42318;
+}
+
+.btn-success {
+  --bs-btn-bg: var(--success);
+  --bs-btn-border-color: var(--success);
+  --bs-btn-hover-bg: #067647;
+  --bs-btn-hover-border-color: #067647;
+  --bs-btn-active-bg: #067647;
+  --bs-btn-active-border-color: #067647;
 }
 
 .form-control,
 .form-select,
 .input-group-text {
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   border-color: rgba(17, 24, 39, 0.12);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--glass-strong);
   color: var(--text-1);
   transition:
     border-color var(--ease),
@@ -472,14 +792,14 @@ body {
 .form-control:focus,
 .form-select:focus {
   border-color: rgba(10, 132, 255, 0.62);
-  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.16);
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.14);
   background: #fff;
 }
 
 .form-label,
 .form-label-sm {
   color: var(--text-2);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -491,7 +811,7 @@ body {
 }
 
 .alert {
-  border-radius: 14px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line-soft);
 }
 
@@ -501,35 +821,33 @@ body {
 
 .Toastify__toast {
   font-family: var(--font-body) !important;
-  border-radius: 14px !important;
-  box-shadow: var(--shadow-sm) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 
 .Toastify__progress-bar {
   /* !important necessário para sobrescrever estilo inline da lib react-toastify */
-  background: linear-gradient(120deg, var(--primary), #4da3ff) !important;
+  background: var(--primary) !important;
 }
 
+/* ---------------------------------------------------------------------------
+   Auth (Esqueci a senha / Redefinir senha): cartao centrado no canvas.
+   O Login tem layout proprio em pages/auth/LoginPage.css.
+   ------------------------------------------------------------------------- */
 .auth-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background:
-    radial-gradient(70% 55% at 18% 8%, rgba(10, 132, 255, 0.22), rgba(10, 132, 255, 0) 68%),
-    radial-gradient(70% 50% at 100% 100%, rgba(6, 182, 212, 0.26), rgba(6, 182, 212, 0) 72%),
-    linear-gradient(165deg, #f3f7ff 0%, #dce7f8 60%, #d4e2f5 100%);
 }
 
 .auth-card {
   width: min(100%, 440px);
   padding: 2.2rem;
-  border-radius: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.78));
-  backdrop-filter: blur(14px) saturate(180%);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--glass-strong);
   box-shadow: var(--shadow-md);
   animation: fade-in-up 420ms cubic-bezier(0.22, 0.8, 0.32, 1);
 }
@@ -553,22 +871,21 @@ body {
   object-fit: contain;
   border-radius: 20px;
   padding: 0.7rem;
-  background: linear-gradient(170deg, #0f172a, #1e293b);
+  background: linear-gradient(170deg, var(--sidebar-bg), var(--sidebar-bg-soft));
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 14px 34px rgba(2, 6, 23, 0.32);
 }
 
 .auth-brand h1 {
   margin-bottom: 0.35rem;
-  font-family: var(--font-title);
   font-size: 2rem;
+  font-weight: 800;
   letter-spacing: -0.04em;
-  color: #1d4ed8;
 }
 
 .auth-brand p {
   color: var(--text-3);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .auth-version {
@@ -576,7 +893,7 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--text-3);
 }
 
 ::-webkit-scrollbar {
@@ -625,15 +942,16 @@ body {
 }
 
 .mobile-menu-btn {
-  border: 0;
-  width: 40px;
-  height: 40px;
+  border: 1px solid var(--line);
+  width: 42px;
+  height: 42px;
+  flex: none;
   display: none;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   color: var(--text-1);
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--glass-strong);
 }
 
 .mobile-menu-btn svg {
@@ -661,6 +979,8 @@ body {
   }
 }
 
+/* Abaixo de 992px a sidebar sai do fluxo e vira gaveta (mesmo mecanismo de
+   antes: .open + overlay controlados pelo App.jsx). */
 @media (max-width: 992px) {
   .app-shell {
     padding: 0.75rem;
@@ -700,11 +1020,23 @@ body {
   }
 
   .app-header {
-    padding: 0.95rem 1rem;
+    padding: 0.75rem 1rem;
+    min-height: 66px;
   }
 
-  .app-header-meta,
-  .app-header-date {
+  .app-header-meta {
+    display: none;
+  }
+
+  .header-search {
+    width: 42px;
+    padding: 0;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .header-search-label,
+  .header-search .header-kbd {
     display: none;
   }
 
@@ -725,12 +1057,8 @@ body {
     width: min(86vw, var(--sidebar-width));
   }
 
-  .app-header {
-    border-radius: 18px;
-  }
-
-  .app-main {
-    border-radius: 18px;
+  .app-content {
+    border-radius: var(--radius-md);
   }
 }
 
@@ -782,9 +1110,9 @@ body {
   max-height: calc(100vh - 100px);
   display: flex;
   flex-direction: column;
-  background: var(--surface, #fff);
-  border: 1px solid var(--line, rgba(17, 24, 39, 0.09));
-  border-radius: var(--radius-md, 14px);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
   z-index: 1055;
 }
@@ -795,14 +1123,14 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  border-bottom: 1px solid var(--line, rgba(17, 24, 39, 0.09));
+  border-bottom: 1px solid var(--line);
   cursor: move;
   user-select: none;
   touch-action: none;
 }
 
 .painel-header:focus-visible {
-  outline: 2px solid var(--primary, #007aff);
+  outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
 
@@ -818,7 +1146,7 @@ body {
 
 .painel-footer {
   padding: 0.85rem 1.25rem;
-  border-top: 1px solid var(--line, rgba(17, 24, 39, 0.09));
+  border-top: 1px solid var(--line);
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;

@@ -43,7 +43,7 @@ describe('GlobalSearch — command palette de ações', () => {
   it('filtra ações pela query, ignorando acento', () => {
     renderPalette()
     abrir()
-    const input = screen.getByPlaceholderText(/Buscar casos, clientes/i)
+    const input = screen.getByPlaceholderText(/Buscar ou executar/i)
     fireEvent.change(input, { target: { value: 'relatorio' } })
     expect(screen.getByText('Abrir Relatórios')).toBeInTheDocument()
     expect(screen.queryByText('Tratar intimações')).not.toBeInTheDocument()
