@@ -97,7 +97,7 @@ export default function OnboardingPage() {
   const salvarOABEAvancar = async () => {
     setSavingStep(true)
     try {
-      await api.put('/auth/me/profile', oab)
+      await api.put('/auth/me', oab)
       avancar()
     } catch (e) {
       toast.error(e?.message || 'Não foi possível salvar a OAB.')
