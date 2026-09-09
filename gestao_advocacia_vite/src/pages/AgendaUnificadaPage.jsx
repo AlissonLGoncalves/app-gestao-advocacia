@@ -1,48 +1,55 @@
 // src/pages/AgendaUnificadaPage.jsx
-// Substituta da AgendaPage antiga (PR D3). Consome /v1/itens-agenda
-// como fonte unica — mostra tarefas + eventos no mesmo calendar/list.
+// Agenda unificada — consome /v1/itens-agenda como fonte unica (tarefas +
+// eventos) e oferece 4 visoes na MESMA rota (?view=):
 //
-// Por que essa pagina existe:
-//   Antes: usuario tinha que olhar 2 telas (/agenda e /prazos) pra
-//   saber o que vence essa semana. Aqui ficam todos os compromissos
-//   datados (eventos) + tarefas com data_vencimento.
+//   hoje        → fila do dia por hora (VisaoHoje)
+//   calendario  → mes (CalendarView) + painel do dia (PainelDoDia)
+//   kanban      → board drag-drop (PrazosPage embutido, estado proprio)
+//   lista       → tabela unificada
 //
-// O que NAO entra aqui:
-//   - Kanban de tarefas (continua em /prazos com drag-drop dedicado).
-//     A unificacao backend (item_agenda) ja foi feita em D1/D2, entao
-//     o kanban antigo continua valido — so muda a fonte (D4).
-import React, { useCallback, useEffect, useState } from 'react'
+// Redesign Stitch (set/2026): a casca mudou (toggle segmentado, cabecalho
+// do mes com chips, painel lateral, pilulas no calendario); a logica,
+// endpoints, drag-and-drop do Kanban e o TratarPrazoModal continuam os
+// mesmos. Estilos em AgendaUnificadaPage.css (tokens de index.css).
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import FullCalendar from '@fullcalendar/react'
-import dayGridPlugin from '@fullcalendar/daygrid'
-import timeGridPlugin from '@fullcalendar/timegrid'
-import interactionPlugin from '@fullcalendar/interaction'
-import listPlugin from '@fullcalendar/list'
-import bootstrap5Plugin from '@fullcalendar/bootstrap5'
-import ptBrLocale from '@fullcalendar/core/locales/pt-br'
 import { toast } from 'react-toastify'
-import { PlusIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
+import {
+  PlusIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  CalendarDaysIcon,
+} from '@heroicons/react/24/outline'
 import ItemAgendaForm from '../components/ItemAgendaForm.jsx'
 import AgendaViewToggle from '../components/AgendaViewToggle.jsx'
 import TratarPrazoModal from '../components/TratarPrazoModal.jsx'
+import CalendarView from '../components/CalendarView.jsx'
+import CabecalhoMes from '../components/agenda/CabecalhoMes.jsx'
+import PainelDoDia from '../components/agenda/PainelDoDia.jsx'
+import VisaoHoje from '../components/agenda/VisaoHoje.jsx'
+import {
+  CHIPS,
+  VIEW_KEYS,
+  hojeYmd,
+  ymdDoItem,
+  urgenciaDoItem,
+  ehAudiencia,
+  filtrarPorChip,
+  itensDoDia,
+  contarMes,
+  tituloMes,
+} from '../components/agenda/agendaHelpers.js'
 import PrazosPage from './PrazosPage.jsx'
-import { listItensAgenda, deleteItemAgenda } from '../api/itensAgenda.js'
+import {
+  listItensAgenda,
+  deleteItemAgenda,
+  concluirItemAgenda,
+  updateItemAgenda,
+} from '../api/itensAgenda.js'
+import { listCasos } from '../api/casos.js'
 import { getProvidencia } from '../utils/providencia.js'
 import { useConfirm } from '../hooks/useConfirm.jsx'
-
-// Cores visuais por tipo+status. Centralizadas pra UI consistente entre
-// calendar e list.
-function classeDoItem(item) {
-  if (item.status === 'Concluido') return 'fc-event-concluido'
-  if (item.status === 'Cancelado') return 'fc-event-cancelado'
-  // Vencido: data passada e ainda pendente
-  const agora = new Date()
-  const dataRelevante = item.data_inicio || item.data_vencimento
-  if (dataRelevante && new Date(dataRelevante) < agora && item.status === 'Pendente') {
-    return 'fc-event-vencido'
-  }
-  return item.tipo === 'tarefa' ? 'fc-event-tarefa' : 'fc-event-evento'
-}
+import './AgendaUnificadaPage.css'
 
 function formatDataBR(iso) {
   if (!iso) return '—'
@@ -67,23 +74,35 @@ const BADGE_STATUS = {
   Cancelado: 'bg-dark',
 }
 
+// Classe do evento no FullCalendar por urgencia (+ marcador de audiencia).
+function classesDoEvento(item, hoje) {
+  const urg = urgenciaDoItem(item, hoje)
+  const classes = [
+    `ag-ev--${urg === 'cancelado' ? 'concluido' : urg === 'semana' ? 'normal' : urg}`,
+  ]
+  if (ehAudiencia(item)) classes.push('ag-ev--audiencia')
+  return classes
+}
+
 function AgendaUnificadaPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [itens, setItens] = useState([])
+  const [casos, setCasos] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
-  // Visao vem da URL (?view=calendario|lista) pra navegacao coesa com o
-  // toggle unificado (que tambem leva pro Kanban em /prazos). Fallback pra
+  // Visao vem da URL (?view=hoje|calendario|kanban|lista). Fallback pra
   // preferencia salva, depois 'calendario'.
   const viewParam = searchParams.get('view')
-  const viewMode =
-    viewParam === 'lista' || viewParam === 'calendario' || viewParam === 'kanban'
-      ? viewParam
-      : localStorage.getItem('agenda_unificada_view') || 'calendario'
+  const salva = localStorage.getItem('agenda_unificada_view')
+  const viewMode = VIEW_KEYS.includes(viewParam)
+    ? viewParam
+    : VIEW_KEYS.includes(salva)
+      ? salva
+      : 'calendario'
   const isKanban = viewMode === 'kanban'
   // Fase 3 (caso como hub): /agenda?caso=ID mostra só a agenda do caso.
   const casoFiltro = searchParams.get('caso')
-  const [filtroTipo, setFiltroTipo] = useState('todos') // todos | tarefa | evento
+  const [chip, setChip] = useState('todos') // todos | prazos | audiencias | tarefas
   const [filtroStatus, setFiltroStatus] = useState('ativos') // ativos | todos | pendentes | concluidos
   const [modalAberto, setModalAberto] = useState(false)
   const [itemEditar, setItemEditar] = useState(null)
@@ -91,6 +110,11 @@ function AgendaUnificadaPage() {
   // ver vencimento, providência, responder com peça, marcar cumprido.
   const [itemTratar, setItemTratar] = useState(null)
   const { confirm, ConfirmDialog } = useConfirm()
+  const hoje = hojeYmd()
+  const [diaSelecionado, setDiaSelecionado] = useState(hoje)
+  const [mesVisivel, setMesVisivel] = useState(() => new Date())
+  const calendarRef = useRef(null)
+
   // Issue #301 — ?novo=evento|tarefa abre o modal de criação direto.
   // Usado pelo QuickAdd do header (substitui a rota legada /agenda/novo).
   const [novoTipoUrl, setNovoTipoUrl] = useState(null)
@@ -104,32 +128,37 @@ function AgendaUnificadaPage() {
       params.delete('novo') // remove da URL pra não reabrir em refresh
       setSearchParams(params, { replace: true })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }, [searchParams, setSearchParams])
 
-  // Fetch unificado
+  // Fetch unificado (itens + casos pra resolver cliente × parte / nº CNJ)
   const carregar = useCallback(async () => {
     setLoading(true)
     try {
       const params = {}
       if (casoFiltro) params.caso_id = casoFiltro
-      if (filtroTipo !== 'todos') params.tipo = filtroTipo
       if (filtroStatus === 'pendentes') params.status = 'Pendente'
       if (filtroStatus === 'concluidos') params.status = 'Concluido'
-      const data = await listItensAgenda(params)
+      const [data, listaCasos] = await Promise.all([
+        listItensAgenda(params),
+        listCasos().catch((err) => {
+          console.warn('AgendaUnificadaPage: erro ao carregar casos', err)
+          return []
+        }),
+      ])
       let lista = Array.isArray(data) ? data : []
       // 'ativos' = nao Concluido nem Cancelado (default, esconde ruido)
       if (filtroStatus === 'ativos') {
         lista = lista.filter((i) => i.status !== 'Concluido' && i.status !== 'Cancelado')
       }
       setItens(lista)
+      setCasos(Array.isArray(listaCasos) ? listaCasos : [])
     } catch (err) {
       console.error('AgendaUnificadaPage: erro ao carregar itens', err)
       toast.error(`Erro ao carregar itens: ${err?.message || 'desconhecido'}`)
     } finally {
       setLoading(false)
     }
-  }, [filtroTipo, filtroStatus, casoFiltro])
+  }, [filtroStatus, casoFiltro])
 
   useEffect(() => {
     // No Kanban o board carrega seus próprios dados; evita fetch redundante.
@@ -149,6 +178,13 @@ function AgendaUnificadaPage() {
 
   const handleAdicionarClick = () => {
     setItemEditar(null)
+    setModalAberto(true)
+  }
+
+  // Painel do dia vazio → "Novo item neste dia": o form nasce com a data
+  // preenchida (sem id = criação; ItemAgendaForm hidrata pelos campos).
+  const handleNovoNoDia = (ymd) => {
+    setItemEditar({ tipo: 'tarefa', data_vencimento: ymd, data_inicio: `${ymd}T09:00` })
     setModalAberto(true)
   }
 
@@ -183,6 +219,23 @@ function AgendaUnificadaPage() {
     }
   }
 
+  // "Concluir" do painel/fila — mesmo endpoint do Kanban pra tarefa;
+  // evento não tem /concluir, vai por PUT de status.
+  const handleConcluir = async (item) => {
+    try {
+      if (item.tipo === 'tarefa') {
+        await concluirItemAgenda(item.id)
+      } else {
+        await updateItemAgenda(item.id, { status: 'Concluido' })
+      }
+      toast.success('Concluído.')
+      setRefreshKey((k) => k + 1)
+    } catch (err) {
+      console.error('AgendaUnificadaPage: erro ao concluir', err)
+      toast.error(err?.message || 'Falha ao concluir.')
+    }
+  }
+
   const handleFormSalvo = () => {
     setModalAberto(false)
     setItemEditar(null)
@@ -190,169 +243,193 @@ function AgendaUnificadaPage() {
     setRefreshKey((k) => k + 1)
   }
 
-  // Adapta itens pra FullCalendar
-  const eventosFullCalendar = itens
-    .filter((i) => i.data_inicio || i.data_vencimento)
-    .map((item) => {
-      const start = item.data_inicio || item.data_vencimento
-      const end = item.data_fim
-      return {
-        id: String(item.id),
-        title: item.titulo,
-        start,
-        end,
-        allDay: !start.includes('T'),
-        extendedProps: { item },
-        className: classeDoItem(item),
-      }
-    })
+  // ── Derivados ────────────────────────────────────────────────────────
+  const itensFiltrados = useMemo(() => filtrarPorChip(itens, chip), [itens, chip])
 
-  const handleCalendarEventClick = (clickInfo) => {
-    const item = clickInfo.event.extendedProps?.item
-    if (item) handleItemClick(item)
+  const eventosFullCalendar = useMemo(
+    () =>
+      itensFiltrados
+        .filter((i) => ymdDoItem(i))
+        .map((item) => {
+          const start = item.data_inicio || item.data_vencimento
+          return {
+            id: String(item.id),
+            title: item.titulo,
+            start,
+            end: item.data_fim || undefined,
+            allDay: !String(start).includes('T'),
+            extendedProps: { item },
+            classNames: classesDoEvento(item, hoje),
+          }
+        }),
+    [itensFiltrados, hoje]
+  )
+
+  const itensDoDiaSelecionado = useMemo(
+    () => itensDoDia(itensFiltrados, diaSelecionado),
+    [itensFiltrados, diaSelecionado]
+  )
+
+  const contagemMes = useMemo(
+    () => contarMes(itens, mesVisivel.getFullYear(), mesVisivel.getMonth() + 1),
+    [itens, mesVisivel]
+  )
+
+  const calApi = () => calendarRef.current?.getApi?.()
+  const irMesAnterior = () => calApi()?.prev()
+  const irMesProximo = () => calApi()?.next()
+  const irHoje = () => {
+    calApi()?.today()
+    setDiaSelecionado(hoje)
+  }
+
+  const agendaVazia = !isKanban && !loading && itens.length === 0 && filtroStatus === 'ativos'
+
+  const acoesCard = {
+    onAbrir: handleItemClick,
+    onResponder: (item) => setItemTratar(item),
+    onConcluir: handleConcluir,
   }
 
   return (
-    <div className="container-fluid py-3 px-3 px-lg-4">
-      <div className="mb-3">
-        <h2 className="h4 mb-1 fw-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-          Agenda
-        </h2>
-        <p className="text-muted small mb-0">
-          Prazos, tarefas e compromissos num só lugar — alterne entre Calendário, Kanban e Lista.
-        </p>
-      </div>
-
-      {/* Controles: view-mode (unificado) + filtros + ação */}
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <div className="d-flex flex-wrap align-items-center gap-2">
+    <div className="ag-page">
+      <div className="ag-header">
+        <div>
+          <h1>Agenda</h1>
+          <p className="ag-header-sub">Prazos, audiências e tarefas</p>
+        </div>
+        <div className="ag-header-acoes">
           <AgendaViewToggle current={viewMode} onLocalChange={handleViewChange} />
-
-          {casoFiltro && (
-            <span
-              className="badge bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center gap-2 px-3 py-2"
-              data-testid="chip-filtro-caso"
-            >
-              Agenda do caso #{casoFiltro}
-              <button
-                type="button"
-                className="btn-close"
-                style={{ fontSize: '0.6rem' }}
-                aria-label="Limpar filtro de caso"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams)
-                  params.delete('caso')
-                  setSearchParams(params, { replace: true })
-                }}
-              />
-            </span>
-          )}
-
-          {/* Filtros tipo/status só fazem sentido no Calendário/Lista. O Kanban
-              tem suas próprias colunas (A Fazer/Em Andamento/Concluído). */}
-          {!isKanban && (
-            <>
-              <select
-                className="form-select form-select-sm"
-                style={{ width: 'auto' }}
-                value={filtroTipo}
-                onChange={(e) => setFiltroTipo(e.target.value)}
-                aria-label="Filtrar por tipo"
-              >
-                <option value="todos">Todos os tipos</option>
-                <option value="tarefa">Só prazos</option>
-                <option value="evento">Só eventos</option>
-              </select>
-
-              <select
-                className="form-select form-select-sm"
-                style={{ width: 'auto' }}
-                value={filtroStatus}
-                onChange={(e) => setFiltroStatus(e.target.value)}
-                aria-label="Filtrar por status"
-              >
-                <option value="ativos">Ativos (default)</option>
-                <option value="pendentes">Só pendentes</option>
-                <option value="concluidos">Só concluídos</option>
-                <option value="todos">Todos</option>
-              </select>
-            </>
+          {/* No Kanban, a criação fica no botão "Novo Prazo" próprio (que refresca
+              o estado do board). No estado vazio o primário desce pro card. */}
+          {!isKanban && !agendaVazia && (
+            <button type="button" className="ag-primary" onClick={handleAdicionarClick}>
+              <PlusIcon aria-hidden="true" />
+              Novo item
+            </button>
           )}
         </div>
-
-        {/* No Kanban, a criação fica no botão "Novo Prazo" próprio (que refresca
-            o estado do board). Aqui o "Novo item" cobre Calendário/Lista. */}
-        {!isKanban && (
-          <button
-            type="button"
-            className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm"
-            onClick={handleAdicionarClick}
-          >
-            <PlusIcon
-              style={{ width: 15, height: 15 }}
-              className="me-1 d-inline align-text-bottom"
-            />
-            Novo item
-          </button>
-        )}
       </div>
+
+      {casoFiltro && (
+        <div className="mb-3">
+          <span className="ag-chip-caso" data-testid="chip-filtro-caso">
+            Agenda do caso #{casoFiltro}
+            <button
+              type="button"
+              className="btn-close"
+              style={{ fontSize: '0.6rem' }}
+              aria-label="Limpar filtro de caso"
+              onClick={() => {
+                const params = new URLSearchParams(searchParams)
+                params.delete('caso')
+                setSearchParams(params, { replace: true })
+              }}
+            />
+          </span>
+        </div>
+      )}
 
       {isKanban ? (
         // Kanban embutido — board drag-drop com estado próprio (não usa o
-        // fetch/loading desta página). Mesma experiência do antigo /prazos,
-        // agora como 3ª aba da Agenda.
-        <PrazosPage embedded />
+        // fetch/loading desta página). Colunas A Fazer/Em Andamento/Concluído
+        // são persistidas pelo backend (/itens-agenda/reorder) — mantidas.
+        <div className="ag-kanban">
+          <PrazosPage embedded />
+        </div>
       ) : loading ? (
-        <div className="d-flex justify-content-center align-items-center p-5">
+        <div className="ag-loading">
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Carregando agenda...</span>
           </div>
-          <span className="ms-3 text-muted">Carregando itens da agenda...</span>
+          <span>Carregando itens da agenda...</span>
         </div>
+      ) : agendaVazia ? (
+        <div className="ag-vazio" data-testid="agenda-vazia">
+          <div className="ag-vazio-icone">
+            <CalendarDaysIcon aria-hidden="true" />
+          </div>
+          <p className="ag-vazio-titulo">Sua agenda está vazia.</p>
+          <p className="ag-vazio-texto">
+            Prazos criados a partir das intimações aparecem aqui automaticamente.
+          </p>
+          <button type="button" className="ag-primary" onClick={handleAdicionarClick}>
+            <PlusIcon aria-hidden="true" />
+            Novo item
+          </button>
+        </div>
+      ) : viewMode === 'hoje' ? (
+        <VisaoHoje itens={itens} casos={casos} hoje={hoje} {...acoesCard} />
       ) : viewMode === 'calendario' ? (
-        <div className="p-1 bg-white rounded shadow-sm">
-          <FullCalendar
-            plugins={[
-              dayGridPlugin,
-              timeGridPlugin,
-              interactionPlugin,
-              listPlugin,
-              bootstrap5Plugin,
-            ]}
-            themeSystem="bootstrap5"
-            initialView="dayGridMonth"
-            locale={ptBrLocale}
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
-            }}
-            buttonText={{
-              today: 'Hoje',
-              month: 'Mês',
-              week: 'Semana',
-              day: 'Dia',
-              list: 'Lista',
-            }}
-            events={eventosFullCalendar}
-            eventClick={handleCalendarEventClick}
-            height="auto"
-            contentHeight="auto"
-            navLinks
-            eventTimeFormat={{
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false,
+        <>
+          <CabecalhoMes
+            titulo={tituloMes(mesVisivel)}
+            contagem={contagemMes}
+            chip={chip}
+            onChip={setChip}
+            onAnterior={irMesAnterior}
+            onProximo={irMesProximo}
+            onHoje={irHoje}
+          />
+          <div className="ag-cal-layout">
+            <CalendarView
+              calendarRef={calendarRef}
+              eventos={eventosFullCalendar}
+              diaSelecionado={diaSelecionado}
+              onDiaClick={setDiaSelecionado}
+              onEventoClick={handleItemClick}
+              onMesChange={setMesVisivel}
+            />
+            <PainelDoDia
+              dataYmd={diaSelecionado}
+              itens={itensDoDiaSelecionado}
+              casos={casos}
+              hoje={hoje}
+              onNovoNoDia={handleNovoNoDia}
+              {...acoesCard}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="ag-lista-toolbar">
+            <div className="ag-chips" role="group" aria-label="Filtrar por tipo">
+              {CHIPS.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  className={`ag-chip${chip === c.key ? ' is-active' : ''}`}
+                  aria-pressed={chip === c.key}
+                  onClick={() => setChip(c.key)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <select
+              className="form-select form-select-sm ms-2"
+              style={{ width: 'auto' }}
+              value={filtroStatus}
+              onChange={(e) => setFiltroStatus(e.target.value)}
+              aria-label="Filtrar por status"
+            >
+              <option value="ativos">Ativos</option>
+              <option value="pendentes">Só pendentes</option>
+              <option value="concluidos">Só concluídos</option>
+              <option value="todos">Todos</option>
+            </select>
+          </div>
+          <ListaItens
+            itens={itensFiltrados}
+            onAbrir={handleItemClick}
+            onEditar={handleEditarClick}
+            onExcluir={handleExcluir}
+            onLimparFiltros={() => {
+              setChip('todos')
+              setFiltroStatus('ativos')
             }}
           />
-        </div>
-      ) : (
-        <ListaItens
-          itens={itens}
-          onAbrir={handleItemClick}
-          onEditar={handleEditarClick}
-          onExcluir={handleExcluir}
-        />
+        </>
       )}
 
       {modalAberto && (
@@ -364,13 +441,13 @@ function AgendaUnificadaPage() {
             setItemEditar(null)
             setNovoTipoUrl(null)
           }}
-          defaultTipo={novoTipoUrl || (filtroTipo === 'evento' ? 'evento' : 'tarefa')}
+          defaultTipo={novoTipoUrl || (chip === 'audiencias' ? 'evento' : 'tarefa')}
         />
       )}
 
       {ConfirmDialog}
 
-      {/* Issue #304 — tratamento do prazo (cumprir, cancelar, gerar peça) */}
+      {/* Issue #304 — tratamento do prazo (cumprir, cancelar, responder com peça) */}
       {itemTratar && (
         <TratarPrazoModal
           item={itemTratar}
@@ -392,20 +469,27 @@ function AgendaUnificadaPage() {
 // Tabela inline — separada pra reduzir tamanho do componente principal
 // e facilitar leitura. Nao virou arquivo separado porque so faz sentido
 // no contexto da AgendaUnificadaPage.
-function ListaItens({ itens, onAbrir, onEditar, onExcluir }) {
+function ListaItens({ itens, onAbrir, onEditar, onExcluir, onLimparFiltros }) {
   if (itens.length === 0) {
     return (
-      <div className="text-center text-muted py-5 bg-white rounded shadow-sm">
-        <p className="mb-1">Nenhum item encontrado.</p>
-        <small>Ajuste os filtros ou clique em "Novo item" pra adicionar.</small>
+      <div className="ag-vazio" data-testid="lista-vazia">
+        <p className="ag-vazio-titulo">Nenhum item com esses filtros.</p>
+        <p className="ag-vazio-texto">Troque o tipo ou o status para ver mais itens.</p>
+        <button
+          type="button"
+          className="btn btn-outline-primary btn-sm rounded-pill px-3"
+          onClick={onLimparFiltros}
+        >
+          Limpar filtros
+        </button>
       </div>
     )
   }
   return (
-    <div className="bg-white rounded shadow-sm">
+    <div className="ag-lista">
       <div className="table-responsive">
         <table className="table table-hover mb-0 align-middle">
-          <thead className="table-light">
+          <thead>
             <tr>
               <th>Título</th>
               <th>Tipo</th>
@@ -433,16 +517,16 @@ function ListaItens({ itens, onAbrir, onEditar, onExcluir }) {
                     </button>
                     {prov && (
                       <span
-                        className={`badge ms-2 bg-${prov.cor} ${prov.cor === 'warning' ? 'text-dark' : ''}`}
+                        className={`ag-badge ms-2 ${prov.cor === 'danger' ? 'ag-badge-danger' : prov.cor === 'warning' ? 'ag-badge-warning' : 'ag-badge-muted'}`}
                         title={prov.descricao}
                       >
-                        ⚖ {prov.label}
+                        {prov.label}
                       </span>
                     )}
                   </td>
                   <td>
                     <span
-                      className={`badge ${item.tipo === 'evento' ? 'bg-primary' : 'bg-warning text-dark'}`}
+                      className={`ag-badge ${item.tipo === 'evento' ? 'ag-badge-audiencia' : 'ag-badge-warning'}`}
                     >
                       {item.tipo === 'evento' ? 'Evento' : 'Prazo'}
                     </span>
@@ -451,7 +535,9 @@ function ListaItens({ itens, onAbrir, onEditar, onExcluir }) {
                     <small className="text-muted">{item.categoria || '—'}</small>
                   </td>
                   <td>
-                    <small>{formatDataBR(item.data_inicio || item.data_vencimento)}</small>
+                    <small className="tabular">
+                      {formatDataBR(item.data_inicio || item.data_vencimento)}
+                    </small>
                   </td>
                   <td>
                     <span className={`badge ${BADGE_STATUS[item.status] || 'bg-secondary'}`}>
@@ -467,6 +553,7 @@ function ListaItens({ itens, onAbrir, onEditar, onExcluir }) {
                       className="btn btn-sm btn-outline-primary me-1 p-1 lh-1"
                       onClick={() => onEditar(item)}
                       title="Editar"
+                      aria-label={`Editar ${item.titulo}`}
                       style={{ width: 28, height: 28 }}
                     >
                       <PencilSquareIcon style={{ width: 14, height: 14 }} />
@@ -476,6 +563,7 @@ function ListaItens({ itens, onAbrir, onEditar, onExcluir }) {
                       className="btn btn-sm btn-outline-danger p-1 lh-1"
                       onClick={() => onExcluir(item)}
                       title="Excluir"
+                      aria-label={`Excluir ${item.titulo}`}
                       style={{ width: 28, height: 28 }}
                     >
                       <TrashIcon style={{ width: 14, height: 14 }} />
