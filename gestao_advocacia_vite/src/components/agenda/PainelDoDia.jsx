@@ -36,7 +36,7 @@ function PainelDoDia({
           {onNovoNoDia && (
             <button
               type="button"
-              className="btn btn-outline-primary btn-sm rounded-pill px-3"
+              className="btn btn-outline-primary btn-sm"
               onClick={() => onNovoNoDia(dataYmd)}
             >
               <PlusIcon style={{ width: 14, height: 14 }} className="me-1" aria-hidden="true" />
