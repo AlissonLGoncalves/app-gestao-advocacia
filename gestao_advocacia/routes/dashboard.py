@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from flask import request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -19,6 +19,51 @@ from models import (
     Recebimento,
     User,
 )
+from utils.datas import TZ_BRASIL, hoje_brasil
+from utils.tribunal_detector import detectar_tribunal_do_cnj
+
+# Janela de varredura da sequencia de dias (chip "N dias seguidos em dia").
+SEQUENCIA_MAX_DIAS = 60
+
+
+def _janela_utc(dia):
+    """Inicio/fim (naive UTC) do dia civil brasileiro `dia`.
+
+    `tratado_em` / `tratada_em` sao gravados com `datetime.utcnow()` (naive,
+    UTC). Para saber se algo foi resolvido "hoje" no Brasil, convertemos o
+    dia civil de America/Sao_Paulo para o intervalo UTC correspondente.
+    """
+    inicio = datetime.combine(dia, time.min, tzinfo=TZ_BRASIL)
+    fim = inicio + timedelta(days=1)
+    return (
+        inicio.astimezone(timezone.utc).replace(tzinfo=None),
+        fim.astimezone(timezone.utc).replace(tzinfo=None),
+    )
+
+
+def _dia_brasil(momento_utc):
+    """Dia civil brasileiro de um timestamp naive UTC."""
+    return momento_utc.replace(tzinfo=timezone.utc).astimezone(TZ_BRASIL).date()
+
+
+def _sequencia_dias(dias_com_atividade, hoje):
+    """Dias consecutivos com >=1 tratamento/conclusao, contando de hoje
+    para tras. Se hoje ainda nao teve atividade, a contagem comeca em ontem
+    (o dia ainda nao acabou — nao pode quebrar a sequencia)."""
+    if not dias_com_atividade:
+        return 0
+    cursor = hoje if hoje in dias_com_atividade else hoje - timedelta(days=1)
+    sequencia = 0
+    while cursor in dias_com_atividade and sequencia < SEQUENCIA_MAX_DIAS:
+        sequencia += 1
+        cursor -= timedelta(days=1)
+    return sequencia
+
+
+def _tribunal_do_caso(caso):
+    if not caso or not caso.numero_processo:
+        return None
+    return detectar_tribunal_do_cnj(caso.numero_processo).get("tribunal_nome")
 
 
 def register_dashboard_routes(app, dashboard_ns):
@@ -32,8 +77,10 @@ def register_dashboard_routes(app, dashboard_ns):
         def get(self):
             user_id = get_jwt_identity()
             tenant_id = get_tenant_id()
-            hoje = datetime.utcnow().date()
+            # Dia civil brasileiro: prazos nunca usam datetime.utcnow().date().
+            hoje = hoje_brasil()
             amanha = hoje + timedelta(days=1)
+            inicio_hoje_utc, fim_hoje_utc = _janela_utc(hoje)
             user = db.session.get(User, int(user_id))
 
             status_inativos = ["Concluido", "Arquivado", "Encerrado"]
@@ -72,6 +119,19 @@ def register_dashboard_routes(app, dashboard_ns):
                 ).all()
             }
 
+            # Publicacao de origem do prazo: da a sigla do tribunal e o link
+            # oficial para o botao "Abrir no tribunal" da fila do dia.
+            pub_ids_tarefas = {
+                item.publicacao_djen_id for item in tarefas_prioritarias if item.publicacao_djen_id
+            }
+            pubs_tarefas = {
+                pub.id: pub
+                for pub in PublicacaoDJEN.query.filter(
+                    PublicacaoDJEN.tenant_id == tenant_id,
+                    PublicacaoDJEN.id.in_(pub_ids_tarefas),
+                ).all()
+            }
+
             tarefas = []
             for item in tarefas_prioritarias:
                 vencimento = item.data_vencimento.date() if item.data_vencimento else None
@@ -82,6 +142,11 @@ def register_dashboard_routes(app, dashboard_ns):
                 else:
                     urgencia = "proximo"
                 caso = casos_tarefas.get(item.caso_id)
+                pub = pubs_tarefas.get(item.publicacao_djen_id)
+                numero_processo = (caso.numero_processo if caso else None) or (
+                    pub.numero_processo if pub else None
+                )
+                tribunal = (pub.sigla_tribunal if pub else None) or _tribunal_do_caso(caso)
                 tarefas.append(
                     {
                         "id": item.id,
@@ -95,28 +160,178 @@ def register_dashboard_routes(app, dashboard_ns):
                         "urgencia": urgencia,
                         "caso_id": item.caso_id,
                         "caso_titulo": caso.titulo if caso else None,
+                        "numero_processo": numero_processo,
+                        "tribunal": tribunal,
+                        "link_publicacao": pub.link if pub else None,
                     }
                 )
 
-            eventos_hoje = ItemAgenda.query.filter(
-                ItemAgenda.user_id == user_id,
-                ItemAgenda.tipo == "evento",
-                ~ItemAgenda.status.in_(["Concluido", "Cancelado"]),
-                ItemAgenda.data_inicio >= datetime.combine(hoje, datetime.min.time()),
-                ItemAgenda.data_inicio < datetime.combine(amanha, datetime.min.time()),
-            ).count()
+            eventos_hoje_itens = (
+                ItemAgenda.query.filter(
+                    ItemAgenda.user_id == user_id,
+                    ItemAgenda.tipo == "evento",
+                    ~ItemAgenda.status.in_(["Concluido", "Cancelado"]),
+                    ItemAgenda.data_inicio >= datetime.combine(hoje, datetime.min.time()),
+                    ItemAgenda.data_inicio < datetime.combine(amanha, datetime.min.time()),
+                )
+                .order_by(ItemAgenda.data_inicio.asc())
+                .all()
+            )
+            eventos_hoje = len(eventos_hoje_itens)
+            caso_ids_eventos = {item.caso_id for item in eventos_hoje_itens if item.caso_id}
+            casos_eventos = {
+                caso.id: caso
+                for caso in Caso.query.filter(
+                    Caso.tenant_id == tenant_id,
+                    Caso.id.in_(caso_ids_eventos),
+                ).all()
+            }
+            eventos_hoje_lista = []
+            for item in eventos_hoje_itens[:7]:
+                caso = casos_eventos.get(item.caso_id)
+                eventos_hoje_lista.append(
+                    {
+                        "id": item.id,
+                        "titulo": item.titulo,
+                        "categoria": item.categoria,
+                        "data_inicio": item.data_inicio.isoformat() if item.data_inicio else None,
+                        "caso_id": item.caso_id,
+                        "caso_titulo": caso.titulo if caso else None,
+                        "numero_processo": caso.numero_processo if caso else None,
+                        "tribunal": _tribunal_do_caso(caso),
+                    }
+                )
 
-            djen_pendentes = PublicacaoDJEN.query.filter(
+            # Pendente = "nao tratada" do inbox de Intimacoes (mesmo criterio
+            # do badge da tela DJEN): sem acao registrada e nao descartada.
+            djen_pendentes_query = PublicacaoDJEN.query.filter(
                 PublicacaoDJEN.tenant_id == tenant_id,
                 PublicacaoDJEN.ativo.is_(True),
                 PublicacaoDJEN.triagem_ignorada.is_(False),
-                PublicacaoDJEN.caso_id.is_(None),
-            ).count()
-            djen_hoje = PublicacaoDJEN.query.filter(
+                PublicacaoDJEN.tratada_em.is_(None),
+            )
+            djen_pendentes = djen_pendentes_query.count()
+            # Fila do dia: mesmas pendentes, agrupadas por tribunal.
+            fila_intimacoes_por_tribunal = [
+                {"tribunal": sigla or "DJEN", "quantidade": int(quantidade)}
+                for sigla, quantidade in (
+                    djen_pendentes_query.with_entities(
+                        PublicacaoDJEN.sigla_tribunal,
+                        func.count(PublicacaoDJEN.id),
+                    )
+                    .group_by(PublicacaoDJEN.sigla_tribunal)
+                    .order_by(func.count(PublicacaoDJEN.id).desc())
+                    .all()
+                )
+            ]
+
+            djen_hoje_query = PublicacaoDJEN.query.filter(
                 PublicacaoDJEN.tenant_id == tenant_id,
                 PublicacaoDJEN.ativo.is_(True),
                 PublicacaoDJEN.data_disponibilizacao == hoje,
-            ).count()
+            )
+            djen_hoje = djen_hoje_query.count()
+            captura_hoje = {
+                "publicacoes": djen_hoje,
+                "tribunais": sorted(
+                    {
+                        sigla
+                        for (sigla,) in djen_hoje_query.with_entities(PublicacaoDJEN.sigla_tribunal)
+                        .distinct()
+                        .all()
+                        if sigla
+                    }
+                ),
+                "vinculadas": djen_hoje_query.filter(PublicacaoDJEN.caso_id.isnot(None)).count(),
+            }
+
+            # --- Progresso do dia / sequencia / semana -----------------------
+            # "Resolvido" = ItemAgenda com tratado_em hoje (unico carimbo de
+            # conclusao do modelo) + PublicacaoDJEN com tratada_em hoje.
+            itens_resolvidos_hoje = (
+                ItemAgenda.query.filter(
+                    ItemAgenda.user_id == user_id,
+                    ItemAgenda.tratado_em.isnot(None),
+                    ItemAgenda.tratado_em >= inicio_hoje_utc,
+                    ItemAgenda.tratado_em < fim_hoje_utc,
+                )
+                .order_by(ItemAgenda.tratado_em.desc())
+                .all()
+            )
+            pubs_resolvidas_hoje = (
+                PublicacaoDJEN.query.filter(
+                    PublicacaoDJEN.tenant_id == tenant_id,
+                    PublicacaoDJEN.tratada_em.isnot(None),
+                    PublicacaoDJEN.tratada_em >= inicio_hoje_utc,
+                    PublicacaoDJEN.tratada_em < fim_hoje_utc,
+                )
+                .order_by(PublicacaoDJEN.tratada_em.desc())
+                .all()
+            )
+            resolvidas = len(itens_resolvidos_hoje) + len(pubs_resolvidas_hoje)
+            pendentes_hoje = tarefas_vencidas + tarefas_hoje + eventos_hoje + djen_pendentes
+            progresso_hoje = {"resolvidas": resolvidas, "total": resolvidas + pendentes_hoje}
+
+            resolvidas_hoje = sorted(
+                [
+                    {
+                        "id": item.id,
+                        "titulo": item.titulo,
+                        "tipo": item.tipo,
+                        "resolvido_em": item.tratado_em.isoformat(),
+                    }
+                    for item in itens_resolvidos_hoje
+                ]
+                + [
+                    {
+                        "id": pub.id,
+                        "titulo": " ".join((pub.texto or "").split())[:120]
+                        or f"Publicação {pub.sigla_tribunal or 'DJEN'}",
+                        "tipo": "publicacao",
+                        "resolvido_em": pub.tratada_em.isoformat(),
+                    }
+                    for pub in pubs_resolvidas_hoje
+                ],
+                key=lambda item: item["resolvido_em"],
+                reverse=True,
+            )[:5]
+
+            limite_sequencia_utc, _ = _janela_utc(hoje - timedelta(days=SEQUENCIA_MAX_DIAS))
+            dias_com_atividade = {
+                _dia_brasil(momento)
+                for (momento,) in ItemAgenda.query.filter(
+                    ItemAgenda.user_id == user_id,
+                    ItemAgenda.tratado_em.isnot(None),
+                    ItemAgenda.tratado_em >= limite_sequencia_utc,
+                )
+                .with_entities(ItemAgenda.tratado_em)
+                .all()
+            } | {
+                _dia_brasil(momento)
+                for (momento,) in PublicacaoDJEN.query.filter(
+                    PublicacaoDJEN.tenant_id == tenant_id,
+                    PublicacaoDJEN.tratada_em.isnot(None),
+                    PublicacaoDJEN.tratada_em >= limite_sequencia_utc,
+                )
+                .with_entities(PublicacaoDJEN.tratada_em)
+                .all()
+            }
+            sequencia_dias = _sequencia_dias(dias_com_atividade, hoje)
+
+            inicio_semana_utc, _ = _janela_utc(hoje - timedelta(days=7))
+            semana = {
+                "intimacoes_tratadas": PublicacaoDJEN.query.filter(
+                    PublicacaoDJEN.tenant_id == tenant_id,
+                    PublicacaoDJEN.tratada_em.isnot(None),
+                    PublicacaoDJEN.tratada_em >= inicio_semana_utc,
+                    PublicacaoDJEN.tratada_em < fim_hoje_utc,
+                ).count(),
+                "prazos_perdidos": tarefas_ativas.filter(
+                    ItemAgenda.data_vencimento.isnot(None),
+                    func.date(ItemAgenda.data_vencimento) >= hoje - timedelta(days=7),
+                    func.date(ItemAgenda.data_vencimento) < hoje,
+                ).count(),
+            }
 
             financeiro = None
             if not user or user.role != "assistente":
@@ -213,6 +428,14 @@ def register_dashboard_routes(app, dashboard_ns):
                 "tarefas_prioritarias": tarefas,
                 "publicacoes_recentes": publicacoes_recentes,
                 "monitoramento_djen_configurado": oabs_monitoradas > 0,
+                # Redesign "Seu dia" (Stitch 2026-09) — fila unica do dia.
+                "eventos_hoje": eventos_hoje_lista,
+                "fila_intimacoes_por_tribunal": fila_intimacoes_por_tribunal,
+                "progresso_hoje": progresso_hoje,
+                "resolvidas_hoje": resolvidas_hoje,
+                "sequencia_dias": sequencia_dias,
+                "semana": semana,
+                "captura_hoje": captura_hoje,
             }, 200
 
     @dashboard_ns.route("/stats")

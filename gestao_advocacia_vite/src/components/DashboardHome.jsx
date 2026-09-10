@@ -1,31 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react'
+// Inicio ("Seu dia") — redesign Stitch 2026-09, TELA 1.
+//
+// A tela que o advogado abre antes do PJe. Uma pergunta ("o que fazer
+// agora?"), uma lista, um botao primario. Nada de KPI, grafico ou coluna.
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import {
-  ArrowPathIcon,
-  ArrowRightIcon,
-  BriefcaseIcon,
-  CalendarDaysIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  NewspaperIcon,
-  PlusIcon,
-  UsersIcon,
-} from '@heroicons/react/24/outline'
+import { toast } from 'react-toastify'
 import { api } from '../api/client.js'
+import { tratarItemAgenda } from '../api/itensAgenda.js'
+import FilaDoDia from './inicio/FilaDoDia.jsx'
+import LinhaDjen from './inicio/LinhaDjen.jsx'
+import ProgressoDia from './inicio/ProgressoDia.jsx'
+import ResumoSemana from './inicio/ResumoSemana.jsx'
+import SequenciaChip from './inicio/SequenciaChip.jsx'
+import TudoEmDia from './inicio/TudoEmDia.jsx'
+import { montarFila, saudacaoPorHora } from './inicio/montarFila.js'
 import './DashboardHome.css'
-
-const formatarMoeda = (valor) =>
-  new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    maximumFractionDigits: 0,
-  }).format(valor || 0)
-
-const formatarData = (valor, opcoes = {}) => {
-  if (!valor) return ''
-  return new Intl.DateTimeFormat('pt-BR', opcoes).format(new Date(valor))
-}
 
 const obterPrimeiroNome = () => {
   try {
@@ -36,31 +25,12 @@ const obterPrimeiroNome = () => {
   }
 }
 
-function MetricCard({ label, value, detail, icon: Icon, tone, onClick }) {
-  return (
-    <button type="button" className={`dh-metric dh-metric--${tone}`} onClick={onClick}>
-      <span className="dh-metric__icon" aria-hidden="true">
-        <Icon />
-      </span>
-      <span className="dh-metric__content">
-        <span className="dh-metric__label">{label}</span>
-        <strong>{value}</strong>
-        <small>{detail}</small>
-      </span>
-      <ArrowRightIcon className="dh-metric__arrow" aria-hidden="true" />
-    </button>
-  )
-}
-
 function DashboardSkeleton() {
   return (
-    <div className="dashboard-home" aria-label="Carregando a tela inicial">
-      <div className="dh-skeleton dh-skeleton--title" />
-      <div className="dh-workspace-grid">
-        <div className="dh-skeleton dh-skeleton--panel" />
-        <div className="dh-skeleton dh-skeleton--panel" />
-      </div>
-      <div className="dh-skeleton dh-skeleton--strip" />
+    <div className="dashboard-home" aria-label="Carregando a tela inicial" aria-busy="true">
+      <div className="dh-skeleton dh-skeleton--titulo" />
+      <div className="dh-skeleton dh-skeleton--linha" />
+      <div className="dh-skeleton dh-skeleton--lista" />
     </div>
   )
 }
@@ -69,19 +39,18 @@ function DashboardHome() {
   const navigate = useNavigate()
   const [dados, setDados] = useState(null)
   const [erro, setErro] = useState('')
-  const [recarregando, setRecarregando] = useState(false)
+  // Concluidas nesta sessao: a linha desce riscada sem recarregar tudo.
+  const [concluidasLocais, setConcluidasLocais] = useState([])
+  const [concluindoChave, setConcluindoChave] = useState(null)
 
-  const carregar = async (silencioso = false) => {
-    if (silencioso) setRecarregando(true)
+  const carregar = useCallback(async () => {
     setErro('')
     try {
       setDados(await api.get('/dashboard/home'))
     } catch (error) {
       setErro(error.message || 'Não foi possível carregar a tela inicial.')
-    } finally {
-      setRecarregando(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     let ativo = true
@@ -91,78 +60,39 @@ function DashboardHome() {
         if (ativo) setDados(resultado)
       })
       .catch((error) => {
-        if (ativo) {
-          setErro(error.message || 'Não foi possível carregar a tela inicial.')
-        }
+        if (ativo) setErro(error.message || 'Não foi possível carregar a tela inicial.')
       })
     return () => {
       ativo = false
     }
   }, [])
 
-  const acoes = useMemo(() => {
-    if (!dados) return []
-    const itens = []
-    const intimacoes = dados.resumo?.intimacoes_pendentes || 0
+  const fila = useMemo(() => montarFila(dados), [dados])
 
-    if (intimacoes > 0) {
-      itens.push({
-        id: 'djen',
-        tone: 'rust',
-        icon: NewspaperIcon,
-        eyebrow: 'Intimações',
-        title: `${intimacoes} ${intimacoes === 1 ? 'publicação aguarda' : 'publicações aguardam'} triagem`,
-        meta: 'Revise e vincule ao processo correto.',
-        target: '/djen',
-      })
+  const concluir = async (linha) => {
+    setConcluindoChave(linha.chave)
+    try {
+      await tratarItemAgenda(linha.acao.itemId, { acao: 'cumpri' })
+      setConcluidasLocais((atuais) => [
+        { ...linha, chave: `local-${linha.chave}`, detalhe: 'Prazo cumprido' },
+        ...atuais,
+      ])
+    } catch (error) {
+      toast.error(error.message || 'Não foi possível concluir o prazo.')
+    } finally {
+      setConcluindoChave(null)
     }
-
-    ;(dados.tarefas_prioritarias || []).slice(0, 4).forEach((tarefa) => {
-      const vencimento = formatarData(tarefa.data_vencimento, {
-        day: '2-digit',
-        month: 'short',
-      })
-      itens.push({
-        id: `tarefa-${tarefa.id}`,
-        tone: tarefa.urgencia === 'vencido' ? 'rust' : tarefa.urgencia === 'hoje' ? 'amber' : 'ink',
-        icon: ClockIcon,
-        eyebrow:
-          tarefa.urgencia === 'vencido'
-            ? 'Prazo vencido'
-            : tarefa.urgencia === 'hoje'
-              ? 'Vence hoje'
-              : `Vence ${vencimento}`,
-        title: tarefa.titulo,
-        meta: tarefa.caso_titulo || tarefa.categoria || 'Tarefa do escritório',
-        target: '/agenda?view=kanban',
-      })
-    })
-
-    const financeiro = dados.resumo?.financeiro_vencido
-    if (financeiro?.quantidade > 0 && itens.length < 5) {
-      itens.push({
-        id: 'financeiro',
-        tone: 'amber',
-        icon: CurrencyDollarIcon,
-        eyebrow: 'Financeiro',
-        title: `${financeiro.quantidade} ${financeiro.quantidade === 1 ? 'lançamento vencido' : 'lançamentos vencidos'}`,
-        meta: `${formatarMoeda(financeiro.valor_total)} requer conferência.`,
-        target: '/financeiro',
-      })
-    }
-
-    return itens.slice(0, 5)
-  }, [dados])
+  }
 
   if (!dados && !erro) return <DashboardSkeleton />
 
   if (!dados && erro) {
     return (
       <div className="dashboard-home">
-        <div className="dh-error" role="alert">
-          <span>Não foi possível montar sua visão do dia.</span>
-          <small>{erro}</small>
-          <button type="button" onClick={() => carregar()}>
+        <div className="dh-erro" role="alert">
+          <strong>Não foi possível montar seu dia.</strong>
+          <span>{erro}</span>
+          <button type="button" className="dh-btn dh-btn--contorno" onClick={carregar}>
             Tentar novamente
           </button>
         </div>
@@ -170,201 +100,58 @@ function DashboardHome() {
     )
   }
 
-  const resumo = dados.resumo || {}
-  const hoje = dados.hoje || {}
-  const financeiro = resumo.financeiro_vencido
+  const chavesLocais = new Set(concluidasLocais.map((item) => item.chave.replace(/^local-/, '')))
+  const pendentes = fila.pendentes.filter((linha) => !chavesLocais.has(linha.chave))
+  const concluidas = [...concluidasLocais, ...fila.concluidas]
+
+  const resolvidas = (dados.progresso_hoje?.resolvidas || 0) + concluidasLocais.length
+  const total = resolvidas + pendentes.length
+  const n = pendentes.length
+
   const primeiroNome = obterPrimeiroNome()
-  const dataExtenso = new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(new Date())
+  const saudacao = saudacaoPorHora(new Date().getHours())
+  const resumo = dados.resumo || {}
+  const bancoVazio = (resumo.clientes || 0) === 0 && (resumo.casos_ativos || 0) === 0
 
   return (
-    <main className="dashboard-home">
-      <header className="dh-masthead">
-        <div>
-          <p className="dh-kicker">Início · {dataExtenso}</p>
-          <h1>{primeiroNome ? `Bom dia, ${primeiroNome}.` : 'Bom dia.'}</h1>
-          <p className="dh-subtitle">O essencial do escritório, em ordem de prioridade.</p>
+    <div className="dashboard-home">
+      <header className="dh-topo">
+        <div className="dh-topo__texto">
+          <h1>{primeiroNome ? `${saudacao}, ${primeiroNome}.` : `${saudacao}.`}</h1>
+          <p className="dh-subtitulo">
+            {n === 0
+              ? 'Nada pendente para hoje.'
+              : `Você tem ${n} ${n === 1 ? 'coisa' : 'coisas'} para resolver hoje. Comece pela primeira.`}
+          </p>
         </div>
-        <div className="dh-header-actions">
-          <button
-            type="button"
-            className="dh-button dh-button--ghost"
-            onClick={() => carregar(true)}
-            disabled={recarregando}
-          >
-            <ArrowPathIcon className={recarregando ? 'is-spinning' : ''} />
-            Atualizar
-          </button>
-          <button
-            type="button"
-            className="dh-button dh-button--primary"
-            onClick={() => navigate('/clientes/novo')}
-          >
-            <PlusIcon />
-            Novo cliente
-          </button>
-        </div>
+        <SequenciaChip dias={dados.sequencia_dias} />
       </header>
 
-      {!dados.monitoramento_djen_configurado && (
-        <button type="button" className="dh-setup-note" onClick={() => navigate('/djen')}>
-          <NewspaperIcon />
-          <span>
-            <strong>Ative o monitoramento do DJEN</strong>
-            Cadastre sua OAB para receber publicações automaticamente.
-          </span>
-          <ArrowRightIcon />
-        </button>
+      {n > 0 && <ProgressoDia resolvidas={resolvidas} total={total} />}
+
+      <LinhaDjen
+        captura={dados.captura_hoje}
+        configurado={Boolean(dados.monitoramento_djen_configurado)}
+        onNavegar={navigate}
+      />
+
+      {n === 0 && concluidas.length === 0 ? (
+        <TudoEmDia bancoVazio={bancoVazio} onNavegar={navigate} />
+      ) : (
+        <>
+          {n === 0 && <TudoEmDia bancoVazio={false} onNavegar={navigate} />}
+          <FilaDoDia
+            pendentes={pendentes}
+            concluidas={concluidas}
+            concluindoChave={concluindoChave}
+            onNavegar={navigate}
+            onConcluir={concluir}
+          />
+        </>
       )}
 
-      <section className="dh-workspace-grid" aria-label="Prioridades do dia">
-        <article className="dh-panel dh-focus-panel">
-          <div className="dh-panel__header">
-            <div>
-              <span className="dh-section-index">01</span>
-              <h2>Atenção agora</h2>
-            </div>
-            <span className="dh-count">{acoes.length}</span>
-          </div>
-
-          {acoes.length === 0 ? (
-            <div className="dh-empty-state">
-              <CheckCircleIcon />
-              <div>
-                <strong>Nenhuma urgência encontrada</strong>
-                <span>Você pode avançar no trabalho planejado.</span>
-              </div>
-            </div>
-          ) : (
-            <div className="dh-action-list">
-              {acoes.map((acao) => {
-                const Icon = acao.icon
-                return (
-                  <button
-                    type="button"
-                    className={`dh-action dh-action--${acao.tone}`}
-                    key={acao.id}
-                    onClick={() => navigate(acao.target)}
-                  >
-                    <span className="dh-action__icon">
-                      <Icon />
-                    </span>
-                    <span className="dh-action__copy">
-                      <small>{acao.eyebrow}</small>
-                      <strong>{acao.title}</strong>
-                      <span>{acao.meta}</span>
-                    </span>
-                    <ArrowRightIcon className="dh-action__arrow" />
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </article>
-
-        <aside className="dh-panel dh-today-panel">
-          <div className="dh-panel__header">
-            <div>
-              <span className="dh-section-index">02</span>
-              <h2>Hoje</h2>
-            </div>
-            <CalendarDaysIcon className="dh-panel__mark" />
-          </div>
-          <div className="dh-today-list">
-            <button type="button" onClick={() => navigate('/agenda?view=kanban')}>
-              <strong>{hoje.prazos || 0}</strong>
-              <span>Prazos vencendo</span>
-            </button>
-            <button type="button" onClick={() => navigate('/agenda')}>
-              <strong>{hoje.eventos || 0}</strong>
-              <span>Eventos na agenda</span>
-            </button>
-            <button type="button" onClick={() => navigate('/djen')}>
-              <strong>{hoje.publicacoes || 0}</strong>
-              <span>Publicações recebidas</span>
-            </button>
-          </div>
-          <button type="button" className="dh-text-link" onClick={() => navigate('/agenda')}>
-            Abrir agenda completa <ArrowRightIcon />
-          </button>
-        </aside>
-      </section>
-
-      <section className="dh-metrics" aria-label="Panorama do escritório">
-        <MetricCard
-          label="Clientes"
-          value={resumo.clientes || 0}
-          detail={`${resumo.casos_ativos || 0} casos ativos`}
-          icon={UsersIcon}
-          tone="teal"
-          onClick={() => navigate('/clientes')}
-        />
-        <MetricCard
-          label="Intimações"
-          value={resumo.intimacoes_pendentes || 0}
-          detail="aguardando triagem"
-          icon={NewspaperIcon}
-          tone="rust"
-          onClick={() => navigate('/djen')}
-        />
-        <MetricCard
-          label="Prazos"
-          value={resumo.prazos_urgentes || 0}
-          detail="vencidos ou para hoje"
-          icon={BriefcaseIcon}
-          tone="amber"
-          onClick={() => navigate('/agenda?view=kanban')}
-        />
-        {financeiro && (
-          <MetricCard
-            label="Financeiro"
-            value={financeiro.quantidade || 0}
-            detail={`${formatarMoeda(financeiro.valor_total)} vencidos`}
-            icon={CurrencyDollarIcon}
-            tone="ink"
-            onClick={() => navigate('/financeiro')}
-          />
-        )}
-      </section>
-
-      <section className="dh-panel dh-movements">
-        <div className="dh-panel__header">
-          <div>
-            <span className="dh-section-index">03</span>
-            <h2>Últimas movimentações</h2>
-          </div>
-          <button type="button" className="dh-text-link" onClick={() => navigate('/djen')}>
-            Ver todas <ArrowRightIcon />
-          </button>
-        </div>
-
-        {(dados.publicacoes_recentes || []).length === 0 ? (
-          <p className="dh-movements__empty">Nenhuma publicação recente.</p>
-        ) : (
-          <div className="dh-publication-list">
-            {dados.publicacoes_recentes.map((publicacao) => (
-              <button type="button" key={publicacao.id} onClick={() => navigate('/djen')}>
-                <span className={`dh-unread-dot ${publicacao.lida ? 'is-read' : ''}`} />
-                <span className="dh-publication__date">
-                  {formatarData(publicacao.data, { day: '2-digit', month: 'short' })}
-                </span>
-                <span className="dh-publication__body">
-                  <strong>
-                    {publicacao.cliente_nome || publicacao.caso_titulo || 'Publicação sem vínculo'}
-                  </strong>
-                  <span>{publicacao.resumo || 'Sem resumo disponível.'}</span>
-                </span>
-                <span className="dh-publication__court">{publicacao.tribunal}</span>
-                <ArrowRightIcon />
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
-    </main>
+      <ResumoSemana semana={dados.semana} onNavegar={navigate} />
+    </div>
   )
 }
 
