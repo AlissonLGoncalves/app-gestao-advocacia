@@ -5,6 +5,7 @@ from flask_jwt_extended import create_access_token
 
 from config_test import ConfigTest
 from models import Caso, Cliente, ItemAgenda, PublicacaoDJEN, Tenant, User
+from utils.datas import hoje_brasil
 
 
 def _headers(token):
@@ -136,7 +137,11 @@ def test_portal_mostra_somente_eventos_dos_casos_do_cliente(app, client, db):
 
 def test_dashboard_home_limita_listas_e_entrega_resumo(auth_client, db):
     usuario = db.session.get(User, int(auth_client.user["id"]))
-    hoje = datetime.utcnow().date()
+    # Ancora as fixtures no dia civil de Brasilia: o handler classifica
+    # urgencia com hoje_brasil(). Usando utcnow() o teste quebrava no CI
+    # entre 21h e 0h BRT, quando UTC ja virou o dia e Brasilia nao.
+    hoje = hoje_brasil()
+    meio_dia_hoje = datetime.combine(hoje, datetime.min.time()) + timedelta(hours=12)
 
     cliente = Cliente(
         nome_razao_social="Cliente Dashboard Home",
@@ -162,7 +167,7 @@ def test_dashboard_home_limita_listas_e_entrega_resumo(auth_client, db):
                 tipo="tarefa",
                 titulo=f"Prazo {indice}",
                 status="Pendente",
-                data_vencimento=datetime.utcnow() + timedelta(days=indice - 2),
+                data_vencimento=meio_dia_hoje + timedelta(days=indice - 2),
                 caso_id=caso.id,
                 user_id=usuario.id,
                 tenant_id=usuario.tenant_id,
