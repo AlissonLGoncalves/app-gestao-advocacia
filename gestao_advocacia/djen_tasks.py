@@ -357,14 +357,64 @@ def _item_get(item, *keys):
     return None
 
 
+def _polos_como_lista(polo_str):
+    """'A | B' -> ['A', 'B']. Usado pelo auto-vinculo, que espera lista."""
+    if not polo_str:
+        return []
+    return [nome.strip() for nome in str(polo_str).split("|") if nome.strip()]
+
+
+def _extrair_polos_do_item(item):
+    """Le as partes do item da ComunicaAPI. Retorna (polo_ativo, polo_passivo).
+
+    Formato real (conferido em 10/09/2026 contra comunicaapi.pje.jus.br):
+
+        "destinatarios": [
+            {"nome": "JOAO DOMINGOS PINTO",  "polo": "A", "comunicacao_id": 1},
+            {"nome": "LUCIANO CANOVA",       "polo": "P", "comunicacao_id": 1}
+        ]
+
+    O polo vem como uma letra: "A" (ativo) ou "P" (passivo). O codigo antigo
+    procurava uma lista "partes" com "tipoParte" contendo "PASSIVO" — nada
+    disso existe na resposta, entao as partes nunca eram preenchidas.
+    Aceita tambem o formato antigo, caso algum tribunal ainda o use.
+    """
+    partes_raw = _item_get(item, "destinatarios", "partes", "polo") or []
+    if not isinstance(partes_raw, list):
+        return None, None
+
+    ativos, passivos = [], []
+    for parte in partes_raw:
+        if not isinstance(parte, dict):
+            continue
+        nome = str(_item_get(parte, "nome", "nomeParte", "nomeAdvogado") or "").strip()
+        if not nome:
+            continue
+        polo = str(_item_get(parte, "polo", "tipoParte", "tipo") or "").strip().upper()
+        # Formato atual: letra "P" (passivo) / "A" (ativo). Formato antigo:
+        # "POLO PASSIVO" / "POLO ATIVO" — nao da' para so' olhar a inicial,
+        # porque "POLO ATIVO" tambem comeca com P.
+        if polo == "P" or "PASSIVO" in polo:
+            passivos.append(nome)
+        else:
+            ativos.append(nome)
+
+    return (" | ".join(ativos) or None, " | ".join(passivos) or None)
+
+
 def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, origem):
     """Persiste uma publicação se ainda não existir no banco."""
     # enriquecimento-cnj: hot-path
     from utils.cnj import extrair_primeiro_cnj_valido  # noqa: PLC0415
 
     hash_com = _item_get(item, "hash", "id", "codigo")
+    # A ComunicaAPI devolve a chave em snake_case ("numero_processo"). As
+    # variantes camelCase abaixo nunca existiram na resposta real, entao ate
+    # 09/2026 TODA publicacao entrava sem numero de processo e caia no
+    # fallback de regex no texto — que falha em intimacao de Projudi, onde o
+    # numero nao aparece no corpo. Mantidas por compatibilidade.
     numero_proc = (
-        _item_get(item, "numeroProcesso", "numeroprocesso")
+        _item_get(item, "numero_processo", "numeroProcesso", "numeroprocesso")
         or (item.get("processo") or {}).get("numero")
         or ""
     )
@@ -416,23 +466,19 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
     numero_com = _item_get(item, "numeroComunicacao", "numerocomunicacao")
     djen_id = _item_get(item, "id")
     link = _item_get(item, "link", "url") or ""
-    numero_proc_masc = _item_get(item, "numeroProcessoMascara", "numeroprocessomascara") or ""
+    # Idem numero_proc: a chave real e' "numeroprocessocommascara".
+    numero_proc_masc = (
+        _item_get(
+            item,
+            "numeroprocessocommascara",
+            "numeroProcessoComMascara",
+            "numeroProcessoMascara",
+            "numeroprocessomascara",
+        )
+        or ""
+    )
 
-    # Extrai partes (polo ativo/passivo)
-    partes_raw = _item_get(item, "partes", "polo") or []
-    polo_ativo_list, polo_passivo_list = [], []
-    if isinstance(partes_raw, list):
-        for parte in partes_raw:
-            if isinstance(parte, dict):
-                nome_parte = _item_get(parte, "nome", "nomeAdvogado", "nomeParte") or ""
-                tipo_parte = str(_item_get(parte, "tipoParte", "tipo") or "").upper()
-                if nome_parte:
-                    if "PASSIVO" in tipo_parte:
-                        polo_passivo_list.append(nome_parte)
-                    else:
-                        polo_ativo_list.append(nome_parte)
-    polo_ativo_str = " | ".join(polo_ativo_list) or None
-    polo_passivo_str = " | ".join(polo_passivo_list) or None
+    polo_ativo_str, polo_passivo_str = _extrair_polos_do_item(item)
     # Feedback 12/06: quando a API nao manda partes estruturadas, extrai
     # do texto (mesmo regex da triagem) — "quem contra quem" sempre que
     # o texto permitir.
@@ -538,8 +584,8 @@ def _salvar_publicacao(db, PublicacaoDJEN, user_id, tenant_id, caso_id, item, or
             # Monta uma "analise" minima compativel com tentar_auto_vincular_a_caso
             # usando o que ja temos extraido de polo_ativo/polo_passivo + texto.
             analise_min = {
-                "partes_autoras": polo_ativo_list,
-                "partes_reus": polo_passivo_list,
+                "partes_autoras": _polos_como_lista(polo_ativo_str),
+                "partes_reus": _polos_como_lista(polo_passivo_str),
                 "documentos_extraidos": list(CPF_CNPJ_REGEX.findall(texto or "")),
             }
             caso_id_auto = tentar_auto_vincular_a_caso(db, Cliente, Caso, tenant_id, analise_min)
