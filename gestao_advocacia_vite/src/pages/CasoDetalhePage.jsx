@@ -1,8 +1,12 @@
 // gestao_advocacia_vite/src/pages/CasoDetalhePage.jsx
-import React, { useState, useEffect, useCallback } from 'react'
+//
+// Redesign Stitch (TELA 3 — Caso como hub com próximo passo).
+// Cabeçalho "{cliente} × {parte contrária}" + botão primário "Abrir no
+// tribunal ↗"; Resumo em duas colunas com o card "Próximo passo" como
+// estrela. Lógica, endpoints e tabs (?tab=) preservados do desenho anterior.
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router'
-import { API_URL } from '../config.js' // Importa API_URL
-import { toast } from 'react-toastify' // Para notificações
+import { toast } from 'react-toastify'
 // PR D4.2 — Atividades do caso lê de /v1/itens-agenda em vez de /tarefas
 import { listItensAgenda, concluirItemAgenda, deleteItemAgenda } from '../api/itensAgenda.js'
 import {
@@ -11,17 +15,26 @@ import {
   getCaso,
   listPublicacoesDjenCaso,
 } from '../api/casos.js'
+import { getCliente } from '../api/clientes.js'
+import { listDocumentos } from '../api/documentos.js'
+import { api } from '../api/client.js'
 import HonorariosCasoCard from '../components/HonorariosCasoCard'
 import DocumentosCasoTab from '../components/DocumentosCasoTab'
 import DocumentosVinculadosCard from '../components/DocumentosVinculadosCard'
 import ApensarMenuCaso from '../components/ApensarMenuCaso.jsx'
 import CasoTimeline from '../components/CasoTimeline'
-import ProximasAtividadesCard from '../components/ProximasAtividadesCard.jsx'
 import PrioridadeBadge from '../components/ui/PrioridadeBadge.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import ItemAgendaForm from '../components/ItemAgendaForm.jsx'
 import ContratoFormModal from '../components/ContratoFormModal.jsx'
 import RecebimentosCasoCard from '../components/RecebimentosCasoCard.jsx'
+import TratarPrazoModal from '../components/TratarPrazoModal.jsx'
+import CabecalhoCaso from '../components/caso/CabecalhoCaso.jsx'
+import ProximoPassoCard from '../components/caso/ProximoPassoCard.jsx'
+import DadosProcessoCard from '../components/caso/DadosProcessoCard.jsx'
+import { selecionarProximoPasso } from '../components/caso/proximoPasso.js'
+import { derivarChecklist } from '../components/caso/checklistCaso.js'
+import { siglaTribunalDoCaso } from '../components/caso/tribunalDoCaso.js'
 import { useConfirm } from '../hooks/useConfirm.jsx'
 import {
   CheckCircleIcon,
@@ -31,17 +44,7 @@ import {
   PencilSquareIcon,
   PlusIcon,
 } from '@heroicons/react/24/outline'
-
-// Componente auxiliar para exibir mensagens de status (loading, error, success)
-const StatusDisplay = ({ isLoading, error, successMessage, className = '' }) => {
-  if (isLoading)
-    return <p className={`text-sm text-blue-600 animate-pulse ${className}`}>Processando...</p>
-  if (error)
-    return <p className={`text-sm text-red-600 font-semibold ${className}`}>Erro: {error}</p>
-  if (successMessage)
-    return <p className={`text-sm text-green-600 font-semibold ${className}`}>{successMessage}</p>
-  return null
-}
+import './CasoDetalhePage.css'
 
 // Epic #6 (#180): tabs do detalhe do caso. Persistido em ?tab=resumo|atividades|historico
 // pra preservar estado em refresh / share de URL. Default: 'resumo'.
@@ -74,33 +77,24 @@ function CasoDetalhePage() {
   // Fase 3 — caso como hub: '+' cria contrato sem sair do caso
   const [contratoNovo, setContratoNovo] = useState(false)
   const [finNonce, setFinNonce] = useState(0)
+  // Stitch — "Gerar peça" / "Vincular peça" abrem o fluxo existente de tratar prazo
+  const [itemParaTratar, setItemParaTratar] = useState(null)
+  // Stitch — contexto do checklist "O que falta" (cada fonte é independente;
+  // undefined = não carregou, o item correspondente fica fora da lista).
+  const [contexto, setContexto] = useState({
+    cliente: undefined,
+    procuracoes: undefined,
+    contratos: undefined,
+    documentos: undefined,
+  })
 
   const [isLoadingCaso, setIsLoadingCaso] = useState(true)
   const [isLoadingMovimentacoes, setIsLoadingMovimentacoes] = useState(false)
   const [isLoadingAtualizacaoCNJ, setIsLoadingAtualizacaoCNJ] = useState(false)
   const [timelineRefreshNonce, setTimelineRefreshNonce] = useState(0)
   const [isLoadingResumo, setIsLoadingResumo] = useState(false)
-  const [resumoError, setResumoError] = useState('')
 
   const [fetchError, setFetchError] = useState('')
-  const [atualizacaoCNJError, setAtualizacaoCNJError] = useState('')
-  const [atualizacaoCNJSuccess, setAtualizacaoCNJSuccess] = useState('')
-
-  const formatarDataLegivel = (dataISO) => {
-    if (!dataISO) return 'Não disponível'
-    try {
-      return new Date(dataISO).toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch (e) {
-      console.warn('Erro ao formatar data:', dataISO, e)
-      return dataISO
-    }
-  }
 
   const carregarDadosDoCaso = useCallback(async () => {
     const token = localStorage.getItem('token')
@@ -109,13 +103,10 @@ function CasoDetalhePage() {
       navigate('/login') // Idealmente, você teria uma rota de login
       return
     }
-    const authHeaders = { Authorization: `Bearer ${token}` }
 
     setIsLoadingCaso(true)
     setIsLoadingMovimentacoes(true)
     setFetchError('')
-    setAtualizacaoCNJError('')
-    setAtualizacaoCNJSuccess('')
 
     try {
       const dataCaso = await getCaso(casoId)
@@ -123,7 +114,7 @@ function CasoDetalhePage() {
       setIsLoadingCaso(false)
 
       const dataMovCNJ = await listPublicacoesDjenCaso(casoId)
-      setPublicacoesDjen(dataMovCNJ)
+      setPublicacoesDjen(Array.isArray(dataMovCNJ) ? dataMovCNJ : [])
 
       // PR D4.2 — busca itens da agenda vinculados ao caso. Backend
       // aceita filtro caso_id direto (mais eficiente que filtrar no
@@ -153,6 +144,33 @@ function CasoDetalhePage() {
   useEffect(() => {
     carregarDadosDoCaso()
   }, [carregarDadosDoCaso])
+
+  // Stitch — contexto do checklist. Três chamadas independentes a endpoints
+  // que já existem; falha em uma não derruba as outras.
+  const carregarContexto = useCallback(async (id, clienteId) => {
+    const [cliente, docsVinculados, documentos] = await Promise.all([
+      clienteId ? getCliente(clienteId).catch(() => undefined) : Promise.resolve(undefined),
+      api.get(`/casos/${id}/documentos`).catch(() => undefined),
+      listDocumentos(id).catch(() => undefined),
+    ])
+    setContexto({
+      cliente:
+        cliente && typeof cliente === 'object' && !Array.isArray(cliente) ? cliente : undefined,
+      procuracoes: Array.isArray(docsVinculados?.procuracoes)
+        ? docsVinculados.procuracoes
+        : undefined,
+      contratos: Array.isArray(docsVinculados?.contratos) ? docsVinculados.contratos : undefined,
+      documentos: Array.isArray(documentos)
+        ? documentos
+        : Array.isArray(documentos?.documentos)
+          ? documentos.documentos
+          : undefined,
+    })
+  }, [])
+
+  useEffect(() => {
+    if (caso?.id) carregarContexto(caso.id, caso.cliente_id)
+  }, [caso?.id, caso?.cliente_id, carregarContexto, finNonce])
 
   // Acoes inline na aba Atividades — evita ter que abrir o Kanban so pra
   // mexer numa tarefa vinculada ao caso. Reusa endpoints existentes do
@@ -198,27 +216,19 @@ function CasoDetalhePage() {
 
   const handleAtualizarViaDJEN = async () => {
     if (!caso || !caso.numero_processo) {
-      setAtualizacaoCNJError(
-        'Não é possível atualizar: dados do caso ou número do processo ausentes.'
-      )
       toast.warn('Número de processo ausente.')
       return
     }
 
     setIsLoadingAtualizacaoCNJ(true)
-    setAtualizacaoCNJError('')
-    setAtualizacaoCNJSuccess('')
-
     try {
       const dataResposta = await atualizarCasoViaDjen(caso.id)
       const mensagem = dataResposta.message || 'Publicações DJEN sincronizadas com sucesso!'
-      setAtualizacaoCNJSuccess(mensagem)
       toast.success(mensagem)
       await carregarDadosDoCaso()
       setTimelineRefreshNonce((v) => v + 1)
     } catch (err) {
       console.error('Erro durante a atualização via DJEN:', err)
-      setAtualizacaoCNJError(err.message)
       toast.error(`Erro na sincronização DJEN: ${err.message}`)
     } finally {
       setIsLoadingAtualizacaoCNJ(false)
@@ -231,18 +241,49 @@ function CasoDetalhePage() {
     }
 
     setIsLoadingResumo(true)
-    setResumoError('')
     try {
       const resp = await gerarResumoCaso(caso.id)
       toast.success(resp.message || 'Resumo gerado com sucesso!')
       setCaso((prev) => ({ ...prev, descricao: resp.resumo }))
       await carregarDadosDoCaso()
     } catch (err) {
-      setResumoError(err.message)
       toast.error(`Erro ao gerar resumo: ${err.message}`)
     } finally {
       setIsLoadingResumo(false)
     }
+  }
+
+  // Stitch — derivações do Resumo
+  const proximoPasso = useMemo(() => selecionarProximoPasso(prazos), [prazos])
+  const publicacaoDoPasso = useMemo(
+    () =>
+      proximoPasso?.publicacao_djen_id
+        ? publicacoesDjen.find((p) => p.id === proximoPasso.publicacao_djen_id) || null
+        : null,
+    [proximoPasso, publicacoesDjen]
+  )
+  const checklist = useMemo(
+    () =>
+      derivarChecklist({
+        cliente: contexto.cliente,
+        procuracoes: contexto.procuracoes,
+        contratos: contexto.contratos,
+        documentos: contexto.documentos,
+        proximoPasso,
+        casoId,
+      }),
+    [contexto, proximoPasso, casoId]
+  )
+  const totalDocumentos = useMemo(() => {
+    const partes = [contexto.documentos, contexto.procuracoes, contexto.contratos]
+    if (partes.every((p) => p === undefined)) return undefined
+    return partes.reduce((acc, p) => acc + (Array.isArray(p) ? p.length : 0), 0)
+  }, [contexto])
+  const sigla = useMemo(() => siglaTribunalDoCaso(caso, publicacoesDjen), [caso, publicacoesDjen])
+
+  const handleChecklistAcao = (acaoId) => {
+    if (acaoId === 'responder' && proximoPasso) setItemParaTratar(proximoPasso)
+    if (acaoId === 'contrato') setContratoNovo(true)
   }
 
   if (isLoadingCaso && !caso) {
@@ -288,137 +329,76 @@ function CasoDetalhePage() {
     )
   }
 
+  const casoFixo = {
+    id: parseInt(casoId, 10),
+    label: caso?.titulo || caso?.numero_processo || `Caso #${casoId}`,
+  }
+
   return (
-    <div className="container-fluid p-md-4 p-lg-5">
-      {/* Epic #6 (#180): cabeçalho fixo com tabs (Resumo / Atividades / Histórico).
-          Inspirado no padrão Astrea — tab persiste na URL pra share/refresh. */}
-      {/* Issue #303 — voltar contextual no topo (antes só nos estados de erro) */}
-      <nav aria-label="breadcrumb" className="mb-2">
-        <Link
-          to="/casos"
-          className="text-decoration-none small text-muted d-inline-flex align-items-center gap-1"
-        >
-          ← Casos
-        </Link>
-      </nav>
-      <div className="card shadow-lg mb-3">
-        <div className="card-header bg-light py-3">
-          <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center">
-            <h5 className="card-title mb-2 mb-sm-0 text-primary">
-              Detalhes do Caso: <span className="fw-bold">{caso.nome_caso}</span>
-            </h5>
-            <div className="d-flex gap-2 align-items-center">
-              {/* Fase 3 — caso como hub: tudo nasce aqui pelo '+' */}
-              <div className="dropdown">
-                <button
-                  className="btn btn-sm btn-primary dropdown-toggle"
-                  type="button"
-                  data-bs-toggle="dropdown"
-                  aria-expanded="false"
-                  data-testid="btn-mais-caso"
-                >
-                  + Novo
-                </button>
-                <ul className="dropdown-menu dropdown-menu-end">
-                  <li>
-                    <button
-                      className="dropdown-item"
-                      onClick={() => setPrazoForm({ tipo: 'tarefa' })}
-                      data-testid="mais-prazo"
-                    >
-                      Prazo / tarefa
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className="dropdown-item"
-                      onClick={() => setPrazoForm({ tipo: 'evento' })}
-                      data-testid="mais-audiencia"
-                    >
-                      Audiência / compromisso
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className="dropdown-item"
-                      onClick={() => setContratoNovo(true)}
-                      data-testid="mais-contrato"
-                    >
-                      Contrato de honorários
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <Link
-                to={`/agenda?caso=${caso.id}`}
-                className="btn btn-sm btn-outline-secondary"
-                title="Calendário e prazos só deste caso"
-              >
-                Agenda do caso
-              </Link>
-              <Link to={`/casos/editar/${caso.id}`} className="btn btn-sm btn-outline-secondary">
-                Editar Caso
-              </Link>
-            </div>
-          </div>
-        </div>
-        <ul className="nav nav-tabs px-3" role="tablist" data-testid="caso-tabs">
-          <li className="nav-item" role="presentation">
-            <button
-              className={`nav-link ${tabAtiva === 'resumo' ? 'active fw-semibold' : ''}`}
-              onClick={() => setTabAtiva('resumo')}
-              role="tab"
-              aria-selected={tabAtiva === 'resumo'}
-              data-testid="tab-resumo"
-            >
-              Resumo
-            </button>
-          </li>
-          <li className="nav-item" role="presentation">
-            <button
-              className={`nav-link ${tabAtiva === 'atividades' ? 'active fw-semibold' : ''}`}
-              onClick={() => setTabAtiva('atividades')}
-              role="tab"
-              aria-selected={tabAtiva === 'atividades'}
-              data-testid="tab-atividades"
-            >
-              Atividades
-              {prazos.length > 0 && (
-                <span className="badge bg-secondary ms-2" style={{ fontSize: '0.7rem' }}>
-                  {prazos.length}
-                </span>
-              )}
-            </button>
-          </li>
-          <li className="nav-item" role="presentation">
-            <button
-              className={`nav-link ${tabAtiva === 'historico' ? 'active fw-semibold' : ''}`}
-              onClick={() => setTabAtiva('historico')}
-              role="tab"
-              aria-selected={tabAtiva === 'historico'}
-              data-testid="tab-historico"
-            >
-              Histórico
-              {publicacoesDjen.length > 0 && (
-                <span className="badge bg-secondary ms-2" style={{ fontSize: '0.7rem' }}>
-                  {publicacoesDjen.length}
-                </span>
-              )}
-            </button>
-          </li>
-          <li className="nav-item" role="presentation">
-            <button
-              className={`nav-link ${tabAtiva === 'financeiro' ? 'active fw-semibold' : ''}`}
-              onClick={() => setTabAtiva('financeiro')}
-              role="tab"
-              aria-selected={tabAtiva === 'financeiro'}
-              data-testid="tab-financeiro"
-            >
-              Financeiro
-            </button>
-          </li>
-        </ul>
-      </div>
+    <div className="caso-detalhe">
+      <CabecalhoCaso
+        caso={caso}
+        publicacoes={publicacoesDjen}
+        onNovoPrazo={() => setPrazoForm({ tipo: 'tarefa' })}
+        onNovoEvento={() => setPrazoForm({ tipo: 'evento' })}
+        onNovoContrato={() => setContratoNovo(true)}
+        onSincronizarDjen={handleAtualizarViaDJEN}
+        onGerarResumo={handleGerarResumo}
+        sincronizando={isLoadingAtualizacaoCNJ}
+        gerandoResumo={isLoadingResumo}
+      />
+
+      {/* Epic #6 (#180): tab persiste na URL pra share/refresh. */}
+      <ul className="cd-tabs nav" role="tablist" data-testid="caso-tabs">
+        <li className="nav-item" role="presentation">
+          <button
+            className={`nav-link ${tabAtiva === 'resumo' ? 'active' : ''}`}
+            onClick={() => setTabAtiva('resumo')}
+            role="tab"
+            aria-selected={tabAtiva === 'resumo'}
+            data-testid="tab-resumo"
+          >
+            Resumo
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            className={`nav-link ${tabAtiva === 'atividades' ? 'active' : ''}`}
+            onClick={() => setTabAtiva('atividades')}
+            role="tab"
+            aria-selected={tabAtiva === 'atividades'}
+            data-testid="tab-atividades"
+          >
+            Atividades
+            {prazos.length > 0 && <span className="cd-tab-count">{prazos.length}</span>}
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            className={`nav-link ${tabAtiva === 'historico' ? 'active' : ''}`}
+            onClick={() => setTabAtiva('historico')}
+            role="tab"
+            aria-selected={tabAtiva === 'historico'}
+            data-testid="tab-historico"
+          >
+            Histórico
+            {publicacoesDjen.length > 0 && (
+              <span className="cd-tab-count">{publicacoesDjen.length}</span>
+            )}
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            className={`nav-link ${tabAtiva === 'financeiro' ? 'active' : ''}`}
+            onClick={() => setTabAtiva('financeiro')}
+            role="tab"
+            aria-selected={tabAtiva === 'financeiro'}
+            data-testid="tab-financeiro"
+          >
+            Financeiro
+          </button>
+        </li>
+      </ul>
 
       {fetchError && (
         <div className="alert alert-warning small mb-3">
@@ -426,197 +406,84 @@ function CasoDetalhePage() {
         </div>
       )}
 
-      {/* ── TAB RESUMO: dados estruturais + honorários + apensos ──────────── */}
+      {/* ── TAB RESUMO: próximo passo (60%) + dados/linha do tempo (40%) ── */}
       {tabAtiva === 'resumo' && (
         <div role="tabpanel" data-testid="painel-resumo">
-          {/* Epic #7 (#181): layout 2 colunas — conteúdo principal à esq.
-              (col-lg-8) + sidebar com cards compactos à dir. (col-lg-4).
-              Em mobile (<lg) empilha vertical naturalmente. */}
-          <div className="row g-3">
-            <div className="col-lg-8" data-testid="caso-coluna-principal">
-              <div className="card shadow-lg mb-4">
-                <div className="card-body p-4">
-                  <div className="row g-4 mb-4">
-                    <div className="col-md-6">
-                      <div className="border p-3 rounded h-100">
-                        <h6 className="text-secondary border-bottom pb-2 mb-3">
-                          Informações Gerais
-                        </h6>
-                        <p className="small mb-1">
-                          <strong>Número do Processo:</strong>{' '}
-                          <span className="text-dark">
-                            {caso.numero_processo || 'Não informado'}
-                          </span>
-                        </p>
-                        <p className="small mb-1">
-                          <strong>Status (Sistema):</strong>{' '}
-                          <span className="text-dark">{caso.status || 'Não definido'}</span>
-                        </p>
-                        <p className="small mb-1">
-                          <strong>Cliente:</strong>{' '}
-                          <span className="text-dark">
-                            {caso.nome_cliente || `ID ${caso.cliente_id}`}
-                          </span>
-                        </p>
-                        <p className="small mb-1">
-                          <strong>Descrição:</strong>
-                        </p>
-                        <p
-                          className="small text-dark bg-light p-2 rounded"
-                          style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                        >
-                          {caso.descricao || 'Nenhuma descrição fornecida.'}
-                        </p>
-                        <button
-                          onClick={handleGerarResumo}
-                          disabled={isLoadingResumo || publicacoesDjen.length === 0}
-                          className="btn btn-sm btn-outline-secondary mt-2 w-100"
-                          title={
-                            publicacoesDjen.length === 0
-                              ? 'Sincronize o DJEN primeiro'
-                              : 'Usa IA para resumir as publicações DJEN'
-                          }
-                        >
-                          {isLoadingResumo ? (
-                            <>
-                              <span
-                                className="spinner-border spinner-border-sm me-2"
-                                role="status"
-                                aria-hidden="true"
-                              ></span>
-                              Gerando resumo...
-                            </>
-                          ) : (
-                            '✨ Gerar Resumo com IA'
-                          )}
-                        </button>
-                        {resumoError && <p className="small text-danger mt-1">{resumoError}</p>}
-                      </div>
-                    </div>
-
-                    <div className="col-md-6">
-                      <div className="border p-3 rounded h-100">
-                        <h6 className="text-secondary border-bottom pb-2 mb-3">
-                          Datas e Sincronização CNJ
-                        </h6>
-                        <p className="small mb-1">
-                          <strong>Criado em:</strong>{' '}
-                          <span className="text-dark">
-                            {formatarDataLegivel(caso.data_criacao)}
-                          </span>
-                        </p>
-                        <p className="small mb-1">
-                          <strong>Última Atualização (Sistema):</strong>{' '}
-                          <span className="text-dark">
-                            {formatarDataLegivel(caso.data_atualizacao)}
-                          </span>
-                        </p>
-                        <p className="small mb-2">
-                          <strong>Última Verificação CNJ:</strong>{' '}
-                          <span className="text-dark">
-                            {formatarDataLegivel(caso.data_ultima_verificacao_cnj)}
-                          </span>
-                        </p>
-
-                        {caso.numero_processo ? (
-                          <button
-                            onClick={handleAtualizarViaDJEN}
-                            disabled={isLoadingAtualizacaoCNJ || isLoadingCaso}
-                            className="btn btn-sm btn-primary w-100 mt-2"
-                          >
-                            {isLoadingAtualizacaoCNJ ? (
-                              <>
-                                <span
-                                  className="spinner-border spinner-border-sm me-2"
-                                  role="status"
-                                  aria-hidden="true"
-                                ></span>
-                                Verificando DJEN...
-                              </>
-                            ) : (
-                              'Verificar Publicações no DJEN'
-                            )}
-                          </button>
-                        ) : (
-                          <p className="mt-2 text-xs text-muted fst-italic">
-                            Número do processo não cadastrado. Consulta ao DJEN indisponível.
-                          </p>
-                        )}
-                        <StatusDisplay
-                          isLoading={isLoadingAtualizacaoCNJ}
-                          error={atualizacaoCNJError}
-                          successMessage={atualizacaoCNJSuccess}
-                          className="mt-2 text-center small"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  {/* /row.g-4 */}
-                </div>
-                {/* /card-body */}
-              </div>
-              {/* /card "Detalhes do Caso" */}
-              {/* HONORÁRIOS continua coluna principal (precisa de espaço) */}
-              {/* Fase 3: honorários moraram aqui; agora têm aba própria */}
-              <div className="card shadow-sm border-0 mb-4">
-                <div className="card-body d-flex justify-content-between align-items-center py-3">
-                  <span className="text-muted small">
-                    Contratos, parcelas e recebimentos deste caso ficam na aba Financeiro.
-                  </span>
-                  <button
-                    className="btn btn-sm btn-outline-primary flex-shrink-0"
-                    onClick={() => setTabAtiva('financeiro')}
-                  >
-                    Abrir Financeiro
-                  </button>
-                </div>
-              </div>
-              {/* DRIVE do processo (full-width principal) */}
-              <div className="card shadow-lg mb-4">
-                <div className="card-body p-4 pt-2">
-                  <DocumentosCasoTab casoId={casoId} />
-                </div>
-              </div>
+          <div className="cd-grid">
+            <div className="cd-col" data-testid="caso-coluna-principal">
+              <ProximoPassoCard
+                item={proximoPasso}
+                publicacao={publicacaoDoPasso}
+                checklist={checklist}
+                onRegistrar={() => setPrazoForm({ tipo: 'tarefa' })}
+                onGerarPeca={(it) => setItemParaTratar(it)}
+                onChecklistAcao={handleChecklistAcao}
+              />
             </div>
-            {/* /coluna principal */}
 
-            {/* Sidebar com cards compactos */}
-            <div className="col-lg-4" data-testid="caso-sidebar">
-              {/* Próximas atividades — usa as `prazos` já carregadas */}
-              <ProximasAtividadesCard prazos={prazos} />
+            <div className="cd-col" data-testid="caso-sidebar">
+              <DadosProcessoCard
+                caso={caso}
+                sigla={sigla}
+                totalDocumentos={totalDocumentos}
+                onVerDocumentos={() => setTabAtiva('historico')}
+              />
 
-              {/* Documentos vinculados (procurações + contratos) */}
-              <DocumentosVinculadosCard casoId={casoId} />
+              <section
+                className="cd-card"
+                aria-labelledby="cd-timeline-titulo"
+                data-testid="timeline-resumo"
+              >
+                <div className="cd-card-head">
+                  <h3 className="cd-card-title" id="cd-timeline-titulo">
+                    Linha do tempo
+                  </h3>
+                  {caso.numero_processo && (
+                    <button
+                      type="button"
+                      className="btn btn-link"
+                      onClick={handleAtualizarViaDJEN}
+                      disabled={isLoadingAtualizacaoCNJ}
+                      title="Busca publicações novas no DJEN para este processo"
+                    >
+                      {isLoadingAtualizacaoCNJ ? 'Verificando...' : 'Sincronizar DJEN'}
+                    </button>
+                  )}
+                </div>
+                <CasoTimeline
+                  key={`${casoId}-${timelineRefreshNonce}-compacta`}
+                  casoId={casoId}
+                  compacto
+                  limite={5}
+                  onVerTudo={() => setTabAtiva('historico')}
+                />
+              </section>
 
-              {/* Apensar processo + alterar instância */}
+              {/* Apensar processo + alterar instância (Epic #8) */}
               <ApensarMenuCaso
                 caso={caso}
                 onCasoAtualizado={(novoCaso) => setCaso((prev) => ({ ...prev, ...novoCaso }))}
               />
             </div>
-            {/* /sidebar */}
           </div>
-          {/* /row.g-3 (2 colunas) */}
         </div>
       )}
 
       {/* ── TAB ATIVIDADES: prazos + tarefas pendentes ────────────────────── */}
       {tabAtiva === 'atividades' && (
-        <div role="tabpanel" data-testid="painel-atividades">
-          <div className="card shadow-lg mb-4">
+        <div role="tabpanel" data-testid="painel-atividades" className="cd-tab-panel">
+          <div className="card mb-4">
             <div className="card-header bg-light py-3 d-flex justify-content-between align-items-center">
-              <h5 className="card-title mb-0 text-primary">
-                Prazos e Tarefas Vinculados ({prazos.length})
-              </h5>
+              <h5 className="card-title mb-0">Prazos e tarefas vinculados ({prazos.length})</h5>
               <div className="d-flex gap-2">
                 <button
                   type="button"
-                  className="btn btn-sm btn-primary d-inline-flex align-items-center"
+                  className="btn btn-sm btn-outline-primary d-inline-flex align-items-center"
                   onClick={() => setPrazoForm({})}
                   data-testid="btn-novo-prazo-caso"
                 >
                   <PlusIcon style={{ width: 16, height: 16 }} className="me-1" />
-                  Novo Prazo
+                  Novo prazo
                 </button>
                 <Link to="/prazos" className="btn btn-sm btn-outline-secondary">
                   Abrir Kanban
@@ -658,7 +525,7 @@ function CasoDetalhePage() {
                             <td>
                               <StatusBadge tipo="tarefa" valor={t.status} />
                             </td>
-                            <td>
+                            <td className="cd-num">
                               {t.data_vencimento
                                 ? new Date(
                                     String(t.data_vencimento).slice(0, 10) + 'T12:00:00'
@@ -707,6 +574,7 @@ function CasoDetalhePage() {
                                   type="button"
                                   className="btn btn-sm btn-outline-success p-1 lh-1 me-1"
                                   title="Marcar como cumprida"
+                                  aria-label="Marcar como cumprida"
                                   onClick={() => handleConcluirTarefa(t)}
                                   style={{ width: 28, height: 28 }}
                                 >
@@ -717,6 +585,7 @@ function CasoDetalhePage() {
                                 type="button"
                                 className="btn btn-sm btn-outline-primary p-1 lh-1 me-1"
                                 title="Editar prazo"
+                                aria-label="Editar prazo"
                                 onClick={() => setPrazoForm({ item: t })}
                                 style={{ width: 28, height: 28 }}
                               >
@@ -726,6 +595,7 @@ function CasoDetalhePage() {
                                 type="button"
                                 className="btn btn-sm btn-outline-danger p-1 lh-1"
                                 title="Excluir prazo"
+                                aria-label="Excluir prazo"
                                 onClick={() => handleExcluirTarefa(t)}
                                 style={{ width: 28, height: 28 }}
                               >
@@ -739,21 +609,28 @@ function CasoDetalhePage() {
                   </table>
                 </div>
               ) : (
-                <p className="text-muted fst-italic text-center py-3 mb-0">
-                  Nenhum prazo vinculado a este caso.
-                </p>
+                <div className="cd-vazio">
+                  <p className="mb-0">Nenhum prazo vinculado a este caso.</p>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={() => setPrazoForm({})}
+                  >
+                    Registrar prazo ou tarefa
+                  </button>
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── TAB HISTÓRICO: timeline + lista raw de publicações DJEN ─────── */}
+      {/* ── TAB HISTÓRICO: timeline + publicações DJEN + documentos ─────── */}
       {tabAtiva === 'historico' && (
-        <div role="tabpanel" data-testid="painel-historico">
-          <div className="card shadow-lg mb-4">
+        <div role="tabpanel" data-testid="painel-historico" className="cd-tab-panel">
+          <div className="card mb-4">
             <div className="card-header bg-light py-3">
-              <h5 className="card-title mb-0 text-primary">Linha do Tempo</h5>
+              <h5 className="card-title mb-0">Linha do tempo</h5>
               <small className="text-muted">
                 Publicações DJEN, documentos e prazos em ordem cronológica
               </small>
@@ -762,11 +639,19 @@ function CasoDetalhePage() {
               <CasoTimeline key={`${casoId}-${timelineRefreshNonce}`} casoId={casoId} />
             </div>
           </div>
-          <div className="card shadow-lg">
-            <div className="card-header bg-light py-3">
-              <h5 className="card-title mb-0 text-primary">
-                Publicações DJEN ({publicacoesDjen.length})
-              </h5>
+          <div className="card mb-4">
+            <div className="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+              <h5 className="card-title mb-0">Publicações DJEN ({publicacoesDjen.length})</h5>
+              {caso.numero_processo && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={handleAtualizarViaDJEN}
+                  disabled={isLoadingAtualizacaoCNJ || isLoadingCaso}
+                >
+                  {isLoadingAtualizacaoCNJ ? 'Verificando DJEN...' : 'Verificar publicações'}
+                </button>
+              )}
             </div>
             <div className="card-body p-3" style={{ maxHeight: '500px', overflowY: 'auto' }}>
               {isLoadingMovimentacoes ? (
@@ -784,7 +669,7 @@ function CasoDetalhePage() {
                           {pub.nome_orgao ? ` — ${pub.nome_orgao}` : ''}
                         </span>
                       </div>
-                      <p className="fw-medium text-dark small mb-1">
+                      <p className="fw-medium text-dark small mb-1 cd-num">
                         Data:{' '}
                         {pub.data_disponibilizacao
                           ? new Date(pub.data_disponibilizacao).toLocaleDateString('pt-BR')
@@ -810,39 +695,56 @@ function CasoDetalhePage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-muted fst-italic text-center py-3">
-                  Nenhuma publicação DJEN registrada. Clique em &ldquo;Verificar Publicações no
-                  DJEN&rdquo; para sincronizar.
-                </p>
+                <div className="cd-vazio">
+                  <p className="mb-0">Nenhuma publicação do DJEN registrada para este processo.</p>
+                  {caso.numero_processo ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={handleAtualizarViaDJEN}
+                      disabled={isLoadingAtualizacaoCNJ}
+                    >
+                      Verificar publicações no DJEN
+                    </button>
+                  ) : (
+                    <Link
+                      to={`/casos/editar/${caso.id}`}
+                      className="btn btn-sm btn-outline-primary"
+                    >
+                      Cadastrar nº do processo
+                    </Link>
+                  )}
+                </div>
               )}
             </div>
           </div>
+          {/* Documentos completos moram aqui (no Resumo só o contador) */}
+          <div className="card mb-4" id="documentos">
+            <div className="card-body p-4 pt-2">
+              <DocumentosCasoTab casoId={casoId} />
+            </div>
+          </div>
+          <DocumentosVinculadosCard casoId={casoId} />
         </div>
       )}
 
       {/* ── Aba Financeiro (Fase 3 — caso como hub) ─────────────────────── */}
       {tabAtiva === 'financeiro' && (
-        <div data-testid="conteudo-financeiro">
+        <div data-testid="conteudo-financeiro" className="cd-tab-panel">
           <HonorariosCasoCard key={`hon-${finNonce}`} casoId={casoId} clienteId={caso.cliente_id} />
           <RecebimentosCasoCard key={`rec-${finNonce}`} casoId={casoId} />
         </div>
       )}
 
-      <div className="mt-4 text-center">
-        <button onClick={() => navigate('/casos')} className="btn btn-secondary">
-          Voltar para Lista de Casos
-        </button>
-      </div>
       {ConfirmDialog}
 
       {/* Fase 3 — contrato nasce dentro do caso (caso travado) */}
       {contratoNovo && (
         <ContratoFormModal
           casoFixo={{
-            id: parseInt(casoId, 10),
+            ...casoFixo,
             cliente_id: caso?.cliente_id,
             cliente_nome: caso?.cliente_nome,
-            label: caso?.titulo || caso?.numero_processo || `Caso #${casoId}`,
           }}
           onCancel={() => setContratoNovo(false)}
           onSalvo={() => {
@@ -858,15 +760,30 @@ function CasoDetalhePage() {
         <ItemAgendaForm
           itemParaEditar={prazoForm.item || null}
           defaultTipo={prazoForm.tipo || 'tarefa'}
-          casoFixo={{
-            id: parseInt(casoId, 10),
-            label: caso?.titulo || caso?.numero_processo || `Caso #${casoId}`,
-          }}
+          casoFixo={casoFixo}
           onCancel={() => setPrazoForm(null)}
           onSalvo={() => {
             setPrazoForm(null)
             recarregarPrazos()
             setTimelineRefreshNonce((n) => n + 1)
+          }}
+        />
+      )}
+
+      {/* Stitch — "Gerar peça" / "Vincular peça": fluxo existente de tratar prazo
+          (Responder com peça + minuta IA + petição cumpridora) */}
+      {itemParaTratar && (
+        <TratarPrazoModal
+          item={itemParaTratar}
+          onClose={() => setItemParaTratar(null)}
+          onTratado={() => {
+            setItemParaTratar(null)
+            recarregarPrazos()
+            setTimelineRefreshNonce((n) => n + 1)
+          }}
+          onEditarDados={(it) => {
+            setItemParaTratar(null)
+            setPrazoForm({ item: it || itemParaTratar })
           }}
         />
       )}

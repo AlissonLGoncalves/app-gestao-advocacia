@@ -18,7 +18,7 @@ function AbaOabs({
   abrirDetalhePublicacao,
 }) {
   return (
-    <div className="row g-4">
+    <div className="row g-4" data-testid="aba-oabs">
       <div className="col-md-5">
         <div className="card shadow-sm border-0">
           <div className="card-header bg-white fw-semibold">

@@ -315,7 +315,65 @@ function PublicacaoDjenItem({ item }) {
   )
 }
 
-export default function CasoTimeline({ casoId }) {
+/** Data curta (dd/mm) pra linha do tempo compacta do Resumo. */
+const formatarDataCurta = (iso) => {
+  if (!iso) return ''
+  try {
+    return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  } catch {
+    return iso
+  }
+}
+
+/**
+ * Redesign Stitch (TELA 3) — modo compacto pro Resumo do caso: só os
+ * últimos `limite` eventos, uma linha cada (tipo · data · título), sem
+ * expansão. `onVerTudo` renderiza o link "Ver histórico completo".
+ */
+function TimelineCompacta({ items, limite, onVerTudo }) {
+  const visiveis = items.slice(0, limite)
+  return (
+    <>
+      {visiveis.length === 0 ? (
+        <p className="cd-tl-vazio" data-testid="timeline-vazia">
+          Nenhum evento ainda. Publicações do DJEN, documentos e prazos aparecem aqui.
+        </p>
+      ) : (
+        <ul className="cd-timeline-compacta" data-testid="timeline-compacta">
+          {visiveis.map((item) => {
+            const config = CONFIG_POR_TIPO[item.tipo] || { label: item.tipo }
+            return (
+              <li key={`${item.tipo}-${item.id}`} className="cd-tl-item">
+                <div className="cd-tl-rail">
+                  <span className="cd-tl-dot" aria-hidden="true" />
+                  <span className="cd-tl-line" aria-hidden="true" />
+                </div>
+                <div className="cd-tl-body">
+                  <div className="cd-tl-head">
+                    <span className="cd-tl-tipo">{config.label}</span>
+                    <span className="cd-tl-data">{formatarDataCurta(item.data)}</span>
+                  </div>
+                  <p className="cd-tl-desc" title={item.titulo}>
+                    {item.titulo}
+                  </p>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {onVerTudo && (
+        <div className="cd-tl-footer">
+          <button type="button" className="btn btn-link" onClick={onVerTudo}>
+            Ver histórico completo →
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
+export default function CasoTimeline({ casoId, compacto = false, limite = 5, onVerTudo }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -348,6 +406,10 @@ export default function CasoTimeline({ casoId }) {
 
   if (error) {
     return <p className="text-danger text-center py-3 small mb-0">{error}</p>
+  }
+
+  if (compacto) {
+    return <TimelineCompacta items={items} limite={limite} onVerTudo={onVerTudo} />
   }
 
   if (items.length === 0) {

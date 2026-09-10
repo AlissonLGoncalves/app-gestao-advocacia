@@ -18,7 +18,9 @@ describe('CategoriasPublicacoes (inbox-zero)', () => {
     render(<CategoriasPublicacoes ativa="nao_tratadas" contagens={CONTAGENS} onChange={vi.fn()} />)
     expect(screen.getByTestId('djen-cat-nao_tratadas')).toHaveTextContent('18')
     expect(screen.getByTestId('djen-cat-sem_processo')).toHaveTextContent('9')
-    expect(screen.getByTestId('djen-cat-tratadas')).toHaveTextContent('164')
+    // "Tratadas" é histórico, não fila: sem contagem (redesign Stitch)
+    expect(screen.getByTestId('djen-cat-tratadas')).toHaveTextContent('Tratadas')
+    expect(screen.getByTestId('djen-cat-tratadas')).not.toHaveTextContent('164')
     expect(screen.getByTestId('djen-cat-descartadas')).toHaveTextContent('65')
     expect(screen.getByTestId('djen-cat-todas')).toHaveTextContent('256')
     expect(screen.getByTestId('djen-cat-importantes')).toBeInTheDocument()
@@ -46,6 +48,20 @@ describe('CategoriasPublicacoes (inbox-zero)', () => {
     fireEvent.click(btn)
     expect(onChange).toHaveBeenCalledWith('importantes')
     expect(btn).toHaveTextContent('5')
+  })
+
+  it('prop `categorias` limita as pills da toolbar (redesign Stitch)', () => {
+    render(
+      <CategoriasPublicacoes
+        ativa="nao_tratadas"
+        contagens={CONTAGENS}
+        onChange={vi.fn()}
+        categorias={['nao_tratadas', 'sem_processo', 'tratadas']}
+      />
+    )
+    expect(screen.getAllByRole('tab')).toHaveLength(3)
+    expect(screen.queryByTestId('djen-cat-todas')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('djen-cat-descartadas')).not.toBeInTheDocument()
   })
 
   it('aceita contagens=undefined sem quebrar (mostra 0)', () => {
