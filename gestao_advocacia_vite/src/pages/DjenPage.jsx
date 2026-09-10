@@ -246,7 +246,7 @@ export default function DjenPage() {
         setNaoLidas(data.nao_lidas || 0)
         if (data.contagens) setContagens(data.contagens)
       } catch {
-        toast.error('Erro ao carregar publicações DJEN.')
+        toast.error('Não foi possível carregar as publicações. Recarregue a página.')
       } finally {
         setLoadingPubs(false)
       }
@@ -328,7 +328,7 @@ export default function DjenPage() {
       setTriagemTotal(data.total || 0)
       setTriagemSelecionadas([])
     } catch {
-      toast.error('Erro de conexão na triagem DJEN.')
+      toast.error('Não foi possível carregar a triagem. Verifique sua conexão.')
     } finally {
       setLoadingTriagem(false)
     }
@@ -392,7 +392,8 @@ export default function DjenPage() {
         const enqueueResp = await syncDjen(diasSync)
         const jobId = enqueueResp?.job_id
         if (!jobId) {
-          if (!silencioso) toast.error('Falha ao enfileirar sync.')
+          if (!silencioso)
+            toast.error('Não foi possível iniciar a leitura do DJEN. Tente de novo em instantes.')
           return
         }
 
@@ -508,7 +509,7 @@ export default function DjenPage() {
         setNaoLidas((prev) => (lida ? prev - 1 : prev + 1))
         if (pubSelecionada?.id === pub.id) setPubSelecionada({ ...pubSelecionada, lida })
       } catch {
-        toast.error('Erro ao atualizar.')
+        toast.error('Não foi possível atualizar a publicação. Tente de novo.')
       }
     },
     [pubSelecionada]
@@ -620,7 +621,7 @@ export default function DjenPage() {
       if (pubSelecionada?.id === pub.id) setPubSelecionada(updated)
       toast.success('Vínculo atualizado.')
     } catch {
-      toast.error('Erro ao vincular.')
+      toast.error('Não foi possível vincular ao caso. Tente de novo.')
     }
   }
 
@@ -634,7 +635,7 @@ export default function DjenPage() {
       await carregarUltimasPublicacoesDjen()
       toast.success('Publicação mesclada ao caso com sucesso.')
     } catch {
-      toast.error('Erro de conexão ao mesclar publicação.')
+      toast.error('Não foi possível mesclar a publicação. Verifique sua conexão.')
     }
   }
 
@@ -648,7 +649,7 @@ export default function DjenPage() {
       await carregarUltimasPublicacoesDjen()
       toast.success('Publicação ignorada na triagem.')
     } catch {
-      toast.error('Erro de conexão ao ignorar publicação.')
+      toast.error('Não foi possível ignorar a publicação. Verifique sua conexão.')
     }
   }
 
@@ -737,7 +738,7 @@ export default function DjenPage() {
       setSelecionadas([])
       await carregarPublicacoes(0)
     } catch {
-      toast.error('Erro ao processar o lote.')
+      toast.error('Não foi possível processar o lote. Tente de novo.')
     } finally {
       setTratandoLote(false)
     }
@@ -762,7 +763,7 @@ export default function DjenPage() {
       await carregarCasos()
       await carregarUltimasPublicacoesDjen()
     } catch {
-      toast.error('Erro de conexão no processamento em lote.')
+      toast.error('Não foi possível processar o lote. Verifique sua conexão.')
     } finally {
       setProcessandoLoteTriagem(false)
     }
@@ -774,11 +775,11 @@ export default function DjenPage() {
     setSalvandoOab(true)
     try {
       await createOab(novaOab)
-      toast.success('OAB cadastrada para monitoramento!')
+      toast.success('OAB cadastrada. O DJEN dela será lido amanhã às 7h.')
       setNovaOab({ numero_oab: '', uf_oab: '', nome_advogado: '', sigla_tribunal: '' })
       carregarOabs()
     } catch {
-      toast.error('Erro de conexão.')
+      toast.error('Não foi possível cadastrar a OAB. Verifique sua conexão.')
     } finally {
       setSalvandoOab(false)
     }
@@ -793,7 +794,7 @@ export default function DjenPage() {
       toast.success('OAB removida.')
       setOabs((prev) => prev.filter((o) => o.id !== id))
     } catch {
-      toast.error('Erro ao remover.')
+      toast.error('Não foi possível remover a OAB. Tente de novo.')
     }
   }
 
@@ -812,7 +813,7 @@ export default function DjenPage() {
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('Erro de conexão.')
+      toast.error('Não foi possível baixar a certidão. Verifique sua conexão.')
     }
   }
 
@@ -990,7 +991,7 @@ export default function DjenPage() {
       if (pubTratar?.id === pub.id) setPubTratar(proximaDaFila(pub.id))
       removerDaCaixa(pub, { descartada: true })
     } catch {
-      toast.error('Erro ao descartar.')
+      toast.error('Não foi possível descartar a intimação. Tente de novo.')
     }
   }
 
@@ -1222,9 +1223,9 @@ export default function DjenPage() {
           <div className="dj-vazio__icone dj-vazio__icone--neutro">
             <IdentificationIcon aria-hidden="true" />
           </div>
-          <h3 className="dj-vazio__titulo">
+          <h2 className="dj-vazio__titulo">
             Cadastre sua OAB para o Patronus ler o DJEN por você.
-          </h3>
+          </h2>
           <p className="dj-vazio__texto">
             Todo dia às 7h as publicações chegam aqui com partes, nº do processo e prazo já
             extraídos.
@@ -1249,7 +1250,7 @@ export default function DjenPage() {
           <div className="dj-vazio__icone">
             <CheckIcon aria-hidden="true" />
           </div>
-          <h3 className="dj-vazio__titulo">Caixa zerada.</h3>
+          <h2 className="dj-vazio__titulo">Caixa zerada.</h2>
           <p className="dj-vazio__texto">
             Todas as publicações de hoje foram tratadas. Próxima leitura do DJEN amanhã às 7h.
           </p>
@@ -1268,7 +1269,7 @@ export default function DjenPage() {
         <div className="dj-vazio__icone dj-vazio__icone--neutro">
           <InboxIcon aria-hidden="true" />
         </div>
-        <h3 className="dj-vazio__titulo">Nenhuma publicação aqui.</h3>
+        <h2 className="dj-vazio__titulo">Nenhuma publicação aqui.</h2>
         <p className="dj-vazio__texto">Nada combina com a caixa e os filtros escolhidos.</p>
         <button
           type="button"

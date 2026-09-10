@@ -154,7 +154,7 @@ function AgendaUnificadaPage() {
       setCasos(Array.isArray(listaCasos) ? listaCasos : [])
     } catch (err) {
       console.error('AgendaUnificadaPage: erro ao carregar itens', err)
-      toast.error(`Erro ao carregar itens: ${err?.message || 'desconhecido'}`)
+      toast.error(err?.message || 'Não foi possível carregar a agenda. Recarregue a página.')
     } finally {
       setLoading(false)
     }
@@ -215,7 +215,7 @@ function AgendaUnificadaPage() {
       setRefreshKey((k) => k + 1)
     } catch (err) {
       console.error('AgendaUnificadaPage: erro ao excluir', err)
-      toast.error(err?.message || 'Erro ao excluir.')
+      toast.error(err?.message || 'Não foi possível excluir o item. Tente de novo.')
     }
   }
 
@@ -232,7 +232,7 @@ function AgendaUnificadaPage() {
       setRefreshKey((k) => k + 1)
     } catch (err) {
       console.error('AgendaUnificadaPage: erro ao concluir', err)
-      toast.error(err?.message || 'Falha ao concluir.')
+      toast.error(err?.message || 'Não foi possível concluir o item. Tente de novo.')
     }
   }
 
@@ -349,7 +349,7 @@ function AgendaUnificadaPage() {
           <div className="ag-vazio-icone">
             <CalendarDaysIcon aria-hidden="true" />
           </div>
-          <p className="ag-vazio-titulo">Sua agenda está vazia.</p>
+          <h2 className="ag-vazio-titulo">Sua agenda está vazia.</h2>
           <p className="ag-vazio-texto">
             Prazos criados a partir das intimações aparecem aqui automaticamente.
           </p>
@@ -359,7 +359,13 @@ function AgendaUnificadaPage() {
           </button>
         </div>
       ) : viewMode === 'hoje' ? (
-        <VisaoHoje itens={itens} casos={casos} hoje={hoje} {...acoesCard} />
+        <VisaoHoje
+          itens={itens}
+          casos={casos}
+          hoje={hoje}
+          onVerCalendario={() => handleViewChange('calendario')}
+          {...acoesCard}
+        />
       ) : viewMode === 'calendario' ? (
         <>
           <CabecalhoMes

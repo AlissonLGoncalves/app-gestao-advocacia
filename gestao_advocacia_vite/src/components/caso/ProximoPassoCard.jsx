@@ -154,6 +154,7 @@ export default function ProximoPassoCard({
         </>
       ) : (
         <div className="cd-passo-vazio" data-testid="passo-vazio">
+          <CheckCircleIcon className="cd-passo-vazio-icone" aria-hidden="true" />
           <h2 className="cd-passo-frase">Nenhum passo pendente.</h2>
           <p className="cd-passo-titulo">
             Não há prazo nem tarefa em aberto neste caso. Registre o próximo quando ele chegar.

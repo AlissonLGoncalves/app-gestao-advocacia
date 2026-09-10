@@ -5,12 +5,14 @@
    =========================================================== */
 
 .dj-page {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 24px 16px 56px;
+  color: var(--text-1);
+  font-family: var(--font-body);
 }
 
-.dj-page--largo {
+/* Painel "Tratar" aberto: a caixa precisa de mais largura que os 1040px do
+   quadro. Quem controla a largura e o .app-main-inner (index.css), entao o
+   alargamento sobe por :has(). Sem suporte a :has() fica nos 1040px. */
+.app-main-inner:has(.dj-page--largo) {
   max-width: 1240px;
 }
 
@@ -131,19 +133,19 @@
   font-weight: 700;
   line-height: 20px;
   text-align: center;
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 
 .dj-count--danger {
-  background: rgba(217, 45, 32, 0.1);
-  color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger-text);
 }
 
 .dj-count--warning {
-  background: rgba(181, 71, 8, 0.1);
-  color: var(--warning, #b54708);
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 /* ---- Toolbar: pills · tribunal · busca · filtros ---- */
@@ -164,7 +166,7 @@
   gap: 2px;
   padding: 3px;
   border-radius: 999px;
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   border: 1px solid var(--line);
 }
 
@@ -202,7 +204,7 @@
 }
 
 .dj-pill.is-active .dj-count {
-  color: var(--primary-strong);
+  color: var(--primary-text);
 }
 
 .dj-select,
@@ -264,7 +266,7 @@
 
 .dj-btn-quiet:hover,
 .dj-btn-quiet.is-active {
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   color: var(--text-1);
 }
 
@@ -386,9 +388,11 @@
 }
 
 .dj-card__check {
-  width: 15px;
-  height: 15px;
-  margin: 0;
+  /* Alvo de toque: 15px reprovava o minimo de 24px do WCAG 2.5.8. */
+  width: 18px;
+  height: 18px;
+  margin: 3px;
+  outline-offset: 3px;
   cursor: pointer;
 }
 
@@ -402,27 +406,29 @@
   font-weight: 700;
   line-height: 18px;
   color: var(--text-2);
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   border: 1px solid var(--line);
   white-space: nowrap;
 }
 
+/* Badge de status = tinta do token, sem borda. Chip neutro (.dj-chip) e o
+   unico com borda — mesma regra nas quatro telas. */
 .dj-chip--tribunal {
-  color: var(--primary-strong);
-  background: rgba(10, 132, 255, 0.08);
-  border-color: rgba(10, 132, 255, 0.18);
+  color: var(--primary-text);
+  background: var(--primary-soft);
+  border-color: transparent;
 }
 
 .dj-chip--sem-processo {
-  color: var(--warning, #b54708);
-  background: rgba(181, 71, 8, 0.08);
-  border-color: rgba(181, 71, 8, 0.2);
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: transparent;
 }
 
 .dj-chip--tratada {
-  color: var(--success);
-  background: rgba(7, 148, 85, 0.08);
-  border-color: rgba(7, 148, 85, 0.2);
+  color: var(--success-text);
+  background: var(--success-soft);
+  border-color: transparent;
 }
 
 .dj-chip--descartada {
@@ -485,12 +491,12 @@
 }
 
 .dj-quiet:hover {
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   color: var(--text-1);
 }
 
 .dj-quiet--danger:hover {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .dj-extraido__label {
@@ -561,7 +567,7 @@
 }
 
 .dj-dot--revisar {
-  background: var(--warning, #b54708);
+  background: var(--warning);
 }
 
 .dj-card__acao {
@@ -572,9 +578,10 @@
 }
 
 .dj-btn-primary {
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 13px;
+  min-height: 38px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 14px;
   padding: 7px 16px;
   white-space: nowrap;
 }
@@ -585,7 +592,7 @@
   padding: 0;
   font-size: 12px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--primary-text);
   text-decoration: none;
 }
 
@@ -600,13 +607,14 @@
   margin-top: 16px;
 }
 
-/* ---- Estados vazios ---- */
+/* ---- Estados vazios (mesma estrutura das outras telas) ---- */
 .dj-vazio {
   text-align: center;
-  padding: 64px 16px;
+  padding: 56px 24px;
   background: var(--glass-strong);
-  border: 1px dashed var(--line);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .dj-vazio__icone {
@@ -627,8 +635,8 @@
 }
 
 .dj-vazio__icone svg {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
 }
 
 .dj-vazio__titulo {
@@ -641,7 +649,7 @@
 }
 
 .dj-vazio__texto {
-  margin: 0 auto 16px;
+  margin: 0 auto 18px;
   max-width: 440px;
   font-size: 15px;
   color: var(--text-2);
@@ -703,8 +711,8 @@
 .dj-sugestao {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
-  background: rgba(10, 132, 255, 0.06);
-  border: 1px solid rgba(10, 132, 255, 0.18);
+  background: var(--primary-soft);
+  border: 1px solid transparent;
   font-size: 14px;
   color: var(--text-1);
   line-height: 1.45;
@@ -715,7 +723,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--primary-strong);
+  color: var(--primary-text);
   margin-bottom: 4px;
 }
 
@@ -731,15 +739,15 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
-  border-radius: 12px;
-  background: var(--surface-soft, #f8fafc);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
   border: 1px solid var(--line);
 }
 
 .dj-seg__btn {
   border: 0;
   background: transparent;
-  border-radius: 9px;
+  border-radius: calc(var(--radius-sm) - 4px);
   padding: 8px 4px;
   font-size: 12px;
   font-weight: 600;
@@ -764,7 +772,7 @@
 
 .dj-seg__btn.is-active {
   background: #fff;
-  color: var(--primary-strong);
+  color: var(--primary-text);
   box-shadow: var(--shadow-xs);
 }
 

@@ -5,6 +5,7 @@
 // semana (proximos 7 dias). Vencidos entram no topo — sao o que mais
 // precisa de decisao.
 import React from 'react'
+import { CalendarDaysIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
 import CardItemDia from './CardItemDia.jsx'
 import { hojeYmd, somarDias, ymdDoItem, itensDoDia, diasEntre, tituloDia } from './agendaHelpers.js'
 
@@ -24,7 +25,15 @@ function Bloco({ titulo, itens, casos, hoje, acoes, testId }) {
   )
 }
 
-function VisaoHoje({ itens, casos, hoje = hojeYmd(), onAbrir, onResponder, onConcluir }) {
+function VisaoHoje({
+  itens,
+  casos,
+  hoje = hojeYmd(),
+  onAbrir,
+  onResponder,
+  onConcluir,
+  onVerCalendario,
+}) {
   const lista = itens || []
   const amanha = somarDias(hoje, 1)
   const ativos = lista.filter((i) => i.status !== 'Concluido' && i.status !== 'Cancelado')
@@ -66,8 +75,17 @@ function VisaoHoje({ itens, casos, hoje = hojeYmd(), onAbrir, onResponder, onCon
 
       {total === 0 ? (
         <div className="ag-vazio ag-vazio--ok" data-testid="hoje-vazio">
-          <p className="ag-vazio-titulo">Tudo em dia.</p>
+          <div className="ag-vazio-icone">
+            <CheckCircleIcon aria-hidden="true" />
+          </div>
+          <h2 className="ag-vazio-titulo">Tudo em dia.</h2>
           <p className="ag-vazio-texto">Nenhum prazo ou compromisso nos próximos 7 dias.</p>
+          {onVerCalendario && (
+            <button type="button" className="ag-btn-quiet" onClick={onVerCalendario}>
+              <CalendarDaysIcon aria-hidden="true" />
+              Ver o mês
+            </button>
+          )}
         </div>
       ) : (
         <>
