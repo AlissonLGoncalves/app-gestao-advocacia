@@ -9,3 +9,6 @@ backups/
 # Per-machine local settings — nao deve ser versionado.
 .claude/settings.local.json
 gestao_advocacia/out/
+
+# Saida dos testes de upload (pytest)
+gestao_advocacia/uploads_test/
