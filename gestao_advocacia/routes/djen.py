@@ -13,6 +13,71 @@ from decimal import Decimal, InvalidOperation
 from flask import current_app, request, send_file
 from flask_restx import Resource, fields
 
+# Redesign Stitch (set/2026) — rotulo humano da providencia por regra do
+# djen_prazo_calculator. So regras que casaram palavra-chave/tipo viram
+# providencia; o fallback conservador NAO e' "extraido" (fica None e a UI
+# mostra "—" em vez de inventar prazo).
+_PROVIDENCIA_POR_REGRA = {
+    "recurso_15d": "Recurso",
+    "contestacao_15d": "Contestação",
+    "cumprimento_sentenca_15d": "Cumprimento de sentença",
+    "manifestacao_15d": "Manifestação",
+    "audiencia_7d": "Audiência",
+    "embargos_declaracao_5d": "Embargos de declaração",
+    "sentenca_revisao_15d": "Análise de sentença",
+    "decisao_despacho_5d": "Cumprimento de decisão",
+}
+
+
+def sugestao_tratamento_de(pub):
+    """Sugestao deterministica de tratamento (mesmo motor das auto-tarefas).
+
+    Usada pelo endpoint /sugestao-tratamento e, em versao enxuta
+    (`prazo_sugerido`), por item da listagem — pra caixa de intimacoes
+    mostrar "Contestação · 15 dias · vence dd/mm" sem N chamadas extras.
+    """
+    from djen_prazo_calculator import calcular_prazo  # noqa: PLC0415
+
+    calc = calcular_prazo(pub.tipo_comunicacao, pub.texto, pub.data_disponibilizacao)
+    regra = calc.get("regra") or ""
+    if regra.startswith("audiencia"):
+        tipo_sugerido, categoria = "audiencia", "Audiência"
+    elif regra.startswith("fallback"):
+        tipo_sugerido, categoria = "tarefa", "Outros"
+    else:
+        tipo_sugerido, categoria = "prazo", "Prazo"
+    proc = pub.numero_processo_mascara or pub.numero_processo or ""
+    titulo = f"{(pub.tipo_comunicacao or 'Intimação').capitalize()}: {proc}".strip(": ")
+    return {
+        "tipo_sugerido": tipo_sugerido,
+        "categoria": categoria,
+        "titulo": titulo[:240],
+        "data_vencimento": calc["data_vencimento"].date().isoformat(),
+        "dias": calc["dias"],
+        "regra": regra,
+        "prioridade": calc["prioridade"],
+        "providencia": _PROVIDENCIA_POR_REGRA.get(regra),
+        "caso_id": pub.caso_id,
+    }
+
+
+def prazo_sugerido_de(pub):
+    """Versao enxuta pra listagem: None quando o calculador caiu no fallback
+    (nada extraido do texto), senao providencia/dias/vencimento."""
+    try:
+        s = sugestao_tratamento_de(pub)
+    except Exception:  # noqa: BLE001 — listagem nunca quebra por causa disso
+        return None
+    if not s.get("providencia"):
+        return None
+    return {
+        "providencia": s["providencia"],
+        "tipo_sugerido": s["tipo_sugerido"],
+        "dias": s["dias"],
+        "data_vencimento": s["data_vencimento"],
+        "regra": s["regra"],
+    }
+
 
 def registrar_rotas_djen(
     djen_ns, db, DjenOabMonitoramento, PublicacaoDJEN, Caso, jwt_required, get_jwt_identity, logger
@@ -790,13 +855,30 @@ def registrar_rotas_djen(
             sem_processo = nao_tratadas_q.filter(PublicacaoDJEN.caso_id.is_(None)).count()
             tratadas = base_q.filter(PublicacaoDJEN.tratada_em.isnot(None)).count()
             descartadas = base_q.filter(PublicacaoDJEN.triagem_ignorada.is_(True)).count()
+            # Redesign Stitch: linha de progresso "x de n tratadas hoje".
+            # tratada_em e' gravado em UTC naive; converte o inicio do dia
+            # civil brasileiro pra UTC antes de comparar.
+            from datetime import datetime as _dt  # noqa: PLC0415
+            from datetime import time as _time
+            from datetime import timezone as _tz
+
+            from utils.datas import TZ_BRASIL, hoje_brasil  # noqa: PLC0415
+
+            inicio_dia_utc = (
+                _dt.combine(hoje_brasil(), _time.min, tzinfo=TZ_BRASIL)
+                .astimezone(_tz.utc)
+                .replace(tzinfo=None)
+            )
+            tratadas_hoje = base_q.filter(PublicacaoDJEN.tratada_em >= inicio_dia_utc).count()
 
             return {
                 "total": total,
                 "nao_lidas": nao_lidas,
                 "limit": limit,
                 "offset": offset,
-                "items": [p.to_dict() for p in items],
+                # Redesign Stitch: campo "Prazo" extraido por item (None quando
+                # o calculador nao reconheceu nada no texto).
+                "items": [{**p.to_dict(), "prazo_sugerido": prazo_sugerido_de(p)} for p in items],
                 "contagens": {
                     "todas": total_geral,
                     "nao_lidas": nao_lidas,
@@ -807,6 +889,7 @@ def registrar_rotas_djen(
                     "sem_processo": sem_processo,
                     "tratadas": tratadas,
                     "descartadas": descartadas,
+                    "tratadas_hoje": tratadas_hoje,
                 },
             }
 
@@ -1937,32 +2020,11 @@ def registrar_rotas_djen(
         )
         @jwt_required()
         def get(self, pub_id):
-            from djen_prazo_calculator import calcular_prazo  # noqa: PLC0415
-
             user = _get_user_or_401()
             pub = _get_scoped_or_404(
                 PublicacaoDJEN, user, pub_id, "PublicacaoDJEN", "Publicação não encontrada."
             )
-            calc = calcular_prazo(pub.tipo_comunicacao, pub.texto, pub.data_disponibilizacao)
-            regra = calc.get("regra") or ""
-            if regra.startswith("audiencia"):
-                tipo_sugerido, categoria = "audiencia", "Audiência"
-            elif regra.startswith("fallback"):
-                tipo_sugerido, categoria = "tarefa", "Outros"
-            else:
-                tipo_sugerido, categoria = "prazo", "Prazo"
-            proc = pub.numero_processo_mascara or pub.numero_processo or ""
-            titulo = f"{(pub.tipo_comunicacao or 'Intimação').capitalize()}: {proc}".strip(": ")
-            return {
-                "tipo_sugerido": tipo_sugerido,
-                "categoria": categoria,
-                "titulo": titulo[:240],
-                "data_vencimento": calc["data_vencimento"].date().isoformat(),
-                "dias": calc["dias"],
-                "regra": regra,
-                "prioridade": calc["prioridade"],
-                "caso_id": pub.caso_id,
-            }
+            return sugestao_tratamento_de(pub)
 
     @djen_ns.route("/publicacoes/contadores")
     class PublicacaoContadoresAPI(Resource):
