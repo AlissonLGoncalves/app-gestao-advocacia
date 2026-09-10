@@ -31,15 +31,26 @@
   --text-2: #475467;
   --text-3: #667085;
 
-  /* Cor so com significado: urgencia, status, confianca, a UNICA acao primaria */
+  /* Cor so com significado: urgencia, status, confianca, a UNICA acao primaria.
+     Regra de uso (WCAG AA):
+       --*        preenchimento, icone, barra, borda (contraste de 3:1 basta);
+       --*-strong estado hover do preenchimento;
+       --*-text   TEXTO pequeno sobre branco ou sobre o -soft correspondente
+                  (todos >= 4.5:1). Nunca usar --primary/--success em texto. */
   --primary: #0a84ff;
   --primary-strong: #006fe3;
+  --primary-text: #0062cc;
   --primary-soft: rgba(10, 132, 255, 0.1);
   --danger: #d92d20;
+  --danger-strong: #b42318;
+  --danger-text: #b42318;
   --danger-soft: rgba(217, 45, 32, 0.1);
   --success: #079455;
+  --success-strong: #067647;
+  --success-text: #067647;
   --success-soft: rgba(7, 148, 85, 0.1);
   --warning: #b54708;
+  --warning-text: #b54708;
   --warning-soft: rgba(181, 71, 8, 0.1);
 
   /* Geometria */
@@ -63,9 +74,9 @@
   --bs-body-color: var(--text-1);
   --bs-secondary-color: var(--text-3);
   --bs-border-color: var(--line);
-  --bs-link-color: var(--primary);
+  --bs-link-color: var(--primary-text);
   --bs-link-hover-color: var(--primary-strong);
-  --bs-link-color-rgb: 10, 132, 255;
+  --bs-link-color-rgb: 0, 98, 204;
   --bs-link-hover-color-rgb: 0, 111, 227;
   --bs-primary: var(--primary);
   --bs-primary-rgb: 10, 132, 255;
@@ -733,7 +744,7 @@ h6,
 }
 
 .btn-outline-primary {
-  --bs-btn-color: var(--primary);
+  --bs-btn-color: var(--primary-text);
   --bs-btn-border-color: rgba(10, 132, 255, 0.35);
   --bs-btn-hover-bg: var(--primary);
   --bs-btn-hover-border-color: var(--primary);
@@ -757,19 +768,19 @@ h6,
 .btn-danger {
   --bs-btn-bg: var(--danger);
   --bs-btn-border-color: var(--danger);
-  --bs-btn-hover-bg: #b42318;
-  --bs-btn-hover-border-color: #b42318;
-  --bs-btn-active-bg: #b42318;
-  --bs-btn-active-border-color: #b42318;
+  --bs-btn-hover-bg: var(--danger-strong);
+  --bs-btn-hover-border-color: var(--danger-strong);
+  --bs-btn-active-bg: var(--danger-strong);
+  --bs-btn-active-border-color: var(--danger-strong);
 }
 
 .btn-success {
   --bs-btn-bg: var(--success);
   --bs-btn-border-color: var(--success);
-  --bs-btn-hover-bg: #067647;
-  --bs-btn-hover-border-color: #067647;
-  --bs-btn-active-bg: #067647;
-  --bs-btn-active-border-color: #067647;
+  --bs-btn-hover-bg: var(--success-strong);
+  --bs-btn-hover-border-color: var(--success-strong);
+  --bs-btn-active-bg: var(--success-strong);
+  --bs-btn-active-border-color: var(--success-strong);
 }
 
 .form-control,
@@ -786,7 +797,8 @@ h6,
 }
 
 .form-control::placeholder {
-  color: #98a2b3;
+  /* #98a2b3 dava 2,58:1 sobre branco — reprova AA. */
+  color: var(--text-3);
 }
 
 .form-control:focus,

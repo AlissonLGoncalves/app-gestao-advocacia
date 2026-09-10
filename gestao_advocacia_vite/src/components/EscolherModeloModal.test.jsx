@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import EscolherModeloModal from './EscolherModeloModal.jsx'
 
 const listModelosMock = vi.fn()
@@ -46,8 +46,9 @@ beforeEach(() => {
 describe('EscolherModeloModal', () => {
   it('lista apenas modelos PF para cliente PF + tipos genéricos', async () => {
     render(<EscolherModeloModal cliente={CLIENTE_PF} onClose={vi.fn()} />)
-    await waitFor(() => expect(listModelosMock).toHaveBeenCalled())
-    expect(screen.getByTestId('escolher-modelo-10')).toBeInTheDocument() // PF
+    // Espera o item aparecer, nao a chamada do mock: o mock resolve antes do
+    // React repintar e o getBy* falhava no CI (maquina mais lenta).
+    expect(await screen.findByTestId('escolher-modelo-10')).toBeInTheDocument() // PF
     expect(screen.getByTestId('escolher-modelo-12')).toBeInTheDocument() // PF
     expect(screen.getByTestId('escolher-modelo-14')).toBeInTheDocument() // peticao (genérico)
     expect(screen.queryByTestId('escolher-modelo-11')).not.toBeInTheDocument() // PJ excluído
@@ -56,16 +57,14 @@ describe('EscolherModeloModal', () => {
 
   it('lista apenas modelos PJ para cliente PJ + tipos genéricos', async () => {
     render(<EscolherModeloModal cliente={CLIENTE_PJ} onClose={vi.fn()} />)
-    await waitFor(() => expect(listModelosMock).toHaveBeenCalled())
-    expect(screen.getByTestId('escolher-modelo-11')).toBeInTheDocument() // PJ
+    expect(await screen.findByTestId('escolher-modelo-11')).toBeInTheDocument() // PJ
     expect(screen.getByTestId('escolher-modelo-13')).toBeInTheDocument() // PJ
     expect(screen.queryByTestId('escolher-modelo-10')).not.toBeInTheDocument() // PF excluído
   })
 
   it('clicar num modelo abre o preview com cliente pré-selecionado', async () => {
     render(<EscolherModeloModal cliente={CLIENTE_PF} onClose={vi.fn()} />)
-    await waitFor(() => expect(listModelosMock).toHaveBeenCalled())
-    fireEvent.click(screen.getByTestId('escolher-modelo-10'))
+    fireEvent.click(await screen.findByTestId('escolher-modelo-10'))
 
     const preview = screen.getByTestId('preview-modal-stub')
     expect(preview).toBeInTheDocument()
@@ -78,15 +77,13 @@ describe('EscolherModeloModal', () => {
       { id: 99, titulo: 'Só PJ', tipo: 'procuracao_pj', padrao: false },
     ])
     render(<EscolherModeloModal cliente={CLIENTE_PF} onClose={vi.fn()} />)
-    await waitFor(() => expect(listModelosMock).toHaveBeenCalled())
-    expect(screen.getByText(/Nenhum modelo compatível/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Nenhum modelo compatível/i)).toBeInTheDocument()
   })
 
   it('clicar no backdrop fecha', async () => {
     const onClose = vi.fn()
     render(<EscolherModeloModal cliente={CLIENTE_PF} onClose={onClose} />)
-    await waitFor(() => expect(listModelosMock).toHaveBeenCalled())
-    fireEvent.click(screen.getByTestId('escolher-modelo-backdrop'))
+    fireEvent.click(await screen.findByTestId('escolher-modelo-backdrop'))
     expect(onClose).toHaveBeenCalled()
   })
 })

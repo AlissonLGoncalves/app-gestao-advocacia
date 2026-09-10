@@ -447,6 +447,22 @@ const MainLayout = () => {
     return map[seg] || 'Patronus — Sistema Jurídico'
   }
 
+  // Telas do redesign Stitch: o cabecalho (titulo + subtitulo) mora DENTRO da
+  // pagina, como nos mockups. Sem isto o app mostra dois <h1> e dois nomes
+  // diferentes pra mesma tela ("Dashboard" x "Bom dia, ...", "DJEN — Diario de
+  // Justica" x "Intimacoes").
+  const paginaComCabecalhoProprio = (() => {
+    const path = location.pathname.toLowerCase().replace(/\/+$/, '')
+    return (
+      path === '' ||
+      path === '/' ||
+      path === '/dashboard' ||
+      path === '/djen' ||
+      path === '/agenda' ||
+      path.startsWith('/casos/detalhe/')
+    )
+  })()
+
   // Valor do contexto memoizado pra nao recriar a cada render.
   const sidebarCtxValue = React.useMemo(() => ({ onClose: closeSidebar }), [closeSidebar])
 
@@ -570,10 +586,12 @@ const MainLayout = () => {
               >
                 {sidebarOpen ? <XMarkIcon /> : <Bars3Icon />}
               </button>
-              <div className="app-header-heading">
-                <h1>{getPageTitle()}</h1>
-                <small className="app-header-meta">{getPageSubtitle()}</small>
-              </div>
+              {!paginaComCabecalhoProprio && (
+                <div className="app-header-heading">
+                  <h1>{getPageTitle()}</h1>
+                  <small className="app-header-meta">{getPageSubtitle()}</small>
+                </div>
+              )}
             </div>
             {/* Direita: busca (Ctrl K), sino e "+ Novo" — nada mais (mockup Stitch). */}
             <div className="app-header-actions">

@@ -23,7 +23,7 @@ function LoginPage() {
     toast.dismiss()
 
     if (!usernameOrEmail || !password) {
-      toast.error('Por favor, preencha o nome de usuário/email e a senha.')
+      toast.error('Informe seu e-mail ou usuário e a senha.')
       setLoading(false)
       return
     }
@@ -34,7 +34,7 @@ function LoginPage() {
       localStorage.setItem('access_token', data.access_token)
       localStorage.setItem('user', JSON.stringify(data.user))
       const nome = data.user?.nome_completo || data.user?.username || 'advogado'
-      toast.success(`Bem-vindo, ${nome}! ✓`)
+      toast.success(`Olá, ${nome}. Sua fila de hoje está pronta.`)
       if (data.user?.role === 'cliente') {
         navigate('/portal')
       } else {
@@ -42,7 +42,7 @@ function LoginPage() {
       }
     } catch (error) {
       console.error('Erro ao tentar fazer login:', error)
-      toast.error(error.message || 'Falha no login. Verifique suas credenciais.')
+      toast.error(error.message || 'E-mail/usuário ou senha incorretos. Tente novamente.')
     } finally {
       setLoading(false)
     }
