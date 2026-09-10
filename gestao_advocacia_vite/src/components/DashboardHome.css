@@ -2,15 +2,7 @@
  * Fundo = canvas global (sem papel/ruido). Tokens de src/index.css. */
 
 .dashboard-home {
-  --dh-ambar: var(--warning, #b54708);
-  --dh-fundo-ambar: rgba(181, 71, 8, 0.08);
-  --dh-fundo-sucesso: rgba(7, 148, 85, 0.1);
-  --dh-fundo-primario: rgba(10, 132, 255, 0.08);
-  --dh-largura: 1040px;
-  max-width: var(--dh-largura);
-  margin: 0 auto;
-  padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1rem, 2.5vw, 2rem) 3rem;
-  color: var(--text-1, #101828);
+  color: var(--text-1);
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.5;
@@ -41,7 +33,7 @@
 
 .dh-subtitulo {
   margin: 0.5rem 0 0;
-  color: var(--text-2, #475467);
+  color: var(--text-2);
   font-size: 15px;
 }
 
@@ -51,20 +43,20 @@
   gap: 0.4rem;
   align-items: center;
   margin-top: 0.35rem;
-  padding: 0.4rem 0.8rem;
+  padding: 4px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  color: var(--text-2, #475467);
+  color: var(--text-2);
   background: var(--glass-strong);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .dh-chip svg {
   width: 16px;
   height: 16px;
-  color: var(--success, #079455);
+  color: var(--success);
 }
 
 /* ---- Progresso -------------------------------------------------------- */
@@ -88,13 +80,13 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--primary, #0a84ff);
+  background: var(--primary);
   transition: width var(--ease);
 }
 
 .dh-progresso__rotulo {
   flex-shrink: 0;
-  color: var(--text-2, #475467);
+  color: var(--text-2);
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -107,7 +99,7 @@
   gap: 0.6rem;
   align-items: flex-start;
   margin: 1rem 0 0;
-  color: var(--text-3, #667085);
+  color: var(--text-3);
   font-size: 14px;
 }
 
@@ -124,7 +116,7 @@
 }
 
 .dh-djen--convite {
-  color: var(--text-2, #475467);
+  color: var(--text-2);
 }
 
 /* ---- Link de texto ---------------------------------------------------- */
@@ -133,7 +125,7 @@
   padding: 0;
   border: 0;
   border-radius: 4px;
-  color: var(--primary, #0a84ff);
+  color: var(--primary-text);
   background: none;
   font: inherit;
   font-weight: 600;
@@ -142,12 +134,12 @@
 }
 
 .dh-link:hover {
-  color: var(--primary-strong, #006fe3);
+  color: var(--primary-strong);
   text-decoration: underline;
 }
 
 .dh-link:focus-visible {
-  outline: 2px solid var(--primary, #0a84ff);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -162,10 +154,10 @@
   min-height: 38px;
   padding: 0.45rem 1rem;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm, 12px);
+  border-radius: var(--radius-sm);
   font: inherit;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   white-space: nowrap;
   text-decoration: none;
@@ -182,7 +174,7 @@
 }
 
 .dh-btn:focus-visible {
-  outline: 2px solid var(--primary, #0a84ff);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -193,22 +185,22 @@
 
 .dh-btn--primario {
   color: #fff;
-  background: var(--primary, #0a84ff);
+  background: var(--primary);
 }
 
 .dh-btn--primario:hover:not(:disabled) {
-  background: var(--primary-strong, #006fe3);
+  background: var(--primary-strong);
 }
 
 .dh-btn--contorno {
   border-color: var(--line);
-  color: var(--text-1, #101828);
+  color: var(--text-1);
   background: var(--glass-strong);
 }
 
 .dh-btn--contorno:hover:not(:disabled) {
-  border-color: var(--primary, #0a84ff);
-  color: var(--primary-strong, #006fe3);
+  border-color: var(--primary);
+  color: var(--primary-strong);
 }
 
 /* ---- Fila do dia ------------------------------------------------------ */
@@ -232,12 +224,12 @@
 }
 
 .dh-fila__contagem {
-  padding: 0.15rem 0.55rem;
+  padding: 2px 8px;
   border-radius: 999px;
-  color: var(--dh-ambar);
-  background: var(--dh-fundo-ambar);
+  color: var(--warning);
+  background: var(--warning-soft);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -246,7 +238,7 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md, 18px);
+  border-radius: var(--radius-md);
   background: var(--glass-strong);
   box-shadow: var(--shadow-sm);
   list-style: none;
@@ -266,19 +258,19 @@
 }
 
 .dh-linha:hover {
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
 }
 
 .dh-linha--vencido {
-  border-left-color: var(--danger, #d92d20);
+  border-left-color: var(--danger);
 }
 
 .dh-linha--hoje {
-  border-left-color: var(--dh-ambar);
+  border-left-color: var(--warning);
 }
 
 .dh-linha--semana {
-  border-left-color: var(--primary, #0a84ff);
+  border-left-color: var(--primary);
 }
 
 .dh-linha__texto {
@@ -299,7 +291,7 @@
 
 .dh-linha__detalhe {
   overflow: hidden;
-  color: var(--text-3, #667085);
+  color: var(--text-3);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -307,8 +299,8 @@
 }
 
 .dh-linha--concluida {
-  color: var(--text-3, #667085);
-  background: var(--surface-soft, #f8fafc);
+  color: var(--text-3);
+  background: var(--surface-soft);
 }
 
 .dh-linha--concluida .dh-linha__texto s {
@@ -322,34 +314,36 @@
   flex-shrink: 0;
   width: 18px;
   height: 18px;
-  color: var(--text-3, #667085);
+  color: var(--text-3);
 }
 
 .dh-rotulo-concluido {
-  padding: 0.3rem 0.7rem;
+  padding: 2px 8px;
   border-radius: 999px;
-  color: var(--text-3, #667085);
+  color: var(--text-3);
   background: var(--line-soft);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .dh-fila__rodape {
   margin: 0.75rem 0 0;
-  color: var(--text-3, #667085);
+  color: var(--text-3);
   font-size: 13px;
 }
 
-/* ---- Estado vazio ("Tudo em dia.") ------------------------------------ */
+/* ---- Estado vazio ("Tudo em dia.") ------------------------------------
+   Mesma estrutura das outras tres telas: circulo de 56px + titulo de 22px
+   + uma frase + UM botao. */
 
 .dh-vazio {
   display: flex;
   flex-direction: column;
   align-items: center;
   margin-top: 2rem;
-  padding: 3rem 1.5rem;
+  padding: 56px 24px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md, 18px);
+  border-radius: var(--radius-md);
   background: var(--glass-strong);
   box-shadow: var(--shadow-sm);
   text-align: center;
@@ -359,23 +353,24 @@
 .dh-vazio__check {
   width: 56px;
   height: 56px;
-  margin-bottom: 0.75rem;
-  padding: 10px;
+  margin-bottom: 12px;
+  padding: 14px;
   border-radius: 50%;
-  color: var(--success, #079455);
-  background: var(--dh-fundo-sucesso);
+  color: var(--success);
+  background: var(--success-soft);
 }
 
 .dh-vazio h2 {
-  margin: 0;
-  font-size: 24px;
+  margin: 0 0 6px;
+  font-size: 22px;
   font-weight: 800;
 }
 
 .dh-vazio p {
-  max-width: 34rem;
-  margin: 0.5rem 0 1.25rem;
-  color: var(--text-2, #475467);
+  max-width: 440px;
+  margin: 0 auto 18px;
+  color: var(--text-2);
+  font-size: 15px;
 }
 
 /* ---- Esta semana ------------------------------------------------------ */
@@ -387,7 +382,7 @@
   margin-top: 1.5rem;
   padding: 1rem 1.25rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md, 18px);
+  border-radius: var(--radius-md);
   background: var(--glass-strong);
   box-shadow: var(--shadow-sm);
 }
@@ -398,9 +393,9 @@
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: var(--radius-sm, 12px);
-  color: var(--primary, #0a84ff);
-  background: var(--dh-fundo-primario);
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+  background: var(--primary-soft);
 }
 
 .dh-semana__icone svg {
@@ -417,7 +412,7 @@
 }
 
 .dh-semana__texto small {
-  color: var(--text-3, #667085);
+  color: var(--text-3);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -425,8 +420,8 @@
 }
 
 .dh-semana--alerta .dh-semana__icone {
-  color: var(--danger, #d92d20);
-  background: rgba(217, 45, 32, 0.08);
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 /* ---- Erro / esqueleto ------------------------------------------------- */
@@ -438,17 +433,17 @@
   align-items: flex-start;
   padding: 1.25rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md, 18px);
+  border-radius: var(--radius-md);
   background: var(--glass-strong);
 }
 
 .dh-erro span {
-  color: var(--text-3, #667085);
+  color: var(--text-3);
   font-size: 14px;
 }
 
 .dh-skeleton {
-  border-radius: var(--radius-sm, 12px);
+  border-radius: var(--radius-sm);
   background: linear-gradient(90deg, var(--line-soft) 25%, var(--line) 50%, var(--line-soft) 75%);
   background-size: 200% 100%;
   animation: dh-brilho 1.4s ease-in-out infinite;
@@ -468,7 +463,7 @@
 .dh-skeleton--lista {
   height: 280px;
   margin-top: 2rem;
-  border-radius: var(--radius-md, 18px);
+  border-radius: var(--radius-md);
 }
 
 /* ---- Movimento -------------------------------------------------------- */

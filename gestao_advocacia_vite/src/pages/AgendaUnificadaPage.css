@@ -1,21 +1,7 @@
-/* Agenda — redesign Stitch (set/2026). So casca: tokens globais de index.css,
-   fallbacks locais onde a shell ainda pode nao ter criado o token. */
+/* Agenda — redesign Stitch (set/2026). So casca: usa apenas os tokens
+   globais de index.css (sem alias nem fallback local). */
 
 .ag-page {
-  /* Barra/realce decorativo segue o token global da shell. */
-  --ag-warning: var(--warning, #b54708);
-  /* Texto e badge usam o ambar #B54708 do briefing: o --warning atual
-     (#ff9500) nao passa AA como texto sobre branco. Quando a shell trocar
-     o valor global pro ambar, isto vira var(--warning). */
-  --ag-warning-text: #b54708;
-  --ag-warning-bg: rgba(181, 71, 8, 0.1);
-  --ag-danger-bg: rgba(217, 45, 32, 0.1);
-  --ag-primary-bg: rgba(10, 132, 255, 0.1);
-  --ag-success-bg: rgba(7, 148, 85, 0.1);
-  --ag-surface-soft: var(--surface-soft, #f8fafc);
-  max-width: 1040px;
-  margin-inline: auto;
-  padding: 24px 16px 40px;
   color: var(--text-1);
   font-family: var(--font-body);
 }
@@ -60,13 +46,15 @@
 .ag-primary {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-height: 38px;
   padding: 9px 16px;
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--primary);
   color: #fff;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 14px;
   line-height: 1;
   box-shadow: var(--shadow-xs);
@@ -133,7 +121,7 @@
 
 .ag-seg-btn.is-active {
   background: #fff;
-  color: var(--primary);
+  color: var(--primary-text);
   box-shadow: var(--shadow-xs);
 }
 
@@ -145,8 +133,8 @@
   gap: 8px;
   padding: 6px 10px 6px 12px;
   border-radius: 999px;
-  background: var(--ag-primary-bg);
-  color: var(--primary-strong);
+  background: var(--primary-soft);
+  color: var(--primary-text);
   font-size: 13px;
   font-weight: 600;
 }
@@ -183,12 +171,13 @@
   letter-spacing: -0.02em;
 }
 
+/* Botao de icone: mesma medida do .btn-icon do Caso (36px). */
 .ag-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   background: #fff;
@@ -202,7 +191,7 @@
 }
 
 .ag-icon-btn:hover {
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   color: var(--text-1);
 }
 
@@ -210,7 +199,7 @@
   padding: 4px 8px;
   border: 0;
   background: transparent;
-  color: var(--primary);
+  color: var(--primary-text);
   font-size: 13px;
   font-weight: 600;
 }
@@ -244,13 +233,13 @@
 }
 
 .ag-chip:hover {
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   color: var(--text-1);
 }
 
 .ag-chip.is-active {
-  background: var(--ag-primary-bg);
-  color: var(--primary-strong);
+  background: var(--primary-soft);
+  color: var(--primary-text);
 }
 
 /* ── Layout calendario + painel ──────────────────────────────────────── */
@@ -320,7 +309,7 @@
 }
 
 .ag-cal .fc-daygrid-day:hover {
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
 }
 
 .ag-cal .fc-daygrid-day-frame {
@@ -347,11 +336,11 @@
 }
 
 .ag-cal .fc-day-today {
-  background: var(--ag-primary-bg) !important;
+  background: var(--primary-soft) !important;
 }
 
 .ag-cal .fc-day-today .fc-daygrid-day-number {
-  color: var(--primary-strong);
+  color: var(--primary-text);
 }
 
 .ag-cal .ag-dia-selecionado {
@@ -397,22 +386,22 @@
 }
 
 .ag-cal .fc-daygrid-event-harness > .fc-event.ag-ev--normal {
-  background: var(--ag-primary-bg);
-  color: var(--primary-strong);
+  background: var(--primary-soft);
+  color: var(--primary-text);
 }
 
 .ag-cal .fc-daygrid-event-harness > .fc-event.ag-ev--hoje {
-  background: var(--ag-warning-bg);
-  color: var(--ag-warning-text);
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .ag-cal .fc-daygrid-event-harness > .fc-event.ag-ev--vencido {
-  background: var(--ag-danger-bg);
-  color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger-text);
 }
 
 .ag-cal .fc-daygrid-event-harness > .fc-event.ag-ev--concluido {
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   color: var(--text-3);
   text-decoration: line-through;
 }
@@ -428,7 +417,7 @@
 }
 
 .ag-cal .fc-popover-header {
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   font-size: 13px;
   font-weight: 600;
 }
@@ -454,7 +443,7 @@
 .ag-painel-kicker {
   grid-column: 1 / -1;
   margin: 0 0 2px;
-  color: var(--primary-strong);
+  color: var(--primary-text);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -470,12 +459,13 @@
 }
 
 .ag-painel-contagem {
-  padding: 4px 10px;
+  padding: 2px 8px;
   border-radius: 999px;
-  background: var(--ag-primary-bg);
-  color: var(--primary-strong);
+  background: var(--primary-soft);
+  color: var(--primary-text);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 18px;
   white-space: nowrap;
 }
 
@@ -520,7 +510,7 @@
 }
 
 .ag-card--hoje::before {
-  background: var(--ag-warning);
+  background: var(--warning);
 }
 
 .ag-card--concluido::before,
@@ -551,7 +541,7 @@
 }
 
 .ag-card--hoje .ag-card-hora {
-  color: var(--ag-warning-text);
+  color: var(--warning);
 }
 
 .ag-badge {
@@ -560,9 +550,9 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 1.4;
+  line-height: 18px;
 }
 
 .ag-badge svg {
@@ -571,23 +561,23 @@
 }
 
 .ag-badge-danger {
-  background: var(--ag-danger-bg);
-  color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger-text);
 }
 
 .ag-badge-warning {
-  background: var(--ag-warning-bg);
-  color: var(--ag-warning-text);
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .ag-badge-muted {
-  background: var(--surface-soft, #f8fafc);
+  background: var(--surface-soft);
   color: var(--text-2);
 }
 
 .ag-badge-audiencia {
-  background: var(--ag-primary-bg);
-  color: var(--primary-strong);
+  background: var(--primary-soft);
+  color: var(--primary-text);
 }
 
 .ag-card-titulo {
@@ -606,7 +596,7 @@
 }
 
 .ag-card-titulo:hover {
-  color: var(--primary-strong);
+  color: var(--primary-text);
 }
 
 .ag-card-titulo.is-done {
@@ -659,12 +649,12 @@
 
 .ag-btn-quiet:hover {
   border-color: var(--primary);
-  color: var(--primary-strong);
+  color: var(--primary-text);
 }
 
 .ag-btn-quiet--ok:hover {
   border-color: var(--success);
-  color: var(--success);
+  color: var(--success-text);
 }
 
 /* ── Visao Hoje ──────────────────────────────────────────────────────── */
@@ -682,7 +672,7 @@
 }
 
 .ag-hoje-resumo-vencidos {
-  color: var(--danger);
+  color: var(--danger-text);
   font-weight: 600;
 }
 
@@ -714,37 +704,37 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  margin: 0 auto 16px;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 12px;
   border-radius: 999px;
-  background: var(--ag-primary-bg);
-  color: var(--primary-strong);
+  background: var(--primary-soft);
+  color: var(--primary-text);
 }
 
 .ag-vazio--ok .ag-vazio-icone {
-  background: var(--ag-success-bg);
-  color: var(--success);
+  background: var(--success-soft);
+  color: var(--success-text);
 }
 
 .ag-vazio-icone svg {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
 }
 
 .ag-vazio-titulo {
   margin: 0 0 6px;
   font-family: var(--font-title);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .ag-vazio-texto {
-  max-width: 420px;
+  max-width: 440px;
   margin: 0 auto 18px;
   color: var(--text-2);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 /* ── Lista (tabela) ──────────────────────────────────────────────────── */
@@ -814,7 +804,7 @@
 
 /* Corpo da coluna: fundo suave pros cards brancos destacarem */
 .ag-kanban .card > .card-body.overflow-auto {
-  background: var(--ag-surface-soft) !important;
+  background: var(--surface-soft) !important;
 }
 
 /* Card da tarefa (KanbanCardVisual) */
