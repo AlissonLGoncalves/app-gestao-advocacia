@@ -771,7 +771,7 @@ function TriagemAssistidaPage() {
                       cursor: 'pointer',
                       background: !casoEscolhidoId ? '#fff3e0' : '#fff',
                       border: !casoEscolhidoId
-                        ? '2px solid var(--warning, #ff9800)'
+                        ? '2px solid var(--warning)'
                         : '1px solid #e0e0e0',
                     }}
                   >
