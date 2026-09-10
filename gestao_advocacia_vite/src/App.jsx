@@ -64,6 +64,7 @@ import GlobalSearch from './components/GlobalSearch.jsx'
 import HeaderQuickAdd from './components/HeaderQuickAdd.jsx'
 import NotificacoesBell from './components/NotificacoesBell.jsx'
 import MenuItemBadge from './components/ui/MenuItemBadge.jsx'
+import PatronusLogo from './components/brand/PatronusLogo.jsx'
 
 // Importação dos ícones
 import {
@@ -76,7 +77,6 @@ import {
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
-  ScaleIcon,
   Cog6ToothIcon,
   NewspaperIcon,
   UserCircleIcon,
@@ -333,12 +333,6 @@ const MainLayout = () => {
       })
   }, [])
 
-  const dataAtual = new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-  }).format(new Date())
-
   const userString = localStorage.getItem('user')
   let userRole = 'admin'
   try {
@@ -468,13 +462,7 @@ const MainLayout = () => {
         {/* Sidebar */}
         <aside className={`app-sidebar ${sidebarOpen ? 'open' : ''}`}>
           <div className="sidebar-brand">
-            <div className="sidebar-brand-icon">
-              <ScaleIcon className="sidebar-brand-scale" strokeWidth={1.8} />
-            </div>
-            <div>
-              <div className="sidebar-brand-text">Patronus</div>
-              <div className="sidebar-brand-sub">Sistema Juridico</div>
-            </div>
+            <PatronusLogo size={40} tone="light" />
           </div>
 
           <nav className="sidebar-nav">
@@ -488,12 +476,8 @@ const MainLayout = () => {
             <SidebarLink to="/dashboard" icon={HomeIcon}>
               Início
             </SidebarLink>
-            <SidebarLink
-              to="/djen"
-              icon={NewspaperIcon}
-              badge={sidebarCounts.djenPendentes}
-              badgeCor="warning"
-            >
+            {/* Badge vermelho: publicacoes aguardando decisao (mockup Stitch). */}
+            <SidebarLink to="/djen" icon={NewspaperIcon} badge={sidebarCounts.djenPendentes}>
               Intimações
             </SidebarLink>
             <SidebarLink to="/casos" icon={BriefcaseIcon}>
@@ -502,7 +486,12 @@ const MainLayout = () => {
             {/* Agenda unificada: UMA entrada. /agenda abre a tela com o seletor
                 de 3 visoes (Calendario | Kanban | Lista). Badge de prazos
                 vencidos/IA pendentes (tarefasAlerta) fica aqui. */}
-            <SidebarLink to="/agenda" icon={CalendarDaysIcon} badge={sidebarCounts.tarefasAlerta}>
+            <SidebarLink
+              to="/agenda"
+              icon={CalendarDaysIcon}
+              badge={sidebarCounts.tarefasAlerta}
+              badgeCor="info"
+            >
               Agenda
             </SidebarLink>
 
@@ -553,15 +542,16 @@ const MainLayout = () => {
 
           <div className="sidebar-footer">
             <button
+              type="button"
               onClick={handleLogout}
-              className="sidebar-link mt-2 text-danger"
-              title="Sair do Sistema"
+              className="sidebar-link sidebar-link-logout"
+              title="Sair do sistema"
             >
               <ArrowLeftOnRectangleIcon className="sidebar-link-icon" />
               <span>Sair</span>
             </button>
-            <div className="sidebar-copyright mt-3">
-              &copy; {new Date().getFullYear()} Patronus{' '}
+            <div className="sidebar-copyright">
+              <span>&copy; {new Date().getFullYear()} Patronus</span>
               <span className="app-version">v{APP_VERSION}</span>
             </div>
           </div>
@@ -570,28 +560,32 @@ const MainLayout = () => {
         {/* Conteúdo Principal */}
         <div className="app-content">
           <header className="app-header">
-            <div className="d-flex align-items-center gap-3">
+            <div className="app-header-title">
               <button
+                type="button"
                 className="mobile-menu-btn"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                aria-label="Menu"
+                aria-label={sidebarOpen ? 'Fechar menu' : 'Abrir menu'}
+                aria-expanded={sidebarOpen}
               >
                 {sidebarOpen ? <XMarkIcon /> : <Bars3Icon />}
               </button>
-              <div>
+              <div className="app-header-heading">
                 <h1>{getPageTitle()}</h1>
-                <small className="app-header-meta text-muted">{getPageSubtitle()}</small>
+                <small className="app-header-meta">{getPageSubtitle()}</small>
               </div>
             </div>
-            <div className="d-flex align-items-center gap-2 ms-auto">
-              <HeaderQuickAdd />
-              <NotificacoesBell />
+            {/* Direita: busca (Ctrl K), sino e "+ Novo" — nada mais (mockup Stitch). */}
+            <div className="app-header-actions">
               <GlobalSearch />
-              <div className="app-header-date text-capitalize d-none d-lg-block">{dataAtual}</div>
+              <NotificacoesBell />
+              <HeaderQuickAdd />
             </div>
           </header>
           <main className="app-main">
-            <Outlet />
+            <div className="app-main-inner">
+              <Outlet />
+            </div>
           </main>
         </div>
       </div>
