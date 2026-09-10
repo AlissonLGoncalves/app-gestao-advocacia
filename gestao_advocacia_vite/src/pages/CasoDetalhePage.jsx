@@ -134,7 +134,7 @@ function CasoDetalhePage() {
     } catch (err) {
       console.error('Erro ao buscar dados do caso ou movimentações:', err)
       setFetchError(err.message)
-      toast.error(`Erro ao carregar dados: ${err.message}`)
+      toast.error(err.message || 'Não foi possível carregar o caso. Recarregue a página.')
     } finally {
       setIsLoadingCaso(false)
       setIsLoadingMovimentacoes(false)
@@ -194,7 +194,7 @@ function CasoDetalhePage() {
       recarregarPrazos()
     } catch (err) {
       console.error('CasoDetalhePage: erro ao concluir', err)
-      toast.error(err?.message || 'Falha ao concluir tarefa.')
+      toast.error(err?.message || 'Não foi possível concluir a tarefa. Tente de novo.')
     }
   }
 
@@ -210,13 +210,13 @@ function CasoDetalhePage() {
       recarregarPrazos()
     } catch (err) {
       console.error('CasoDetalhePage: erro ao excluir', err)
-      toast.error(err?.message || 'Falha ao excluir.')
+      toast.error(err?.message || 'Não foi possível excluir o prazo. Tente de novo.')
     }
   }
 
   const handleAtualizarViaDJEN = async () => {
     if (!caso || !caso.numero_processo) {
-      toast.warn('Número de processo ausente.')
+      toast.warn('Cadastre o nº do processo (CNJ) para consultar o DJEN.')
       return
     }
 
