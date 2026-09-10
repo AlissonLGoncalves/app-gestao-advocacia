@@ -131,34 +131,19 @@ export default function HeaderQuickAdd() {
       <button
         ref={buttonRef}
         type="button"
-        className="btn btn-sm btn-primary rounded-pill d-flex align-items-center gap-1 px-3"
+        className="header-btn header-btn-novo"
         onClick={open ? handleClose : handleOpen}
-        title="Criar novo... (Alt+N)"
+        title="Criar novo… (Alt+N)"
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="header-quick-add-toggle"
       >
-        <PlusIcon style={{ width: 15, height: 15 }} />
-        <span className="d-none d-lg-inline" style={{ fontSize: '0.82rem' }}>
-          Novo
-        </span>
+        <PlusIcon className="header-btn-icon" aria-hidden="true" />
+        <span>Novo</span>
       </button>
 
       {open && (
-        <div
-          role="menu"
-          className="card shadow border-0 mt-1"
-          data-testid="header-quick-add-menu"
-          style={{
-            position: 'absolute',
-            top: '100%',
-            right: 0,
-            minWidth: 240,
-            zIndex: 1050,
-            borderRadius: 10,
-            overflow: 'hidden',
-          }}
-        >
+        <div role="menu" className="header-menu" data-testid="header-quick-add-menu">
           <div className="list-group list-group-flush">
             {ITENS.map((item, idx) => {
               const Icon = item.icon
