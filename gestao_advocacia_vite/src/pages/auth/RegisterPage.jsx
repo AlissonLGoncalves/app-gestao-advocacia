@@ -13,9 +13,9 @@ import {
   EnvelopeIcon,
   BuildingOfficeIcon,
   IdentificationIcon,
-  CheckCircleIcon,
 } from '@heroicons/react/24/outline'
 import PasswordInput from '../../components/ui/PasswordInput.jsx'
+import AuthHero from './AuthHero.jsx'
 
 function stripFrontMatter(markdown) {
   if (!markdown?.startsWith('---\n')) return markdown || ''
@@ -225,53 +225,14 @@ function RegisterPage() {
   }
 
   return (
-    <div
-      className="container-fluid d-flex align-items-center justify-content-center min-vh-100 py-5"
-      style={{ backgroundColor: '#0f172a' }}
-    >
+    <div className="container-fluid d-flex align-items-center justify-content-center min-vh-100 py-5">
       <div
         className="card shadow-lg border-0"
-        style={{ width: '100%', maxWidth: '800px', overflow: 'hidden' }}
+        style={{ width: '100%', maxWidth: '880px', overflow: 'hidden' }}
       >
         <div className="row g-0">
-          {/* Painel Esquerdo: Marketing / SaaS Message */}
-          <div
-            className="col-md-5 text-white p-5 d-flex flex-column justify-content-between"
-            style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}
-          >
-            <div>
-              <img
-                src="/logo.png"
-                alt="Patronus Logo"
-                className="mb-4 shadow-sm"
-                style={{ width: '80px', borderRadius: '14px' }}
-              />
-              <h2 className="fw-bolder mb-3">Patronus</h2>
-              <p className="lead fw-normal text-white-50">Sua Advocacia sem Fronteiras.</p>
-
-              <ul className="list-unstyled mt-5">
-                <li className="mb-3 d-flex align-items-center">
-                  <CheckCircleIcon className="me-2" style={{ width: '24px', opacity: 0.8 }} /> 100%
-                  de Controle B2B
-                </li>
-                <li className="mb-3 d-flex align-items-center">
-                  <CheckCircleIcon className="me-2" style={{ width: '24px', opacity: 0.8 }} />{' '}
-                  Captura Inteligente OCR
-                </li>
-                <li className="mb-3 d-flex align-items-center">
-                  <CheckCircleIcon className="me-2" style={{ width: '24px', opacity: 0.8 }} />{' '}
-                  Compliance Total LGPD
-                </li>
-                <li className="d-flex align-items-center">
-                  <CheckCircleIcon className="me-2" style={{ width: '24px', opacity: 0.8 }} />{' '}
-                  Multi-Usuários Ilimitados
-                </li>
-              </ul>
-            </div>
-            <div className="mt-5">
-              <small className="text-white-50">Ambiente Seguro & Encriptado.</small>
-            </div>
-          </div>
+          {/* Painel Esquerdo: mesma promessa do Login (TELA 4 do Stitch) */}
+          <AuthHero className="col-md-5 auth-hero-compact" />
 
           {/* Painel Direito: Formulário de Onboarding */}
           <div className="col-md-7 p-4 p-md-5 bg-white">

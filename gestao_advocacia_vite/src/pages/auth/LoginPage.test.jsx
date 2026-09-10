@@ -44,7 +44,7 @@ describe('LoginPage', () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByLabelText(/usuário ou email/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/e-mail ou usuário/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/senha/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /entrar/i })).toBeInTheDocument()
   })
@@ -74,7 +74,7 @@ describe('LoginPage', () => {
       </MemoryRouter>
     )
 
-    fireEvent.change(screen.getByLabelText(/usuário ou email/i), { target: { value: 'admin' } })
+    fireEvent.change(screen.getByLabelText(/e-mail ou usuário/i), { target: { value: 'admin' } })
     fireEvent.change(screen.getByLabelText(/senha/i), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
@@ -97,7 +97,7 @@ describe('LoginPage', () => {
       </MemoryRouter>
     )
 
-    fireEvent.change(screen.getByLabelText(/usuário ou email/i), { target: { value: 'admin' } })
+    fireEvent.change(screen.getByLabelText(/e-mail ou usuário/i), { target: { value: 'admin' } })
     fireEvent.change(screen.getByLabelText(/senha/i), { target: { value: 'errado' } })
     fireEvent.click(screen.getByRole('button', { name: /entrar/i }))
 

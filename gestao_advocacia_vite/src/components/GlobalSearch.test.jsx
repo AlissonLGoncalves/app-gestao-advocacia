@@ -23,7 +23,7 @@ const renderSearch = () =>
 
 const abrirEDigitar = async (texto) => {
   fireEvent.click(screen.getByRole('button', { name: /Buscar/i }))
-  const input = await screen.findByPlaceholderText(/Buscar casos, clientes/i)
+  const input = await screen.findByPlaceholderText(/Buscar ou executar/i)
   fireEvent.change(input, { target: { value: texto } })
   return input
 }

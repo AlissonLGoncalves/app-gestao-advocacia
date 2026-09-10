@@ -1,0 +1,128 @@
+/* Painel navy das telas de auth (AuthHero.jsx). Tokens em src/index.css. */
+
+.auth-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  padding: clamp(2rem, 5vw, 4rem);
+  color: var(--sidebar-text);
+  background: linear-gradient(160deg, var(--sidebar-bg) 0%, var(--sidebar-bg-soft) 100%);
+}
+
+.auth-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    60% 45% at 0% 0%,
+    rgba(31, 120, 255, 0.28) 0%,
+    rgba(31, 120, 255, 0) 70%
+  );
+}
+
+.auth-hero > * {
+  position: relative;
+}
+
+.auth-hero-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2rem;
+  max-width: 30rem;
+}
+
+.auth-hero-tagline {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: clamp(1.9rem, 3.2vw, 2.7rem);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+
+.auth-hero-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.auth-hero-item {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 0.98rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.auth-hero-item-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #56a6ff;
+}
+
+.auth-hero-item-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.5;
+}
+
+/* Variante compacta: dentro do cartao de cadastro (col-md-5). Seletor duplo
+   pra vencer o `.row > *` do Bootstrap, que zera o padding horizontal. */
+.auth-hero.auth-hero-compact {
+  gap: 2rem;
+  padding: 2.25rem 1.75rem;
+}
+
+.auth-hero-compact .auth-hero-tagline {
+  font-size: 1.7rem;
+}
+
+.auth-hero-compact .auth-hero-item {
+  font-size: 0.9rem;
+}
+
+.auth-hero-compact .auth-hero-item-icon {
+  width: 34px;
+  height: 34px;
+}
+
+@media (max-width: 900px) {
+  .auth-hero,
+  .auth-hero.auth-hero-compact {
+    gap: 1.5rem;
+    padding: 1.75rem 1.5rem;
+  }
+
+  .auth-hero-body {
+    gap: 1.25rem;
+  }
+
+  .auth-hero-tagline {
+    font-size: 1.6rem;
+  }
+
+  .auth-hero-item {
+    font-size: 0.9rem;
+  }
+
+  .auth-hero-item-icon {
+    width: 34px;
+    height: 34px;
+  }
+}

@@ -1,0 +1,80 @@
+/* Login — TELA 4 do redesign Stitch. Painel esquerdo em AuthHero.css;
+   tokens em src/index.css. */
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+}
+
+/* Painel direito: formulario minimo sobre o canvas claro */
+.login-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.login-form {
+  width: min(100%, 380px);
+}
+
+.login-title {
+  margin: 0 0 0.3rem;
+  font-size: 1.9rem;
+  font-weight: 800;
+}
+
+.login-subtitle {
+  margin: 0 0 1.75rem;
+  color: var(--text-3);
+}
+
+.login-form .form-control-lg {
+  font-size: 0.95rem;
+  padding: 0.7rem 0.95rem;
+}
+
+.login-form .btn-lg {
+  padding: 0.75rem 1rem;
+  font-size: 0.98rem;
+}
+
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.login-links a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+
+.login-links a:hover,
+.login-links a:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.login-footer {
+  margin: 2.5rem 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-panel {
+    align-items: flex-start;
+    padding-top: 2.25rem;
+  }
+}
