@@ -1084,6 +1084,44 @@ class TestInboxIntimacoes:
         assert data["regra"] == "contestacao_15d"
         assert data["dias"] == 15
         assert data["data_vencimento"]
+        # Redesign Stitch: rotulo humano da providencia pra UI
+        assert data["providencia"] == "Contestação"
+
+    def test_listagem_traz_prazo_sugerido_por_item(self, auth_client, db):
+        # Redesign Stitch: card da caixa mostra "Contestação · 15 dias · vence"
+        # sem N chamadas; fallback (nada extraido) vem None -> UI mostra "—".
+        u = self._user(db)
+        p1 = _criar_publicacao(db, u.tenant_id, u.id, djen_id=841)
+        p1.tipo_comunicacao = "intimacao"
+        p1.texto = "Fica o réu intimado para apresentar contestação no prazo de 15 dias."
+        p2 = _criar_publicacao(db, u.tenant_id, u.id, djen_id=842)
+        p2.tipo_comunicacao = "edital"
+        p2.texto = "Texto sem qualquer palavra-chave reconhecida."
+        db.session.commit()
+
+        resp = auth_client.get("/api/v1/djen/publicacoes?ordenar=data_asc")
+        assert resp.status_code == 200
+        por_djen = {i["djen_id"]: i for i in json.loads(resp.data)["items"]}
+        ps = por_djen[841]["prazo_sugerido"]
+        assert ps["providencia"] == "Contestação"
+        assert ps["dias"] == 15
+        assert ps["tipo_sugerido"] == "prazo"
+        assert ps["data_vencimento"]
+        assert por_djen[842]["prazo_sugerido"] is None
+
+    def test_contagens_incluem_tratadas_hoje(self, auth_client, db):
+        u = self._user(db)
+        _criar_publicacao(db, u.tenant_id, u.id, djen_id=851)
+        p2 = _criar_publicacao(db, u.tenant_id, u.id, djen_id=852)
+
+        resp = auth_client.get("/api/v1/djen/publicacoes")
+        assert json.loads(resp.data)["contagens"]["tratadas_hoje"] == 0
+
+        auth_client.patch(f"/api/v1/djen/publicacoes/{p2.id}/tratar", json={})
+        resp = auth_client.get("/api/v1/djen/publicacoes")
+        contagens = json.loads(resp.data)["contagens"]
+        assert contagens["tratadas_hoje"] == 1
+        assert contagens["nao_tratadas"] == 1
 
     def test_sugestao_tratamento_audiencia(self, auth_client, db):
         u = self._user(db)
