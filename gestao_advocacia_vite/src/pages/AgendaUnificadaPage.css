@@ -1,0 +1,855 @@
+/* Agenda — redesign Stitch (set/2026). So casca: tokens globais de index.css,
+   fallbacks locais onde a shell ainda pode nao ter criado o token. */
+
+.ag-page {
+  /* Barra/realce decorativo segue o token global da shell. */
+  --ag-warning: var(--warning, #b54708);
+  /* Texto e badge usam o ambar #B54708 do briefing: o --warning atual
+     (#ff9500) nao passa AA como texto sobre branco. Quando a shell trocar
+     o valor global pro ambar, isto vira var(--warning). */
+  --ag-warning-text: #b54708;
+  --ag-warning-bg: rgba(181, 71, 8, 0.1);
+  --ag-danger-bg: rgba(217, 45, 32, 0.1);
+  --ag-primary-bg: rgba(10, 132, 255, 0.1);
+  --ag-success-bg: rgba(7, 148, 85, 0.1);
+  --ag-surface-soft: var(--surface-soft, #f8fafc);
+  max-width: 1040px;
+  margin-inline: auto;
+  padding: 24px 16px 40px;
+  color: var(--text-1);
+  font-family: var(--font-body);
+}
+
+.ag-page .tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Cabecalho da pagina ─────────────────────────────────────────────── */
+
+.ag-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ag-header h1 {
+  margin: 0 0 4px;
+  font-family: var(--font-title);
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.ag-header-sub {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+.ag-header-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.ag-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: var(--shadow-xs);
+  transition:
+    background var(--ease),
+    transform var(--ease);
+}
+
+.ag-primary svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ag-primary:hover {
+  background: var(--primary-strong);
+  color: #fff;
+}
+
+.ag-primary:focus-visible,
+.ag-seg-btn:focus-visible,
+.ag-chip:focus-visible,
+.ag-icon-btn:focus-visible,
+.ag-btn-quiet:focus-visible,
+.ag-card-titulo:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ── Toggle segmentado ───────────────────────────────────────────────── */
+
+.ag-seg {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+}
+
+.ag-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 3px);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  transition:
+    background var(--ease),
+    color var(--ease);
+}
+
+.ag-seg-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ag-seg-btn:hover {
+  color: var(--text-1);
+}
+
+.ag-seg-btn.is-active {
+  background: #fff;
+  color: var(--primary);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ── Chip de filtro de caso (mantido do fluxo ?caso=) ────────────────── */
+
+.ag-chip-caso {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 12px;
+  border-radius: 999px;
+  background: var(--ag-primary-bg);
+  color: var(--primary-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Cabecalho do mes ────────────────────────────────────────────────── */
+
+.ag-mes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.ag-mes-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ag-mes-titulo {
+  min-width: 150px;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-title);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ag-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-2);
+  transition: background var(--ease);
+}
+
+.ag-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ag-icon-btn:hover {
+  background: var(--surface-soft, #f8fafc);
+  color: var(--text-1);
+}
+
+.ag-link-btn {
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ag-mes-contagem {
+  margin-left: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.ag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ag-chip {
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  transition:
+    background var(--ease),
+    color var(--ease);
+}
+
+.ag-chip:hover {
+  background: var(--surface-soft, #f8fafc);
+  color: var(--text-1);
+}
+
+.ag-chip.is-active {
+  background: var(--ag-primary-bg);
+  color: var(--primary-strong);
+}
+
+/* ── Layout calendario + painel ──────────────────────────────────────── */
+
+.ag-cal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 992px) {
+  .ag-cal-layout {
+    grid-template-columns: minmax(0, 65fr) minmax(280px, 35fr);
+  }
+
+  .ag-painel {
+    position: sticky;
+    top: 16px;
+  }
+}
+
+/* ── FullCalendar (tema por tokens) ──────────────────────────────────── */
+
+.ag-cal {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-sm);
+  --fc-border-color: var(--line-soft);
+  --fc-today-bg-color: transparent;
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: transparent;
+  --fc-event-border-color: transparent;
+}
+
+.ag-cal .fc {
+  font-family: var(--font-body);
+}
+
+.ag-cal .fc-theme-standard .fc-scrollgrid {
+  border: 0;
+}
+
+.ag-cal .fc-theme-standard th {
+  border-width: 0 0 1px;
+}
+
+.ag-cal .fc-theme-standard td {
+  border-width: 0 0 1px;
+}
+
+.ag-cal .fc-col-header-cell-cushion {
+  padding: 8px 0 10px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.ag-cal .fc-daygrid-day {
+  cursor: pointer;
+  transition: background var(--ease);
+}
+
+.ag-cal .fc-daygrid-day:hover {
+  background: var(--surface-soft, #f8fafc);
+}
+
+.ag-cal .fc-daygrid-day-frame {
+  min-height: 84px;
+  padding: 2px;
+}
+
+.ag-cal .fc-daygrid-day-top {
+  flex-direction: row;
+}
+
+.ag-cal .fc-daygrid-day-number {
+  padding: 6px 8px 2px;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+
+.ag-cal .fc-day-other .fc-daygrid-day-number {
+  color: var(--text-3);
+  opacity: 0.6;
+}
+
+.ag-cal .fc-day-today {
+  background: var(--ag-primary-bg) !important;
+}
+
+.ag-cal .fc-day-today .fc-daygrid-day-number {
+  color: var(--primary-strong);
+}
+
+.ag-cal .ag-dia-selecionado {
+  box-shadow: inset 0 0 0 2px var(--primary);
+  border-radius: 8px;
+}
+
+/* Eventos como pilulas */
+.ag-cal .fc-daygrid-event {
+  margin: 1px 4px 2px;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.ag-cal .fc-daygrid-event .fc-event-time {
+  margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.ag-cal .fc-daygrid-event .fc-event-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-cal .fc-daygrid-block-event .fc-event-time,
+.ag-cal .fc-daygrid-block-event .fc-event-title {
+  padding: 0;
+}
+
+.ag-cal .fc-daygrid-more-link {
+  margin: 0 6px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ag-cal .fc-daygrid-event-harness > .fc-event.ag-ev--normal {
+  background: var(--ag-primary-bg);
+  color: var(--primary-strong);
+}
+
+.ag-cal .fc-daygrid-event-harness > .fc-event.ag-ev--hoje {
+  background: var(--ag-warning-bg);
+  color: var(--ag-warning-text);
+}
+
+.ag-cal .fc-daygrid-event-harness > .fc-event.ag-ev--vencido {
+  background: var(--ag-danger-bg);
+  color: var(--danger);
+}
+
+.ag-cal .fc-daygrid-event-harness > .fc-event.ag-ev--concluido {
+  background: var(--surface-soft, #f8fafc);
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.ag-cal .fc-event.ag-ev--audiencia .fc-event-title::before {
+  content: '⚖ ';
+}
+
+.ag-cal .fc-popover {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.ag-cal .fc-popover-header {
+  background: var(--surface-soft, #f8fafc);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Painel do dia ───────────────────────────────────────────────────── */
+
+.ag-painel {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.ag-painel-cabecalho {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ag-painel-kicker {
+  grid-column: 1 / -1;
+  margin: 0 0 2px;
+  color: var(--primary-strong);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ag-painel-titulo {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.ag-painel-contagem {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ag-primary-bg);
+  color: var(--primary-strong);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ag-painel-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ag-painel-vazio {
+  padding: 24px 8px 8px;
+  text-align: center;
+}
+
+.ag-painel-vazio p {
+  margin: 0 0 12px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+/* ── Card do compromisso ─────────────────────────────────────────────── */
+
+.ag-card {
+  position: relative;
+  padding: 12px 14px 12px 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  overflow: hidden;
+}
+
+.ag-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--primary);
+}
+
+.ag-card--vencido::before {
+  background: var(--danger);
+}
+
+.ag-card--hoje::before {
+  background: var(--ag-warning);
+}
+
+.ag-card--concluido::before,
+.ag-card--cancelado::before {
+  background: var(--line);
+}
+
+.ag-card--normal::before {
+  background: var(--line);
+}
+
+.ag-card-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.ag-card-hora {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ag-card--vencido .ag-card-hora {
+  color: var(--danger);
+}
+
+.ag-card--hoje .ag-card-hora {
+  color: var(--ag-warning-text);
+}
+
+.ag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.ag-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ag-badge-danger {
+  background: var(--ag-danger-bg);
+  color: var(--danger);
+}
+
+.ag-badge-warning {
+  background: var(--ag-warning-bg);
+  color: var(--ag-warning-text);
+}
+
+.ag-badge-muted {
+  background: var(--surface-soft, #f8fafc);
+  color: var(--text-2);
+}
+
+.ag-badge-audiencia {
+  background: var(--ag-primary-bg);
+  color: var(--primary-strong);
+}
+
+.ag-card-titulo {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-family: var(--font-title);
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.ag-card-titulo:hover {
+  color: var(--primary-strong);
+}
+
+.ag-card-titulo.is-done {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.ag-card-partes {
+  margin-top: 3px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.ag-card-processo {
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.ag-card-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.ag-btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  transition:
+    background var(--ease),
+    color var(--ease),
+    border-color var(--ease);
+}
+
+.ag-btn-quiet svg {
+  width: 13px;
+  height: 13px;
+}
+
+.ag-btn-quiet:hover {
+  border-color: var(--primary);
+  color: var(--primary-strong);
+}
+
+.ag-btn-quiet--ok:hover {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+/* ── Visao Hoje ──────────────────────────────────────────────────────── */
+
+.ag-hoje {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ag-hoje-resumo {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+.ag-hoje-resumo-vencidos {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.ag-hoje-bloco-titulo {
+  margin: 0 0 10px;
+  font-family: var(--font-title);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ag-hoje-bloco-titulo span {
+  color: var(--text-3);
+  font-weight: 600;
+}
+
+/* ── Estados vazios ──────────────────────────────────────────────────── */
+
+.ag-vazio {
+  padding: 56px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+
+.ag-vazio-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 999px;
+  background: var(--ag-primary-bg);
+  color: var(--primary-strong);
+}
+
+.ag-vazio--ok .ag-vazio-icone {
+  background: var(--ag-success-bg);
+  color: var(--success);
+}
+
+.ag-vazio-icone svg {
+  width: 26px;
+  height: 26px;
+}
+
+.ag-vazio-titulo {
+  margin: 0 0 6px;
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.ag-vazio-texto {
+  max-width: 420px;
+  margin: 0 auto 18px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+/* ── Lista (tabela) ──────────────────────────────────────────────────── */
+
+.ag-lista {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.ag-lista .table {
+  margin: 0;
+}
+
+.ag-lista .table th {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ag-lista .table td {
+  font-size: 14px;
+}
+
+.ag-lista-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* ── Kanban embutido ─────────────────────────────────────────────────────
+   A SEMANTICA das colunas (A Fazer / Em Andamento / Concluido) e persistida
+   pelo backend em PUT /itens-agenda/reorder (status + posicao), entao nao
+   muda — aqui e so pele, e so quando o board esta embutido na Agenda
+   (o /prazos standalone continua como estava). */
+
+.ag-kanban .card {
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.ag-kanban .card-header {
+  padding-top: 16px !important;
+  padding-bottom: 16px !important;
+  border-bottom: 1px solid var(--line-soft) !important;
+}
+
+.ag-kanban .card-header h6 {
+  color: var(--text-1);
+  font-family: var(--font-title);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ag-kanban .card-header .badge {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Corpo da coluna: fundo suave pros cards brancos destacarem */
+.ag-kanban .card > .card-body.overflow-auto {
+  background: var(--ag-surface-soft) !important;
+}
+
+/* Card da tarefa (KanbanCardVisual) */
+.ag-kanban .card .card {
+  border-color: var(--line-soft) !important;
+  border-radius: var(--radius-sm) !important;
+  background: #fff;
+}
+
+.ag-kanban .card .card:hover {
+  box-shadow: var(--shadow-md) !important;
+}
+
+.ag-kanban .card-title {
+  font-family: var(--font-title);
+  font-size: 14px !important;
+  letter-spacing: -0.02em;
+}
+
+.ag-kanban .card .card .text-muted {
+  color: var(--text-3) !important;
+}
+
+.ag-kanban .card .card .small,
+.ag-kanban .card .card [class*='fs-'] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Loading ─────────────────────────────────────────────────────────── */
+
+.ag-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px;
+  color: var(--text-2);
+}
