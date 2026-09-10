@@ -1,629 +1,428 @@
+/**
+ * LandingPage — pagina publica do Patronus (redesign Stitch, set/2026).
+ *
+ * REGRA DE CONTEUDO (nao afrouxar em refator futuro): esta pagina nao exibe
+ * metrica de resultado, depoimento, logo de cliente, selo, premio, preco nem
+ * plano. Nada disso existe no produto. Toda afirmacao aqui e' rastreavel a
+ * codigo da main — a origem de cada bloco esta comentada acima dele.
+ *
+ * Chamada para acao: "solicitar acesso". O cadastro publico e' fechado
+ * (config.py REGISTRATION_MODE default "closed"; routes/auth.py devolve 403
+ * em /register e so aceita /register-invite), entao nao ha teste gratis.
+ *
+ * Visual: tokens globais de index.css + Bootstrap 5 utilitarios + estilos
+ * proprios em LandingPage.css (prefixo lp-). Sem Tailwind. Icones Heroicons.
+ */
+
 import React from 'react'
 import { Link } from 'react-router'
 import {
-  ScaleIcon,
-  NewspaperIcon,
-  SparklesIcon,
-  BuildingOffice2Icon,
-  ClipboardDocumentListIcon,
-  ShieldCheckIcon,
-  CheckIcon,
   ArrowRightIcon,
-  EnvelopeOpenIcon,
-  TableCellsIcon,
-  Squares2X2Icon,
-  BoltIcon,
-  ArrowsRightLeftIcon,
+  BanknotesIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ClipboardDocumentCheckIcon,
+  FolderOpenIcon,
+  InboxArrowDownIcon,
+  KeyIcon,
+  ShieldCheckIcon,
+  Square3Stack3DIcon,
 } from '@heroicons/react/24/outline'
+import PatronusLogo from '../components/brand/PatronusLogo.jsx'
+import JanelaIntimacoes from '../components/landing/JanelaIntimacoes.jsx'
 import './LandingPage.css'
 
-const TRUST_LOGOS = ['CNJ DataJud', 'DJEN', 'OAB', 'Receita Federal', 'Google Gemini']
+const ANO = new Date().getFullYear()
 
-const PAINS = [
+// Navegacao interna — so ancoras que existem nesta pagina.
+const MENU = [
+  { href: '#como-funciona', texto: 'Como funciona' },
+  { href: '#recursos', texto: 'Recursos' },
+  { href: '#seguranca', texto: 'Segurança' },
+  { href: '#perguntas', texto: 'Perguntas' },
+]
+
+// Fonte de cada passo:
+//  1. models/djen.py (DjenOabMonitoramento) + routes/djen.py (/oabs, /tribunais)
+//  2. djen_service.py (comunicaapi.pje.jus.br) + djen_tasks.py (job_monitorar_djen)
+//     + app_runtime.py (cron SincronizarDJENJob) + App.jsx (/djen/sync/diario)
+//  3. djen_classifier.py (relevante x rotina) + djen_triagem.py (auto-vinculo CNJ)
+//  4. djen_prazo_calculator.py + djen_tasks.py (executar_auto_criacao_tarefas)
+const PASSOS = [
   {
-    icone: EnvelopeOpenIcon,
-    titulo: 'Inbox compartilhado',
-    descricao: 'Publicações lidas, mas não classificadas. Ninguém sabe quem viu o quê.',
+    titulo: 'Você cadastra as OABs',
+    texto:
+      'Número, UF e as siglas dos tribunais que quer acompanhar. Dá para monitorar várias OABs no mesmo escritório.',
   },
   {
-    icone: TableCellsIcon,
-    titulo: 'Planilha desatualizada',
-    descricao: 'O Excel só serve até alguém esquecer de atualizar. Daí, serve contra você.',
+    titulo: 'O Patronus busca no DJEN',
+    texto:
+      'A consulta ao Diário de Justiça Eletrônico Nacional roda uma vez por dia, e você também pode disparar na hora pelo botão de sincronizar.',
   },
   {
-    icone: ArrowsRightLeftIcon,
-    titulo: 'Histórico fragmentado',
-    descricao:
-      'Documentos no Drive, prazos no Outlook, valores no WhatsApp. O caso vive em quatro lugares.',
+    titulo: 'Cada publicação é separada e vinculada',
+    texto:
+      'O que é rotina fica de lado; o que exige providência vai para a caixa. O vínculo ao processo é feito pelo número CNJ, e o que sobra você resolve na triagem assistida.',
+  },
+  {
+    titulo: 'Vira prazo na agenda',
+    texto:
+      'A publicação relevante já vinculada a um caso gera um item na agenda com data sugerida — que você confere e valida antes de contar com ela.',
   },
 ]
 
-const FEATURES = [
+// Cada item abaixo aponta para o arquivo que o sustenta.
+const GRUPOS = [
   {
-    icone: NewspaperIcon,
-    titulo: 'Vigilância diária do DJEN',
-    descricao:
-      'Cada publicação cai no caso certo. Sem leitura manual, sem encaminhamento de e-mail, sem "achei que você ia ver".',
+    icone: InboxArrowDownIcon,
+    titulo: 'Intimações e prazos',
+    resumo: 'A fila de trabalho do dia, com o que ainda não foi tratado sempre visível.',
+    itens: [
+      'Caixa organizada por tratamento: não tratadas, sem processo, tratadas e descartadas', // components/djen/CategoriasPublicacoes.jsx
+      'Filtro por tribunal, OAB, período e busca por número do processo ou nome da parte', // pages/DjenPage.jsx
+      'Triagem assistida que agrupa as publicações sem vínculo e pede sua confirmação', // pages/TriagemAssistidaPage.jsx
+      'Prazo sugerido em dias corridos, deliberadamente conservador, para você validar no card', // djen_prazo_calculator.py + routes/itens_agenda.py (/validar-prazo)
+      'Agenda unificada em quatro visões: hoje, calendário, kanban e lista', // pages/AgendaUnificadaPage.jsx
+      'Aviso no sino e por e-mail quando o prazo entra em 7 e em 3 dias', // alertas_tasks.py + routes/notificacoes.py
+    ],
   },
   {
-    icone: SparklesIcon,
-    titulo: 'Cadastro em segundos, não em horas',
-    descricao:
-      'Suba a procuração em PDF. A IA do Gemini extrai cliente, OAB, CPF e cria o caso pré-preenchido. Você revisa e segue.',
+    icone: FolderOpenIcon,
+    titulo: 'Casos, clientes e documentos',
+    resumo: 'O cadastro que alimenta o vínculo automático — e os textos que saem dele.',
+    itens: [
+      'Cadastro de clientes e casos, com histórico de alterações', // routes/clientes.py + routes/casos.py
+      'Busca do processo no DataJud do CNJ para preencher classe, assunto, órgão e movimentos', // cnj_service.py + routes/casos_busca.py
+      'Conferência de listas de números CNJ antes de criar os casos, até 40 por vez', // routes/casos_busca.py + pages/ImportarCnjsPage.jsx
+      'Documentos anexados ao caso, guardados em volume próprio do servidor', // routes/documentos.py
+      'Modelos de peça com os campos do cliente e do caso já preenchidos', // routes/modelos_documento.py (Jinja2)
+      'Leitura de procuração em PDF ou DOCX para abrir o caso a partir dela', // routes/procuracoes.py + procuracao_service.py
+    ],
   },
   {
-    icone: ScaleIcon,
-    titulo: 'Auto-fill direto do CNJ',
-    descricao:
-      'Digite o número do processo. O Patronus busca tudo na API oficial do CNJ DataJud: partes, classe, vara, movimentações.',
+    icone: BanknotesIcon,
+    titulo: 'Financeiro do escritório',
+    resumo: 'Honorários, custos e nota — no mesmo lugar do caso que os gerou.',
+    itens: [
+      'Recebimentos, despesas e contratos de honorários com geração das parcelas', // routes/recebimentos.py, despesas.py, contratos.py
+      'Aviso diário do que vence, no sino e por e-mail', // notificacoes_tasks.py
+      'Relatórios de contas a receber, contas a pagar, fluxo de caixa e casos por status', // routes/relatorios.py
+      'Exportação das listas em PDF respeitando os filtros da tela', // src/utils/pdfGenerator.js
+      'Emissão de NFS-e pelo Portal Nacional (gov.br) com certificado A1 — enquanto o certificado não é configurado, o emissor fica em modo de simulação', // nfse/portal_nacional/gateway.py + nfse/gateway.py (MockGateway default)
+    ],
+  },
+]
+
+// Fonte: helpers/tenant.py + migrations rls_*, routes/auth.py, models/auditoria.py,
+// models/conta.py (ConsentimentoUsuario), nfse/portal_nacional/signer.py.
+const SEGURANCA = [
+  {
+    icone: Square3Stack3DIcon,
+    titulo: 'Isolamento por linha no banco',
+    texto:
+      'Cada registro carrega o identificador do escritório e o Postgres aplica política de row level security na própria transação, além do filtro por escritório na aplicação. São duas camadas para a mesma pergunta: este dado é seu?',
   },
   {
-    icone: ClipboardDocumentListIcon,
-    titulo: 'Kanban com prioridade visual',
-    descricao:
-      'A fazer, fazendo, concluído. Prazos vencidos em vermelho. Timeline alternativa para quem prefere lista.',
+    icone: KeyIcon,
+    titulo: 'Autenticação com JWT',
+    texto:
+      'Sessão por token assinado, política de senha, limite de tentativas de login e registro de cada acesso.',
   },
   {
-    icone: BuildingOffice2Icon,
-    titulo: 'Workspace isolado por escritório',
-    descricao:
-      'Convide sócios, associados e assistentes com permissões granulares. Portal restrito para o cliente acompanhar o caso dele — só o dele.',
+    icone: ClipboardDocumentCheckIcon,
+    titulo: 'Trilha de auditoria',
+    texto:
+      'Criação, alteração e exclusão em casos, clientes, intimações e itens de agenda ficam registradas com autor, data e o registro afetado. É trilha de quem mexeu e quando, não uma cópia do valor anterior de cada campo.',
   },
   {
     icone: ShieldCheckIcon,
-    titulo: 'LGPD por padrão',
-    descricao:
-      'Auditoria de toda alteração, consentimentos versionados, anonimização sob demanda. Você defende, a gente arquiva.',
+    titulo: 'Consentimento versionado',
+    texto:
+      'O aceite dos termos e do aviso de privacidade guarda a versão do documento e o hash do texto aceito, então dá para provar depois o que estava escrito. Os dados do caso ficam legíveis no banco: a proteção é o isolamento e o controle de acesso, não criptografia campo a campo. O certificado digital da nota é a exceção — esse é guardado cifrado.',
   },
 ]
 
-const STEPS = [
+const PERGUNTAS = [
   {
-    titulo: 'Conecte sua OAB',
-    descricao:
-      'Cadastre o número da OAB e os tribunais que atende. O monitoramento começa no mesmo dia.',
+    q: 'O Patronus substitui o PJe, o PROJUDI ou o e-SAJ?',
+    // Direção do produto: camada acima dos tribunais. Nenhuma rota peticiona.
+    a: 'Não, e não tenta. Ele é uma camada acima dos tribunais: junta o que está espalhado, organiza a fila e ajuda a preparar a resposta. O peticionamento continua sendo feito no sistema do tribunal.',
   },
   {
-    titulo: 'Importe ou crie casos',
-    descricao:
-      'Use o auto-fill do CNJ ou suba uma procuração. Em segundos, cliente e processo aparecem cadastrados.',
+    q: 'De onde vêm as publicações?',
+    // djen_service.py (DJEN_BASE_URL) + models/djen.py + app_runtime.py + App.jsx
+    a: 'Da API pública do Diário de Justiça Eletrônico Nacional, consultada pelas OABs que você cadastra. A sigla do tribunal é configurável por OAB, então dá para acompanhar mais de um. A busca roda uma vez por dia e também pode ser disparada manualmente.',
   },
   {
-    titulo: 'Trabalhe no fluxo, não no e-mail',
-    descricao:
-      'Publicações, prazos e movimentações chegam direto no caso. Você revisa, decide, executa.',
-  },
-]
-
-const DIFERENCIAIS = [
-  'Linha do tempo unificada por caso — CNJ, DJEN, documentos e tarefas no mesmo lugar',
-  'Dashboards de carteira, financeiro e produtividade com gráficos prontos',
-  'Filtros profundos: área, fase, vara, valor, datas — em casos e clientes',
-  'Onboarding em 2 minutos: você sai do cadastro com o escritório operacional',
-]
-
-const PLANOS = [
-  {
-    nome: 'Solo',
-    publico: '1 advogado autônomo',
-    preco: 'em breve',
-    items: ['Cadastro ilimitado de clientes e casos', 'DJEN para 1 OAB', 'Suporte por e-mail'],
-    destaque: false,
+    q: 'O prazo que aparece no card é o prazo oficial?',
+    // djen_prazo_calculator.py — dias corridos, sem feriados, prazo_validado
+    a: 'Não. É uma sugestão calculada em dias corridos a partir da data de disponibilização, por uma tabela de regras por tipo de publicação. Ela não considera dias úteis, suspensão forense nem feriados, e erra sempre para o lado curto de propósito. Por isso o card pede que você valide a data antes de tratá-la como prazo.',
   },
   {
-    nome: 'Escritório',
-    publico: 'até 5 advogados',
-    preco: 'em breve',
-    items: [
-      'Tudo do plano Solo',
-      'DJEN multi-OAB e multi-tribunal',
-      'Portal do cliente com acesso restrito',
-      'Relatórios financeiros e gerenciais',
-    ],
-    destaque: true,
+    q: 'Preciso de certificado digital ou da minha senha do tribunal?',
+    // DJEN e DataJud são públicos; certificado só na NFS-e; PROJUDI usa agente local
+    a: 'Para o DJEN e para a busca de processos no DataJud, não: são bases públicas e o Patronus não guarda senha de tribunal. Certificado A1 só é necessário para emitir NFS-e. A integração com o PROJUDI é um caso à parte: ela depende de um agente que roda na máquina do escritório e hoje cobre o TJ-PR.',
   },
   {
-    nome: 'Corporate',
-    publico: 'banca grande / contratos jurídicos',
-    preco: 'sob consulta',
-    items: [
-      'Tudo do plano Escritório',
-      'SSO e provisionamento de usuários',
-      'SLA dedicado',
-      'Onboarding com time Patronus',
-    ],
-    destaque: false,
+    q: 'A busca de processo cobre todos os tribunais?',
+    // cnj_service.py (~90 aliases) + routes/casos_busca.py (503 sem chave, cobertura 2ª inst.)
+    a: 'A consulta usa o DataJud do CNJ, que expõe cerca de noventa tribunais entre superiores, federais, estaduais, trabalhistas, eleitorais e militares. A cobertura vem do próprio CNJ e é reconhecidamente irregular em segunda instância. O recurso também depende de uma chave de acesso ao DataJud configurada no ambiente.',
+  },
+  {
+    q: 'Quanto custa?',
+    // Não há gateway, modelo de plano, assinatura ou fatura no código.
+    a: 'Não há plano nem cobrança definidos. O produto não tem meio de pagamento integrado, e por isso o acesso hoje é concedido caso a caso, por solicitação.',
+  },
+  {
+    q: 'Como consigo acesso?',
+    // routes/auth.py (/auth/access-request, resposta em até 48h) + admin.py
+    a: 'Pelo formulário de solicitação. Ele registra seu contato, OAB e escritório, e a resposta é enviada por e-mail em até 48 horas. Aprovada a solicitação, você recebe um convite individual para criar a conta — o cadastro aberto está desligado.',
+  },
+  {
+    q: 'Os dados de um escritório podem aparecer para outro?',
+    // helpers/tenant.py + migrations RLS restritivo
+    a: 'Não. Cada escritório é um inquilino separado: a consulta é filtrada na aplicação e o banco tem política que rejeita leitura e escrita fora do escritório da sessão.',
   },
 ]
-
-const FAQ = [
-  {
-    q: 'Preciso migrar meus casos antigos manualmente?',
-    a: 'Não. Auto-fill do CNJ, import por planilha e IA para procurações. Você sobe os documentos, o Patronus preenche os dados.',
-  },
-  {
-    q: 'Funciona com o meu tribunal?',
-    a: 'O DJEN cobre o sistema unificado nacional. Para tribunais que ainda publicam fora do DJEN, o monitoramento acontece por número de processo via API oficial do CNJ.',
-  },
-  {
-    q: 'E se o DJEN sair do ar?',
-    a: 'Nosso ingestor reprocessa automaticamente. Você não perde uma publicação por queda de API.',
-  },
-  {
-    q: 'Posso cancelar quando quiser?',
-    a: 'A qualquer momento, com exportação completa em CSV/PDF. Seus dados são seus.',
-  },
-  {
-    q: 'Vocês usam meus dados para treinar IA?',
-    a: 'Não. Os dados do seu escritório nunca saem do seu workspace, nem alimentam modelos de terceiros.',
-  },
-]
-
-const IMG_DIFERENCIAL =
-  'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1200&q=80'
-const IMG_HOW =
-  'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1200&q=80'
 
 export default function LandingPage() {
   return (
     <div className="lp-root">
-      {/* ============== TOP BAR ============== */}
-      <header
-        className="border-bottom"
-        style={{
-          background: 'rgba(255,255,255,0.85)',
-          backdropFilter: 'saturate(160%) blur(8px)',
-          WebkitBackdropFilter: 'saturate(160%) blur(8px)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        <div className="container-fluid py-3 px-4 px-lg-5 d-flex align-items-center justify-content-between">
-          <div className="d-flex align-items-center gap-2">
-            <ScaleIcon style={{ width: 28, height: 28, color: '#2563eb' }} />
-            <span className="fw-bold fs-5" style={{ fontFamily: 'var(--font-heading)' }}>
-              Patronus
-            </span>
-            <small className="text-muted ms-1 d-none d-md-inline">Sistema Jurídico</small>
-          </div>
-          <nav className="d-flex align-items-center gap-3">
-            <a
-              href="#features"
-              className="text-decoration-none text-secondary small d-none d-md-inline"
-            >
-              Recursos
-            </a>
-            <a
-              href="#planos"
-              className="text-decoration-none text-secondary small d-none d-md-inline"
-            >
-              Planos
-            </a>
-            <Link to="/login" className="text-decoration-none text-secondary small">
+      {/* ─── Cabeçalho fixo: marca + um único botão primário ─────────────── */}
+      <header className="lp-topbar">
+        <div className="lp-shell lp-topbar__inner">
+          <Link to="/" aria-label="Patronus — página inicial" className="text-decoration-none">
+            <PatronusLogo tone="dark" size={34} />
+          </Link>
+
+          <nav className="lp-topbar__nav" aria-label="Seções da página">
+            {MENU.map((item) => (
+              <a key={item.href} href={item.href} className="lp-topbar__link">
+                {item.texto}
+              </a>
+            ))}
+          </nav>
+
+          <div className="lp-topbar__acoes">
+            <Link to="/login" className="lp-topbar__link">
               Entrar
             </Link>
-            <Link to="/solicitar-acesso" className="btn btn-primary btn-sm rounded-pill px-3">
+            <Link to="/solicitar-acesso" className="lp-btn lp-btn--primary lp-btn--sm">
               Solicitar acesso
             </Link>
-          </nav>
+          </div>
         </div>
       </header>
 
-      {/* ============== HERO ============== */}
-      <section className="lp-hero">
-        <span className="lp-blob lp-blob--1" />
-        <span className="lp-blob lp-blob--2" />
-        <div className="container-fluid px-4 px-lg-5 py-5 py-lg-6">
-          <div className="row align-items-center g-5">
-            <div className="col-lg-7 lp-reveal lp-reveal-1">
-              <span className="lp-eyebrow mb-4">
-                <span className="lp-eyebrow__pulse" />
-                Para escritórios que ainda controlam prazos no Outlook
+      <main>
+        {/* ─── Herói ─────────────────────────────────────────────────────── */}
+        <section className="lp-hero">
+          <div className="lp-shell lp-hero__grid">
+            <div>
+              <span className="lp-eyebrow">
+                <ShieldCheckIcon className="lp-eyebrow__icone" aria-hidden="true" />
+                Acesso por convite
               </span>
-              <h1 className="display-3 lp-headline mb-3">
-                Prazos jurídicos não deveriam depender de{' '}
-                <span className="lp-grad-text">quem viu o e-mail.</span>
+
+              <h1 className="lp-h1">
+                As intimações de todos os seus tribunais numa <em>fila só</em>.
               </h1>
-              <p className="lead text-muted mb-4" style={{ maxWidth: 640 }}>
-                Patronus monitora o DJEN todos os dias, vincula cada publicação ao caso certo e
-                avisa antes do prazo vencer — num único workspace com cliente, processo, financeiro
-                e agenda.
+
+              <p className="lp-lead">
+                O Patronus consulta o DJEN pelas OABs que você monitora, liga cada publicação ao
+                processo pelo número CNJ e sugere o prazo. Você decide o que fazer com ela e leva a
+                peça ao tribunal.
               </p>
-              <div className="d-flex flex-wrap gap-2">
-                <Link
-                  to="/solicitar-acesso"
-                  className="btn btn-primary btn-lg rounded-pill px-4 d-inline-flex align-items-center gap-2"
-                >
-                  Solicitar acesso à beta
-                  <ArrowRightIcon style={{ width: 18, height: 18 }} />
+
+              <ul className="lp-hero__pontos">
+                <li className="lp-hero__ponto">
+                  <CheckIcon aria-hidden="true" />
+                  Busca diária no DJEN
+                </li>
+                <li className="lp-hero__ponto">
+                  <CheckIcon aria-hidden="true" />
+                  Vínculo pelo número CNJ
+                </li>
+                <li className="lp-hero__ponto">
+                  <CheckIcon aria-hidden="true" />
+                  Prazo sugerido para validar
+                </li>
+              </ul>
+
+              <div className="lp-hero__acoes">
+                <Link to="/solicitar-acesso" className="lp-btn lp-btn--primary">
+                  Solicitar acesso
+                  <ArrowRightIcon className="lp-btn__icone" aria-hidden="true" />
                 </Link>
-                <a
-                  href="#como-funciona"
-                  className="btn btn-outline-secondary btn-lg rounded-pill px-4"
-                >
+                <a href="#como-funciona" className="lp-btn lp-btn--ghost">
                   Ver como funciona
                 </a>
               </div>
-              <p className="small text-muted mt-3 mb-0">
-                Beta privada — selecionamos os primeiros escritórios participantes. Resposta em até
-                48h.
+
+              <p className="lp-hero__nota">
+                O cadastro aberto está desligado. O acesso é liberado por convite depois da análise
+                da solicitação, com resposta por e-mail em até 48 horas.
               </p>
             </div>
 
-            <div className="col-lg-5 lp-reveal lp-reveal-2">
-              <div className="lp-mockup">
-                <div className="lp-mockup__bar">
-                  <span className="lp-mockup__dot" />
-                  <span className="lp-mockup__dot" />
-                  <span className="lp-mockup__dot" />
-                </div>
-                <div className="lp-mockup__body">
-                  <div className="d-flex align-items-center justify-content-between mb-3">
+            <figure className="lp-figura">
+              <JanelaIntimacoes />
+              <figcaption className="lp-figura__legenda">
+                Reprodução estática da tela de Intimações: as abas, as categorias e os campos são os
+                mesmos do produto. As faixas cinzas marcam onde entram as publicações do seu
+                escritório — esta página não exibe dados de processo de ninguém.
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        {/* ─── Como funciona ─────────────────────────────────────────────── */}
+        <section id="como-funciona" className="lp-secao lp-secao--soft">
+          <div className="lp-shell">
+            <div className="lp-secao__cabeca">
+              <p className="lp-kicker">Como funciona</p>
+              <h2 className="lp-h2">Da publicação no diário ao prazo na sua agenda.</h2>
+              <p className="lp-sub">
+                O caminho é sempre o mesmo, e nenhuma etapa tira você da decisão: o sistema separa,
+                vincula e sugere; quem confirma é o advogado.
+              </p>
+            </div>
+
+            <ol className="lp-fluxo list-unstyled mb-0">
+              {PASSOS.map((passo, i) => (
+                <li key={passo.titulo} className="lp-passo">
+                  <span className="lp-passo__num" aria-hidden="true">
+                    {i + 1}
+                  </span>
+                  <h3 className="lp-h3">{passo.titulo}</h3>
+                  <p>{passo.texto}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* ─── Recursos ──────────────────────────────────────────────────── */}
+        <section id="recursos" className="lp-secao">
+          <div className="lp-shell">
+            <div className="lp-secao__cabeca">
+              <p className="lp-kicker">Recursos</p>
+              <h2 className="lp-h2">O que existe hoje no Patronus.</h2>
+              <p className="lp-sub">
+                Esta lista é o produto que está no ar, não um roteiro. O que ainda não foi
+                construído não aparece aqui.
+              </p>
+            </div>
+
+            <div className="lp-grupos">
+              {GRUPOS.map((grupo) => {
+                const Icone = grupo.icone
+                return (
+                  <article key={grupo.titulo} className="lp-grupo">
+                    <span className="lp-grupo__icone">
+                      <Icone aria-hidden="true" />
+                    </span>
+                    <h3 className="lp-h3">{grupo.titulo}</h3>
+                    <p className="lp-sub" style={{ marginTop: 8 }}>
+                      {grupo.resumo}
+                    </p>
+                    <ul className="lp-grupo__lista">
+                      {grupo.itens.map((item) => (
+                        <li key={item}>
+                          <CheckIcon aria-hidden="true" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Segurança e isolamento ────────────────────────────────────── */}
+        <section id="seguranca" className="lp-secao lp-secao--soft">
+          <div className="lp-shell lp-seg">
+            <div>
+              <p className="lp-kicker">Segurança</p>
+              <h2 className="lp-h2">O que o sistema faz para separar o seu do alheio.</h2>
+              <p className="lp-sub">
+                Descrito como está implementado — inclusive onde a proteção termina. Um sistema
+                jurídico que exagera a própria segurança é um risco a mais para o escritório.
+              </p>
+            </div>
+
+            <div className="lp-seg__itens">
+              {SEGURANCA.map((item) => {
+                const Icone = item.icone
+                return (
+                  <article key={item.titulo} className="lp-seg__item">
+                    <Icone aria-hidden="true" />
                     <div>
-                      <p className="mb-0 small text-muted">Painel do escritório</p>
-                      <p className="mb-0 fw-bold">Esta semana</p>
+                      <h3 className="lp-h3">{item.titulo}</h3>
+                      <p>{item.texto}</p>
                     </div>
-                    <Squares2X2Icon style={{ width: 22, height: 22, color: '#94a3b8' }} />
-                  </div>
-
-                  <div className="row g-2 mb-3">
-                    <div className="col-4">
-                      <div className="lp-kpi">
-                        <p className="lp-kpi__label mb-1">DJEN</p>
-                        <p className="lp-kpi__value mb-0">142</p>
-                        <p className="lp-kpi__delta mb-0">+18%</p>
-                      </div>
-                    </div>
-                    <div className="col-4">
-                      <div className="lp-kpi">
-                        <p className="lp-kpi__label mb-1">Urgentes</p>
-                        <p className="lp-kpi__value mb-0">6</p>
-                        <p className="lp-kpi__delta lp-kpi__delta--warn mb-0">≤ 3 dias</p>
-                      </div>
-                    </div>
-                    <div className="col-4">
-                      <div className="lp-kpi">
-                        <p className="lp-kpi__label mb-1">Casos</p>
-                        <p className="lp-kpi__value mb-0">318</p>
-                        <p className="lp-kpi__delta mb-0">ativos</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="lp-bars mb-2">
-                    {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                      <span key={i} className="lp-bars__bar" style={{ height: `${h}%` }} />
-                    ))}
-                  </div>
-
-                  <div className="mt-3">
-                    <p className="text-muted small mb-2 fw-semibold">Próximos prazos</p>
-                    <div className="lp-row">
-                      <span className="lp-row__pill lp-row__pill--urgent">Hoje</span>
-                      <span className="flex-grow-1 text-truncate">
-                        Contestação — 0001234-56.2024
-                      </span>
-                    </div>
-                    <div className="lp-row">
-                      <span className="lp-row__pill lp-row__pill--info">2 dias</span>
-                      <span className="flex-grow-1 text-truncate">Recurso — 0009876-54.2023</span>
-                    </div>
-                    <div className="lp-row">
-                      <span className="lp-row__pill lp-row__pill--ok">5 dias</span>
-                      <span className="flex-grow-1 text-truncate">
-                        Manifestação — 0005555-44.2024
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                  </article>
+                )
+              })}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ============== TRUST BAR ============== */}
-      <section className="lp-trust">
-        <div className="container-fluid px-4 px-lg-5 py-4">
-          <div className="d-flex flex-wrap align-items-center justify-content-center gap-3 gap-md-4">
-            <span className="lp-trust__label">Integrado com</span>
-            {TRUST_LOGOS.map((logo, i) => (
-              <React.Fragment key={logo}>
-                <span className="lp-trust__item">{logo}</span>
-                {i < TRUST_LOGOS.length - 1 && <span className="lp-trust__sep" />}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      </section>
+        {/* ─── Perguntas ─────────────────────────────────────────────────── */}
+        <section id="perguntas" className="lp-secao">
+          <div className="lp-shell">
+            <div className="lp-secao__cabeca">
+              <p className="lp-kicker">Perguntas</p>
+              <h2 className="lp-h2">O que costuma ser perguntado antes de pedir acesso.</h2>
+            </div>
 
-      {/* ============== PROBLEMA ============== */}
-      <section className="lp-section-soft">
-        <div className="container-fluid px-4 px-lg-5 py-5 py-lg-6">
-          <div className="row justify-content-center text-center mb-5">
-            <div className="col-lg-8">
-              <p className="lp-section-eyebrow">Por que Patronus existe</p>
-              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}>
-                O e-mail não foi desenhado para gestão de prazos.
-              </h2>
-              <p className="text-muted mb-0" style={{ maxWidth: 680, margin: '0 auto' }}>
-                A publicação cai no inbox compartilhado às 3h da manhã. O estagiário marca como lida
-                sem identificar o processo. Três dias depois, o prazo venceu. A planilha de
-                controle? Ninguém atualizou.
-              </p>
-            </div>
-          </div>
-          <div className="row g-4">
-            {PAINS.map((p) => {
-              const Icone = p.icone
-              return (
-                <div key={p.titulo} className="col-md-4">
-                  <div className="lp-pain">
-                    <span className="lp-pain__icon">
-                      <Icone style={{ width: 20, height: 20, color: '#dc2626' }} />
-                    </span>
-                    <h5 className="fw-bold mb-2">{p.titulo}</h5>
-                    <p className="text-muted small mb-0">{p.descricao}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ============== FEATURES ============== */}
-      <section id="features" className="lp-section-mesh border-top">
-        <div className="container-fluid px-4 px-lg-5 py-5 py-lg-6">
-          <div className="row justify-content-center text-center mb-5">
-            <div className="col-lg-8">
-              <p className="lp-section-eyebrow">Recursos</p>
-              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}>
-                Tudo o que um escritório jurídico precisa.
-              </h2>
-              <p className="text-muted mb-0">
-                Construído com integrações reais, não com promessas.
-              </p>
-            </div>
-          </div>
-          <div className="row g-4">
-            {FEATURES.map((f) => {
-              const Icone = f.icone
-              return (
-                <div key={f.titulo} className="col-md-6 col-lg-4">
-                  <div className="lp-feature">
-                    <span className="lp-feature__icon">
-                      <Icone style={{ width: 24, height: 24, color: '#2563eb' }} />
-                    </span>
-                    <h5 className="fw-bold mb-2">{f.titulo}</h5>
-                    <p className="text-muted small mb-0" style={{ lineHeight: 1.6 }}>
-                      {f.descricao}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ============== COMO FUNCIONA ============== */}
-      <section id="como-funciona" className="border-top">
-        <div className="container-fluid px-4 px-lg-5 py-5 py-lg-6">
-          <div className="row align-items-center g-5">
-            <div className="col-lg-5">
-              <p className="lp-section-eyebrow">Como funciona</p>
-              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)' }}>
-                Do cadastro à primeira publicação automática em poucos minutos.
-              </h2>
-              <p className="text-muted mb-4">
-                Sem onboarding longo, sem consultor implantador, sem migração de planilha. O fluxo
-                foi desenhado para você sair do cadastro com o escritório operacional.
-              </p>
-              <div className="lp-image-card">
-                <img
-                  src={IMG_HOW}
-                  alt="Advogado trabalhando em escritório moderno"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-            <div className="col-lg-7">
-              <div className="d-flex flex-column gap-4 mt-4 mt-lg-0">
-                {STEPS.map((s, i) => (
-                  <div key={s.titulo} className="lp-step">
-                    <span className="lp-step__num">{i + 1}</span>
-                    <h5 className="fw-bold mb-2 mt-2">{s.titulo}</h5>
-                    <p className="text-muted mb-0" style={{ lineHeight: 1.6 }}>
-                      {s.descricao}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============== DIFERENCIAIS ============== */}
-      <section className="lp-section-soft border-top">
-        <div className="container-fluid px-4 px-lg-5 py-5 py-lg-6">
-          <div className="row align-items-center g-5">
-            <div className="col-lg-6">
-              <div className="lp-image-card">
-                <img
-                  src={IMG_DIFERENCIAL}
-                  alt="Livros de direito e ambiente jurídico"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-            <div className="col-lg-6">
-              <p className="lp-section-eyebrow">Diferenciais</p>
-              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)' }}>
-                Não é um CRM com cara de software jurídico.
-              </h2>
-              <p className="text-muted mb-4">
-                É um sistema desenhado desde a primeira linha de código para o fluxo de um
-                escritório brasileiro. Sem adaptações de Salesforce. Sem integração "em breve" com o
-                CNJ. Sem cobrança extra por usuário ativo.
-              </p>
-              <ul className="list-unstyled mb-0">
-                {DIFERENCIAIS.map((d) => (
-                  <li key={d} className="d-flex align-items-start gap-3 mb-3">
-                    <span
-                      className="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
-                      style={{
-                        width: 24,
-                        height: 24,
-                        background: 'rgba(22,163,74,0.12)',
-                        marginTop: 2,
-                      }}
-                    >
-                      <CheckIcon style={{ width: 14, height: 14, color: '#16a34a' }} />
-                    </span>
-                    <span>{d}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============== PLANOS ============== */}
-      <section id="planos" className="lp-section-mesh border-top">
-        <div className="container-fluid px-4 px-lg-5 py-5 py-lg-6">
-          <div className="row justify-content-center text-center mb-5">
-            <div className="col-lg-8">
-              <p className="lp-section-eyebrow">Planos</p>
-              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}>
-                14 dias grátis antes de qualquer cobrança.
-              </h2>
-              <p className="text-muted mb-0">
-                Você experimenta o produto inteiro, sem cartão e sem fricção.
-              </p>
-            </div>
-          </div>
-          <div className="row g-4 justify-content-center align-items-stretch">
-            {PLANOS.map((p) => (
-              <div key={p.nome} className="col-md-6 col-lg-4">
-                <div className={`lp-plan ${p.destaque ? 'lp-plan--highlight' : ''}`}>
-                  <h5 className="fw-bold mb-1">{p.nome}</h5>
-                  <p className="text-muted small mb-3">{p.publico}</p>
-                  <p className="fs-2 fw-bold mb-3" style={{ color: '#2563eb' }}>
-                    {p.preco}
-                  </p>
-                  <ul className="list-unstyled small mb-4">
-                    {p.items.map((it) => (
-                      <li key={it} className="d-flex align-items-start gap-2 mb-2">
-                        <CheckIcon
-                          style={{
-                            width: 16,
-                            height: 16,
-                            color: '#16a34a',
-                            marginTop: 2,
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span>{it}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    to="/solicitar-acesso"
-                    className={`btn ${p.destaque ? 'btn-primary' : 'btn-outline-primary'} w-100 rounded-pill`}
-                  >
-                    Solicitar acesso
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="text-center text-muted small mt-4 mb-0">
-            Cobrança via Stripe será habilitada em breve. Durante a beta privada, acesso é por
-            convite após análise da solicitação.
-          </p>
-        </div>
-      </section>
-
-      {/* ============== FAQ ============== */}
-      <section className="border-top">
-        <div className="container-fluid px-4 px-lg-5 py-5 py-lg-6">
-          <div className="row justify-content-center">
-            <div className="col-lg-8">
-              <div className="text-center mb-5">
-                <p className="lp-section-eyebrow">Perguntas frequentes</p>
-                <h2
-                  className="lp-headline mb-0"
-                  style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)' }}
-                >
-                  Antes de você abrir um chamado.
-                </h2>
-              </div>
-              {FAQ.map((item) => (
-                <details key={item.q} className="lp-faq">
-                  <summary>{item.q}</summary>
-                  <div className="lp-faq__body">{item.a}</div>
+            <div className="lp-faq">
+              {PERGUNTAS.map((item) => (
+                <details key={item.q} className="lp-faq__item">
+                  <summary>
+                    {item.q}
+                    <ChevronDownIcon className="lp-faq__sinal" aria-hidden="true" />
+                  </summary>
+                  <p className="lp-faq__resposta">{item.a}</p>
                 </details>
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ============== CTA FINAL ============== */}
-      <section className="lp-cta-final border-top">
-        <div className="container-fluid px-4 px-lg-5 py-5 py-lg-6 text-center">
-          <div className="row justify-content-center">
-            <div className="col-lg-8">
-              <span
-                className="lp-eyebrow mb-4"
-                style={{
-                  background: 'rgba(255,255,255,0.12)',
-                  color: '#fff',
-                  borderColor: 'rgba(255,255,255,0.25)',
-                }}
-              >
-                <BoltIcon style={{ width: 14, height: 14 }} />
-                Pronto em 2 minutos
-              </span>
-              <h2 className="lp-headline mb-3" style={{ fontSize: 'clamp(2rem, 4vw, 3rem)' }}>
-                Beta privada. Acesso por convite.
-              </h2>
-              <p className="mb-4 fs-5" style={{ maxWidth: 640, margin: '0 auto 1.5rem' }}>
-                Estamos selecionando os primeiros escritórios participantes. Solicite acesso e
-                respondemos em até 48h com um convite individual.
+        {/* ─── Chamada final ─────────────────────────────────────────────── */}
+        <section className="lp-secao" style={{ paddingTop: 0 }}>
+          <div className="lp-shell">
+            <div className="lp-cta">
+              <h2 className="lp-h2">Peça acesso ao Patronus.</h2>
+              <p className="lp-cta__texto">
+                Conte quem é você, sua OAB e o escritório. A solicitação é analisada uma a uma e a
+                resposta vai por e-mail em até 48 horas.
               </p>
-              <div className="d-flex flex-wrap justify-content-center gap-2">
-                <Link
-                  to="/solicitar-acesso"
-                  className="btn btn-primary btn-lg rounded-pill px-5 d-inline-flex align-items-center gap-2"
-                >
-                  Solicitar acesso à beta
-                  <ArrowRightIcon style={{ width: 18, height: 18 }} />
+              <div className="lp-cta__acoes">
+                <Link to="/solicitar-acesso" className="lp-btn lp-btn--inverse">
+                  Solicitar acesso
+                  <ArrowRightIcon className="lp-btn__icone" aria-hidden="true" />
                 </Link>
               </div>
-              <p className="small mt-3 mb-0" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                Análise individual · resposta em até 48h · convite por email
+              <p className="lp-cta__nota">
+                Já tem conta? <Link to="/login">Entrar</Link>.
               </p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* ============== FOOTER ============== */}
-      <footer className="border-top text-muted small" style={{ background: '#fff' }}>
-        <div className="container-fluid px-4 px-lg-5 py-4 d-flex flex-wrap justify-content-between gap-2">
-          <span>&copy; {new Date().getFullYear()} Patronus — Sistema Jurídico</span>
-          <div className="d-flex gap-3">
-            <Link to="/termos" className="text-muted text-decoration-none">
-              Termos de uso
-            </Link>
-            <Link to="/login" className="text-muted text-decoration-none">
-              Entrar
-            </Link>
+      {/* ─── Rodapé ──────────────────────────────────────────────────────── */}
+      <footer className="lp-rodape">
+        <div className="lp-shell lp-rodape__inner">
+          <span>&copy; {ANO} Patronus — Sistema Jurídico</span>
+          <div className="lp-rodape__links">
+            <Link to="/termos">Termos e privacidade</Link>
+            <Link to="/solicitar-acesso">Solicitar acesso</Link>
+            <Link to="/login">Entrar</Link>
           </div>
         </div>
       </footer>
