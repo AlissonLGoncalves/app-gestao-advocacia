@@ -279,46 +279,38 @@ export default function GlobalSearch() {
   if (!open) {
     return (
       <button
-        className="btn btn-sm btn-outline-secondary rounded-pill d-flex align-items-center gap-1 px-3"
+        type="button"
+        className="header-search"
         onClick={handleOpen}
-        title="Buscar e executar ações (Ctrl+K)"
-        style={{ opacity: 0.85, whiteSpace: 'nowrap' }}
+        title="Buscar ou executar ação (Ctrl+K)"
+        aria-label="Buscar ou executar ação"
       >
-        <MagnifyingGlassIcon style={{ width: 15, height: 15 }} />
-        <span className="d-none d-md-inline" style={{ fontSize: '0.82rem' }}>
-          Buscar...
-        </span>
-        <kbd
-          className="d-none d-lg-inline ms-1"
-          style={{ fontSize: '0.62rem', opacity: 0.6, background: 'transparent', border: 0 }}
-        >
-          Ctrl K
-        </kbd>
+        <MagnifyingGlassIcon className="header-search-icon" aria-hidden="true" />
+        <span className="header-search-label">Buscar ou executar ação…</span>
+        <kbd className="header-kbd">Ctrl K</kbd>
       </button>
     )
   }
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', zIndex: 1050, flex: '0 0 auto' }}>
-      <div
-        className="input-group input-group-sm shadow-sm"
-        style={{ width: 'clamp(200px, 28vw, 360px)' }}
-      >
-        <span className="input-group-text bg-white border-end-0">
+    <div ref={containerRef} className="header-search-open">
+      <div className="input-group input-group-sm">
+        <span className="input-group-text">
           {loading ? (
             <span
               className="spinner-border spinner-border-sm text-secondary"
               style={{ width: 13, height: 13 }}
             />
           ) : (
-            <MagnifyingGlassIcon style={{ width: 14, height: 14, color: '#6b7280' }} />
+            <MagnifyingGlassIcon className="header-search-icon" aria-hidden="true" />
           )}
         </span>
         <input
           ref={inputRef}
           type="text"
-          className="form-control border-start-0 ps-0"
-          placeholder="Buscar casos, clientes ou ação..."
+          className="form-control ps-0"
+          placeholder="Buscar ou executar ação…"
+          aria-label="Buscar ou executar ação"
           value={query}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
@@ -326,9 +318,11 @@ export default function GlobalSearch() {
           style={{ fontSize: '0.88rem' }}
         />
         <button
-          className="btn btn-outline-secondary border-start-0"
+          type="button"
+          className="btn btn-outline-secondary"
           onClick={handleClose}
           tabIndex={-1}
+          aria-label="Fechar busca"
         >
           <XMarkIcon style={{ width: 14, height: 14 }} />
         </button>
