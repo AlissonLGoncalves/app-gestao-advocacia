@@ -21,6 +21,13 @@ function parseValorCausa(valor) {
   return Number.isFinite(num) ? num : null
 }
 
+// A ComunicaAPI manda os polos como "FULANO | BELTRANO | CICRANO".
+// O cliente/parte contraria do caso e' um nome so': fica o primeiro.
+function primeiroNome(polo) {
+  if (!polo) return ''
+  return String(polo).split('|')[0].trim()
+}
+
 // Posicao inicial: centralizada horizontal, topo a 80px.
 function calcularPosicaoInicial() {
   if (typeof window === 'undefined') return { x: 0, y: 80 }
@@ -34,8 +41,13 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
   const analise = publicacao?.analise || {}
   const sugestoes = publicacao?.sugestoes_vinculo || publicacao?.sugestoes || {}
 
-  const autorPadrao = (analise.partes_autoras || [])[0] || ''
-  const reuPadrao = (analise.partes_reus || [])[0] || ''
+  // analise.* so' existe quando a triagem por IA rodou. Sem ela (ou com a
+  // chave do Gemini ausente) o formulario abria VAZIO mesmo com a parte
+  // visivel no card, obrigando a redigitar o nome que o sistema ja tinha.
+  // polo_ativo/polo_passivo vem direto da ComunicaAPI e podem trazer varios
+  // nomes separados por " | " — o primeiro e' o que interessa aqui.
+  const autorPadrao = (analise.partes_autoras || [])[0] || primeiroNome(pub.polo_ativo)
+  const reuPadrao = (analise.partes_reus || [])[0] || primeiroNome(pub.polo_passivo)
   const papelInicial = autorPadrao ? 'autor' : 'reu'
 
   const [papelCliente, setPapelCliente] = useState(papelInicial)
@@ -54,17 +66,24 @@ export default function ModalCriarClienteCaso({ publicacao, onClose, onSuccess }
     email: '',
   })
 
-  const parteContrariaDefault = useMemo(() => {
-    if (papelCliente === 'autor') return (analise.partes_reus || [])[0] || ''
-    return (analise.partes_autoras || [])[0] || ''
-  }, [analise.partes_autoras, analise.partes_reus, papelCliente])
+  const parteContrariaDefault = useMemo(
+    () => (papelCliente === 'autor' ? reuPadrao : autorPadrao),
+    [papelCliente, autorPadrao, reuPadrao]
+  )
+
+  // Numero com mascara (0000791-09.2026.8.16.0075) em vez dos 20 digitos
+  // corridos: e' o formato que o advogado reconhece e que o tribunal usa.
+  const numeroProcessoPadrao =
+    analise.numero_processo || pub.numero_processo_mascara || pub.numero_processo || ''
 
   const [formCaso, setFormCaso] = useState({
-    titulo: analise.numero_processo
-      ? `Processo ${analise.numero_processo}`
+    titulo: numeroProcessoPadrao
+      ? `Processo ${numeroProcessoPadrao}`
       : `Caso DJEN #${pub.id || ''}`,
-    numero_processo: analise.numero_processo || pub.numero_processo || '',
-    tipo_acao: analise.classe_processual || '',
+    numero_processo: numeroProcessoPadrao,
+    // nome_classe e' a classe processual que o tribunal manda (o "Assunto"
+    // que aparece no card) — serve de tipo da acao quando a IA nao rodou.
+    tipo_acao: analise.classe_processual || pub.nome_classe || '',
     vara_juizo: pub.nome_orgao || analise.vara || '',
     comarca: analise.comarca || '',
     valor_causa: parseValorCausa(analise.valor_causa),
