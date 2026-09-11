@@ -93,4 +93,43 @@ describe('ModalCriarClienteCaso', () => {
     expect(screen.getByText(/Já existe caso com este número/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Vincular a este caso' })).toBeInTheDocument()
   })
+
+  // Regressao 10/09/2026: sem a triagem por IA (chave do Gemini ausente) o
+  // formulario abria vazio mesmo com as partes visiveis no card, obrigando a
+  // redigitar o nome. Agora cai para polo_ativo/polo_passivo da ComunicaAPI.
+  const semAnalise = () => ({
+    publicacao: {
+      id: 91,
+      nome_orgao: 'Juizado Especial da Fazenda Publica de Cornelio Procopio',
+      numero_processo: '00007910920268160075',
+      numero_processo_mascara: '0000791-09.2026.8.16.0075',
+      nome_classe: 'Procedimento do Juizado Especial da Fazenda Publica',
+      polo_ativo: 'HELOISA CASSIANO DA SILVA | OUTRO AUTOR',
+      polo_passivo: 'MUNICIPIO DE CORNELIO PROCOPIO',
+    },
+    analise: {},
+    sugestoes_vinculo: {},
+  })
+
+  it('sem analise da IA, usa as partes da publicacao no formulario', () => {
+    render(
+      <ModalCriarClienteCaso publicacao={semAnalise()} onClose={vi.fn()} onSuccess={vi.fn()} />
+    )
+
+    // Primeiro nome do polo ativo vira o cliente (o " | OUTRO AUTOR" fica de fora).
+    expect(screen.getByLabelText(/Nome.*Raz/i)).toHaveValue('HELOISA CASSIANO DA SILVA')
+    expect(screen.getByLabelText(/Parte contr/i)).toHaveValue('MUNICIPIO DE CORNELIO PROCOPIO')
+  })
+
+  it('sem analise da IA, usa numero com mascara e a classe do tribunal', () => {
+    render(
+      <ModalCriarClienteCaso publicacao={semAnalise()} onClose={vi.fn()} onSuccess={vi.fn()} />
+    )
+
+    expect(screen.getByLabelText(/N.*mero do processo/i)).toHaveValue('0000791-09.2026.8.16.0075')
+    expect(screen.getByLabelText(/T.*tulo/i)).toHaveValue('Processo 0000791-09.2026.8.16.0075')
+    expect(screen.getByLabelText(/Tipo da a/i)).toHaveValue(
+      'Procedimento do Juizado Especial da Fazenda Publica'
+    )
+  })
 })
